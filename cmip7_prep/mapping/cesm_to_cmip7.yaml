@@ -1,0 +1,101 @@
+
+# cesm_to_cmip7.yaml
+# Mapping from CESM variable names to CMIP7 definitions.
+# You can add/patch fields: units, positive, cell_methods, standard_name, dims, regrid_method.
+# regrid_method: 'conservative' | 'bilinear' (overrides automatic choice)
+
+dataset_overrides:
+  grid_label: gr1           # Amon/Lmon on 1-degree grid; use 'gn' for native
+  institution_id: NCAR
+  source_id: CESM3
+  nominal_resolution: 100 km
+
+# Per-variable mappings
+variables:
+
+  # Atmosphere near-surface temperature
+  TS:
+    cmip_name: tas
+    table: Amon
+    units: K
+    long_name: Near-Surface Air Temperature
+    standard_name: air_temperature
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: bilinear
+
+  PSL:
+    cmip_name: psl
+    table: Amon
+    units: Pa
+    long_name: Sea Level Pressure
+    standard_name: air_pressure_at_sea_level
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: bilinear
+
+  PS:
+    cmip_name: ps
+    table: Amon
+    units: Pa
+    long_name: Surface Air Pressure
+    standard_name: surface_air_pressure
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: bilinear
+
+  PRECT:   # CESM total precip rate (m/s)
+    cmip_name: pr
+    table: Amon
+    units: kg m-2 s-1
+    long_name: Precipitation
+    standard_name: precipitation_flux
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: conservative
+
+  FLNS:
+    cmip_name: rlds
+    table: Amon
+    units: W m-2
+    long_name: Surface Downwelling Longwave Radiation
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: conservative
+
+  Q10:     # example soil moisture (10cm) in CTSM → Lmon 'mrso' on levels
+    cmip_name: mrso
+    table: Lmon
+    units: kg m-2
+    long_name: Total Soil Moisture Content
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: conservative
+
+  # 3D winds example (interpolate to plev before writing)
+  U:
+    cmip_name: ua
+    table: Amon
+    units: m s-1
+    long_name: Zonal Wind
+    cell_methods: "time: mean"
+    dims: [time, plev, lat, lon]
+    regrid_method: bilinear
+
+  V:
+    cmip_name: va
+    table: Amon
+    units: m s-1
+    long_name: Meridional Wind
+    cell_methods: "time: mean"
+    dims: [time, plev, lat, lon]
+    regrid_method: bilinear
+
+# fx fields on the target 1° grid (Amon/Lmon)
+fx:
+  areacella:
+    units: m2
+    source: cell_area      # name in your intermediate DS after you compute area
+  sftlf:
+    units: '%'
+    source: sftlf          # regridded land fraction (0-100)

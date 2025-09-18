@@ -1,0 +1,37 @@
+
+[tool.poetry]
+name = "cmip7-prep"
+version = "0.1.0"
+description = "Prepare CESM outputs for CMIP7 using CMOR, with SE->1deg regridding."
+authors = ["Jim Edwards <jedwards@example.com>"]
+readme = "README.md"
+packages = [{ include = "cmip7_prep" }]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.14"
+xarray = "^2024.5.0"
+netCDF4 = "^1.6.5"
+cftime = "^1.6.3"
+numpy = "^2.0.0"
+pandas = "^2.2.2"
+xesmf = "^0.8.5"
+typer = { version = "^0.12.3", extras = ["all"] }
+PyYAML = "^6.0.2"
+# CMOR typically comes from conda-forge; if pip isn't viable, install it outside Poetry or via a wheel.
+# cmor = "^3.8.0"
+
+# Optional performance
+dask = {version = "^2024.7.0", optional = true}
+zarr = {version = "^2.18.2", optional = true}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
+ruff = "^0.6.0"
+mypy = "^1.10.0"
+
+[tool.poetry.scripts]
+cmip7-prep = "cmip7_prep.cli:app"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
