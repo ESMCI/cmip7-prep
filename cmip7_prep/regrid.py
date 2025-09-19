@@ -1,4 +1,4 @@
-# cmip7_prep/regrid.py
+
 """Regridding utilities for CESM -> 1° lat/lon using precomputed ESMF weights."""
 from __future__ import annotations
 from dataclasses import dataclass
@@ -10,8 +10,8 @@ import xesmf as xe
 import numpy as np
 
 # Default weight maps; override via function args.
-DEFAULT_CONS_MAP = Path("map_ne30pg3_to_1x1d_aave.nc")
-DEFAULT_BILIN_MAP = Path("")  # optional bilinear map
+DEFAULT_CONS_MAP = Path("/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc")
+DEFAULT_BILIN_MAP = Path("/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc")  # optional bilinear map
 
 # Variables treated as "intensive" → prefer bilinear when available.
 INTENSIVE_VARS = {
@@ -26,16 +26,37 @@ class MapSpec:
     path: Path
 
 class _RegridderCache:
-    """Cache of xESMF Regridders constructed from weight files."""
+    """Cache of xESMF Regridders constructed from weight files.
+
+    This avoids reconstructing regridders for the same weight file multiple times
+    and provides a small API to fetch or clear cached instances.
+    """
     _cache: Dict[Path, xe.Regridder] = {}
 
     @classmethod
     def get(cls, mapfile: Path, method_label: str) -> xe.Regridder:
+        """Return a cached regridder for the given weight file and method.
+
+        If no regridder exists yet for `mapfile`, it is created using xESMF with
+        `filename=mapfile` (so source/destination grids are read from the weight
+        file) and stored in the cache. Subsequent calls reuse the same instance.
+
+        Parameters
+        ----------
+        mapfile : Path
+            Path to an ESMF weight file.
+        method_label : str
+            xESMF method label; used only for constructor parity.
+
+        Returns
+        -------
+        xe.Regridder
+            Cached or newly created regridder.
+        """
         mapfile = mapfile.expanduser().resolve()
         if mapfile not in cls._cache:
             if not mapfile.exists():
                 raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
-            # With filename=..., xESMF reads grids from the weight file.
             cls._cache[mapfile] = xe.Regridder(
                 xr.Dataset(), xr.Dataset(),
                 method=method_label,
@@ -43,6 +64,11 @@ class _RegridderCache:
                 reuse_weights=True,
             )
         return cls._cache[mapfile]
+
+    @classmethod
+    def clear(cls) -> None:
+        """Clear all cached regridders (useful for tests or releasing resources)."""
+        cls._cache.clear()
 
 def _pick_maps(
     varname: str,
@@ -202,4 +228,3 @@ def regrid_mask_or_area(
         pass
 
     return out
-
