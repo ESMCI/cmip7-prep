@@ -1,6 +1,5 @@
-
 [MASTER]
-ignore-paths=build,dist,.venv,.eggs
+ignore-paths=build,dist,.venv,.eggs,scripts
 extension-pkg-allow-list=cmor
 init-hook='import sys, os; sys.path.append(os.getcwd())'
 

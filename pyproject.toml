@@ -6,6 +6,13 @@ description = "Prepare CESM outputs for CMIP7 using CMOR, with SE->1deg regriddi
 authors = ["Jim Edwards <jedwards@example.com>"]
 readme = "README.md"
 packages = [{ include = "cmip7_prep" }]
+# Include non-Python data files in both sdist and wheel
+include = [
+  { path = "cmip7_prep/mapping/*.yaml", format = "sdist" },
+  { path = "cmip7_prep/mapping/*.yaml", format = "wheel" },
+  { path = "cmip7_prep/mapping/*.json", format = "sdist" },
+  { path = "cmip7_prep/mapping/*.json", format = "wheel" },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.14"

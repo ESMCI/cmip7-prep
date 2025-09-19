@@ -10,47 +10,90 @@ import xarray as xr
 import xesmf as xe
 
 # Default weight maps; override via function args.
-DEFAULT_CONS_MAP = Path("map_ne30pg3_to_1x1d_aave.nc")
-DEFAULT_BILIN_MAP = Path("")  # optional bilinear map
+DEFAULT_CONS_MAP = Path(
+    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
+)
+DEFAULT_BILIN_MAP = Path(
+    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+)  # optional bilinear map
 
 # Variables treated as "intensive" → prefer bilinear when available.
 INTENSIVE_VARS = {
-    "tas", "tasmin", "tasmax", "psl", "ps", "huss", "uas", "vas", "sfcWind",
-    "ts", "prsn", "clt", "ta", "ua", "va", "zg", "hus", "thetao", "uo", "vo", "so",
+    "tas",
+    "tasmin",
+    "tasmax",
+    "psl",
+    "ps",
+    "huss",
+    "uas",
+    "vas",
+    "sfcWind",
+    "ts",
+    "prsn",
+    "clt",
+    "ta",
+    "ua",
+    "va",
+    "zg",
+    "hus",
+    "thetao",
+    "uo",
+    "vo",
+    "so",
 }
+
 
 @dataclass(frozen=True)
 class MapSpec:
     """Specification of which weight map to use for a variable."""
+
     method_label: str  # "conservative" or "bilinear"
     path: Path
+
 
 # -------------------------
 # NetCDF opener (backends)
 # -------------------------
-
 def _open_nc(path: Path) -> xr.Dataset:
-    """Open NetCDF with explicit engine(s) to avoid backend autodetect failures."""
+    """Open NetCDF with explicit engines and narrow exception handling.
+
+    Tries 'netcdf4' then 'scipy'. Collects the failure reasons and raises a
+    single RuntimeError if neither works.
+    """
     path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Weight file not found: {path}")
+
+    errors: dict[str, Exception] = {}
     for engine in ("netcdf4", "scipy"):
         try:
             return xr.open_dataset(str(path), engine=engine)
-        except Exception:
-            pass
-    raise ValueError(
-        f"Could not open {path} with xarray engines ['netcdf4','scipy']. "
-        "Check that the file is a NetCDF and the backends are installed."
+        except (ValueError, OSError, ImportError, ModuleNotFoundError) as exc:
+            # ValueError: invalid/unavailable engine or decode issue
+            # OSError: low-level file I/O/HDF5 issues
+            # ImportError/ModuleNotFoundError: backend not installed
+            errors[engine] = exc
+
+    details = "; ".join(
+        f"{eng}: {type(err).__name__}: {err}" for eng, err in errors.items()
     )
+    raise RuntimeError(
+        f"Could not open {path} with xarray engines ['netcdf4', 'scipy']. "
+        f"Tried both; reasons: {details}"
+    )
+
 
 # -------------------------
 # Minimal dummy grids from the weight file (based on your approach)
 # -------------------------
+
 
 def _read_array(m: xr.Dataset, *names: str) -> Optional[xr.DataArray]:
     for n in names:
         if n in m:
             return m[n]
     return None
+
 
 def _get_src_shape(m: xr.Dataset) -> Tuple[int, int]:
     """Infer the source grid 'shape' expected by xESMF's ds_to_ESMFgrid.
@@ -74,6 +117,7 @@ def _get_src_shape(m: xr.Dataset) -> Tuple[int, int]:
         size = int(np.asarray(m["row"]).max())
         return (1, size)
     raise ValueError("Cannot infer source grid size from weight file.")
+
 
 def _get_dst_latlon_1d(m: xr.Dataset) -> Tuple[np.ndarray, np.ndarray]:
     """Return 1D dest lat, lon arrays from weight file.
@@ -114,6 +158,7 @@ def _get_dst_latlon_1d(m: xr.Dataset) -> Tuple[np.ndarray, np.ndarray]:
     lon = (np.arange(nx, dtype="f8") + 0.5) * (360.0 / nx)
     return lat, lon
 
+
 def _make_dummy_grids(mapfile: Path) -> Tuple[xr.Dataset, xr.Dataset]:
     """Construct minimal ds_in/ds_out satisfying xESMF when reusing weights."""
     with _open_nc(mapfile) as m:
@@ -131,17 +176,17 @@ def _make_dummy_grids(mapfile: Path) -> Tuple[xr.Dataset, xr.Dataset]:
     ds_in["lon"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
 
     # Output: 1D regular lat/lon extracted from weights
-    ds_out = xr.Dataset(
-        {"lat": ("lat", lat_out_1d), "lon": ("lon", lon_out_1d)}
-    )
+    ds_out = xr.Dataset({"lat": ("lat", lat_out_1d), "lon": ("lon", lon_out_1d)})
     ds_out["lat"].attrs.update({"units": "degrees_north", "standard_name": "latitude"})
     ds_out["lon"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
 
     return ds_in, ds_out
 
+
 # -------------------------
 # Cache
 # -------------------------
+
 
 class _RegridderCache:
     """Cache of xESMF Regridders constructed from weight files.
@@ -149,6 +194,7 @@ class _RegridderCache:
     We build minimal `ds_in`/`ds_out` from the weight file to satisfy CF checks,
     then reuse the weight file for the actual mapping.
     """
+
     _cache: Dict[Path, xe.Regridder] = {}
 
     @classmethod
@@ -163,9 +209,9 @@ class _RegridderCache:
                 ds_in,
                 ds_out,
                 method=method_label,
-                filename=str(mapfile),   # reuse the ESMF weight file on disk
+                filename=str(mapfile),  # reuse the ESMF weight file on disk
                 reuse_weights=True,
-                periodic=True,           # 0..360 longitudes
+                periodic=True,  # 0..360 longitudes
             )
         return cls._cache[mapfile]
 
@@ -174,9 +220,11 @@ class _RegridderCache:
         """Clear all cached regridders (useful for tests or releasing resources)."""
         cls._cache.clear()
 
+
 # -------------------------
 # Selection & utilities
 # -------------------------
+
 
 def _pick_maps(
     varname: str,
@@ -201,12 +249,14 @@ def _pick_maps(
         return MapSpec("bilinear", bilin)
     return MapSpec("conservative", cons)
 
+
 def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
     """Move 'ncol' to the last position; return (da, non_spatial_dims)."""
     if "ncol" not in da.dims:
         raise ValueError(f"Expected 'ncol' in dims; got {da.dims}")
     non_spatial = tuple(d for d in da.dims if d != "ncol")
     return da.transpose(*non_spatial, "ncol"), non_spatial
+
 
 def _rename_xy_to_latlon(da: xr.DataArray) -> xr.DataArray:
     """Normalize 2-D dims to ('lat','lon') if they came out as ('y','x')."""
@@ -217,9 +267,11 @@ def _rename_xy_to_latlon(da: xr.DataArray) -> xr.DataArray:
         dim_map["x"] = "lon"
     return da.rename(dim_map) if dim_map else da
 
+
 # -------------------------
 # Public API
 # -------------------------
+
 
 def regrid_to_1deg(
     ds_in: xr.Dataset,
@@ -277,7 +329,15 @@ def regrid_to_1deg(
     if "time" in da2.dims and output_time_chunk:
         kwargs["output_chunks"] = {"time": output_time_chunk}
 
-    out = regridder(da2, **kwargs)  # -> (*non_spatial, y/x or lat/lon)
+    da2_2d = (
+        da2.rename({"ncol": "lon"})
+        .expand_dims({"lat": 1})  # add a dummy 'lat' of length 1
+        .transpose(*non_spatial, "lat", "lon")  # ensure last two dims are ('lat','lon')
+    )
+    if "time" in da2_2d.dims and output_time_chunk:
+        kwargs["output_chunks"] = {"time": output_time_chunk}
+
+    out = regridder(da2_2d, **kwargs)  # -> (*non_spatial, y/x or lat/lon)
     out = _rename_xy_to_latlon(out)
 
     if keep_attrs:
@@ -296,6 +356,7 @@ def regrid_to_1deg(
 
     return out
 
+
 def regrid_mask_or_area(
     da_in: xr.DataArray,
     *,
@@ -307,10 +368,11 @@ def regrid_mask_or_area(
     if "time" in da_in.dims:
         da_in = da_in.transpose("time", "ncol", ...)
 
-    spec = MapSpec("conservative", Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP)
+    spec = MapSpec(
+        "conservative", Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP
+    )
     regridder = _RegridderCache.get(spec.path, spec.method_label)
 
     out = regridder(da_in)
     out = _rename_xy_to_latlon(out)
     return out
-
