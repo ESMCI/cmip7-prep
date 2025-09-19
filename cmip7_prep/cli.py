@@ -74,7 +74,11 @@ def main(argv: list[str] | None = None) -> int:
         "--cmor-tables", required=True, type=Path, help="Path to CMOR Tables directory."
     )
     p_prep.add_argument(
-        "--dataset-json", required=True, type=Path, help="Path to cmor_dataset.json."
+        "--dataset-json",
+        required=True,
+        type=Path,
+        help="Path to cmor_dataset.json.",
+        default=Path("data/cmor_dataset.json"),
     )
     p_prep.add_argument(
         "--outdir",

@@ -20,7 +20,7 @@ import yaml  # runtime dep
 
 def packaged_mapping_resource(filename: str = "cesm_to_cmip7.yaml"):
     """Context manager yielding a real filesystem path to the packaged mapping file."""
-    res = files("cmip7_prep").joinpath(f"mapping/{filename}")
+    res = files("cmip7_prep").joinpath(f"data/{filename}")
     return as_file(res)
 
 
@@ -119,7 +119,11 @@ class Mapping:
             data = yaml.safe_load(f)
 
         # Accept top-level "variables:" wrapper
-        if isinstance(data, dict) and "variables" in data and isinstance(data["variables"], dict):
+        if (
+            isinstance(data, dict)
+            and "variables" in data
+            and isinstance(data["variables"], dict)
+        ):
             data = data["variables"]
 
         result: Dict[str, VarConfig] = {}

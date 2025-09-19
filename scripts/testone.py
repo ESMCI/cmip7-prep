@@ -50,7 +50,9 @@ da_rg = regrid_to_1deg(
     xr.Dataset({var: da}), var, output_time_chunk=time_chunk, dtype="float32"
 )
 
-with CmorSession(tables_path="Tables", dataset_json="cmor_dataset.json") as cm:
+with CmorSession(
+    tables_path="/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables"
+) as cm:
     vdef = type(
         "VDef", (), {"name": var, "realm": "Amon", "units": cfg.get("units", "")}
     )()
