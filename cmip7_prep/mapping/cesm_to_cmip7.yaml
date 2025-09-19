@@ -1,21 +1,22 @@
 
-# cesm_to_cmip7.yaml
-# Mapping from CESM variable names to CMIP7 definitions.
-# You can add/patch fields: units, positive, cell_methods, standard_name, dims, regrid_method.
-# regrid_method: 'conservative' | 'bilinear' (overrides automatic choice)
+# cesm_to_cmip7.yaml — CMIP-keyed schema with CMIP6 compatibility
+#
+# Top-level keys are CMIP variable names.
+# Each variable can be defined either with:
+#   - new-style 'sources' (preferred for complex/multi-source),
+#   - or CMIP6-style 'raw_variables' + 'formula' (+ 'unit_conversion', 'levels', etc.).
+#
+# This allows direct reuse of CMIP6 tables while supporting newer expressive mappings.
 
 dataset_overrides:
-  grid_label: gr1           # Amon/Lmon on 1-degree grid; use 'gn' for native
+  grid_label: gr1
   institution_id: NCAR
   source_id: CESM3
   nominal_resolution: 100 km
 
-# Per-variable mappings
 variables:
 
-  # Atmosphere near-surface temperature
-  TS:
-    cmip_name: tas
+  tas:
     table: Amon
     units: K
     long_name: Near-Surface Air Temperature
@@ -23,29 +24,30 @@ variables:
     cell_methods: "time: mean"
     dims: [time, lat, lon]
     regrid_method: bilinear
+    sources:
+      - cesm_var: TS
 
-  PSL:
-    cmip_name: psl
+  psl:
     table: Amon
     units: Pa
     long_name: Sea Level Pressure
-    standard_name: air_pressure_at_sea_level
     cell_methods: "time: mean"
     dims: [time, lat, lon]
     regrid_method: bilinear
+    sources:
+      - cesm_var: PSL
 
-  PS:
-    cmip_name: ps
+  ps:
     table: Amon
     units: Pa
     long_name: Surface Air Pressure
-    standard_name: surface_air_pressure
     cell_methods: "time: mean"
     dims: [time, lat, lon]
     regrid_method: bilinear
+    sources:
+      - cesm_var: PS
 
-  PRECT:   # CESM total precip rate (m/s)
-    cmip_name: pr
+  pr:
     table: Amon
     units: kg m-2 s-1
     long_name: Precipitation
@@ -53,49 +55,97 @@ variables:
     cell_methods: "time: mean"
     dims: [time, lat, lon]
     regrid_method: conservative
+    sources:
+      - cesm_var: PRECT
+        scale: 1000.0   # convert from m/s to kg m-2 s-1 if needed
 
-  FLNS:
-    cmip_name: rlds
+  evspsbl:
     table: Amon
-    units: W m-2
-    long_name: Surface Downwelling Longwave Radiation
+    units: kg m-2 s-1
+    long_name: Evaporation
     cell_methods: "time: mean"
     dims: [time, lat, lon]
     regrid_method: conservative
+    sources:
+      - cesm_var: QFLX
+        scale: -1.0     # flip sign if CESM positive upward
 
-  Q10:     # example soil moisture (10cm) in CTSM → Lmon 'mrso' on levels
-    cmip_name: mrso
-    table: Lmon
-    units: kg m-2
-    long_name: Total Soil Moisture Content
-    cell_methods: "time: mean"
+  huss:
+    table: Amon
+    units: "1"
+    long_name: Near-Surface Specific Humidity
     dims: [time, lat, lon]
-    regrid_method: conservative
+    regrid_method: bilinear
+    sources:
+      - cesm_var: QREFHT
+        as: qref
+      - cesm_var: TREFHT
+        as: tref
+        optional: true
+      - cesm_var: PS
+        as: ps
+        optional: true
+      - cesm_var: RHREFHT
+        as: rh
+        optional: true
+      - expr: "qref if qref is not None else rh_to_q(rh, tref, ps)"
 
-  # 3D winds example (interpolate to plev before writing)
-  U:
-    cmip_name: ua
+  ua:
     table: Amon
     units: m s-1
     long_name: Zonal Wind
-    cell_methods: "time: mean"
     dims: [time, plev, lat, lon]
     regrid_method: bilinear
+    requires_plev19: true
+    sources:
+      - cesm_var: U
 
-  V:
-    cmip_name: va
+  va:
     table: Amon
     units: m s-1
     long_name: Meridional Wind
-    cell_methods: "time: mean"
     dims: [time, plev, lat, lon]
     regrid_method: bilinear
+    requires_plev19: true
+    sources:
+      - cesm_var: V
 
-# fx fields on the target 1° grid (Amon/Lmon)
+  mrso:
+    table: Lmon
+    units: kg m-2
+    long_name: Total Soil Moisture Content
+    dims: [time, lat, lon]
+    regrid_method: conservative
+    sources:
+      - cesm_var: QSOIL
+        as: qsoil
+      - cesm_var: LANDMASK
+        as: landmask
+        optional: true
+      - expr: "qsoil.where(landmask > 0.5) if landmask is not None else qsoil"
+
+  mmrbc:
+    table: AERmon
+    units: kg kg-1
+    long_name: Black carbon mass mixing ratio
+    dims: [time, lev, lat, lon]
+    regrid_method: bilinear
+    positive: null
+
+    # CMIP6-style fields
+    raw_variables: [bc_a1, bc_a4, bc_c1, bc_c4]
+    formula: bc_a1 + bc_a4 + bc_c1 + bc_c4
+    unit_conversion: null
+    levels:
+      name: standard_hybrid_sigma
+      units: "1"
+      src_axis_name: lev
+      src_axis_bnds: ilev
+
 fx:
   areacella:
     units: m2
-    source: cell_area      # name in your intermediate DS after you compute area
+    source: cell_area
   sftlf:
     units: '%'
-    source: sftlf          # regridded land fraction (0-100)
+    source: sftlf
