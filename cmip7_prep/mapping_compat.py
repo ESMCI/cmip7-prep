@@ -1,4 +1,3 @@
-
 # cmip7_prep/mapping_compat.py
 r"""Mapping loader/evaluator compatible with CMIP6-style lists and CMIP7-style dicts.
 
@@ -48,6 +47,7 @@ def _normalize_table_name(value: Optional[str]) -> Optional[str]:
 @dataclass(frozen=True)
 class VarConfig:
     """Normalized mapping entry for a single CMIP variable."""
+
     name: str
     table: Optional[str] = None
     units: Optional[str] = None
@@ -110,6 +110,7 @@ class Mapping:
     The loader accepts both dict- and list-based YAML styles. All table names
     are normalized to a short form (e.g., 'Amon').
     """
+
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self._vars: Dict[str, VarConfig] = self._load_yaml(self.path)
@@ -138,7 +139,9 @@ class Mapping:
                 name = str(item["name"])
                 result[name] = _to_varconfig(name, item)
         else:
-            raise TypeError("Unsupported YAML structure: expected dict or list at top level.")
+            raise TypeError(
+                "Unsupported YAML structure: expected dict or list at top level."
+            )
 
         return result
 
@@ -208,7 +211,9 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
     return vc
 
 
-def _require_vars(ds: xr.Dataset, names: List[str], context: str) -> Dict[str, xr.DataArray]:
+def _require_vars(
+    ds: xr.Dataset, names: List[str], context: str
+) -> Dict[str, xr.DataArray]:
     missing = [n for n in names if n not in ds]
     if missing:
         raise KeyError(f"{context}: missing variables {missing}")
@@ -224,7 +229,11 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
         return ds[vc.source]
 
     # 2) identity mapping from a single raw variable
-    if vc.raw_variables and vc.formula in (None, "", "null") and len(vc.raw_variables) == 1:
+    if (
+        vc.raw_variables
+        and vc.formula in (None, "", "null")
+        and len(vc.raw_variables) == 1
+    ):
         var = vc.raw_variables[0]
         if var not in ds:
             raise KeyError(f"raw variable {var!r} not found in dataset")
@@ -263,7 +272,9 @@ def _apply_unit_conversion(da: xr.DataArray, rule: Any) -> xr.DataArray:
         try:
             out = _safe_eval(rule, {"x": da})
         except Exception as exc:
-            raise ValueError(f"Error evaluating unit_conversion expression: {exc}") from exc
+            raise ValueError(
+                f"Error evaluating unit_conversion expression: {exc}"
+            ) from exc
         if not isinstance(out, xr.DataArray):
             raise ValueError("unit_conversion expression did not return a DataArray")
         return out
@@ -273,4 +284,6 @@ def _apply_unit_conversion(da: xr.DataArray, rule: Any) -> xr.DataArray:
         offset = rule.get("offset", 0.0)
         return da * float(scale) + float(offset)
 
-    raise TypeError("unit_conversion must be a string expression or a dict with 'scale'/'offset'")
+    raise TypeError(
+        "unit_conversion must be a string expression or a dict with 'scale'/'offset'"
+    )

@@ -15,5 +15,5 @@ disable=
 max-line-length=100
 
 [TYPECHECK]
-ignored-modules=xarray,xesmf,cmor,numpy,geocat.comp
+ignored-modules=xarray,xesmf,cmor,numpy,geocat.comp,yaml
 ignored-classes=cmor

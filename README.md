@@ -2,7 +2,7 @@
 # cmip7-prep (skeleton)
 
 Quickstart:
-1) Ensure you have a precomputed E3SM weights file: `map_ne30pg3_to_1x1d_aave.nc`.
+1) Ensure you have a precomputed ESMF weights file: `map_ne30pg3_to_1x1d_aave.nc`.
 2) Fill in `cmor_dataset.json` placeholders (experiment_id, etc.).
 3) Export the CMIP7 Data Request v1.2.2 (CSV) as `data_request_v1.2.2.csv`.
 4) `poetry install`
