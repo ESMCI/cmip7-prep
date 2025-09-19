@@ -1,5 +1,5 @@
 
-"""Utilities for reading and querying a CMIP Data Request export.
+r"""Utilities for reading and querying a CMIP Data Request export.
 
 Supports Airtable-style JSON (with a top-level ``records`` list) and CSV exports.
 Provides a small helper class :class:`DReq` to select variables by table (e.g., Amon)

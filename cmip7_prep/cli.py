@@ -17,10 +17,10 @@ def make_target(out: Path) -> None:
     ds.to_netcdf(out)
 
 def prepare(
+    *,
     var: str,
     in_files: list[Path],
     realm: str,
-    mapping_yaml: Path,
     cmor_tables: Path,
     dataset_json: Path,
     outdir: Path,
@@ -36,23 +36,28 @@ def prepare(
         cm.write_variable(ds_out, var, vdef, outdir=outdir)
 
 def main(argv: list[str] | None = None) -> int:
+    """Entry point for the cmip7_prep command-line interface."""
     p = argparse.ArgumentParser(prog="cmip7-prep")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    p_make = sub.add_parser("make-target")
-    p_make.add_argument("out", type=Path)
+    p_make = sub.add_parser("make-target", help="Write a simple 1° lat/lon grid file.")
+    p_make.add_argument("out", type=Path, help="Output NetCDF path for the target grid.")
     p_make.set_defaults(func=lambda a: make_target(a.out))
 
-    p_prep = sub.add_parser("prepare")
-    p_prep.add_argument("--var", required=True)
-    p_prep.add_argument("--in-file", "-i", action="append", required=True, type=Path)
-    p_prep.add_argument("--realm", required=True)
-    p_prep.add_argument("--mapping-yaml", required=True, type=Path)
-    p_prep.add_argument("--cmor-tables", required=True, type=Path)
-    p_prep.add_argument("--dataset-json", required=True, type=Path)
-    p_prep.add_argument("--outdir", default=Path("out"), type=Path)
+    p_prep = sub.add_parser("prepare", help="Regrid one variable and write CMOR output.")
+    p_prep.add_argument("--var", required=True, help="Variable name in input files.")
+    p_prep.add_argument("--in-file", "-i", action="append", required=True, type=Path, help="Input files (repeatable).")
+    p_prep.add_argument("--realm", required=True, help="CMOR realm/table, e.g., Amon.")
+    p_prep.add_argument("--cmor-tables", required=True, type=Path, help="Path to CMOR Tables directory.")
+    p_prep.add_argument("--dataset-json", required=True, type=Path, help="Path to cmor_dataset.json.")
+    p_prep.add_argument("--outdir", default=Path("out"), type=Path, help="Output directory for CMORized files.")
     p_prep.set_defaults(func=lambda a: prepare(
-        a.var, a.in_file, a.realm, a.mapping_yaml, a.cmor_tables, a.dataset_json, a.outdir
+        var=a.var,
+        in_files=a.in_file,
+        realm=a.realm,
+        cmor_tables=a.cmor_tables,
+        dataset_json=a.dataset_json,
+        outdir=a.outdir,
     ))
 
     args = p.parse_args(argv)
