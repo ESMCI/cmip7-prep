@@ -1,4 +1,3 @@
-
 """Vertical coordinate handling for CESM → CMIP7.
 
 This module provides utilities to convert hybrid-sigma model levels to requested
@@ -11,29 +10,20 @@ Dependencies:
     - geocat-comp (preferred): uses `interp_hybrid_to_pressure`
       If not available, this function raises ImportError (fallback can be added later).
 """
+
 from __future__ import annotations
 
 import json
 import os
-from typing import Optional
 
 import numpy as np
 import xarray as xr
-
-# Try to resolve geocat.comp's interpolation function in a compatible way
-try:
-    # geocat-comp >= 2023.x commonly exposes this symbol at top-level
-    from geocat.comp import interp_hybrid_to_pressure as _interp_h2p  # type: ignore
-except Exception:  # pragma: no cover - environment-dependent
-    try:
-        # older layouts may nest it under .interpolation
-        import geocat.comp as _gc  # type: ignore
-        _interp_h2p = _gc.interpolation.interp_hybrid_to_pressure
-    except Exception:  # pragma: no cover
-        _interp_h2p = None
+from geocat.comp import interp_hybrid_to_pressure
 
 
-def _read_requested_levels(tables_path: str | os.PathLike, axis_name: str = "plev19") -> np.ndarray:
+def _read_requested_levels(
+    tables_path: str | os.PathLike, axis_name: str = "plev19"
+) -> np.ndarray:
     """Read requested target pressure levels from CMIP coordinate JSON.
 
     Parameters
@@ -78,19 +68,40 @@ def _read_requested_levels(tables_path: str | os.PathLike, axis_name: str = "ple
 
 
 def _resolve_p0(ds: xr.Dataset, p0_name: str = "P0") -> float:
-    """Return reference pressure P0 (Pa) from dataset or default to 100000 Pa."""
+    """Return reference pressure P0 (Pa) from dataset or default to 100000 Pa.
+
+    Tries, in order:
+      1) Variable `P0` inside the dataset (scalar or size-1 array)
+      2) Global attribute `P0`
+      3) Default 100000.0 Pa
+    """
     if p0_name in ds:
-        # could be a scalar DataArray
-        val = ds[p0_name].values
+        da = ds[p0_name]
+        # Handle scalar DataArray or size-1 arrays robustly
         try:
-            return float(val)
-        except Exception:
+            if isinstance(da, xr.DataArray):
+                if getattr(da, "ndim", None) == 0 or getattr(da, "size", None) == 1:
+                    return float(np.asarray(da.values).reshape(()).item())
+            # Fallback: attempt direct float conversion (covers plain scalars)
+            return float(da)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            # Continue to other sources
             pass
+
+        # Last resort: try via .values if size-1
+        arr = np.asarray(getattr(da, "values", da))
+        if getattr(arr, "size", None) == 1:
+            try:
+                return float(arr.reshape(()).item())
+            except (TypeError, ValueError):
+                pass
+
     if p0_name in ds.attrs:
         try:
             return float(ds.attrs[p0_name])
-        except Exception:
+        except (TypeError, ValueError):
             pass
+
     return 100000.0  # Pa
 
 
@@ -133,11 +144,6 @@ def to_plev19(
     This function prefers geocat-comp's `interp_hybrid_to_pressure`. If geocat-comp
     is not importable in the environment, it will raise ImportError with guidance.
     """
-    if _interp_h2p is None:  # pragma: no cover - depends on environment
-        raise ImportError(
-            "geocat.comp is not available. Please install 'geocat-comp' "
-            "to enable hybrid->pressure vertical interpolation."
-        )
 
     required = [var, ps_name, hyam_name, hybm_name]
     missing = [name for name in required if name not in ds]
@@ -148,7 +154,7 @@ def to_plev19(
     new_levels = _read_requested_levels(tables_path, axis_name="plev19")
 
     # geocat-comp performs log-pressure interpolation internally
-    out_da = _interp_h2p(
+    out_da = interp_hybrid_to_pressure(
         ds[var],
         ds[ps_name],
         ds[hyam_name],

@@ -1,4 +1,3 @@
-
 """Thin CMOR wrapper used by cmip7_prep.
 
 This module centralizes CMOR session setup and writing so that the rest of the
@@ -6,6 +5,7 @@ pipeline can stay xarray-first. It supports either a dataset JSON file (preferre
 or directly injected global attributes, and creates axes based on the coordinates
 present in the provided dataset.
 """
+
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
@@ -88,10 +88,14 @@ class CmorSession(AbstractContextManager):
             cal = time.attrs.get("calendar", "standard")
             if np.issubdtype(time.dtype, np.datetime64):
                 # convert to numeric time using CF units if needed
-                tvals = xr.conventions.times.encode_cf_datetime(time.values, t_units, calendar=cal)
+                tvals = xr.conventions.times.encode_cf_datetime(
+                    time.values, t_units, calendar=cal
+                )
             else:
                 tvals = time.values
-            axes.append(cmor.axis(table_entry="time", units=str(t_units), coord_vals=tvals))
+            axes.append(
+                cmor.axis(table_entry="time", units=str(t_units), coord_vals=tvals)
+            )
 
         # Vertical axis (pressure or model levels)
         levels_info = getattr(vdef, "levels", None)
@@ -121,7 +125,9 @@ class CmorSession(AbstractContextManager):
             table_entry = "alev"
             if isinstance(levels_info, dict):
                 table_entry = levels_info.get("axis_entry", table_entry)
-            axes.append(cmor.axis(table_entry=table_entry, units="1", coord_vals=lev.values))
+            axes.append(
+                cmor.axis(table_entry=table_entry, units="1", coord_vals=lev.values)
+            )
 
         # Latitude / Longitude
         if "lat" in ds.coords and "lon" in ds.coords:
@@ -152,7 +158,9 @@ class CmorSession(AbstractContextManager):
     # public API
     # -------------------------
 
-    def write_variable(self, ds: xr.Dataset, varname: str, vdef: Any, outdir: Path) -> None:
+    def write_variable(
+        self, ds: xr.Dataset, varname: str, vdef: Any, outdir: Path
+    ) -> None:
         """Write one variable from `ds` to a CMOR-compliant NetCDF file.
 
         Parameters
@@ -162,8 +170,10 @@ class CmorSession(AbstractContextManager):
         varname : str
             Name of the variable in `ds` to CMORize.
         vdef : Any
-            An object with fields: ``name``, ``realm``, optional ``units``, ``positive``, and optional
-            ``levels`` dict (see :meth:`_define_axes`). This is typically a light-weight holder.
+            An object with fields: ``name``, ``realm``,
+            optional ``units``, ``positive``, and optional
+            ``levels`` dict (see :meth:`_define_axes`).
+            This is typically a light-weight holder.
         outdir : Path
             Output directory for the CMORized NetCDF file.
         """
@@ -182,8 +192,12 @@ class CmorSession(AbstractContextManager):
 
         axes_ids = self._define_axes(ds, vdef)
         units = getattr(vdef, "units", "")
-        var_id = cmor.variable(getattr(vdef, "name", varname), units, axes_ids,
-                               positive=getattr(vdef, "positive", None))
+        var_id = cmor.variable(
+            getattr(vdef, "name", varname),
+            units,
+            axes_ids,
+            positive=getattr(vdef, "positive", None),
+        )
 
         # Optional variable attributes (e.g., cell_methods)
         if getattr(vdef, "cell_methods", None):

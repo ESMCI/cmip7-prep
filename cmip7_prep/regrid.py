@@ -1,5 +1,5 @@
-
 """Regridding utilities for CESM -> 1° lat/lon using precomputed ESMF weights."""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,20 +10,46 @@ import xesmf as xe
 import numpy as np
 
 # Default weight maps; override via function args.
-DEFAULT_CONS_MAP = Path("/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc")
-DEFAULT_BILIN_MAP = Path("/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc")  # optional bilinear map
+DEFAULT_CONS_MAP = Path(
+    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
+)
+DEFAULT_BILIN_MAP = Path(
+    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+)  # optional bilinear map
 
 # Variables treated as "intensive" → prefer bilinear when available.
 INTENSIVE_VARS = {
-    "tas", "tasmin", "tasmax", "psl", "ps", "huss", "uas", "vas", "sfcWind",
-    "ts", "prsn", "clt", "ta", "ua", "va", "zg", "hus", "thetao", "uo", "vo", "so",
+    "tas",
+    "tasmin",
+    "tasmax",
+    "psl",
+    "ps",
+    "huss",
+    "uas",
+    "vas",
+    "sfcWind",
+    "ts",
+    "prsn",
+    "clt",
+    "ta",
+    "ua",
+    "va",
+    "zg",
+    "hus",
+    "thetao",
+    "uo",
+    "vo",
+    "so",
 }
+
 
 @dataclass(frozen=True)
 class MapSpec:
     """Specification of which weight map to use for a variable."""
+
     method_label: str  # "conservative" or "bilinear"
     path: Path
+
 
 class _RegridderCache:
     """Cache of xESMF Regridders constructed from weight files.
@@ -31,6 +57,7 @@ class _RegridderCache:
     This avoids reconstructing regridders for the same weight file multiple times
     and provides a small API to fetch or clear cached instances.
     """
+
     _cache: Dict[Path, xe.Regridder] = {}
 
     @classmethod
@@ -58,7 +85,8 @@ class _RegridderCache:
             if not mapfile.exists():
                 raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
             cls._cache[mapfile] = xe.Regridder(
-                xr.Dataset(), xr.Dataset(),
+                xr.Dataset(),
+                xr.Dataset(),
                 method=method_label,
                 filename=str(mapfile),
                 reuse_weights=True,
@@ -69,6 +97,7 @@ class _RegridderCache:
     def clear(cls) -> None:
         """Clear all cached regridders (useful for tests or releasing resources)."""
         cls._cache.clear()
+
 
 def _pick_maps(
     varname: str,
@@ -93,12 +122,14 @@ def _pick_maps(
         return MapSpec("bilinear", bilin)
     return MapSpec("conservative", cons)
 
+
 def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
     """Move 'ncol' to the last position; return (da, non_spatial_dims)."""
     if "ncol" not in da.dims:
         raise ValueError(f"Expected 'ncol' in dims; got {da.dims}")
     non_spatial = tuple(d for d in da.dims if d != "ncol")
     return da.transpose(*non_spatial, "ncol"), non_spatial
+
 
 def _dst_coords_from_map(mapfile: Path) -> Dict[str, xr.DataArray]:
     """Extract dest lat/lon (+bounds if present) from an ESMF map file."""
@@ -115,7 +146,9 @@ def _dst_coords_from_map(mapfile: Path) -> Dict[str, xr.DataArray]:
             ny = int(dims[-2]) if dims.size >= 2 else 180
             nx = int(dims[-1]) if dims.size >= 2 else 360
             lat = xr.DataArray(np.linspace(-89.5, 89.5, ny), dims=("lat",), name="lat")
-            lon = xr.DataArray((np.arange(nx) + 0.5) * (360.0 / nx), dims=("lon",), name="lon")
+            lon = xr.DataArray(
+                (np.arange(nx) + 0.5) * (360.0 / nx), dims=("lon",), name="lon"
+            )
 
         # bounds
         lat_b = None
@@ -136,6 +169,7 @@ def _dst_coords_from_map(mapfile: Path) -> Dict[str, xr.DataArray]:
         coords["lon_bnds"] = lon_b
     return coords
 
+
 def _rename_xy_to_latlon(da: xr.DataArray) -> xr.DataArray:
     """Normalize 2-D dims to ('lat','lon') if they came out as ('y','x')."""
     dim_map = {}
@@ -144,6 +178,7 @@ def _rename_xy_to_latlon(da: xr.DataArray) -> xr.DataArray:
     if "x" in da.dims:
         dim_map["x"] = "lon"
     return da.rename(dim_map) if dim_map else da
+
 
 def regrid_to_1deg(
     ds_in: xr.Dataset,
@@ -176,7 +211,9 @@ def regrid_to_1deg(
     try:
         dst_coords = _dst_coords_from_map(spec.path)
         if {"lat", "lon"}.issubset(out.dims):
-            out = out.assign_coords({k: v for k, v in dst_coords.items() if k in {"lat", "lon"}})
+            out = out.assign_coords(
+                {k: v for k, v in dst_coords.items() if k in {"lat", "lon"}}
+            )
             for bname in ("lat_bnds", "lon_bnds"):
                 if bname in dst_coords:
                     out = out.assign_coords({bname: dst_coords[bname]})
@@ -200,6 +237,7 @@ def regrid_to_1deg(
 
     return out
 
+
 def regrid_mask_or_area(
     da_in: xr.DataArray,
     *,
@@ -211,7 +249,9 @@ def regrid_mask_or_area(
     if "time" in da_in.dims:
         da_in = da_in.transpose("time", "ncol", ...)
 
-    spec = MapSpec("conservative", Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP)
+    spec = MapSpec(
+        "conservative", Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP
+    )
     regridder = _RegridderCache.get(spec.path, spec.method_label)
 
     out = regridder(da_in)
@@ -220,7 +260,9 @@ def regrid_mask_or_area(
     try:
         dst_coords = _dst_coords_from_map(spec.path)
         if {"lat", "lon"}.issubset(out.dims):
-            out = out.assign_coords({k: v for k, v in dst_coords.items() if k in {"lat", "lon"}})
+            out = out.assign_coords(
+                {k: v for k, v in dst_coords.items() if k in {"lat", "lon"}}
+            )
             for bname in ("lat_bnds", "lon_bnds"):
                 if bname in dst_coords:
                     out = out.assign_coords({bname: dst_coords[bname]})

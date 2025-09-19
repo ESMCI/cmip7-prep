@@ -1,4 +1,3 @@
-
 r"""Utilities for reading and querying a CMIP Data Request export.
 
 Supports Airtable-style JSON (with a top-level ``records`` list) and CSV exports.
@@ -12,6 +11,7 @@ Example
 >>> 'tas' in vars_amon
 True
 """
+
 from __future__ import annotations
 
 import csv
@@ -60,8 +60,24 @@ class DReq:
 
     # Heuristics for common column names across exports
     _DEFAULT_TABLE_KEYS = ["Table", "table", "CMOR table", "CMOR_table"]
-    _DEFAULT_GROUP_KEYS = ["Group", "Groups", "Bucket", "MIP bucket", "Baseline group", "Notes", "Tags"]
-    _DEFAULT_SHORT_NAME_KEYS = ["Short name", "short_name", "Variable", "Name", "name", "CMIP Variable", "Compound name"]
+    _DEFAULT_GROUP_KEYS = [
+        "Group",
+        "Groups",
+        "Bucket",
+        "MIP bucket",
+        "Baseline group",
+        "Notes",
+        "Tags",
+    ]
+    _DEFAULT_SHORT_NAME_KEYS = [
+        "Short name",
+        "short_name",
+        "Variable",
+        "Name",
+        "name",
+        "CMIP Variable",
+        "Compound name",
+    ]
 
     def __init__(
         self,
@@ -76,7 +92,9 @@ class DReq:
         self.rows: List[Dict[str, Any]] = self._read(self.path)
         self.table_keys: List[str] = table_keys or self._DEFAULT_TABLE_KEYS
         self.group_keys: List[str] = group_keys or self._DEFAULT_GROUP_KEYS
-        self.short_name_keys: List[str] = short_name_keys or self._DEFAULT_SHORT_NAME_KEYS
+        self.short_name_keys: List[str] = (
+            short_name_keys or self._DEFAULT_SHORT_NAME_KEYS
+        )
         self.group_patterns = _compile_patterns(group_regexes)
 
     # ---------------------------
