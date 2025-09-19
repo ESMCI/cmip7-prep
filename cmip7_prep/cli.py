@@ -1,63 +1,63 @@
-# cmip7_prep/cli.py
-import typer
+
+"""Simple CLI entry points for cmip7_prep (argparse-based)."""
+from __future__ import annotations
+import argparse
 from pathlib import Path
-from cmip7_prep.dreq import DReq
-from cmip7_prep.regrid import RegridderPool
+import xarray as xr
+import numpy as np
+
+from cmip7_prep.regrid import regrid_to_1deg
 from cmip7_prep.cmor_writer import CmorSession
-from cmip7_prep.vertical import to_plev19
 
-app = typer.Typer(help="Prepare CESM output for CMIP7 with CMOR.")
-
-@app.command()
-def make_target(out: Path = Path("grids/target_1deg.nc")):
-    """Build a canonical 1° grid template with lat/lon, bounds, cell_area."""
-    import xarray as xr, numpy as np
+def make_target(out: Path) -> None:
+    """Create a canonical 1° grid template with lat/lon and (placeholder) bounds."""
     lat = np.arange(-89.5, 90.5, 1.0)
     lon = np.arange(0.5, 360.5, 1.0)
-    ds = xr.Dataset(
-        dict(),
-        coords=dict(lat=("lat", lat), lon=("lon", lon))
-    )
-    # add bounds + area (simple spherical approx or from ESMF Mesh)
-    # ... (fill) ...
+    ds = xr.Dataset(coords={"lat": ("lat", lat), "lon": ("lon", lon)})
     ds.to_netcdf(out)
 
-@app.command()
-def build_weights(cam_grid: Path, target: Path="grids/target_1deg.nc", outdir: Path="grids/weights"):
-    """(Optional) Document how you produced weights with TempestRemap; store here."""
-    # We keep the CLI hook mainly for provenance notes.
-    # Actual weights are produced offline with TempestRemap (see README).
-
-@app.command()
 def prepare(
     var: str,
     in_files: list[Path],
-    realm: str,              # 'Amon', 'Lmon', 'Omon', etc.
-    dreq_export: Path,       # Airtable export CSV/JSON
-    mapping_yaml: Path="mapping/cesm_to_cmip7.yaml",
-    cmor_tables: Path="Tables",    # CMOR JSON (CMIP7-or-6 as applicable)
-    outdir: Path="out"
-):
-    """Main entry: regrid (if needed) and CMOR-write one variable."""
-    import xarray as xr
-    dreq = DReq(dreq_export, mapping_yaml)
-    vdef = dreq.lookup(realm, var)          # all required metadata
-
+    realm: str,
+    mapping_yaml: Path,
+    cmor_tables: Path,
+    dataset_json: Path,
+    outdir: Path,
+) -> None:
+    """Regrid (if needed) and CMOR-write a single variable (thin wrapper demo)."""
     ds = xr.open_mfdataset([str(p) for p in in_files], combine="by_coords", use_cftime=True)
+    da = ds[var]
+    ds_tmp = xr.Dataset({var: da})
+    da1 = regrid_to_1deg(ds_tmp, var)
+    ds_out = xr.Dataset({var: da1})
+    with CmorSession(tables_path=str(cmor_tables), dataset_json=str(dataset_json)) as cm:
+        vdef = type("VDef", (), {"name": var, "realm": realm, "units": da.attrs.get("units", "")})()
+        cm.write_variable(ds_out, var, vdef, outdir=outdir)
 
-    # Regrid for ATM/LND only
-    if realm[0] in ("A","L"):
-        from cmip7_prep.regrid import regrid_to_1deg
-        ds[var] = regrid_to_1deg(var, ds, method=vdef.regrid_method)
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(prog="cmip7-prep")
+    sub = p.add_subparsers(dest="cmd", required=True)
 
-    # Vertical levels if needed (e.g., plev19)
-    if vdef.requires_plev19:
-        ds = to_plev19(ds, var, vdef)
+    p_make = sub.add_parser("make-target")
+    p_make.add_argument("out", type=Path)
+    p_make.set_defaults(func=lambda a: make_target(a.out))
 
-    # CMOR write
-    with CmorSession(tables_path=cmor_tables, dataset_attrs=dreq.dataset_attrs()) as cm:
-        cm.write_variable(ds, var, vdef, outdir=Path(outdir))
+    p_prep = sub.add_parser("prepare")
+    p_prep.add_argument("--var", required=True)
+    p_prep.add_argument("--in-file", "-i", action="append", required=True, type=Path)
+    p_prep.add_argument("--realm", required=True)
+    p_prep.add_argument("--mapping-yaml", required=True, type=Path)
+    p_prep.add_argument("--cmor-tables", required=True, type=Path)
+    p_prep.add_argument("--dataset-json", required=True, type=Path)
+    p_prep.add_argument("--outdir", default=Path("out"), type=Path)
+    p_prep.set_defaults(func=lambda a: prepare(
+        a.var, a.in_file, a.realm, a.mapping_yaml, a.cmor_tables, a.dataset_json, a.outdir
+    ))
+
+    args = p.parse_args(argv)
+    args.func(args)
+    return 0
 
 if __name__ == "__main__":
-    app()
-
+    raise SystemExit(main())
