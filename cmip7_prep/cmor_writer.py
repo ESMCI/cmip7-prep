@@ -12,7 +12,8 @@ from pathlib import Path
 import re
 from importlib.resources import files as ir_files, as_file
 from typing import Any, Optional, Dict
-
+import datetime as dt
+import cftime
 import cmor
 import numpy as np
 import xarray as xr
@@ -40,31 +41,57 @@ def packaged_dataset_json(filename: str = "cmor_dataset.json") -> Any:
 # ---------------------------------------------------------------------
 # Time encoding
 # ---------------------------------------------------------------------
-def _encode_time_to_num(time_da: xr.DataArray, units: str, calendar: str) -> np.ndarray:
-    """Return numeric CF time values (float64) acceptable to CMOR.
 
-    Tries xarray's encoder first; if that fails and cftime is available,
-    falls back to cftime.date2num. Raises a ValueError with details otherwise.
+
+def _encode_time_to_num(obj, units: str, calendar: str) -> np.ndarray:
     """
-    # 1) xarray encoder (handles numpy datetime64 and cftime objects if cftime present)
-    try:
-        out = _encode_time_to_num(time_da.values, units=units, calendar=calendar)
-        return np.asarray(out, dtype="f8")
-    except (ValueError, TypeError) as exc_xr:
-        last_err = exc_xr
+    Return numeric CF time for:
+      - xarray.DataArray of cftime or datetime64
+      - numpy.ndarray (any shape) of cftime / datetime64 / python datetime
+      - scalar cftime / python datetime
 
-    # 2) Optional cftime path (lazy import to keep lint/typecheck happy)
-    try:
-        import cftime  # type: ignore # pylint: disable=import-outside-toplevel
+    Always returns float64 ndarray of the same shape as input.
+    """
+    # Normalize to ndarray
+    arr = obj.values if hasattr(obj, "values") else np.asarray(obj)
 
-        seq = time_da.values.tolist()  # handles object arrays / cftime arrays
-        out = cftime.date2num(seq, units=units, calendar=calendar)
-        return np.asarray(out, dtype="f8")
-    except Exception as exc_cf:  # noqa: BLE001 - we surface both causes together
-        raise ValueError(
-            f"Could not encode time to numeric CF values with units={units!r}, "
-            f"calendar={calendar!r}. xarray error: {last_err}; cftime error: {exc_cf}"
-        ) from exc_cf
+    # Already numeric → just cast
+    if np.issubdtype(arr.dtype, np.number):
+        return arr.astype("f8", copy=False)
+
+    # datetime64 → list[datetime]
+    if np.issubdtype(arr.dtype, "datetime64"):
+        # convert to python datetime (UTC)
+        ns = arr.astype("datetime64[ns]").astype("int64")
+        out = []
+        epoch = dt.datetime(1970, 1, 1)
+        for n in ns.ravel():
+            out.append(epoch + dt.timedelta(microseconds=n / 1000))
+        seq = out
+
+    # object dtype: cftime or python datetime already
+    elif arr.dtype == object:
+        seq = list(arr.ravel())
+
+    else:
+        raise TypeError(f"Unsupported time dtype {arr.dtype!r} for CF encoding")
+
+    nums = np.asarray(cftime.date2num(seq, units=units, calendar=calendar), dtype="f8")
+
+    return nums.reshape(arr.shape)
+
+
+def _encode_time_bounds_to_num(tb, units: str, calendar: str) -> np.ndarray:
+    """
+    Encode bounds array of shape (..., 2) to numeric CF time.
+    Returns float64 array with same shape.
+    """
+    tba = tb.values if hasattr(tb, "values") else np.asarray(tb)
+    if tba.ndim < 1 or tba.shape[-1] != 2:
+        raise ValueError(f"time bounds must have last dim == 2, got {tba.shape}")
+    left = _encode_time_to_num(tba[..., 0], units, calendar)
+    right = _encode_time_to_num(tba[..., 1], units, calendar)
+    return np.stack([left, right], axis=-1)
 
 
 def _bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
