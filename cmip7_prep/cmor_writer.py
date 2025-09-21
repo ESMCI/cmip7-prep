@@ -7,18 +7,19 @@ present in the provided dataset. It also supports a packaged default
 `cmor_dataset.json` living under `cmip7_prep/data/`.
 """
 
-from __future__ import annotations
-
 from contextlib import AbstractContextManager
-from importlib.resources import as_file, files
 from pathlib import Path
-from typing import Any, Dict, Optional
+import re
+from importlib.resources import files as ir_files, as_file
+from typing import Any, Optional, Dict
 
+import cmor
 import numpy as np
 import xarray as xr
-from xarray.coding.times import encode_cf_datetime
 
-import cmor  # type: ignore
+
+_HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
+_UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------
@@ -32,7 +33,7 @@ def packaged_dataset_json(filename: str = "cmor_dataset.json") -> Any:
         with packaged_dataset_json() as p:
             cmor.dataset_json(str(p))
     """
-    res = files("cmip7_prep").joinpath(f"data/{filename}")
+    res = ir_files("cmip7_prep.data").joinpath(filename)
     return as_file(res)
 
 
@@ -47,7 +48,7 @@ def _encode_time_to_num(time_da: xr.DataArray, units: str, calendar: str) -> np.
     """
     # 1) xarray encoder (handles numpy datetime64 and cftime objects if cftime present)
     try:
-        out = encode_cf_datetime(time_da.values, units=units, calendar=calendar)
+        out = _encode_time_to_num(time_da.values, units=units, calendar=calendar)
         return np.asarray(out, dtype="f8")
     except (ValueError, TypeError) as exc_xr:
         last_err = exc_xr
@@ -64,6 +65,62 @@ def _encode_time_to_num(time_da: xr.DataArray, units: str, calendar: str) -> np.
             f"Could not encode time to numeric CF values with units={units!r}, "
             f"calendar={calendar!r}. xarray error: {last_err}; cftime error: {exc_cf}"
         ) from exc_cf
+
+
+def _bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
+    """Compute [n,2] cell bounds from 1-D centers for 'lat' or 'lon'.
+
+    - For 'lat': clamps to [-90, 90]
+    - For 'lon': treats as periodic [0, 360)
+    - Works with non-uniform spacing (uses midpoints between neighbors)
+    """
+    v = np.asarray(vals, dtype="f8").reshape(-1)
+    n = v.size
+    if n < 2:
+        raise ValueError("Need at least 2 points to compute bounds")
+
+    # neighbor midpoints
+    mid = 0.5 * (v[1:] + v[:-1])  # length n-1
+    bounds = np.empty((n, 2), dtype="f8")
+    bounds[1:, 0] = mid
+    bounds[:-1, 1] = mid
+
+    # end caps: extrapolate by half-step at ends
+    first_step = v[1] - v[0]
+    last_step = v[-1] - v[-2]
+    bounds[0, 0] = v[0] - 0.5 * first_step
+    bounds[-1, 1] = v[-1] + 0.5 * last_step
+
+    if kind == "lat":
+        # clamp to physical limits
+        bounds[:, 0] = np.maximum(bounds[:, 0], -90.0)
+        bounds[:, 1] = np.minimum(bounds[:, 1], 90.0)
+    elif kind == "lon":
+        # wrap to [0, 360)
+        bounds = bounds % 360.0
+        # ensure each row is increasing in modulo arithmetic
+        wrap = bounds[:, 1] < bounds[:, 0]
+        if np.any(wrap):
+            bounds[wrap, 1] += 360.0
+    else:
+        raise ValueError("kind must be 'lat' or 'lon'")
+
+    return bounds
+
+
+# --- CMOR attribute compat layer (handles both API variants) ---
+def _set_attr(name: str, value) -> None:
+    try:
+        cmor.set_cur_dataset_attribute(name, value)  # new API
+    except AttributeError:  # fallback for older CMOR
+        cmor.setGblAttr(name, value)  # type: ignore[attr-defined]
+
+
+def _get_attr(name: str):
+    try:
+        return cmor.get_cur_dataset_attribute(name)  # new API
+    except AttributeError:  # fallback for older CMOR
+        return cmor.getGblAttr(name)  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------
@@ -100,11 +157,52 @@ class CmorSession(AbstractContextManager):
             cmor.dataset_json(self.dataset_json_path)
         elif self.dataset_attrs:
             for key, value in self.dataset_attrs.items():
-                cmor.setGblAttr(key, value)
+                cmor.set_cur_dataset_attribute(key, value)
         else:
             # Fallback to packaged cmor_dataset.json if available
             with packaged_dataset_json() as p:
                 cmor.dataset_json(str(p))
+
+        # product must be exactly "model-output" for CMIP6 tables
+        if "cmip6" in str(self.tables_path):
+            try:
+                prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
+            except Exception:  # pylint: disable=broad-except
+                prod = None
+            if prod != "model-output":
+                cmor.set_cur_dataset_attribute("product", "model-output")
+
+        # long paragraph; split to keep lines < 100
+        inst = _get_attr("institution_id") or "NCAR"
+        license_text = (
+            f"CMIP6 model data produced by {inst} is licensed under a Creative Commons "
+            "Attribution 4.0 International License "
+            "(https://creativecommons.org/licenses/by/4.0/). "
+            "Consult https://pcmdi.llnl.gov/CMIP6/TermsOfUse for terms of use "
+            "governing CMIP6 output, including citation requirements and proper "
+            "acknowledgment. Further information about this data, including some "
+            "limitations, can be found via the further_info_url (recorded as a "
+            "global attribute in this file). The data producers and data providers "
+            "make no warranty, either express or implied, including, but not "
+            "limited to, warranties of merchantability and fitness for a "
+            "particular purpose. All liabilities arising from the supply of the "
+            "information (including any liability arising in negligence) are "
+            "excluded to the fullest extent permitted by law."
+        )
+
+        cmor.set_cur_dataset_attribute("license", license_text)
+
+        # Tell CMOR how to build tracking_id; let CMOR generate it
+        prefix = _get_attr("tracking_prefix")
+        if not (isinstance(prefix, str) and prefix.startswith("hdl:")):
+            _set_attr("tracking_prefix", "hdl:21.14100/")
+
+        # If a non-handle tracking_id snuck in (e.g., bare UUID from JSON), clear it
+        tid = _get_attr("tracking_id")
+        if isinstance(tid, str) and not tid.startswith("hdl:21.14100/"):
+            _set_attr(
+                "tracking_id", ""
+            )  # empty lets CMOR regenerate from tracking_prefix
 
         return self
 
@@ -139,7 +237,7 @@ class CmorSession(AbstractContextManager):
                     t_bnds = _encode_time_to_num(tb, t_units, cal)
                 except ValueError:
                     t_bnds = None
-            print(f"ds = {ds} tb = {tb} tbnds is {t_bnds}")
+
             axes.append(
                 cmor.axis(
                     table_entry="time",
@@ -180,32 +278,48 @@ class CmorSession(AbstractContextManager):
             )
 
         # ---- horizontal axes ----
-        if "lat" in ds.coords and "lon" in ds.coords:
-            lat = ds["lat"]
-            lon = ds["lon"]
-            lat_b = ds.get("lat_bnds") or ds.get("lat_bounds")
-            lon_b = ds.get("lon_bnds") or ds.get("lon_bounds")
+        if "lat" not in ds.coords or "lon" not in ds.coords:
+            raise ValueError("Dataset missing required coordinates 'lat' and 'lon'.")
 
-            axes.append(
-                cmor.axis(
-                    table_entry="lat",
-                    units="degrees_north",
-                    coord_vals=lat.values,
-                    cell_bounds=lat_b.values if lat_b is not None else None,
-                )
+        lat = ds["lat"]
+        lon = ds["lon"]
+        lat_b = ds.get("lat_bnds") or ds.get("lat_bounds")
+        lon_b = ds.get("lon_bnds") or ds.get("lon_bounds")
+
+        lat_vals = np.asarray(lat.values, dtype="f8").reshape(-1)
+        lon_vals = np.asarray(lon.values, dtype="f8").reshape(-1)
+
+        # synthesize bounds if missing
+        lat_b_vals = (
+            np.asarray(lat_b.values, dtype="f8")
+            if lat_b is not None
+            else _bounds_from_centers_1d(lat_vals, "lat")
+        )
+        lon_b_vals = (
+            np.asarray(lon_b.values, dtype="f8")
+            if lon_b is not None
+            else _bounds_from_centers_1d(lon_vals, "lon")
+        )
+
+        axes.append(
+            cmor.axis(
+                table_entry="latitude",
+                units="degrees_north",
+                coord_vals=lat_vals,
+                cell_bounds=lat_b_vals,
             )
-            axes.append(
-                cmor.axis(
-                    table_entry="lon",
-                    units="degrees_east",
-                    coord_vals=lon.values,
-                    cell_bounds=lon_b.values if lon_b is not None else None,
-                )
+        )
+        axes.append(
+            cmor.axis(
+                table_entry="longitude",
+                units="degrees_east",
+                coord_vals=lon_vals,
+                cell_bounds=lon_b_vals,
             )
+        )
 
         return axes
 
-    # -------------------------
     # public API
     # -------------------------
     def write_variable(
@@ -217,6 +331,7 @@ class CmorSession(AbstractContextManager):
         table_key = str(table_key)
         candidate7 = Path(self.tables_path) / f"CMIP7_{table_key}.json"
         candidate6 = Path(self.tables_path) / f"CMIP6_{table_key}.json"
+        print(f"table_key is {table_key} candidate6 is {candidate6}")
 
         if candidate7.exists():
             cmor.load_table(str(candidate7))
@@ -248,8 +363,18 @@ class CmorSession(AbstractContextManager):
         if "time" in data.dims:
             data = data.transpose("time", ...)
 
+        data_np = np.asarray(data)
         # CMOR expects a NumPy array; this will materialize data as needed.
-        cmor.write(var_id, np.asarray(data), ntimes_passed=data.sizes.get("time", 1))
+
+        try:
+            # type: ignore[attr-defined]
+            print("DEBUG tracking_id:", cmor.get_cur_dataset_attribute("tracking_id"))
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+        cmor.write(
+            var_id, data_np, ntimes_passed=data_np.shape[0] if "time" in ds.dims else 1
+        )
 
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)

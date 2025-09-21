@@ -1,29 +1,34 @@
 {
-  "calendar": "noleap",
-  "outpath": "out",
-  "tracking_prefix": "hdl:21.14100",
-  "product": "output",
+  "mip_era": "CMIP6",
   "activity_id": "CMIP",
   "institution_id": "NCAR",
-  "source_id": "CESM3",
-  "source": "CESM3 (2025): atmosphere: CAM-SE; ocean: MOM6; seaIce: CICE; land: CTSM; aerosol: MAM; landIce: CISM; OASIS/CMEPS coupler",
-  "experiment_id": "<FILL: e.g., historical or sspXXXX>",
-  "member_id": "r1i1p1f1",
-  "variant_label": "r1i1p1f1",
-  "table_id": "<filled per-variable>",
-  "grid_label": "gn",
+  "institution": "National Center for Atmospheric Research, Climate and Global Dynamics Laboratory, 1850 Table Mesa Drive, Boulder, CO 80305, USA",
+  "contact": "cmip-support@ucar.edu",
+    "product": "model-output",
+
+  "source_id": "CESM2",
+  "source": "CESM2 (2025): atmosphere: CAM; ocean: MOM; sea ice: CICE5; land: CTSM; aerosol: MAM4; coupler: CMEPS.",
+  "source_type": "AOGCM",
   "nominal_resolution": "100 km",
+
+  "experiment_id": "piControl",
+  "experiment": "Pre-Industrial Control",
   "sub_experiment_id": "none",
-  "license": "CMIP6 model data produced by NCAR is licensed under a Creative Commons Attribution 4.0 International License (CC BY 4.0).",
-  "contact": "cesmhelp@ucar.edu",
-  "references": "https://www.cesm.ucar.edu",
-  "realm": "<filled per-variable>",
-  "frequency": "<filled per-variable>",
-  "mip_era": "CMIP7",
-  "Conventions": "CF-1.10 CMIP-7.0",
-  "release_year": "2025",
-  "grid": "1x1 degree latitude-longitude for Amon/Lmon; native MOM6 curvilinear for Omon",
-  "institution": "National Center for Atmospheric Research, Boulder, CO, USA",
-  "tracking_id": "",
-  "title": "CESM CMIP7 output prepared with cmip7_prep"
+  "sub_experiment": "none",
+
+  "realization_index": 1,
+  "initialization_index": 1,
+  "physics_index": 1,
+  "forcing_index": 1,
+  "member_id": "r1i1p1f1",
+
+  "calendar": "noleap",
+  "frequency": "mon",
+  "grid": "data mapped to a 1x1 degree.",
+
+  "grid_label": "gr",
+
+  "title": "CESM2 piControl on 1x1 degree grid (regridded)",
+  "references": "See CESM2 documentation and CMIP6 references for NCAR/CGD.",
+  "outpath": "/glade/derecho/scratch/cmip7/CMIP7"
 }

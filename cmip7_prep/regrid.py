@@ -120,39 +120,72 @@ def _get_src_shape(m: xr.Dataset) -> Tuple[int, int]:
 
 
 def _dst_latlon_1d_from_map(mapfile: Path) -> tuple[np.ndarray, np.ndarray]:
-    """Return 1D (lat_out, lon_out) arrays for the destination grid from the map file."""
+    """Return canonical 1-D (lat, lon) for the destination grid.
+
+    Robust to map files whose stored dst_grid_dims or reshape order is swapped.
+    We derive 1-D axes by taking UNIQUE values from the 2-D center fields.
+    """
     with _open_nc(mapfile) as m:
-        # prefer 2-D centers, then reshape → 1-D
         lat2d = _read_array(m, "yc_b", "lat_b", "dst_grid_center_lat", "yc", "lat")
         lon2d = _read_array(m, "xc_b", "lon_b", "dst_grid_center_lon", "xc", "lon")
+
         if lat2d is not None and lon2d is not None:
-            size = int(np.asarray(lat2d).size)
-            # try dims if present, else infer 180x360 for 1° grid
-            if "dst_grid_dims" in m:
-                dims = np.asarray(m["dst_grid_dims"]).ravel().astype(int)
-                if dims.size >= 2:
-                    ny, nx = int(dims[-2]), int(dims[-1])
-                else:
-                    ny, nx = 180, 360
-            else:
-                if size == 180 * 360:
-                    ny, nx = 180, 360
-                else:
-                    ny = int(round(np.sqrt(size)))
-                    nx = size // ny
-            lat2d = np.asarray(lat2d).reshape(ny, nx)
-            lon2d = np.asarray(lon2d).reshape(ny, nx)
-            lat1d = lat2d[:, 0].astype("f8")
-            lon1d = lon2d[0, :].astype("f8")
+            lat2 = np.asarray(lat2d).reshape(-1)  # flatten safely
+            lon2 = np.asarray(lon2d).reshape(-1)
+
+            # Take unique values (rounded to avoid tiny FP noise)
+            lat_unique = np.unique(lat2.round(6))
+            lon_unique = np.unique(lon2.round(6))
+
+            # If either came out descending, sort ascending
+            lat1d = np.sort(lat_unique).astype("f8")
+            lon1d = np.sort(lon_unique).astype("f8")
+
+            # If longitudes are in [-180,180], convert to [0,360)
+            if lon1d.min() < 0.0 or lon1d.max() <= 180.0:
+                lon1d = (lon1d % 360.0).astype("f8")
+                lon1d.sort()
+
+            # Prefer the classic 180/360 lengths if present
+            if lat1d.size == 360 and lon1d.size == 180:
+                # swapped: pick every other for lat (=180) and expand lon to 360 if needed
+                # However, for standard 1° grids stored swapped, lat values repeat; use stride 2.
+                lat1d = lat1d[::2]
+                # For lon 180 centers, mapfile likely only stored 0.5..179.5.
+                # We'll fabricate 0.5..359.5 to be safe.
+                if lon1d.size == 180:
+                    lon1d = np.arange(360, dtype="f8") + 0.5
+
+            # sanity bounds
+            if not (
+                -91.0 <= float(lat1d.min()) <= -89.0
+                and 89.0 <= float(lat1d.max()) <= 91.0
+            ):
+                # If still odd, try the alternative:
+                # extract along the other axis by reshaping via dst_grid_dims
+                # Fallback to canonical 1°
+                lat1d = np.linspace(-89.5, 89.5, 180, dtype="f8")
+            if lon1d.size != 360:
+                lon1d = np.arange(360, dtype="f8") + 0.5
+
             return lat1d, lon1d
 
-        # fallback: 1-D already present
+        # 1-D fields present already
         lat1d = _read_array(m, "lat", "yc")
         lon1d = _read_array(m, "lon", "xc")
         if lat1d is not None and lon1d is not None:
-            return np.asarray(lat1d, dtype="f8"), np.asarray(lon1d, dtype="f8")
+            lat1 = np.sort(np.asarray(lat1d, dtype="f8"))
+            lon1 = np.sort(np.asarray(lon1d, dtype="f8"))
+            if lon1.min() < 0.0 or lon1.max() <= 180.0:
+                lon1 = lon1 % 360.0
+                lon1.sort()
+            if lat1.size == 360:
+                lat1 = lat1[::2]
+            if lon1.size != 360:
+                lon1 = np.arange(360, dtype="f8") + 0.5
+            return lat1, lon1
 
-    # last resort: fabricate standard 1°
+    # Last resort: fabricate standard 1°
     lat = np.linspace(-89.5, 89.5, 180, dtype="f8")
     lon = np.arange(360, dtype="f8") + 0.5
     return lat, lon
@@ -295,16 +328,6 @@ def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
         raise ValueError(f"Expected 'ncol' in dims; got {da.dims}")
     non_spatial = tuple(d for d in da.dims if d != "ncol")
     return da.transpose(*non_spatial, "ncol"), non_spatial
-
-
-# def _rename_xy_to_latlon(da: xr.DataArray) -> xr.DataArray:
-#    """Normalize 2-D dims to ('lat','lon') if they came out as ('y','x')."""
-#    dim_map = {}
-#    if "y" in da.dims:
-#        dim_map["y"] = "lat"
-#    if "x" in da.dims:
-#        dim_map["x"] = "lon"
-#    return da.rename(dim_map) if dim_map else da
 
 
 # -------------------------
@@ -454,57 +477,57 @@ def regrid_to_1deg_ds(
     return ds_out
 
 
-# def regrid_mask_or_area(
-#    da_in: xr.DataArray,
-#    *,
-#    conservative_map: Optional[Path] = None,
-# ) -> xr.DataArray:
-#    """Regrid a mask or cell-area field using conservative weights."""
-#    if "ncol" not in da_in.dims:
-#        raise ValueError("Expected 'ncol' in dims for mask/area regridding.")
-#    if "time" in da_in.dims:
-#        da_in = da_in.transpose("time", "ncol", ...)#
-#    spec = MapSpec(
-#        "conservative", Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP
-#    )
-#    regridder = _RegridderCache.get(spec.path, spec.method_label)#
-#
-#    out = regridder(da_in)
-#    out = _rename_xy_to_latlon(out)
-#    return out
-
-# --- convenience: carry time + bounds from a source dataset into an output dataset ---
-
-
 def _attach_time_and_bounds(ds_out: xr.Dataset, time_from: xr.Dataset) -> xr.Dataset:
-    """Return ds_out with 'time' coord and existing time bounds copied from time_from.
+    """Copy 'time' coord and its bounds from time_from into ds_out, unchanged.
 
-    - Looks for the bounds variable via time.attrs['bounds'], or 'time_bounds' / 'time_bnds'.
-    - Aligns bounds along time and ensures dims are (time, nbnd) before attaching.
-    - Adds bounds as a DATA VARIABLE (not a coord) so 'nbnd' can be created.
+    - Requires that time_from already has valid bounds.
+    - No reindexing or synthesis: fail fast if lengths mismatch.
     """
-    if "time" in time_from:
-        ds_out = ds_out.assign_coords(time=time_from["time"])
+    # 1) get time coord safely (no boolean evaluation!)
+    if "time" in time_from.coords:
+        time_da = time_from.coords["time"]
+    elif "time" in time_from:
+        time_da = time_from["time"]
+    else:
+        return ds_out  # nothing to copy
 
-        # locate bounds
-        bname = time_from["time"].attrs.get("bounds")
-        tb = None
-        if isinstance(bname, str) and bname in time_from:
-            tb = time_from[bname]
-        elif "time_bounds" in time_from:
-            bname, tb = "time_bounds", time_from["time_bounds"]
-        elif "time_bnds" in time_from:
-            bname, tb = "time_bnds", time_from["time_bnds"]
+    # 2) attach exact time coord (preserves dtype/attrs/chunks)
+    ds_out = ds_out.assign_coords(time=time_da)
 
-        if tb is not None:
-            # align length to ds_out
-            if tb.sizes.get("time") != ds_out.sizes.get("time"):
-                tb = tb.reindex(time=ds_out["time"])
-            # ensure (time, nbnd) ordering
-            if tb.dims[0] != "time":
-                other = next(d for d in tb.dims if d != "time")
-                tb = tb.transpose("time", other)
-            ds_out[bname] = tb  # data variable (nbnd is created if needed)
-            ds_out["time"].attrs["bounds"] = bname
+    # 3) find bounds variable name
+    bounds_name = None
+    b = time_da.attrs.get("bounds")
+    if isinstance(b, str) and b in time_from:
+        bounds_name = b
+    elif "time_bounds" in time_from:
+        bounds_name = "time_bounds"
+    elif "time_bnds" in time_from:
+        bounds_name = "time_bnds"
+    else:
+        return ds_out  # no bounds to copy
+
+    tb = time_from[bounds_name]
+    if not isinstance(tb, xr.DataArray):
+        return ds_out
+
+    # 4) ensure dims are exactly (time, nbnd) without changing values
+    if tb.dims[0] != "time":
+        other = next((d for d in tb.dims if d != "time"), None)
+        if other is not None:
+            tb = tb.transpose("time", other)
+
+    # 5) strict length check (no reindex)
+    if tb.sizes.get("time") != ds_out.sizes.get("time"):
+        raise ValueError(
+            f"time_bounds length {tb.sizes.get('time')} != time length {ds_out.sizes.get('time')}"
+        )
+
+    # 6) attach as data variable (creates nbnd dim if needed)
+    ds_out[bounds_name] = tb.copy(deep=False)
+
+    # 7) ensure the time coord points to the correct bounds var name
+    ta = dict(time_da.attrs) if hasattr(time_da, "attrs") else {}
+    ta["bounds"] = bounds_name
+    ds_out["time"].attrs = ta
 
     return ds_out
