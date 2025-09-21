@@ -124,6 +124,7 @@ class CmorSession(AbstractContextManager):
             time = ds["time"]
             t_units = time.attrs.get("units", "days since 1850-01-01")
             cal = time.attrs.get("calendar", time.encoding.get("calendar", "noleap"))
+
             tvals = _encode_time_to_num(time, t_units, cal)
 
             # Optional bounds: try common names or CF 'bounds' attribute
@@ -138,7 +139,7 @@ class CmorSession(AbstractContextManager):
                     t_bnds = _encode_time_to_num(tb, t_units, cal)
                 except ValueError:
                     t_bnds = None
-
+            print(f"ds = {ds} tb = {tb} tbnds is {t_bnds}")
             axes.append(
                 cmor.axis(
                     table_entry="time",

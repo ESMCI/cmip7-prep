@@ -119,6 +119,45 @@ def _get_src_shape(m: xr.Dataset) -> Tuple[int, int]:
     raise ValueError("Cannot infer source grid size from weight file.")
 
 
+def _dst_latlon_1d_from_map(mapfile: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Return 1D (lat_out, lon_out) arrays for the destination grid from the map file."""
+    with _open_nc(mapfile) as m:
+        # prefer 2-D centers, then reshape → 1-D
+        lat2d = _read_array(m, "yc_b", "lat_b", "dst_grid_center_lat", "yc", "lat")
+        lon2d = _read_array(m, "xc_b", "lon_b", "dst_grid_center_lon", "xc", "lon")
+        if lat2d is not None and lon2d is not None:
+            size = int(np.asarray(lat2d).size)
+            # try dims if present, else infer 180x360 for 1° grid
+            if "dst_grid_dims" in m:
+                dims = np.asarray(m["dst_grid_dims"]).ravel().astype(int)
+                if dims.size >= 2:
+                    ny, nx = int(dims[-2]), int(dims[-1])
+                else:
+                    ny, nx = 180, 360
+            else:
+                if size == 180 * 360:
+                    ny, nx = 180, 360
+                else:
+                    ny = int(round(np.sqrt(size)))
+                    nx = size // ny
+            lat2d = np.asarray(lat2d).reshape(ny, nx)
+            lon2d = np.asarray(lon2d).reshape(ny, nx)
+            lat1d = lat2d[:, 0].astype("f8")
+            lon1d = lon2d[0, :].astype("f8")
+            return lat1d, lon1d
+
+        # fallback: 1-D already present
+        lat1d = _read_array(m, "lat", "yc")
+        lon1d = _read_array(m, "lon", "xc")
+        if lat1d is not None and lon1d is not None:
+            return np.asarray(lat1d, dtype="f8"), np.asarray(lon1d, dtype="f8")
+
+    # last resort: fabricate standard 1°
+    lat = np.linspace(-89.5, 89.5, 180, dtype="f8")
+    lon = np.arange(360, dtype="f8") + 0.5
+    return lat, lon
+
+
 def _get_dst_latlon_1d(m: xr.Dataset) -> Tuple[np.ndarray, np.ndarray]:
     """Return 1D dest lat, lon arrays from weight file.
 
@@ -258,14 +297,14 @@ def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
     return da.transpose(*non_spatial, "ncol"), non_spatial
 
 
-def _rename_xy_to_latlon(da: xr.DataArray) -> xr.DataArray:
-    """Normalize 2-D dims to ('lat','lon') if they came out as ('y','x')."""
-    dim_map = {}
-    if "y" in da.dims:
-        dim_map["y"] = "lat"
-    if "x" in da.dims:
-        dim_map["x"] = "lon"
-    return da.rename(dim_map) if dim_map else da
+# def _rename_xy_to_latlon(da: xr.DataArray) -> xr.DataArray:
+#    """Normalize 2-D dims to ('lat','lon') if they came out as ('y','x')."""
+#    dim_map = {}
+#    if "y" in da.dims:
+#        dim_map["y"] = "lat"
+#    if "x" in da.dims:
+#        dim_map["x"] = "lon"
+#    return da.rename(dim_map) if dim_map else da
 
 
 # -------------------------
@@ -305,8 +344,8 @@ def regrid_to_1deg(
     if varname not in ds_in:
         raise KeyError(f"{varname!r} not in dataset.")
 
-    da = ds_in[varname]
-    da2, non_spatial = _ensure_ncol_last(da)
+    var_da = ds_in[varname]  # always a DataArray
+    da2, non_spatial = _ensure_ncol_last(var_da)
 
     # cast to save memory
     if dtype is not None and str(da2.dtype) != dtype:
@@ -337,42 +376,135 @@ def regrid_to_1deg(
     if "time" in da2_2d.dims and output_time_chunk:
         kwargs["output_chunks"] = {"time": output_time_chunk}
 
-    out = regridder(da2_2d, **kwargs)  # -> (*non_spatial, y/x or lat/lon)
-    out = _rename_xy_to_latlon(out)
+    out = regridder(da2_2d, **kwargs)  # current call that returns (*non_spatial, ?, ?)
 
-    if keep_attrs:
-        out.attrs.update(da.attrs)
+    # --- NEW: robust lat/lon assignment based on destination grid lengths ---
+    lat1d, lon1d = _dst_latlon_1d_from_map(spec.path)
+    ny, nx = len(lat1d), len(lon1d)
 
-    for c in non_spatial:
-        if c in ds_in.coords and c in out.dims:
-            out = out.assign_coords({c: ds_in[c]})
+    # find the last two dims that came from xESMF
+    spatial_dims = [d for d in out.dims if d not in non_spatial]
+    if len(spatial_dims) < 2:
+        raise ValueError(f"Unexpected output dims {out.dims}; need two spatial dims.")
 
-    if "lat" in out.coords:
-        out["lat"].attrs.setdefault("units", "degrees_north")
-        out["lat"].attrs.setdefault("standard_name", "latitude")
-    if "lon" in out.coords:
-        out["lon"].attrs.setdefault("units", "degrees_east")
-        out["lon"].attrs.setdefault("standard_name", "longitude")
+    da, db = spatial_dims[-2], spatial_dims[-1]
+    na, nb = out.sizes[da], out.sizes[db]
+
+    # Decide mapping by comparing lengths to (ny, nx)
+    if na == ny and nb == nx:
+        out = out.rename({da: "lat", db: "lon"})
+    elif na == nx and nb == ny:
+        out = out.rename({da: "lon", db: "lat"})
+    else:
+        # Heuristic fallback: pick the dim whose size matches 180 as lat
+        if {na, nb} == {ny, nx}:
+            # covered above; should not reach here
+            pass
+        else:
+            # choose the one closer to 180 as lat
+            choose_lat = da if abs(na - 180) <= abs(nb - 180) else db
+            choose_lon = db if choose_lat == da else da
+            out = out.rename({choose_lat: "lat", choose_lon: "lon"})
+
+    # assign canonical 1-D coords
+    out = out.assign_coords(lat=("lat", lat1d), lon=("lon", lon1d))
+
+    try:
+        out = out.transpose(*non_spatial, "lat", "lon")
+    except ValueError:
+        # fallback if non_spatial is empty
+        out = out.transpose("lat", "lon")
+    if keep_attrs and hasattr(var_da, "attrs"):
+        out.attrs.update(var_da.attrs)
 
     return out
 
 
-def regrid_mask_or_area(
-    da_in: xr.DataArray,
+def regrid_to_1deg_ds(
+    ds_in: xr.Dataset,
+    varname: str,
     *,
+    time_from: xr.Dataset | None = None,
+    method: Optional[str] = None,
     conservative_map: Optional[Path] = None,
-) -> xr.DataArray:
-    """Regrid a mask or cell-area field using conservative weights."""
-    if "ncol" not in da_in.dims:
-        raise ValueError("Expected 'ncol' in dims for mask/area regridding.")
-    if "time" in da_in.dims:
-        da_in = da_in.transpose("time", "ncol", ...)
+    bilinear_map: Optional[Path] = None,
+    keep_attrs: bool = True,
+    dtype: str | None = "float32",
+    output_time_chunk: int | None = 12,
+) -> xr.Dataset:
+    """Regrid `varname` and return a Dataset containing the regridded variable.
 
-    spec = MapSpec(
-        "conservative", Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP
+    Parameters mirror regrid_to_1deg, but this function:
+      - returns an xr.Dataset({varname: DataArray})
+      - if `time_from` is provided, copies 'time' and its bounds into the dataset
+    """
+    da = regrid_to_1deg(
+        ds_in,
+        varname,
+        method=method,
+        conservative_map=conservative_map,
+        bilinear_map=bilinear_map,
+        keep_attrs=keep_attrs,
+        dtype=dtype,
+        output_time_chunk=output_time_chunk,
     )
-    regridder = _RegridderCache.get(spec.path, spec.method_label)
+    ds_out = xr.Dataset({varname: da})
+    if time_from is not None:
+        ds_out = _attach_time_and_bounds(ds_out, time_from)
+    return ds_out
 
-    out = regridder(da_in)
-    out = _rename_xy_to_latlon(out)
-    return out
+
+# def regrid_mask_or_area(
+#    da_in: xr.DataArray,
+#    *,
+#    conservative_map: Optional[Path] = None,
+# ) -> xr.DataArray:
+#    """Regrid a mask or cell-area field using conservative weights."""
+#    if "ncol" not in da_in.dims:
+#        raise ValueError("Expected 'ncol' in dims for mask/area regridding.")
+#    if "time" in da_in.dims:
+#        da_in = da_in.transpose("time", "ncol", ...)#
+#    spec = MapSpec(
+#        "conservative", Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP
+#    )
+#    regridder = _RegridderCache.get(spec.path, spec.method_label)#
+#
+#    out = regridder(da_in)
+#    out = _rename_xy_to_latlon(out)
+#    return out
+
+# --- convenience: carry time + bounds from a source dataset into an output dataset ---
+
+
+def _attach_time_and_bounds(ds_out: xr.Dataset, time_from: xr.Dataset) -> xr.Dataset:
+    """Return ds_out with 'time' coord and existing time bounds copied from time_from.
+
+    - Looks for the bounds variable via time.attrs['bounds'], or 'time_bounds' / 'time_bnds'.
+    - Aligns bounds along time and ensures dims are (time, nbnd) before attaching.
+    - Adds bounds as a DATA VARIABLE (not a coord) so 'nbnd' can be created.
+    """
+    if "time" in time_from:
+        ds_out = ds_out.assign_coords(time=time_from["time"])
+
+        # locate bounds
+        bname = time_from["time"].attrs.get("bounds")
+        tb = None
+        if isinstance(bname, str) and bname in time_from:
+            tb = time_from[bname]
+        elif "time_bounds" in time_from:
+            bname, tb = "time_bounds", time_from["time_bounds"]
+        elif "time_bnds" in time_from:
+            bname, tb = "time_bnds", time_from["time_bnds"]
+
+        if tb is not None:
+            # align length to ds_out
+            if tb.sizes.get("time") != ds_out.sizes.get("time"):
+                tb = tb.reindex(time=ds_out["time"])
+            # ensure (time, nbnd) ordering
+            if tb.dims[0] != "time":
+                other = next(d for d in tb.dims if d != "time")
+                tb = tb.transpose("time", other)
+            ds_out[bname] = tb  # data variable (nbnd is created if needed)
+            ds_out["time"].attrs["bounds"] = bname
+
+    return ds_out

@@ -1,4 +1,5 @@
 {
+  "calendar": "noleap",
   "outpath": "out",
   "tracking_prefix": "hdl:21.14100",
   "product": "output",
