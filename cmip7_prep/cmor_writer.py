@@ -14,7 +14,12 @@ from importlib.resources import files as ir_files, as_file
 from typing import Any, Optional, Dict, Union
 import datetime as dt
 import cftime
-import cmor
+
+try:
+    import cmor
+except Exception:  # pylint: disable=broad-except
+    cmor = None  # pylint: disable=invalid-name
+
 import numpy as np
 import xarray as xr
 
@@ -212,6 +217,12 @@ class CmorSession(AbstractContextManager):
     def __enter__(self) -> "CmorSession":
         """Initialize CMOR and register dataset metadata."""
         # Setup CMOR with the Tables directory
+        if cmor is None:
+            raise ImportError(
+                "The 'cmor' package is required at runtime. "
+                "Install from conda-forge (e.g., `mamba install -c conda-forge cmor`). "
+                "Unit tests patch `cmor` with a FakeCMOR, so CI can run without it."
+            )
         replace_flag = getattr(cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 0))
         verbosity = getattr(cmor, "CMOR_NORMAL", getattr(cmor, "CMOR_VERBOSE", 0))
         cmor.setup(

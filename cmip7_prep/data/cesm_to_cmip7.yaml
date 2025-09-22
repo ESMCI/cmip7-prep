@@ -90,6 +90,19 @@ variables:
         optional: true
       - expr: "qref if qref is not None else rh_to_q(rh, tref, ps)"
 
+  ta:
+    table: Amon
+    units: K
+    long_name: Air Temperature
+    dims: [time, plev, lat, lon]
+    regrid_method: bilinear
+    levels:
+      name: plev19
+      units: Pa
+    requires_plev19: true
+    sources:
+      - cesm_var: T
+
   ua:
     table: Amon
     units: m s-1
