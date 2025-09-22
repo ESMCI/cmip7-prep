@@ -55,9 +55,7 @@ def packaged_dataset_json(filename: str = "cmor_dataset.json") -> Any:
             cmor.dataset_json(str(p))
     """
     res = ir_files("cmip7_prep.data").joinpath(filename)
-    p = as_file(res)
-    print(f" p is {p}")
-    return p
+    return as_file(res)
 
 
 # ---------------------------------------------------------------------
@@ -178,7 +176,7 @@ def _resolve_table_filename(tables_path: Path, table_key: str) -> str:
     if table_key.endswith(".json"):
         return table_key
     pstr = str(tables_path)
-    if "CMIP6" in pstr:
+    if "cmip6" in pstr:
         return f"CMIP6_{table_key}.json"
     if "CMIP7" in pstr:
         return f"CMIP7_{table_key}.json"
@@ -229,7 +227,17 @@ class CmorSession(AbstractContextManager):
             if self.dataset_json_path is not None
             else packaged_dataset_json()
         )
-        cmor.dataset_json(str(p))
+
+        with _as_path_cm(p) as dataset_json_path:
+            loader = getattr(cmor, "dataset_json_path", None)
+            if loader is None or not callable(loader):
+                loader = getattr(cmor, "dataset_json", None)
+            if loader is None or not callable(loader):
+                raise RuntimeError(
+                    "CMOR: neither dataset_json_path nor dataset_json is available"
+                )
+            loader(str(dataset_json_path))
+
         try:
             prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
         except Exception:  # pylint: disable=broad-except
@@ -422,12 +430,6 @@ class CmorSession(AbstractContextManager):
 
         data_np = np.asarray(data)
         # CMOR expects a NumPy array; this will materialize data as needed.
-
-        try:
-            # type: ignore[attr-defined]
-            print("DEBUG tracking_id:", cmor.get_cur_dataset_attribute("tracking_id"))
-        except Exception:  # pylint: disable=broad-except
-            pass
 
         cmor.write(
             var_id, data_np, ntimes_passed=data_np.shape[0] if "time" in ds.dims else 1

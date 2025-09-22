@@ -33,56 +33,6 @@ ds_cmor = realize_regrid_prepare(
     time_chunk=12,
     regrid_kwargs={"output_time_chunk": 12, "dtype": "float32"},
 )
-tbname = ds_cmor["time"].attrs.get("bounds")
-tb = ds_cmor[tbname]
-print(
-    "CHECK:",
-    "time dtype",
-    ds_cmor["time"].dtype,
-    "| tb dims",
-    tb.dims,
-    "dtype",
-    tb.dtype,
-    "| equal lengths",
-    tb.sizes["time"] == ds_cmor.sizes["time"],
-)
-print(
-    "CHECK lat/lon: ",
-    "lat",
-    ds_cmor.lat.size,
-    float(ds_cmor.lat.min()),
-    float(ds_cmor.lat.max()),
-    "| lon",
-    ds_cmor.lon.size,
-    float(ds_cmor.lon.min()),
-    float(ds_cmor.lon.max()),
-)
-attrs = {
-    "mip_era": "CMIP6",
-    "activity_id": "CMIP",
-    "institution_id": "NCAR",
-    "institution": "National Center for Atmospheric Research, Climate and Global Dynamics Laboratory, 1850 Table Mesa Drive, Boulder, CO 80305, USA",
-    "product": "model-output",
-    "source_id": "CESM2",
-    "source_type": "AOGCM",
-    "experiment_id": "piControl",
-    "experiment": "Pre-Industrial Control",
-    "sub_experiment_id": "none",
-    "sub_experiment": "none",
-    "realization_index": 1,
-    "initialization_index": 1,
-    "physics_index": 1,
-    "forcing_index": 1,
-    "member_id": "r1i1p1f1",
-    "grid_label": "gr",
-    "calendar": "NO_LEAP",
-    "frequency": "mon",
-    "title": "CESM2 piControl on 1x1 degree grid (regridded)",
-    "outpath": "/glade/derecho/scratch/cmip7/CMIP7",
-    "_controlled_vocabulary_file": "CMIP6_CV.json",
-    "_AXIS_ENTRY_FILE": "CMIP6_coordinate.json",
-    "_FORMULA_VAR_FILE": "CMIP6_formula_terms.json",
-}
 
 # 3) CMOR write
 with CmorSession(
