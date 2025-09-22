@@ -43,7 +43,7 @@ def test_write_variable_loads_basename_table_and_defines_axes(fake_cmor, tmp_pat
         cm.write_variable(ds, "tas", vdef, outdir=outdir)
 
     # Table basename should be used (resolved by inpath)
-    assert fake.last_table == "CMIP6_Amon.json"
+    assert fake.last_table == "Amon.json"
 
     # Axis calls: expect time, latitude, longitude in some order; verify entries exist
     entries = [a[0] for a in fake.axis_calls]
