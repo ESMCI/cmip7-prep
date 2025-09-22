@@ -7,7 +7,7 @@ present in the provided dataset. It also supports a packaged default
 `cmor_dataset.json` living under `cmip7_prep/data/`.
 """
 
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 import re
 from importlib.resources import files as ir_files, as_file
@@ -21,6 +21,26 @@ import xarray as xr
 
 _HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
 _UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
+
+
+@contextmanager
+def _as_path_cm(obj):
+    """
+    Yield a Path whether `obj` is already a path-like or a context manager
+    (e.g., importlib.resources.as_file(...)).
+    """
+    # already a path-like → no-op context
+    if isinstance(obj, (str, Path)):
+        yield Path(obj)
+        return
+
+    # context manager that yields a path-like
+    if hasattr(obj, "__enter__") and hasattr(obj, "__exit__"):
+        with obj as p:
+            yield Path(p)
+        return
+
+    raise TypeError(f"Unsupported dataset_json object type: {type(obj)!r}")
 
 
 # ---------------------------------------------------------------------
