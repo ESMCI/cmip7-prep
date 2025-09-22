@@ -70,7 +70,7 @@ jobs:
       - name: Install NetCDF
         run: sudo apt-get update && sudo apt-get install -y libnetcdf-dev
       - name: Install ESMF
-        uses: esmf-org/install-esmf-action@v1
+        uses: esmf-org/install-esmf-action@v1.0.0
 	with:
 	  version: latest
 
