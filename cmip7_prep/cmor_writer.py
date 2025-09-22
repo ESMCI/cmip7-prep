@@ -35,7 +35,9 @@ def packaged_dataset_json(filename: str = "cmor_dataset.json") -> Any:
             cmor.dataset_json(str(p))
     """
     res = ir_files("cmip7_prep.data").joinpath(filename)
-    return as_file(res)
+    p = as_file(res)
+    print(f" p is {p}")
+    return p
 
 
 # ---------------------------------------------------------------------
@@ -150,6 +152,19 @@ def _get_attr(name: str):
         return cmor.getGblAttr(name)  # type: ignore[attr-defined]
 
 
+def _resolve_table_filename(tables_path: Path, table_key: str) -> str:
+    """Return basename like 'CMIP6_Amon.json' or 'CMIP7_Amon.json' based on tables_path."""
+    # If caller passed an explicit filename, keep it.
+    if table_key.endswith(".json"):
+        return table_key
+    pstr = str(tables_path)
+    if "CMIP6" in pstr:
+        return f"CMIP6_{table_key}.json"
+    if "CMIP7" in pstr:
+        return f"CMIP7_{table_key}.json"
+    return f"{table_key}.json"
+
+
 # ---------------------------------------------------------------------
 # CMOR session
 # ---------------------------------------------------------------------
@@ -178,26 +193,29 @@ class CmorSession(AbstractContextManager):
 
     def __enter__(self) -> "CmorSession":
         """Initialize CMOR and register dataset metadata."""
-        cmor.setup(inpath=self.tables_path, netcdf_file_action=cmor.CMOR_REPLACE_3)
+        # Setup CMOR with the Tables directory
+        replace_flag = getattr(cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 0))
+        verbosity = getattr(cmor, "CMOR_NORMAL", getattr(cmor, "CMOR_VERBOSE", 0))
+        cmor.setup(
+            inpath=str(self.tables_path),
+            netcdf_file_action=replace_flag,
+            set_verbosity=verbosity,
+        )
 
-        if self.dataset_json_path:
-            cmor.dataset_json(self.dataset_json_path)
-        elif self.dataset_attrs:
-            for key, value in self.dataset_attrs.items():
-                cmor.set_cur_dataset_attribute(key, value)
-        else:
-            # Fallback to packaged cmor_dataset.json if available
-            with packaged_dataset_json() as p:
-                cmor.dataset_json(str(p))
-
-        # product must be exactly "model-output" for CMIP6 tables
-        if "cmip6" in str(self.tables_path):
-            try:
-                prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
-            except Exception:  # pylint: disable=broad-except
-                prod = None
-            if prod != "model-output":
-                cmor.set_cur_dataset_attribute("product", "model-output")
+        # ALWAYS seed CMOR’s internal dataset state from a JSON file,
+        # then apply dataset_attrs as overrides.
+        p = (
+            self.dataset_json_path
+            if self.dataset_json_path is not None
+            else packaged_dataset_json()
+        )
+        cmor.dataset_json(str(p))
+        try:
+            prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
+        except Exception:  # pylint: disable=broad-except
+            prod = None
+        if prod != "model-output":
+            cmor.set_cur_dataset_attribute("product", "model-output")
 
         # long paragraph; split to keep lines < 100
         inst = _get_attr("institution_id") or "NCAR"
@@ -354,19 +372,11 @@ class CmorSession(AbstractContextManager):
     ) -> None:
         """Write one variable from `ds` to a CMOR-compliant NetCDF file."""
         # Pick CMOR table: prefer vdef.table, else vdef.realm (default Amon)
-        table_key = getattr(vdef, "table", None) or getattr(vdef, "realm", "Amon")
-        table_key = str(table_key)
-        candidate7 = Path(self.tables_path) / f"CMIP7_{table_key}.json"
-        candidate6 = Path(self.tables_path) / f"CMIP6_{table_key}.json"
-        print(f"table_key is {table_key} candidate6 is {candidate6}")
-
-        if candidate7.exists():
-            cmor.load_table(str(candidate7))
-        elif candidate6.exists():
-            cmor.load_table(str(candidate6))
-        else:
-            # Let CMOR search inpath; will raise if not found
-            cmor.load_table(f"CMIP7_{table_key}.json")
+        table_key = (
+            getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "Amon"
+        )
+        table_filename = _resolve_table_filename(self.tables_path, table_key)
+        cmor.load_table(table_filename)
 
         axes_ids = self._define_axes(ds, vdef)
 

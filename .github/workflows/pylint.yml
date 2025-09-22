@@ -67,6 +67,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
+      - name: Install NetCDF
+        run: sudo apt-get update && sudo apt-get install -y libnetcdf-dev
+      - name: Install ESMF
+        uses: esmf-org/install-esmf-action@v1
+	with:
+	  version: latest
 
       - name: Install Poetry
         run: |
