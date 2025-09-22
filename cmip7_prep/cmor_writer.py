@@ -11,7 +11,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 import re
 from importlib.resources import files as ir_files, as_file
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, Union
 import datetime as dt
 import cftime
 import cmor
@@ -168,8 +168,8 @@ class CmorSession(AbstractContextManager):
 
     def __init__(
         self,
-        tables_path: str | Path,
-        dataset_json: str | Path | None = None,
+        tables_path: Union[str, Path],
+        dataset_json: Union[str, Path, None] = None,
         dataset_attrs: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.tables_path = str(tables_path)
