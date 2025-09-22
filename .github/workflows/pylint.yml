@@ -70,9 +70,16 @@ jobs:
       - name: Install NetCDF
         run: sudo apt-get update && sudo apt-get install -y libnetcdf-dev
       - name: Install ESMF
-        uses: esmf-org/install-esmf-action@v1.0.0
+        uses: esmf-org/install-esmf-action@v1
+	env:
+	  ESMF_NETCDF: nc-config
 	with:
 	  version: latest
+	  esmpy: true
+      - name: Show ESMF info
+        run: |
+          echo "ESMFMKFILE=$ESMFMKFILE"
+          test -f "$ESMFMKFILE" && head -n 20 "$ESMFMKFILE"
 
       - name: Install Poetry
         run: |
