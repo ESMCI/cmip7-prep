@@ -75,7 +75,7 @@ jobs:
           ESMF_NETCDF: nc-config
           ESMF_INSTALL_PREFIX: $HOME/ESMF
         with:
-          version: v8.8.1
+          version: latest
           esmpy: true
       - name: Show ESMF info
         run: |
