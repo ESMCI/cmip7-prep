@@ -84,13 +84,12 @@ jobs:
 
       - name: Install Poetry
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pipx
+          python -m pip install --upgrade pip pipx
           pipx install poetry
           poetry --version
 
       - name: Enable in-project venv for better caching
-        run: poetry config virtualenvs.in-project true
+        run: poetry config virtualenvs.create false
 
       - name: Cache virtualenv
         uses: actions/cache@v4
@@ -104,9 +103,8 @@ jobs:
       - name: Install deps (incl. dev)
         run: poetry install --no-interaction --no-ansi
 
-      # If your tests need environment variables, set them here (example):
-      # - name: Set test env
-      #   run: echo "CMIP7_PREP_TEST=1" >> $GITHUB_ENV
-
       - name: Run pytest
+        env:
+          ESMFMKFILE: ${{ env.ESMFMKFILE }}
+          LD_LIBRARY_PATH: ${{ env.ESMF_INSTALL_PREFIX }}/lib:${{ env.LD_LIBRARY_PATH }}
         run: poetry run pytest -q
