@@ -7,10 +7,7 @@ readme = "README.md"
 packages = [{ include = "cmip7_prep" }]
 # Include non-Python data files in both sdist and wheel
 include = [
-  { path = "cmip7_prep/data/*.yaml", format = "sdist" },
-  { path = "cmip7_prep/data/*.yaml", format = "wheel" },
-  { path = "cmip7_prep/data/*.json", format = "sdist" },
-  { path = "cmip7_prep/data/*.json", format = "wheel" },
+  { path = "cmip7_prep/data/**" }
 ]
 
 [tool.poetry.dependencies]

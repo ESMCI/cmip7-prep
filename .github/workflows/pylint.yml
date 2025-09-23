@@ -88,17 +88,17 @@ jobs:
           pipx install poetry
           poetry --version
 
-      - name: Enable in-project venv for better caching
+      - name: Do not create virtualenv
         run: poetry config virtualenvs.create false
 
-      - name: Cache virtualenv
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            venv-${{ runner.os }}-py${{ matrix.python-version }}-
-            venv-${{ runner.os }}-
+#      - name: Cache virtualenv
+#        uses: actions/cache@v4
+#        with:
+#          path: .venv
+#          key: venv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+#          restore-keys: |
+#            venv-${{ runner.os }}-py${{ matrix.python-version }}-
+#            venv-${{ runner.os }}-
 
       - name: Install deps (incl. dev)
         run: poetry install --no-interaction --no-ansi

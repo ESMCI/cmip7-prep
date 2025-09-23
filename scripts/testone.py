@@ -4,6 +4,7 @@ import xarray as xr
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
+from cmip7_prep.dreq_search import find_variables_by_prefix
 
 basedir = Path(
     "/glade/derecho/scratch/cmip7/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1_32/atm/hist_monthly/"
@@ -11,6 +12,10 @@ basedir = Path(
 
 # 0) Load mapping (uses packaged data/cesm_to_cmip7.yaml by default)
 mapping = Mapping.from_packaged_default()
+
+cmip_vars = find_variables_by_prefix(None, "Amon.", include_groups={"baseline_monthly"})
+print(f"cmip_vars found: {cmip_vars}")
+exit
 cmip_vars = ["tas"]
 
 ds_native = open_native_for_cmip_vars(
