@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import xarray as xr
 from cmip7_prep.mapping_compat import Mapping
-from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
+from cmip7_prep.pipeline import realize_regrid_prepare_many, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
 
 basedir = Path(
@@ -22,27 +22,29 @@ ds_native = open_native_for_cmip_vars(
     parallel=True,
 )
 
-for cmip_var in cmip_vars:
-    # 2) One call: realize → chunk → regrid → carry time+bounds
-    ds_cmor = realize_regrid_prepare(
-        mapping,
-        ds_native,
-        cmip_var,
-        time_chunk=12,
-        regrid_kwargs={"output_time_chunk": 12, "dtype": "float32"},
+# 2) One call: realize → chunk → regrid → carry time+bounds
+ds_cmor = realize_regrid_prepare_many(
+    mapping,
+    ds_native,
+    cmip_vars,
+    time_chunk=12,
+    regrid_kwargs={
+        "output_time_chunk": 12,
+        "dtype": "float32",
+        "bilinear_map": Path(
+            "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+        ),
+        "conservative_map": Path(
+            "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
+        ),
+    },
+)
+# 3) CMOR write
+with CmorSession(
+    tables_path="/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables",
+) as cm:
+    cm.write_variables(
+        ds_cmor, cmip_vars, mapping, outdir=Path("/glade/derecho/scratch/cmip7/CMIP7")
     )
-    cfg = mapping.get_cfg(cmip_var)
-    # 3) CMOR write
-    with CmorSession(
-        tables_path="/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables",
-    ) as cm:
-        vdef = type(
-            "VDef",
-            (),
-            {"name": cmip_var, "realm": "Amon", "units": cfg.get("units", "")},
-        )()
-        cm.write_variable(
-            ds_cmor, cmip_var, vdef, outdir=Path("/glade/derecho/scratch/cmip7/CMIP7")
-        )
 
 print("ok")

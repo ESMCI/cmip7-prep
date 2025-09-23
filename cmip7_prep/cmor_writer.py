@@ -10,8 +10,9 @@ present in the provided dataset. It also supports a packaged default
 from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 import re
+import types
 from importlib.resources import files as ir_files, as_file
-from typing import Any, Optional, Dict, Union
+from typing import Any, Optional, Dict, Union, Sequence
 import datetime as dt
 import cftime
 
@@ -450,3 +451,19 @@ class CmorSession(AbstractContextManager):
         outdir.mkdir(parents=True, exist_ok=True)
         outfile = outdir / f"{getattr(vdef, 'name', varname)}.nc"
         cmor.close(var_id, file_name=str(outfile))
+
+    def write_variables(
+        self,
+        ds: xr.Dataset,
+        cmip_vars: Sequence[str],
+        mapping: "Mapping",
+        *,
+        outdir: Path,
+    ) -> None:
+        """Write multiple CMIP variables from one dataset."""
+        for v in cmip_vars:
+            cfg = mapping.get_cfg(v) or {}
+            table = cfg.get("table", "Amon")
+            units = cfg.get("units", "")
+            vdef = types.SimpleNamespace(name=v, table=table, realm=table, units=units)
+            self.write_variable(ds, v, vdef, outdir=outdir)

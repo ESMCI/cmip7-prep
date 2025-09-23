@@ -3,7 +3,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, Sequence
 
 import numpy as np
 import xarray as xr
@@ -445,7 +445,7 @@ def regrid_to_1deg(
 
 def regrid_to_1deg_ds(
     ds_in: xr.Dataset,
-    varname: str,
+    varname: str | Sequence[str],
     *,
     time_from: xr.Dataset | None = None,
     method: Optional[str] = None,
@@ -455,12 +455,38 @@ def regrid_to_1deg_ds(
     dtype: str | None = "float32",
     output_time_chunk: int | None = 12,
 ) -> xr.Dataset:
-    """Regrid `varname` and return a Dataset containing the regridded variable.
+    """Regrid one or many variables in `ds_in` to a 1° lat/lon grid.
 
-    Parameters mirror regrid_to_1deg, but this function:
-      - returns an xr.Dataset({varname: DataArray})
-      - if `time_from` is provided, copies 'time' and its bounds into the dataset
+    - If `varname` is a string, returns Dataset with that single variable.
+    - If `varname` is a sequence (list/tuple), regrids each and returns them together.
+    - If `time_from` is None, we copy time (+bounds) from `ds_in` when present.
     """
+    # Multi-var path
+    if not isinstance(varname, str):
+        names = list(varname)
+        out_vars: dict[str, xr.DataArray] = {}
+        for vn in names:
+            if vn not in ds_in:
+                raise KeyError(f"Variable '{vn}' not found in input dataset.")
+            out_vars[vn] = regrid_to_1deg(
+                ds_in,
+                vn,
+                method=method,
+                conservative_map=conservative_map,
+                bilinear_map=bilinear_map,
+                keep_attrs=keep_attrs,
+                dtype=dtype,
+                output_time_chunk=output_time_chunk,
+            )
+        ds_out = xr.Dataset(out_vars)
+        # Attach time + bounds from ds_in by default (or explicit time_from)
+        src = time_from if time_from is not None else ds_in
+
+        ds_out = _attach_time_and_bounds(ds_out, src)
+
+        return ds_out
+
+    # Single-var path (unchanged from your version)
     da = regrid_to_1deg(
         ds_in,
         varname,
@@ -472,8 +498,10 @@ def regrid_to_1deg_ds(
         output_time_chunk=output_time_chunk,
     )
     ds_out = xr.Dataset({varname: da})
-    if time_from is not None:
-        ds_out = _attach_time_and_bounds(ds_out, time_from)
+    src = time_from if time_from is not None else ds_in
+
+    ds_out = _attach_time_and_bounds(ds_out, src)
+
     return ds_out
 
 
