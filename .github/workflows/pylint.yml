@@ -89,7 +89,7 @@ jobs:
         env:
           ESMFMKFILE: ${{ env.ESMFMKFILE }}
           LD_LIBRARY_PATH: ${{ env.ESMF_INSTALL_PREFIX }}/lib:${{ env.LD_LIBRARY_PATH }}
-	run: |
+        run: |
           poetry run python -m pip install --upgrade pip
           poetry run python -m pip install esmpy
       - name: Cache virtualenv
