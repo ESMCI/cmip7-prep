@@ -15,6 +15,27 @@ dataset_overrides:
   nominal_resolution: 100 km
 
 variables:
+variables:
+  cl:
+    table: Amon
+    units: "%"
+    long_name: Cloud Area Fraction
+    standard_name: cloud_area_fraction
+    cell_methods: "time: mean"
+    dims: [time, lev, lat, lon]         # keep model levels
+    formula: CLOUD * 100
+    levels:
+      name: standard_hybrid_sigma
+      units: "1"
+      src_axis_name: lev                 # model midlevel dimension
+      src_axis_bnds: ilev                # model interface/bounds dim (if you ever need it)
+      hyam: hyam                         # 1D (lev,)
+      hybm: hybm                         # 1D (lev,)
+      ps: PS                             # (time, lat, lon) — regridded with the rest
+      p0: P0                             # scalar (Pa); default to 100000 if missing
+    sources:
+      - cesm_var: CLOUD
+      - cesm_var: PS
 
   tas:
     table: Amon

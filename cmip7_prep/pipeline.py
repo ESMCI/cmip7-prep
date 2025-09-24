@@ -52,6 +52,8 @@ def _collect_required_cesm_vars(
         levels = cfg.get("levels") or {}
         if (levels.get("name") or "").lower() == "plev19":
             needed.update({"PS", "hyam", "hybm", "P0"})
+        elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
+            needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
     return sorted(needed)
 
 

@@ -33,6 +33,7 @@ class FakeCMOR:  # pylint: disable=too-many-instance-attributes
         self.axis_calls: list[tuple] = []
         self.variable_calls: list[tuple] = []
         self.write_calls: list[tuple] = []
+        self.logfile: str | None = None
         self.closed = False
         self.closed_file = ""
 

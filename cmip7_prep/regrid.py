@@ -3,8 +3,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Tuple, Sequence
-
+from typing import Optional, Dict, Tuple
+from collections.abc import Mapping, Iterable
 import numpy as np
 import xarray as xr
 import xesmf as xe
@@ -231,71 +231,138 @@ def _get_dst_latlon_1d(m: xr.Dataset) -> Tuple[np.ndarray, np.ndarray]:
     return lat, lon
 
 
-def _make_dummy_grids(mapfile: Path) -> Tuple[xr.Dataset, xr.Dataset]:
-    """Construct minimal ds_in/ds_out satisfying xESMF when reusing weights."""
+def _bounds_from_centers_1d(
+    centers: np.ndarray, *, periodic: bool = False, period: float = 360.0
+) -> np.ndarray:
+    """Compute simple 1D bounds from 1D cell centers.
+    For regular spacing this sets bounds[i] = [c[i]-dx/2, c[i]+dx/2].
+    For periodic=True, wrap the last bound to period (e.g., lon 0..360)."""
+
+    centers = np.asarray(centers, dtype="f8").ravel()
+    n = centers.size
+    b = np.empty((n, 2), dtype="f8")
+    if n == 1:
+        # Any small cell is fine for dummy grid; choose +/- 0.5 around center
+        dx = 1.0
+        b[0, 0] = centers[0] - dx / 2.0
+        b[0, 1] = centers[0] + dx / 2.0
+    else:
+        # Estimate dx from adjacent centers (assume uniform spacing)
+        dx = np.diff(centers).mean()
+        b[:, 0] = centers - dx / 2.0
+        b[:, 1] = centers + dx / 2.0
+    if periodic:
+        # Keep within [0, period]
+        b = np.mod(b, period)
+        # Ensure right bound of last cell connects to period exactly
+        # (helps some ESMF periodic checks for 0..360)
+        b[-1, 1] = (
+            period if abs(b[-1, 1] - period) < 1e-6 or b[-1, 1] < 1e-6 else b[-1, 1]
+        )
+    return b
+
+
+def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
+    """Construct minimal ds_in/ds_out satisfying xESMF when reusing weights.
+    Adds CF-style bounds for both lat and lon so conservative methods don’t
+    trigger cf-xarray’s bounds inference on size-1 dimensions."""
     with _open_nc(mapfile) as m:
         nlat_in, nlon_in = _get_src_shape(m)
         lat_out_1d, lon_out_1d = _get_dst_latlon_1d(m)
 
-    # Dummy input: arbitrary 2D indices, only shapes matter when weights are provided.
+    # --- Dummy INPUT grid (unstructured → represent as 2D with length-1 lat) ---
+    lat_in = np.arange(nlat_in, dtype="f8")  # e.g., [0], length can be 1
+    lon_in = np.arange(nlon_in, dtype="f8")
     ds_in = xr.Dataset(
-        {
-            "lat": ("lat", np.arange(nlat_in, dtype="f8")),
-            "lon": ("lon", np.arange(nlon_in, dtype="f8")),
-        }
+        data_vars={
+            "lat_bnds": (
+                ("lat", "nbnds"),
+                _bounds_from_centers_1d(lat_in, periodic=False),
+            ),
+            "lon_bnds": (
+                ("lon", "nbnds"),
+                _bounds_from_centers_1d(lon_in, periodic=False),
+            ),
+        },
+        coords={
+            "lat": (
+                "lat",
+                lat_in,
+                {
+                    "units": "degrees_north",
+                    "standard_name": "latitude",
+                    "bounds": "lat_bnds",
+                },
+            ),
+            "lon": (
+                "lon",
+                lon_in,
+                {
+                    "units": "degrees_east",
+                    "standard_name": "longitude",
+                    "bounds": "lon_bnds",
+                },
+            ),
+            "nbnds": ("nbnds", np.array([0, 1], dtype="i4")),
+        },
     )
-    ds_in["lat"].attrs.update({"units": "degrees_north", "standard_name": "latitude"})
-    ds_in["lon"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
 
-    # Output: 1D regular lat/lon extracted from weights
-    ds_out = xr.Dataset({"lat": ("lat", lat_out_1d), "lon": ("lon", lon_out_1d)})
-    ds_out["lat"].attrs.update({"units": "degrees_north", "standard_name": "latitude"})
-    ds_out["lon"].attrs.update({"units": "degrees_east", "standard_name": "longitude"})
+    # --- OUTPUT grid from weights (canonical 1° lat/lon) ---
+    lat_out_bnds = _bounds_from_centers_1d(lat_out_1d, periodic=False)
+    lon_out_bnds = _bounds_from_centers_1d(lon_out_1d, periodic=True, period=360.0)
+
+    ds_out = xr.Dataset(
+        data_vars={
+            "lat_bnds": (("lat", "nbnds"), lat_out_bnds),
+            "lon_bnds": (("lon", "nbnds"), lon_out_bnds),
+        },
+        coords={
+            "lat": (
+                "lat",
+                lat_out_1d,
+                {
+                    "units": "degrees_north",
+                    "standard_name": "latitude",
+                    "bounds": "lat_bnds",
+                },
+            ),
+            "lon": (
+                "lon",
+                lon_out_1d,
+                {
+                    "units": "degrees_east",
+                    "standard_name": "longitude",
+                    "bounds": "lon_bnds",
+                },
+            ),
+            "nbnds": ("nbnds", np.array([0, 1], dtype="i4")),
+        },
+    )
 
     return ds_in, ds_out
 
 
 # -------------------------
-# Cache
-# -------------------------
-
-
-class _RegridderCache:
-    """Cache of xESMF Regridders constructed from weight files.
-
-    We build minimal `ds_in`/`ds_out` from the weight file to satisfy CF checks,
-    then reuse the weight file for the actual mapping.
-    """
-
-    _cache: Dict[Path, xe.Regridder] = {}
-
-    @classmethod
-    def get(cls, mapfile: Path, method_label: str) -> xe.Regridder:
-        """Return a cached regridder for the given weight file and method."""
-        mapfile = mapfile.expanduser().resolve()
-        if mapfile not in cls._cache:
-            if not mapfile.exists():
-                raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
-            ds_in, ds_out = _make_dummy_grids(mapfile)
-            cls._cache[mapfile] = xe.Regridder(
-                ds_in,
-                ds_out,
-                method=method_label,
-                filename=str(mapfile),  # reuse the ESMF weight file on disk
-                reuse_weights=True,
-                periodic=True,  # 0..360 longitudes
-            )
-        return cls._cache[mapfile]
-
-    @classmethod
-    def clear(cls) -> None:
-        """Clear all cached regridders (useful for tests or releasing resources)."""
-        cls._cache.clear()
-
-
-# -------------------------
 # Selection & utilities
 # -------------------------
+
+
+def _hybrid_support_names(cfg: dict) -> set[str]:
+    """Return names needed for hybrid-sigma CMOR axis/z-factors, based on mapping cfg."""
+    levels = (cfg or {}).get("levels") or {}
+    if (levels.get("name") or "").lower() != "standard_hybrid_sigma":
+        return set()
+    # mapping keys with sensible defaults for CESM
+    return {
+        levels.get("src_axis_name", "lev"),
+        levels.get("src_axis_bnds", "ilev"),
+        levels.get("hyam", "hyam"),
+        levels.get("hybm", "hybm"),
+        levels.get("hyai", "hyai"),
+        levels.get("hybi", "hybi"),
+        levels.get("p0", "P0"),
+        levels.get("ps", "PS"),  # PS needs regridding (handled separately below)
+    }
 
 
 def _pick_maps(
@@ -333,6 +400,59 @@ def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
 # -------------------------
 # Public API
 # -------------------------
+# regrid.py
+
+
+def regrid_to_1deg_ds(
+    ds_in: xr.Dataset,
+    varname: str | list[str],
+    *,
+    time_from: xr.Dataset | None = None,
+    method: Optional[str] = None,
+    conservative_map: Optional[Path] = None,
+    bilinear_map: Optional[Path] = None,
+    keep_attrs: bool = True,
+    dtype: str | None = "float32",
+    output_time_chunk: int | None = 12,
+    carry: Iterable[str] = (),  # NEW
+) -> xr.Dataset:
+    """Regrid var(s) and return a Dataset. If `carry` is provided, copy those
+    names through unchanged when they are 1-D/non-spatial (no ncol/lat/lon)."""
+
+    names = [varname] if isinstance(varname, str) else list(varname)
+    out_vars: dict[str, xr.DataArray] = {}
+
+    for name in names:
+        out_vars[name] = regrid_to_1deg(
+            ds_in,
+            name,
+            method=method,
+            conservative_map=conservative_map,
+            bilinear_map=bilinear_map,
+            keep_attrs=keep_attrs,
+            dtype=dtype,
+            output_time_chunk=output_time_chunk,
+        )
+
+    ds_out = xr.Dataset(out_vars)
+
+    # Attach time (and bounds) from the original dataset if requested
+    if time_from is not None:
+        ds_out = _attach_time_and_bounds(ds_out, time_from)
+
+    # --- NEW: carry hybrid metadata (or any requested 1-D fields) unchanged ---
+    for name in carry or ():
+        if name in ds_in:
+            da = ds_in[name]
+            # copy only if it isn't a spatial field that would need regridding
+            if isinstance(da, xr.DataArray) and not any(
+                d in da.dims for d in ("ncol", "lat", "lon")
+            ):
+                ds_out[name] = da
+        elif name in ds_in.coords:
+            ds_out = ds_out.assign_coords({name: ds_in.coords[name]})
+
+    return ds_out
 
 
 def regrid_to_1deg(
@@ -443,66 +563,64 @@ def regrid_to_1deg(
     return out
 
 
-def regrid_to_1deg_ds(
-    ds_in: xr.Dataset,
-    varname: str | Sequence[str],
+def realize_regrid_prepare_many(
+    mapping: Mapping,
+    ds_native: xr.Dataset,
+    cmip_vars: Iterable[str],
     *,
-    time_from: xr.Dataset | None = None,
-    method: Optional[str] = None,
-    conservative_map: Optional[Path] = None,
-    bilinear_map: Optional[Path] = None,
-    keep_attrs: bool = True,
-    dtype: str | None = "float32",
-    output_time_chunk: int | None = 12,
+    time_chunk: int = 12,
+    regrid_kwargs: dict | None = None,
 ) -> xr.Dataset:
-    """Regrid one or many variables in `ds_in` to a 1° lat/lon grid.
+    """Realize multiple CMIP variables, regrid to 1°, and return one Dataset."""
 
-    - If `varname` is a string, returns Dataset with that single variable.
-    - If `varname` is a sequence (list/tuple), regrids each and returns them together.
-    - If `time_from` is None, we copy time (+bounds) from `ds_in` when present.
-    """
-    # Multi-var path
-    if not isinstance(varname, str):
-        names = list(varname)
-        out_vars: dict[str, xr.DataArray] = {}
-        for vn in names:
-            if vn not in ds_in:
-                raise KeyError(f"Variable '{vn}' not found in input dataset.")
-            out_vars[vn] = regrid_to_1deg(
-                ds_in,
-                vn,
-                method=method,
-                conservative_map=conservative_map,
-                bilinear_map=bilinear_map,
-                keep_attrs=keep_attrs,
-                dtype=dtype,
-                output_time_chunk=output_time_chunk,
-            )
-        ds_out = xr.Dataset(out_vars)
-        # Attach time + bounds from ds_in by default (or explicit time_from)
-        src = time_from if time_from is not None else ds_in
+    regrid_kwargs = dict(regrid_kwargs or {})
+    regrid_kwargs.setdefault("output_time_chunk", time_chunk)
+    regrid_kwargs.setdefault("dtype", "float32")
 
-        ds_out = _attach_time_and_bounds(ds_out, src)
+    # 1) Realize all requested variables on native grid (includes formulas)
+    realized: dict[str, xr.DataArray] = {}
+    for v in cmip_vars:
+        realized[v] = mapping.realize(ds_native, v)
 
-        return ds_out
+    ds_tmp = xr.Dataset(realized)
 
-    # Single-var path (unchanged from your version)
-    da = regrid_to_1deg(
-        ds_in,
-        varname,
-        method=method,
-        conservative_map=conservative_map,
-        bilinear_map=bilinear_map,
-        keep_attrs=keep_attrs,
-        dtype=dtype,
-        output_time_chunk=output_time_chunk,
+    # 2) Figure out which hybrid pieces we must preserve / regrid
+    carry_names: set[str] = set()
+    need_ps = False
+    for v in cmip_vars:
+        cfg = mapping.get_cfg(v) or {}
+        needed = _hybrid_support_names(cfg)
+        if not needed:
+            continue
+        carry_names |= {n for n in needed if n != "PS"}  # carry 1-D stuff
+        if "PS" in needed:
+            need_ps = True
+    print(f"carry_names: {carry_names}")
+    # 3) Regrid the realized variables
+    ds_regr = regrid_to_1deg_ds(
+        ds_tmp,
+        list(cmip_vars),
+        time_from=ds_native,
+        carry=sorted(carry_names),  # lev/ilev/hyam/hybm/hyai/hybi/P0
+        **regrid_kwargs,
     )
-    ds_out = xr.Dataset({varname: da})
-    src = time_from if time_from is not None else ds_in
 
-    ds_out = _attach_time_and_bounds(ds_out, src)
+    # 4) If any var needs PS for hybrid z-factors, regrid and add it
+    if need_ps:
+        # Pick the PS field from *native* dataset (common name P(S)), or via mapping if needed
+        ps_name = "PS"
+        if ps_name not in ds_native and "ps" in ds_native:
+            ps_name = "ps"
+        if ps_name in ds_native:
+            ds_regr["PS"] = regrid_to_1deg(
+                ds_native,
+                ps_name,
+                output_time_chunk=regrid_kwargs["output_time_chunk"],
+                dtype=regrid_kwargs["dtype"],
+            )
+        # else: leave it out; cmor_writer will raise a clear KeyError if missing
 
-    return ds_out
+    return ds_regr
 
 
 def _attach_time_and_bounds(ds_out: xr.Dataset, time_from: xr.Dataset) -> xr.Dataset:
@@ -559,3 +677,41 @@ def _attach_time_and_bounds(ds_out: xr.Dataset, time_from: xr.Dataset) -> xr.Dat
     ds_out["time"].attrs = ta
 
     return ds_out
+
+
+# -------------------------
+# Cache
+# -------------------------
+
+
+class _RegridderCache:
+    """Cache of xESMF Regridders constructed from weight files.
+
+    We build minimal `ds_in`/`ds_out` from the weight file to satisfy CF checks,
+    then reuse the weight file for the actual mapping.
+    """
+
+    _cache: Dict[Path, xe.Regridder] = {}
+
+    @classmethod
+    def get(cls, mapfile: Path, method_label: str) -> xe.Regridder:
+        """Return a cached regridder for the given weight file and method."""
+        mapfile = mapfile.expanduser().resolve()
+        if mapfile not in cls._cache:
+            if not mapfile.exists():
+                raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
+            ds_in, ds_out = _make_dummy_grids(mapfile)
+            cls._cache[mapfile] = xe.Regridder(
+                ds_in,
+                ds_out,
+                method=method_label,
+                filename=str(mapfile),  # reuse the ESMF weight file on disk
+                reuse_weights=True,
+                periodic=True,  # 0..360 longitudes
+            )
+        return cls._cache[mapfile]
+
+    @classmethod
+    def clear(cls) -> None:
+        """Clear all cached regridders (useful for tests or releasing resources)."""
+        cls._cache.clear()
