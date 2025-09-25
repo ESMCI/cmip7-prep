@@ -216,6 +216,146 @@ def _get_attr(name: str):
         return cmor.getGblAttr(name)  # type: ignore[attr-defined]
 
 
+def make_strictly_monotonic(x, direction="increasing"):
+    """
+    Return a float copy of x with strictly monotonic values by minimally nudging
+    entries when needed.
+
+    Parameters
+    ----------
+    x : array_like
+        1-D array.
+    direction : {"increasing", "decreasing"}
+        Desired strict monotonic direction.
+
+    Notes
+    -----
+    - Uses np.nextafter(prev, ±inf) to bump the *smallest possible* amount.
+    - NaNs split the series into independent segments (left unchanged).
+    - If an infinite value appears where a further increase/decrease is required,
+      a ValueError is raised because it can't be nudged.
+    """
+    y = np.asarray(x, dtype=float).copy()
+    if y.ndim != 1:
+        raise ValueError(f"x must be 1-D {y.ndim}")
+
+    inc = direction.lower().startswith("inc")
+    n = y.size
+    i = 0
+    while i < n:
+        # skip NaNs; treat each finite segment independently
+        if not np.isfinite(y[i]):
+            i += 1
+            continue
+        # find contiguous finite segment [i:j)
+        j = i + 1
+        while j < n and np.isfinite(y[j]):
+            j += 1
+
+        smallest_normal_float = 1.0e-12
+        # enforce strict monotonicity within y[i:j]
+        for k in range(i + 1, j):
+            prev = y[k - 1]
+            curr = y[k]
+            if inc:
+                if prev == np.inf:
+                    if not curr > prev:
+                        raise ValueError(
+                            "Cannot make sequence strictly increasing past +inf."
+                        )
+                if not curr > prev:
+                    y[k] = max(curr, prev + smallest_normal_float)
+            else:
+                if prev == -np.inf:
+                    if not curr < prev:
+                        raise ValueError(
+                            "Cannot make sequence strictly decreasing past -inf."
+                        )
+                if not curr < prev:
+                    y[k] = min(curr, prev - smallest_normal_float)
+        i = j  # move to next segment
+
+    return y
+
+
+def is_strictly_monotonic(arr):
+    """simple test to see if 1d array is strictly monotonic"""
+    # Check for non-decreasing
+    is_increasing = np.all(arr[:-1] < arr[1:])
+    # Check for non-increasing
+    is_decreasing = np.all(arr[:-1] > arr[1:])
+    return is_increasing or is_decreasing
+
+
+def _sigma_mid_and_bounds(
+    ds: xr.Dataset, levels: dict
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return (mid_sigma, bounds_sigma) in [0,1] for standard_hybrid_sigma."""
+    lev_name = levels.get("src_axis_name", "lev")
+    hybm_name = levels.get("hybm", "hybm")  # B mid
+    # hyai_name = levels.get("hyai", "hyai")  # A interfaces (optional)
+    hybi_name = levels.get("hybi", "hybi")  # B interfaces (preferred)
+    ilev_name = levels.get("src_axis_bnds", "ilev")
+
+    # 1) midpoints: prefer B mid (dimensionless 0..1); fallback to lev if already 0..1
+    if hybm_name in ds:
+        mid = np.asarray(ds[hybm_name].values, dtype="f8")
+        mid = make_strictly_monotonic(mid)
+    elif lev_name in ds:
+        mid_candidate = np.asarray(ds[lev_name].values, dtype="f8")
+        if np.nanmin(mid_candidate) >= 0.0 and np.nanmax(mid_candidate) <= 1.0:
+            mid = mid_candidate
+        else:
+            raise ValueError(f"{lev_name} is not sigma (0..1);")
+    else:
+        raise KeyError("No sigma mid-levels found (need hybm or lev in [0,1]).")
+
+    # 2) bounds: prefer B interfaces; else use ilev if 0..1; else synthesize
+    if hybi_name in ds:
+        edges = np.asarray(ds[hybi_name].values, dtype="f8")
+        edges = make_strictly_monotonic(edges)
+        if edges.ndim == 1 and edges.size == mid.size + 1:
+            bnds = np.column_stack((edges[:-1], edges[1:]))
+        else:
+            raise ValueError(f"{hybi_name} has unexpected shape.")
+    elif ilev_name in ds:
+        ilev = np.asarray(ds[ilev_name].values, dtype="f8")
+        if (
+            np.nanmin(ilev) >= 0.0
+            and np.nanmax(ilev) <= 1.0
+            and ilev.size == mid.size + 1
+        ):
+            bnds = np.column_stack((ilev[:-1], ilev[1:]))
+        else:
+            # synthesize from mid if ilev isn't sigma
+            edges = np.empty(mid.size + 1, dtype="f8")
+            edges[1:-1] = 0.5 * (mid[:-1] + mid[1:])
+            edges[0] = 0.0
+            edges[-1] = 1.0
+            bnds = np.column_stack((edges[:-1], edges[1:]))
+    else:
+        edges = np.empty(mid.size + 1, dtype="f8")
+        edges[1:-1] = 0.5 * (mid[:-1] + mid[1:])
+        edges[0] = 0.0
+        edges[-1] = 1.0
+        bnds = np.column_stack((edges[:-1], edges[1:]))
+
+    # sanity: must be in [0,1]
+    if (
+        np.nanmin(mid) < 0.0
+        or np.nanmax(mid) > 1.0
+        or np.nanmin(bnds) < 0.0
+        or np.nanmax(bnds) > 1.0
+    ):
+        raise ValueError("sigma mid/bounds not in [0,1].")
+    print("check for monotinic arrays")
+    if not is_strictly_monotonic(mid):
+        raise ValueError(f"sigma mid {mid} not monotonic.")
+    if not is_strictly_monotonic(bnds):
+        raise ValueError(f"sigma bounds {bnds} not monotonic.")
+    return mid, bnds
+
+
 def _resolve_table_filename(tables_path: Path, key: str) -> str:
     # key like "Amon" or "coordinate"
     candidates = [
@@ -268,11 +408,7 @@ class CmorSession(
         self._log_name = log_name
         self._log_path: Path | None = None
 
-        # internals you already had…
-        self._last_time_vals = None
-        self._last_time_bnds = None
-        self._last_ps_zvar_id = None
-        self._last_ps_name = None
+        self._pending_ps = None
 
     def __enter__(self) -> "CmorSession":
         # Resolve logfile path if requested
@@ -419,12 +555,6 @@ class CmorSession(
         - axis_ids order MUST match the order of ds[vdef.name].dims
         """
 
-        var_name = getattr(vdef, "name", None)
-        if var_name is None or var_name not in ds:
-            raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
-        var_da = ds[var_name]
-        var_dims = list(var_da.dims)
-
         # ---- helpers ----
         def _get_time_and_bounds(dsi: xr.Dataset):
             time_da = (
@@ -479,30 +609,13 @@ class CmorSession(
                     b = np.array([[vals[0] - 0.5, vals[0] + 0.5]], dtype="f8")
             return vals, b, units
 
-        def _get_scalar_p0(dsi: xr.Dataset, p0_name: str) -> float:
-            if p0_name in dsi:
-                arr = dsi[p0_name]
-                v = arr.values[()] if arr.shape == () else np.asarray(arr).ravel()[0]
-                try:
-                    return float(v)
-                except (TypeError, ValueError, OverflowError):
-                    pass
-            return 1.0e5
-
-        # ---- time axis ----
-        time_id = None
-        tvals, tbnds, t_units = _get_time_and_bounds(ds)
-        if tvals is not None:
-            time_id = cmor.axis(
-                table_entry="time",
-                units=t_units,
-                coord_vals=tvals,
-                cell_bounds=tbnds if tbnds is not None else None,
-            )
-        # keep for cmor.write()
-        self._last_time_vals = tvals
-        self._last_time_bnds = tbnds
-
+        var_name = getattr(vdef, "name", None)
+        if var_name is None or var_name not in ds:
+            raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
+        var_da = ds[var_name]
+        var_dims = list(var_da.dims)
+        alev_id = None
+        plev_id = None
         # ---- horizontal axes (use CMOR names) ----
         if "lat" not in ds or "lon" not in ds:
             raise KeyError(
@@ -524,89 +637,79 @@ class CmorSession(
             cell_bounds=lon_bnds,
         )
 
-        # ---- vertical axis (hybrid sigma or pressure) ----
+        # ---- time axis ----
+        time_id = None
+        tvals, tbnds, t_units = _get_time_and_bounds(ds)
+        if tvals is not None:
+            time_id = cmor.axis(
+                table_entry="time",
+                units=t_units,
+                coord_vals=tvals,
+                cell_bounds=tbnds if tbnds is not None else None,
+            )
+        # --- vertical: standard_hybrid_sigma ---
+        levels = getattr(vdef, "levels", {}) or {}
 
-        alev_id = None
-        plev_id = None
-        ps_zvar_id = None
-        self._last_ps_zvar_id = None
-        self._last_ps_name = None
-
-        levels = getattr(vdef, "levels", None) or {}
-        lev_kind = (levels.get("name") or "").lower()
-
-        if lev_kind in {"standard_hybrid_sigma"} or "lev" in var_dims:
-            # Names from mapping (with sensible defaults for CESM/CAM)
-            lev_name = levels.get("src_axis_name", "lev")
-            lev_bnds = levels.get("src_axis_bnds", "ilev")
-            hyam_name = levels.get("hyam", "hyam")
-            hybm_name = levels.get("hybm", "hybm")
-            hyai_name = levels.get("hyai", "hyai")
-            hybi_name = levels.get("hybi", "hybi")
+        if (levels.get("name") or "").lower() in {
+            "standard_hybrid_sigma",
+            "alevel",
+            "alev",
+        } or "lev" in var_dims:
+            # names in the native ds
+            hyam_name = levels.get("hyam", "hyam")  # A mid (dimensionless)
+            hybm_name = levels.get("hybm", "hybm")  # B mid (dimensionless)
+            hyai_name = levels.get("hyai", "hyai")  # A interfaces (optional)
+            hybi_name = levels.get("hybi", "hybi")  # B interfaces (preferred)
             ps_name = levels.get("ps", "PS")
-            p0_name = levels.get("p0", "P0")
 
-            # 0) Required arrays present?
-            for req in (lev_name, lev_bnds, hyam_name, hybm_name, ps_name, p0_name):
-                if req not in ds:
-                    raise KeyError(f"Hybrid sigma requires '{req}' in dataset.")
-            # bounds for a/b are optional; axis bounds are mandatory
-            if hyai_name not in ds or hybi_name not in ds:
-                pass  # not fatal for zfactors; but axis bounds still come from lev_bnds
+            # 0) sigma mid and bounds (0..1)
+            sigma_mid, sigma_bnds = _sigma_mid_and_bounds(ds, levels)
 
-            # 1) Define the hybrid sigma axis with coord values + bounds
-            lev_vals = np.asarray(ds[lev_name].values, dtype="f8")
-            ilev_vals = np.asarray(
-                ds[lev_bnds].values, dtype="f8"
-            )  # shape (nlev, 2) or (nlev+1) to be reshaped
-            # Ensure bounds are (nlev, 2)
-            if ilev_vals.ndim == 1 and ilev_vals.size == lev_vals.size + 1:
-                ilev_vals = np.column_stack([ilev_vals[:-1], ilev_vals[1:]])
-            elif ilev_vals.ndim != 2 or ilev_vals.shape[1] != 2:
-                raise ValueError(
-                    f"{lev_bnds} must be (nlev, 2) or length nlev+1; got {ilev_vals.shape}"
-                )
-
+            # 1) define axis using sigma
             alev_id = cmor.axis(
                 table_entry="standard_hybrid_sigma",
                 units="1",
-                coord_vals=lev_vals,
-                cell_bounds=ilev_vals,
+                coord_vals=sigma_mid,
+                cell_bounds=sigma_bnds,
             )
 
-            # 2) Z-factors: a (Pa), b (1), p0 (Pa), ps(time,lat,lon) (Pa)
-            p0 = float(np.asarray(ds[p0_name]).reshape(()))  # scalar
-            hyam = np.asarray(ds[hyam_name].values, dtype="f8")
-            hybm = np.asarray(ds[hybm_name].values, dtype="f8")
+            # 2) z-factors: a(lev), b(lev), p0(scalar), ps(time,lat,lon)
 
-            # CMOR expects 'a' in Pa (use CESM hyam * p0) and 'b' unitless
             cmor.zfactor(
                 zaxis_id=alev_id,
                 zfactor_name="a",
-                units="Pa",
+                units="1",
                 axis_ids=[alev_id],
-                values=hyam * p0,
+                zfactor_values=np.asarray(ds[hyam_name].values),
+                zfactor_bounds=np.asarray(ds[hyai_name].values),
             )
             cmor.zfactor(
                 zaxis_id=alev_id,
                 zfactor_name="b",
                 units="1",
                 axis_ids=[alev_id],
-                values=hybm,
+                zfactor_values=np.asarray(ds[hybm_name].values),
+                zfactor_bounds=np.asarray(ds[hybi_name].values),
             )
-            cmor.zfactor(zaxis_id=alev_id, zfactor_name="p0", units="Pa", values=p0)
 
-            # ps will be written alongside the main variable (so CMOR can snapshot it)
-            if ps_name not in ds:
-                raise KeyError(
-                    "Hybrid coordinate requires surface pressure 'PS' in dataset."
-                )
-            ps_axes = [ax for ax in (time_id, lat_id, lon_id) if ax is not None]
-            ps_zvar_id = cmor.zfactor(
-                zaxis_id=alev_id, zfactor_name="ps", units="Pa", axis_ids=ps_axes
+            # p0 scalar
+            cmor.zfactor(
+                zaxis_id=alev_id, zfactor_name="p0", units="Pa", zfactor_values=1.0e5
             )
-            self._last_ps_zvar_id = ps_zvar_id
-            self._last_ps_name = ps_name
+            # ps(time,lat,lon) zfactor must be DEFINED before the main variable
+            ps_da = ds[ps_name]  # ensure units are Pa
+            ps_zvar_id = cmor.zfactor(
+                zaxis_id=alev_id,
+                zfactor_name="ps",
+                units="Pa",
+                axis_ids=[
+                    time_id,
+                    lat_id,
+                    lon_id,
+                ],  # order must match var’s non-vertical axes
+            )
+            # stash to write before main variable
+            self._pending_ps = (ps_zvar_id, ps_da)
 
         elif "plev" in var_dims:
             # Pressure levels expected in data
@@ -626,14 +729,15 @@ class CmorSession(
             )
 
         axes_ids = []
-        if "time" in ds.dims:
+        if "time" in var_dims:
             axes_ids.append(time_id)
-        if alev_id is not None and "lev" in getattr(vdef, "dims", []):
+        if alev_id is not None and "lev" in var_dims:
             axes_ids.append(alev_id)
-        if "plev" in getattr(vdef, "dims", []):
+        if "plev" in var_dims:
             axes_ids.append(plev_id)
-        axes_ids.extend([lat_id, lon_id])
 
+        axes_ids.extend([lat_id, lon_id])
+        print(f"axes_ids at this point {axes_ids}")
         return axes_ids
 
     # public API
@@ -675,70 +779,34 @@ class CmorSession(
         time_da = ds.coords.get("time")
         if time_da is None:
             time_da = ds.get("time")
-        tvals = None
-        tbnds = None
         nt = 0
-        if isinstance(time_da, xr.DataArray):
-            nt = int(time_da.sizes.get("time", 0))
-            # numeric time passes through; cftime → encode
-            try:
-                tvals = _encode_time_to_num(
-                    time_da,  # works for numeric or cftime
-                    units=time_da.attrs.get("units", "days since 1850-01-01"),
-                    calendar=time_da.attrs.get(
-                        "calendar", time_da.encoding.get("calendar", "noleap")
-                    ),
-                )
-            except ValueError:
-                # If numeric, just pass as numpy
-                tvals = np.asarray(time_da, dtype="f8")
-
-            # bounds (via CF 'bounds' attr or common names)
-            bname = time_da.attrs.get("bounds")
-            if isinstance(bname, str) and bname in ds:
-                tb = ds[bname]
-            elif "time_bounds" in ds:
-                tb = ds["time_bounds"]
-            elif "time_bnds" in ds:
-                tb = ds["time_bnds"]
-            else:
-                tb = None
-            if isinstance(tb, xr.DataArray):
-                try:
-                    tbnds = _encode_time_to_num(
-                        tb,
-                        units=time_da.attrs.get("units", "days since 1850-01-01"),
-                        calendar=time_da.attrs.get(
-                            "calendar", time_da.encoding.get("calendar", "noleap")
-                        ),
-                    )
-                except ValueError:
-                    tbnds = np.asarray(tb, dtype="f8")
-
-        # ---- Hybrid ps streaming (if present) ----
-        store_with = None
-        if getattr(self, "_last_ps_zvar_id", None) is not None:
-            store_with = self._last_ps_zvar_id
-            ps_name = getattr(self, "_last_ps_name", None)
-            if ps_name and ps_name in ds:
-                ps_filled, _ = _filled_for_cmor(ds[ps_name])
-                cmor.write(
-                    store_with,
-                    np.asarray(ps_filled),
-                    time_vals=tvals,
-                    time_bnds=tbnds,
-                    ntimes_passed=nt,
-                )
 
         # ---- Main variable write ----
         cmor.write(
             var_id,
             np.asarray(data_filled),
             ntimes_passed=nt,
-            time_vals=tvals,
-            time_bnds=tbnds,
-            store_with=store_with,  # safe if None
         )
+        # ---- Hybrid ps streaming (if present) ----
+        if self._pending_ps is not None:
+            ps_id, ps_da = self._pending_ps
+            if "time" in ps_da.dims:
+                ps_da = ps_da.transpose("time", "lat", "lon")
+                nt_ps = int(ps_da.sizes["time"])
+            else:
+                nt_ps = 0
+            ps_filled, _ = _filled_for_cmor(ps_da)
+            if nt_ps > 0:
+                print(f"writing ps for {ps_filled} .")
+                cmor.write(
+                    ps_id,
+                    np.asarray(ps_filled),
+                    ntimes_passed=nt_ps,
+                    store_with=var_id,
+                )
+            else:
+                cmor.write(ps_id, np.asarray(ps_filled), store_with=var_id)
+            self._pending_ps = None
 
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)

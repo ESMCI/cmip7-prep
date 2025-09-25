@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Tuple
-from collections.abc import Mapping, Iterable
 import numpy as np
 import xarray as xr
 import xesmf as xe
@@ -81,6 +80,36 @@ def _open_nc(path: Path) -> xr.Dataset:
         f"Could not open {path} with xarray engines ['netcdf4', 'scipy']. "
         f"Tried both; reasons: {details}"
     )
+
+
+def _attach_vertical_metadata(ds_out: xr.Dataset, ds_src: xr.Dataset) -> xr.Dataset:
+    """
+    Pass-through vertical metadata needed for hybrid-sigma:
+      - level midpoints: lev (1D)
+      - level interfaces: ilev (1D)  -> bounds for lev
+      - hybrid coefficients: hyam, hybm (mid), hyai, hybi (interfaces)
+      - p0/P0 scalar
+    Does not regrid any of these (they are non-horizontal).
+    """
+    # carry 'lev' coord if the field uses it
+
+    if "lev" in ds_src and "lev" not in ds_out.coords:
+        ds_out = ds_out.assign_coords(lev=ds_src["lev"])
+
+    # carry interface levels and hybrid coeffs if present
+    for name in ("ilev", "hyam", "hybm", "hyai", "hybi", "P0", "p0"):
+        if name in ds_src and name not in ds_out:
+            print(f"adding field {name} to ds_out")
+            ds_out[name] = ds_src[name]
+
+    # ensure lev points to ilev as bounds (what CMOR expects)
+    if "lev" in ds_out and "ilev" in ds_out:
+        attrs = dict(ds_out["lev"].attrs)
+        attrs.setdefault("units", "1")
+        attrs["bounds"] = "ilev"
+        ds_out["lev"].attrs = attrs
+
+    return ds_out
 
 
 # -------------------------
@@ -414,7 +443,6 @@ def regrid_to_1deg_ds(
     keep_attrs: bool = True,
     dtype: str | None = "float32",
     output_time_chunk: int | None = 12,
-    carry: Iterable[str] = (),  # NEW
 ) -> xr.Dataset:
     """Regrid var(s) and return a Dataset. If `carry` is provided, copy those
     names through unchanged when they are 1-D/non-spatial (no ncol/lat/lon)."""
@@ -441,17 +469,7 @@ def regrid_to_1deg_ds(
         ds_out = _attach_time_and_bounds(ds_out, time_from)
 
     # --- NEW: carry hybrid metadata (or any requested 1-D fields) unchanged ---
-    for name in carry or ():
-        if name in ds_in:
-            da = ds_in[name]
-            # copy only if it isn't a spatial field that would need regridding
-            if isinstance(da, xr.DataArray) and not any(
-                d in da.dims for d in ("ncol", "lat", "lon")
-            ):
-                ds_out[name] = da
-        elif name in ds_in.coords:
-            ds_out = ds_out.assign_coords({name: ds_in.coords[name]})
-
+    ds_out = _attach_vertical_metadata(ds_out, ds_in)
     return ds_out
 
 
@@ -488,6 +506,7 @@ def regrid_to_1deg(
         raise KeyError(f"{varname!r} not in dataset.")
 
     var_da = ds_in[varname]  # always a DataArray
+
     da2, non_spatial = _ensure_ncol_last(var_da)
 
     # cast to save memory
@@ -561,66 +580,6 @@ def regrid_to_1deg(
         out.attrs.update(var_da.attrs)
 
     return out
-
-
-def realize_regrid_prepare_many(
-    mapping: Mapping,
-    ds_native: xr.Dataset,
-    cmip_vars: Iterable[str],
-    *,
-    time_chunk: int = 12,
-    regrid_kwargs: dict | None = None,
-) -> xr.Dataset:
-    """Realize multiple CMIP variables, regrid to 1°, and return one Dataset."""
-
-    regrid_kwargs = dict(regrid_kwargs or {})
-    regrid_kwargs.setdefault("output_time_chunk", time_chunk)
-    regrid_kwargs.setdefault("dtype", "float32")
-
-    # 1) Realize all requested variables on native grid (includes formulas)
-    realized: dict[str, xr.DataArray] = {}
-    for v in cmip_vars:
-        realized[v] = mapping.realize(ds_native, v)
-
-    ds_tmp = xr.Dataset(realized)
-
-    # 2) Figure out which hybrid pieces we must preserve / regrid
-    carry_names: set[str] = set()
-    need_ps = False
-    for v in cmip_vars:
-        cfg = mapping.get_cfg(v) or {}
-        needed = _hybrid_support_names(cfg)
-        if not needed:
-            continue
-        carry_names |= {n for n in needed if n != "PS"}  # carry 1-D stuff
-        if "PS" in needed:
-            need_ps = True
-    print(f"carry_names: {carry_names}")
-    # 3) Regrid the realized variables
-    ds_regr = regrid_to_1deg_ds(
-        ds_tmp,
-        list(cmip_vars),
-        time_from=ds_native,
-        carry=sorted(carry_names),  # lev/ilev/hyam/hybm/hyai/hybi/P0
-        **regrid_kwargs,
-    )
-
-    # 4) If any var needs PS for hybrid z-factors, regrid and add it
-    if need_ps:
-        # Pick the PS field from *native* dataset (common name P(S)), or via mapping if needed
-        ps_name = "PS"
-        if ps_name not in ds_native and "ps" in ds_native:
-            ps_name = "ps"
-        if ps_name in ds_native:
-            ds_regr["PS"] = regrid_to_1deg(
-                ds_native,
-                ps_name,
-                output_time_chunk=regrid_kwargs["output_time_chunk"],
-                dtype=regrid_kwargs["dtype"],
-            )
-        # else: leave it out; cmor_writer will raise a clear KeyError if missing
-
-    return ds_regr
 
 
 def _attach_time_and_bounds(ds_out: xr.Dataset, time_from: xr.Dataset) -> xr.Dataset:

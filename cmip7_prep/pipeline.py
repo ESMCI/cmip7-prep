@@ -105,6 +105,12 @@ def open_native_for_cmip_vars(
         parallel=parallel,
         **open_kwargs,
     )
+    # Convert "lev" and "ilev" units from mb to Pa for downstream operations.
+    if "lev" in ds:
+        ds["lev"] = ds["lev"] / 1000
+    if "ilev" in ds:
+        ds["ilev"] = ds["ilev"] / 1000
+
     return ds
 
 
@@ -209,12 +215,15 @@ def realize_regrid_prepare_many(
     open_kwargs: Optional[dict] = None,
 ) -> xr.Dataset:
     """
-    Open native (if needed) → realize all CMIP variables → verticalize if needed → regrid all to 1°.
-    Returns an xr.Dataset with all requested CMIP variables ready for CMOR.
+    Open native (if needed) → realize requested CMIP variables →
+    ensure hybrid-σ support fields are present (PS & coeffs) →
+    apply vertical handling for CMIP vars only → regrid CMIP vars + PS →
+    return 1° dataset that still includes hybrid coeffs (unmodified).
     """
     regrid_kwargs = dict(regrid_kwargs or {})
     open_kwargs = dict(open_kwargs or {})
 
+    # 1) Open native once
     if isinstance(ds_or_glob, xr.Dataset):
         ds_native = ds_or_glob
     else:
@@ -222,29 +231,68 @@ def realize_regrid_prepare_many(
             list(cmip_vars), ds_or_glob, mapping, **open_kwargs
         )
 
-    # realize all
-    realized = {}
+    # 2) Realize each CMIP var and overlay onto native so we keep auxiliaries
+    realized: dict[str, xr.DataArray] = {}
     for v in cmip_vars:
         ds_v = mapping.realize(ds_native, v)
-        if isinstance(ds_v, xr.DataArray):
-            da = ds_v
-        else:
-            if v not in ds_v:
-                raise KeyError(f"Mapping produced no '{v}' variable.")
-            da = ds_v[v]
+        da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[v]
         if time_chunk and "time" in da.dims:
             da = da.chunk({"time": int(time_chunk)})
         realized[v] = da
 
-    ds_vars = xr.Dataset(realized)
+    ds_tmp = ds_native.assign(**realized)
 
-    # verticals
+    # Promote vertical axes to coords if present (helps CF/CMOR)
+    for name in ("lev", "ilev"):
+        if name in ds_tmp:
+            ds_tmp = ds_tmp.set_coords(name)
+
+    # 3) Detect if any requested CMIP var uses hybrid-σ and, if so, prepare support
+    regrid_vars = set(cmip_vars)  # variables to actually regrid (lat/lon)
+    carry_along: dict[str, xr.DataArray] = {}  # coeffs kept unchanged (1D)
+
+    for v in cmip_vars:
+        cfg = mapping.get_cfg(v) or {}
+        levels = cfg.get("levels") or {}
+        kind = str(levels.get("name", "")).lower()
+        if kind in {"standard_hybrid_sigma", "alev", "alevel"}:
+            # names as specified in mapping (with robust defaults)
+            ps_name = levels.get("ps", "PS")
+            hyam_name = levels.get("hyam", "hyam")
+            hybm_name = levels.get("hybm", "hybm")
+            p0_name = levels.get("P0", "P0")
+            ilev_name = levels.get("src_axis_bnds", "ilev")
+            lev_name = levels.get("src_axis_name", "lev")
+
+            # PS must be regridded (time,lat,lon); include only if present
+            if ps_name in ds_tmp:
+                regrid_vars.add(ps_name)
+
+            # Hybrid coeffs are 1D; just carry them through unchanged if present
+            for aux in (hyam_name, hybm_name, p0_name, ilev_name, lev_name):
+                if aux in ds_tmp and aux not in carry_along:
+                    carry_along[aux] = ds_tmp[aux]
+
+    # 4) Vertical handling for CMIP vars only (do NOT include PS here)
     ds_vert = _apply_vertical_if_needed_many(
-        ds_vars, ds_native, cmip_vars, mapping, tables_path
+        ds_tmp, ds_native, list(cmip_vars), mapping, tables_path
     )
 
-    # regrid together
+    # Make sure hybrid coeffs (1D) are still present for CMOR writer
+    if carry_along:
+        ds_vert = ds_vert.assign(
+            **{k: v for k, v in carry_along.items() if k not in ds_vert}
+        )
+
+    # 5) Regrid CMIP vars + PS (PS will be present if required & found above)
     ds_regr = regrid_to_1deg_ds(
-        ds_vert, list(cmip_vars), time_from=ds_native, **regrid_kwargs
+        ds_vert, list(sorted(regrid_vars)), time_from=ds_native, **regrid_kwargs
     )
+
+    # Reattach coeffs after regridding (they're 1D; no regridding needed)
+    if carry_along:
+        missing = {k: v for k, v in carry_along.items() if k not in ds_regr}
+        if missing:
+            ds_regr = ds_regr.assign(**missing)
+
     return ds_regr
