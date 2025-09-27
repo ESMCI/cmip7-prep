@@ -2,12 +2,29 @@
 
 from __future__ import annotations
 import argparse
+import sys
+import warnings
 from pathlib import Path
 import xarray as xr
 import numpy as np
 
 from cmip7_prep.regrid import regrid_to_1deg
 from cmip7_prep.cmor_writer import CmorSession
+
+# The following will give a traceback with each warning
+# def _short_formatwarning(message, category, filename, lineno, line=None):
+#    # Only "Category: message", newline at end (no file/line)
+#    return f"{category.__name__}: {message}\n"
+# warnings.formatwarning = _short_formatwarning
+
+
+# pylint: disable=unused-argument,too-many-positional-arguments
+def _one_line_showwarning(message, category, filename, lineno, file=None, line=None):
+    (file or sys.stderr).write(f"{category.__name__}: {message}\n")
+
+
+warnings.showwarning = _one_line_showwarning
+warnings.simplefilter("always", RuntimeWarning)
 
 
 def make_target(out: Path) -> None:
@@ -41,7 +58,12 @@ def prepare(
         vdef = type(
             "VDef",
             (),
-            {"name": var, "realm": realm, "units": da.attrs.get("units", "")},
+            {
+                "name": var,
+                "realm": realm,
+                "units": da.attrs.get("units", ""),
+                "positive": None,
+            },
         )()
         cm.write_variable(ds_out, var, vdef, outdir=outdir)
 

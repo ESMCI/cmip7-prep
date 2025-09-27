@@ -15,7 +15,6 @@ dataset_overrides:
   nominal_resolution: 100 km
 
 variables:
-variables:
   cl:
     table: Amon
     units: "%"
@@ -35,50 +34,51 @@ variables:
       p0: P0                             # scalar (Pa); default to 100000 if missing
     sources:
       - cesm_var: CLOUD
-      - cesm_var: PS
-
-  tas:
+  cli:
     table: Amon
-    units: K
-    long_name: Near-Surface Air Temperature
-    standard_name: air_temperature
-    cell_methods: "time: mean"
-    dims: [time, lat, lon]
-    regrid_method: bilinear
+    units: "kg kg-1"
+    dims: [time, lev, lat, lon]
+    levels:
+      name: standard_hybrid_sigma
+      units: "1"
+      src_axis_name: lev
+      src_axis_bnds: ilev
     sources:
-      - cesm_var: TS
+      - cesm_var: CLDICE
 
-  psl:
+  clivi:
     table: Amon
-    units: Pa
-    long_name: Sea Level Pressure
-    cell_methods: "time: mean"
+    units: "kg m-2"
     dims: [time, lat, lon]
-    regrid_method: bilinear
     sources:
-      - cesm_var: PSL
+      - cesm_var: TGCLDIWP
 
-  ps:
+  clt:
     table: Amon
-    units: Pa
-    long_name: Surface Air Pressure
-    cell_methods: "time: mean"
+    units: "%"
     dims: [time, lat, lon]
-    regrid_method: bilinear
+    formula: CLDTOT * 100
     sources:
-      - cesm_var: PS
+      - cesm_var: CLDTOT
 
-  pr:
+  clw:
     table: Amon
-    units: kg m-2 s-1
-    long_name: Precipitation
-    standard_name: precipitation_flux
-    cell_methods: "time: mean"
-    dims: [time, lat, lon]
-    regrid_method: conservative
+    units: "kg kg-1"
+    dims: [time, lev, lat, lon]
+    levels:
+      name: standard_hybrid_sigma
+      units: "1"
+      src_axis_name: lev
+      src_axis_bnds: ilev
     sources:
-      - cesm_var: PRECT
-        scale: 1000.0   # convert from m/s to kg m-2 s-1 if needed
+      - cesm_var: CLDLIQ
+
+  clwvi:
+    table: Amon
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: TGCLDLWP
 
   evspsbl:
     table: Amon
@@ -91,6 +91,49 @@ variables:
       - cesm_var: QFLX
         scale: -1.0     # flip sign if CESM positive upward
 
+  hfls:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: LHFLX
+
+  hfss:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: SHFLX
+
+  hur:
+    table: Amon
+    units: "%"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: RELHUM
+
+  hurs:
+    table: Amon
+    units: "%"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: RHREFHT
+
+  hus:
+    table: Amon
+    units: "kg kg-1"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: Q
+
   huss:
     table: Amon
     units: "1"
@@ -99,17 +142,175 @@ variables:
     regrid_method: bilinear
     sources:
       - cesm_var: QREFHT
-        as: qref
-      - cesm_var: TREFHT
-        as: tref
-        optional: true
+
+  pr:
+    table: Amon
+    units: kg m-2 s-1
+    long_name: Precipitation
+    standard_name: precipitation_flux
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: conservative
+    sources:
+      - cesm_var: PRECT
+        scale: 1000.0   # convert from m/s to kg m-2 s-1 if needed
+  prc:
+    table: Amon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    # PRECC is in m s-1 (water equivalent) → convert to kg m-2 s-1
+    formula: PRECC * 1000.0
+    sources:
+      - cesm_var: PRECC
+
+  prsn:
+    table: Amon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    # PRECSC/PRECSL are snowfall rates in m s-1 (water equiv) → convert to kg m-2 s-1
+    formula: (PRECSC + PRECSL) * 1000.0
+    sources:
+      - cesm_var: PRECSC
+      - cesm_var: PRECSL
+
+  prw:
+    table: Amon
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: TMQ
+
+  psl:
+    table: Amon
+    units: Pa
+    long_name: Sea Level Pressure
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: PSL
+  ps:
+    table: Amon
+    units: Pa
+    long_name: Surface Air Pressure
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: bilinear
+    sources:
       - cesm_var: PS
-        as: ps
-        optional: true
-      - cesm_var: RHREFHT
-        as: rh
-        optional: true
-      - expr: "qref if qref is not None else rh_to_q(rh, tref, ps)"
+  rlds:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FLDS
+
+  rldscs:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    formula: FLDS + FLNS - FLNSC
+    sources:
+      - cesm_var: FLDS
+      - cesm_var: FLNS
+      - cesm_var: FLNSC
+
+  rlus:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    formula: FLDS + FLNS
+    sources:
+      - cesm_var: FLDS
+      - cesm_var: FLNS
+  rluscs:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FLUSC
+
+  rlut:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FLUT
+
+  rlutcs:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FLUTC
+
+  rsds:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FSDS
+
+  rsdscs:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FSDSC
+
+  rsdt:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: SOLIN
+
+  rsus:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FSUS
+
+  rsuscs:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FSUSC
+
+  rsut:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FSUTOA
+
+  rsutcs:
+    table: Amon
+    units: "W m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: FSUTOAC
+
+  sfcWind:
+    table: Amon
+    units: "m s-1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: U10
 
   ta:
     table: Amon
@@ -120,9 +321,56 @@ variables:
     levels:
       name: plev19
       units: Pa
-    requires_plev19: true
     sources:
       - cesm_var: T
+
+  tas:
+    table: Amon
+    units: K
+    long_name: Near-Surface Air Temperature
+    standard_name: air_temperature
+    cell_methods: "time: mean"
+    dims: [time, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: TS
+
+  tasmax:
+    table: Amon
+    units: "K"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: TREFHTMX
+
+  tasmin:
+    table: Amon
+    units: "K"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: TREFHTMN
+
+  tauu:
+    table: Amon
+    units: "N m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: TAUX
+
+  tauv:
+    table: Amon
+    units: "N m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: TAUY
+
+  ts:
+    table: Amon
+    units: "K"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: TS
 
   ua:
     table: Amon
@@ -130,9 +378,18 @@ variables:
     long_name: Zonal Wind
     dims: [time, plev, lat, lon]
     regrid_method: bilinear
-    requires_plev19: true
+    levels:
+      name: plev19
+      units: Pa
     sources:
       - cesm_var: U
+
+  uas:
+    table: Amon
+    units: "m s-1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: U10
 
   va:
     table: Amon
@@ -140,41 +397,37 @@ variables:
     long_name: Meridional Wind
     dims: [time, plev, lat, lon]
     regrid_method: bilinear
-    requires_plev19: true
+    levels:
+      name: plev19
+      units: Pa
     sources:
       - cesm_var: V
-
-  mrso:
-    table: Lmon
-    units: kg m-2
-    long_name: Total Soil Moisture Content
+  vas:
+    table: Amon
+    units: "m s-1"
     dims: [time, lat, lon]
-    regrid_method: conservative
     sources:
-      - cesm_var: QSOIL
-        as: qsoil
-      - cesm_var: LANDMASK
-        as: landmask
-        optional: true
-      - expr: "qsoil.where(landmask > 0.5) if landmask is not None else qsoil"
+      - cesm_var: V10
 
-  mmrbc:
-    table: AERmon
-    units: kg kg-1
-    long_name: Black carbon mass mixing ratio
-    dims: [time, lev, lat, lon]
-    regrid_method: bilinear
-    positive: null
-
-    # CMIP6-style fields
-    raw_variables: [bc_a1, bc_a4, bc_c1, bc_c4]
-    formula: bc_a1 + bc_a4 + bc_c1 + bc_c4
-    unit_conversion: null
+  wap:
+    table: Amon
+    units: "Pa s-1"
+    dims: [time, plev, lat, lon]
     levels:
-      name: standard_hybrid_sigma
-      units: "1"
-      src_axis_name: lev
-      src_axis_bnds: ilev
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: OMEGA
+
+  zg:
+    table: Amon
+    units: "m"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: Z3
 
 fx:
   areacella:

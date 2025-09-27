@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from importlib.resources import files, as_file
 from pathlib import Path
 from typing import Any, Dict, List, Mapping as TMapping, Optional
+import warnings
 
 import numpy as np
 import xarray as xr
@@ -168,19 +169,24 @@ class Mapping:
     def realize(self, ds: xr.Dataset, cmip_name: str) -> xr.DataArray:
         """Construct a CMIP variable as an xarray.DataArray from a native dataset."""
         if cmip_name not in self._vars:
-            raise KeyError(f"No mapping for {cmip_name!r} in {self.path}")
+            warnings.warn(
+                f"[mapping] source variable {cmip_name} not found in dataset — skipping",
+                RuntimeWarning,
+                stacklevel=1,
+            )
+            return None
         vc = self._vars[cmip_name]
 
         da = _realize_core(ds, vc)
-
-        if vc.unit_conversion is not None:
-            da = _apply_unit_conversion(da, vc.unit_conversion)
-        if vc.units:
-            da.attrs["units"] = vc.units
-        if vc.long_name:
-            da.attrs.setdefault("long_name", vc.long_name)
-        if vc.standard_name:
-            da.attrs.setdefault("standard_name", vc.standard_name)
+        if da is not None:
+            if vc.unit_conversion is not None:
+                da = _apply_unit_conversion(da, vc.unit_conversion)
+            if vc.units:
+                da.attrs["units"] = vc.units
+            if vc.long_name:
+                da.attrs.setdefault("long_name", vc.long_name)
+            if vc.standard_name:
+                da.attrs.setdefault("standard_name", vc.standard_name)
 
         return da
 

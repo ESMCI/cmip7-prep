@@ -99,7 +99,6 @@ def _attach_vertical_metadata(ds_out: xr.Dataset, ds_src: xr.Dataset) -> xr.Data
     # carry interface levels and hybrid coeffs if present
     for name in ("ilev", "hyam", "hybm", "hyai", "hybi", "P0", "p0"):
         if name in ds_src and name not in ds_out:
-            print(f"adding field {name} to ds_out")
             ds_out[name] = ds_src[name]
 
     # ensure lev points to ilev as bounds (what CMOR expects)

@@ -6,8 +6,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Sequence, Union, Dict, List
 import re
+import warnings
 import glob
-
+import sys
 import xarray as xr
 
 from .mapping_compat import Mapping
@@ -37,7 +38,14 @@ def _collect_required_cesm_vars(
     """Gather all native CESM vars needed to realize the requested CMIP vars."""
     needed: set[str] = set()
     for v in cmip_vars:
-        cfg = mapping.get_cfg(v) or {}
+        try:
+            cfg = mapping.get_cfg(v) or {}
+        except KeyError:
+            print(
+                f"WARNING: skipping '{v}': no mapping found in {mapping.path}",
+                file=sys.stderr,
+            )
+            continue
         src = cfg.get("source")
         raws = cfg.get("raw_variables") or cfg.get("sources") or []
         if src:
@@ -54,6 +62,7 @@ def _collect_required_cesm_vars(
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
+
     return sorted(needed)
 
 
@@ -83,16 +92,29 @@ def open_native_for_cmip_vars(
     xr.Dataset containing only the required CESM variables.
     """
     open_kwargs = dict(open_kwargs or {})
-    required = _collect_required_cesm_vars(mapping, cmip_vars)
+    new_cmip_vars = []
+    for var in cmip_vars:
+        rvar = _collect_required_cesm_vars(mapping, [var])
+        candidates = glob.glob(str(files_glob))
+        selected = sorted(
+            {p for p in candidates if any(_filename_contains_var(p, v) for v in rvar)}
+        )
 
-    candidates = glob.glob(str(files_glob))
-    if not candidates:
-        raise FileNotFoundError(f"No files matched glob: {files_glob}")
+        if selected:
+            new_cmip_vars.append(var)
+        else:
+            warnings.warn(
+                f"[mapping] missing native inputs for {var} - skipping",
+                RuntimeWarning,
+            )
+    required = _collect_required_cesm_vars(mapping, new_cmip_vars)
 
     # keep any file that contains ANY of the required CESM vars as '.var.' in the name
+
     selected = sorted(
         {p for p in candidates if any(_filename_contains_var(p, v) for v in required)}
     )
+
     if not selected:
         raise FileNotFoundError(
             f"No files under glob matched required variables {required} with '.VAR.' token."
@@ -111,7 +133,7 @@ def open_native_for_cmip_vars(
     if "ilev" in ds:
         ds["ilev"] = ds["ilev"] / 1000
 
-    return ds
+    return ds, new_cmip_vars
 
 
 # ----------------------- realization / vertical -----------------------

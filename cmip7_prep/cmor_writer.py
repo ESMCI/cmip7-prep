@@ -13,6 +13,7 @@ import os
 import re
 import types
 import json
+import warnings
 from importlib.resources import files, as_file
 from typing import Any, Sequence
 import datetime as dt
@@ -348,7 +349,7 @@ def _sigma_mid_and_bounds(
         or np.nanmax(bnds) > 1.0
     ):
         raise ValueError("sigma mid/bounds not in [0,1].")
-    print("check for monotinic arrays")
+
     if not is_strictly_monotonic(mid):
         raise ValueError(f"sigma mid {mid} not monotonic.")
     if not is_strictly_monotonic(bnds):
@@ -407,7 +408,6 @@ class CmorSession(
         self._log_dir = Path(log_dir) if log_dir is not None else None
         self._log_name = log_name
         self._log_path: Path | None = None
-
         self._pending_ps = None
 
     def __enter__(self) -> "CmorSession":
@@ -417,6 +417,7 @@ class CmorSession(
             fname = self._log_name or f"cmor_{ts}.log"
             self._log_dir.mkdir(parents=True, exist_ok=True)
             self._log_path = (self._log_dir / fname).resolve()
+            print(f"Creating CMOR data with logs to {self._log_path}")
 
         # Setup CMOR; pass logfile if CMOR supports it, else fall back
         try:
@@ -715,15 +716,43 @@ class CmorSession(
             # Pressure levels expected in data
             plev = ds["plev"]
             pvals = np.asarray(plev.values, dtype="f8")
-            punits = plev.attrs.get("units", "Pa")
+            punits = str(plev.attrs.get("units", "")).strip().lower()
+
+            # Optional bounds
             pb = None
             for nm in ("plev_bnds", "plev_bounds"):
                 if nm in ds:
                     pb = np.asarray(ds[nm].values, dtype="f8")
                     break
+
+            # --- NEW: normalize to Pa ---
+            # Convert hPa/mb/etc → Pa;
+            # if units missing but magnitudes look like hPa (<= ~2000), assume hPa
+            if punits in {"hpa", "mb", "mbar", "millibar"} or (
+                punits == "" and (np.nanmax(pvals) if pvals.size else 0.0) <= 2000.0
+            ):
+                pvals = pvals * 100.0
+                if pb is not None:
+                    pb = pb * 100.0
+            # (if punits already "pa" or values are already in Pa, do nothing)
+
+            # Debug (optional)
+            if pvals.size == 19:
+                table_entry = "plev19"
+            else:
+                table_entry = "plev"
+
+            levels = getattr(vdef, "levels", None) or {}
+            name = levels.get("name")
+            if isinstance(name, str):
+                key = name.strip()
+                # Accept entries like plev19, plev7h, plev27, etc.
+                if key.lower().startswith("plev"):
+                    table_entry = key
+
             plev_id = cmor.axis(
-                table_entry="plev",
-                units=str(punits),
+                table_entry=table_entry,
+                units="Pa",
                 coord_vals=pvals,
                 cell_bounds=pb if pb is not None else None,
             )
@@ -731,13 +760,12 @@ class CmorSession(
         axes_ids = []
         if "time" in var_dims:
             axes_ids.append(time_id)
-        if alev_id is not None and "lev" in var_dims:
+        if alev_id is not None:
             axes_ids.append(alev_id)
-        if "plev" in var_dims:
+        if plev_id is not None:
             axes_ids.append(plev_id)
 
         axes_ids.extend([lat_id, lon_id])
-        print(f"axes_ids at this point {axes_ids}")
         return axes_ids
 
     # public API
@@ -797,7 +825,6 @@ class CmorSession(
                 nt_ps = 0
             ps_filled, _ = _filled_for_cmor(ps_da)
             if nt_ps > 0:
-                print(f"writing ps for {ps_filled} .")
                 cmor.write(
                     ps_id,
                     np.asarray(ps_filled),
@@ -826,5 +853,17 @@ class CmorSession(
             cfg = mapping.get_cfg(v) or {}
             table = cfg.get("table", "Amon")
             units = cfg.get("units", "")
-            vdef = types.SimpleNamespace(name=v, table=table, realm=table, units=units)
-            self.write_variable(ds, v, vdef, outdir=outdir)
+            positive = cfg.get("positive") or None
+            vdef = types.SimpleNamespace(
+                name=v,
+                table=table,
+                realm=table,
+                units=units,
+                positive=positive,
+            )
+            # pylint: disable=broad-exception-caught
+            try:
+                self.write_variable(ds, v, vdef, outdir=outdir)
+            except Exception as e:
+                warnings.warn(f"[cmor] skipping {v} due to error: {e}", RuntimeWarning)
+                # continue to next variable
