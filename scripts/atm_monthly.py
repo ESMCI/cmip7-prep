@@ -17,8 +17,19 @@ from datetime import datetime, UTC
 import dask
 from dask import delayed
 
+scratch = os.getenv("SCRATCH")
 TABLES = "/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables"
-OUTDIR = Path("/glade/derecho/scratch/cmip7/CMIP7")
+INPUTDIR = "/glade/derecho/scratch/cmip7/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist_amon64"
+TSDIR = (
+    scratch
+    + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
+)
+OUTDIR = scratch + "CMIP7"
+
+if not os.path.exists(str(OUTDIR)):
+    os.makedirs(str(OUTDIR))
+if not os.path.exists(str(TSDIR)):
+    os.makedirs(str(TSDIR))
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -92,8 +103,8 @@ if __name__ == "__main__":
 
     cluster = LocalCluster(n_workers=128, threads_per_worker=1, memory_limit="235GB")
     client = cluster.get_client()
-    input_head_dir = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist_amon32"
-    output_head_dir = "/glade/derecho/scratch/cmip7/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
+    input_head_dir = INPUTDIR
+    output_head_dir = TSDIR
     hf_collection = HFCollection(input_head_dir, dask_client=client)
     hf_collection = hf_collection.include_patterns([include_pattern])
 
