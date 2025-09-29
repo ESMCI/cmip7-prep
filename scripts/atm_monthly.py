@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # 1) Load requested variables
     ds_native, cmip_vars = open_native_for_cmip_vars(
         cmip_vars,
-        TSDIR,
+        TSDIR + "/*",
         mapping,
         use_cftime=True,
         parallel=True,
