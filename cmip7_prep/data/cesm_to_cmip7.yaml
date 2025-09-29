@@ -279,16 +279,20 @@ variables:
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
+    formula: FSDS - FSNS
     sources:
-      - cesm_var: FSUS
+      - cesm_var: FSDS
+      - cesm_var: FSNS
 
   rsuscs:
     table: Amon
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
+    formula: FSDSC - FSNSC
     sources:
-      - cesm_var: FSUSC
+      - cesm_var: FSDSC
+      - cesm_var: FSNSC
 
   rsut:
     table: Amon
@@ -302,8 +306,10 @@ variables:
     table: Amon
     units: "W m-2"
     dims: [time, lat, lon]
+    formula: SOLIN - FSNTOAC
     sources:
-      - cesm_var: FSUTOAC
+      - cesm_var: SOLIN
+      - cesm_var: FSNTOAC
 
   sfcWind:
     table: Amon
@@ -407,7 +413,7 @@ variables:
     units: "m s-1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: V10
+      - cesm_var: VBOT
 
   wap:
     table: Amon
