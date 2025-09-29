@@ -19,7 +19,7 @@ from dask import delayed
 
 scratch = os.getenv("SCRATCH")
 TABLES = "/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables"
-INPUTDIR = "/glade/derecho/scratch/cmip7/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist_amon64"
+INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist_amon64"
 TSDIR = (
     scratch
     + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
@@ -95,9 +95,9 @@ def process_one_var(varname: str) -> tuple[str, str]:
 
 
 if __name__ == "__main__":
-
+    # JPE: THIS MECHANISM is currently broken
     # Only atm monthly 32 bit
-    include_pattern = "*cam.h0a.*"
+    # include_pattern = "*cam.h0a.*"
     # Only atm monthly 64 bit
     #    include_pattern = "*cam.h0a*"
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     input_head_dir = INPUTDIR
     output_head_dir = TSDIR
     hf_collection = HFCollection(input_head_dir, dask_client=client)
-    hf_collection = hf_collection.include_patterns([include_pattern])
+    # hf_collection = hf_collection.include_patterns([include_pattern])
 
     hf_collection.pull_metadata()
     ts_collection = TSCollection(
