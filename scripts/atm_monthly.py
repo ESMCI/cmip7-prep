@@ -24,7 +24,7 @@ TSDIR = (
     scratch
     + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
 )
-OUTDIR = scratch + "CMIP7"
+OUTDIR = scratch + "/CMIP7"
 
 if not os.path.exists(str(OUTDIR)):
     os.makedirs(str(OUTDIR))
