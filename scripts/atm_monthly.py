@@ -122,11 +122,10 @@ if __name__ == "__main__":
         None, "Amon.", include_groups={"baseline_monthly"}
     )
     print(f"CMORIZING {len(cmip_vars)} variables")
-    basedir = Path(output_head_dir)
     # 1) Load requested variables
     ds_native, cmip_vars = open_native_for_cmip_vars(
         cmip_vars,
-        os.path.join(basedir, include_pattern),
+        TSDIR,
         mapping,
         use_cftime=True,
         parallel=True,
