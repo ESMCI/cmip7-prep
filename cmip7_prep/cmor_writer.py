@@ -9,13 +9,11 @@ present in the provided dataset. It also supports a packaged default
 
 from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
-import os
 import re
 import types
-import json
 import warnings
 from importlib.resources import files, as_file
-from typing import Any, Sequence
+from typing import Any, Sequence, Optional, Union
 import datetime as dt
 import cftime
 
@@ -30,6 +28,12 @@ import xarray as xr
 _FILL_DEFAULT = 1.0e20
 _HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
 _UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
+
+
+def packaged_dataset_json(filename: str = "cmor_dataset.json"):
+    """Context manager yielding a real filesystem path to the packaged mapping file."""
+    res = files("cmip7_prep").joinpath(f"data/{filename}")
+    return as_file(res)
 
 
 @contextmanager
@@ -371,6 +375,9 @@ def _resolve_table_filename(tables_path: Path, key: str) -> str:
     return f"{key}.json"
 
 
+DatasetJsonLike = Union[str, Path, AbstractContextManager]
+
+
 # ---------------------------------------------------------------------
 # CMOR session
 # ---------------------------------------------------------------------
@@ -394,15 +401,16 @@ class CmorSession(
         *,
         tables_path: Path | str,
         dataset_attrs: dict[str, str] | None = None,
-        dataset_json: Path | None = None,
+        dataset_json: Optional[DatasetJsonLike] = None,
         tracking_prefix: str | None = None,
         # NEW: one log per run (session)
         log_dir: Path | str | None = None,
         log_name: str | None = None,
     ) -> None:
         self.tables_path = Path(tables_path)
-        self.dataset_attrs = dataset_attrs or {}
-        self.dataset_json = Path(dataset_json) if dataset_json else None
+        self.dataset_attrs = dict(dataset_attrs or {})
+        self.dataset_json = dataset_json
+        self._dataset_json_cm = None
         self.tracking_prefix = tracking_prefix
         # logging config
         self._log_dir = Path(log_dir) if log_dir is not None else None
@@ -453,50 +461,22 @@ class CmorSession(
                     getattr(cmor, name)(str(self._log_path))
                     break
 
-        if self.dataset_json is not None:
-            cmor.dataset_json(str(self.dataset_json))
+        # Resolve dataset_json to a real filesystem path
+        dj = self.dataset_json
+        if dj is None:
+            # packaged file → returns a context manager
+            cm = packaged_dataset_json("cmor_dataset.json")
+            self._dataset_json_cm = cm
+            p = cm.__enter__()  # ← ENTER the CM, get a Path
+        elif isinstance(dj, (str, Path)):
+            p = Path(dj)
         else:
-            try:
-                res = files("cmip7_prep").joinpath("data/cmor_dataset.json")
-                # as_file makes sure we have a real filesystem path even if the package is in a zip
-                with as_file(res) as _p:
-                    cmor.dataset_json(
-                        str(_p)
-                    )  # <-- this sets fake.dataset_json_path in tests
-            except (
-                FileNotFoundError,
-                OSError,
-                json.JSONDecodeError,
-                ValueError,
-            ):
-                # Final fallback: still call dataset_json with a dummy string so fakes record it
-                # (real CMOR would error if it tried to open it, but our tests use FakeCMOR)
-                try:
-                    cmor.dataset_json("cmor_dataset.json")
-                except (
-                    FileNotFoundError,
-                    OSError,
-                    json.JSONDecodeError,
-                    ValueError,
-                ):
-                    pass
+            # caller passed a context manager directly
+            self._dataset_json_cm = dj
+            p = dj.__enter__()  # ← ENTER the CM, get a Path
 
-            # Load coordinates first (defines latitude/longitude/alev/plev, etc.)
-            try:
-                table = _resolve_table_filename(self.tables_path, "CV")
-                cmor.set_cur_dataset_attribute(
-                    "_controlled_vocabulary_file", os.path.basename(table)
-                )
-                table = _resolve_table_filename(self.tables_path, "coordinate")
-                cmor.set_cur_dataset_attribute(
-                    "_AXIS_ENTRY_FILE", os.path.basename(table)
-                )
-                table = _resolve_table_filename(self.tables_path, "formula_terms")
-                cmor.set_cur_dataset_attribute(
-                    "_FORMULA_VAR_FILE", os.path.basename(table)
-                )
-            except Exception:  # pylint: disable=broad-except
-                pass
+        cmor.dataset_json(str(p))
+
         try:
             prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
         except Exception:  # pylint: disable=broad-except
@@ -538,9 +518,14 @@ class CmorSession(
 
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: D401
-        """Finalize CMOR, closing any open handles."""
-        cmor.close()
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            cmor.close()  # or your per-var close logic
+        finally:
+            if self._dataset_json_cm is not None:
+                # Close the context manager we entered in __enter__
+                self._dataset_json_cm.__exit__(exc_type, exc, tb)
+                self._dataset_json_cm = None
 
     # -------------------------
     # internal helpers

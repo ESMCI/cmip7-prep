@@ -58,7 +58,7 @@ def process_one_var(varname: str) -> tuple[str, str]:
         )
 
         # Unique log per *run* is in your CmorSession; still fine to reuse here.
-        log_dir = OUTDIR / "logs"
+        log_dir = Path(OUTDIR) / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         with CmorSession(
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     # 1) Load requested variables
     ds_native, cmip_vars = open_native_for_cmip_vars(
         cmip_vars,
-        TSDIR + "/*",
+        Path(TSDIR + "/*"),
         mapping,
         use_cftime=True,
         parallel=True,

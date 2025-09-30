@@ -137,6 +137,7 @@ def open_native_for_cmip_vars(
 
 
 # ----------------------- realization / vertical -----------------------
+#    ds_vert = _apply_vertical_if_needed(ds_vars, cmip_var, cfg, mapping, tables_path=tables_path)
 
 
 def _apply_vertical_if_needed(
@@ -180,8 +181,6 @@ def _apply_vertical_if_needed_many(
 
 
 # ----------------------- single / multi var pipeline -----------------------
-
-
 def realize_regrid_prepare(
     mapping: Mapping,
     ds_or_glob: Union[str, Path, xr.Dataset],
@@ -192,37 +191,65 @@ def realize_regrid_prepare(
     regrid_kwargs: Optional[dict] = None,
     open_kwargs: Optional[dict] = None,
 ) -> xr.Dataset:
-    """
-    Open native (if needed) → realize one CMIP variable → verticalize if needed → regrid to 1°.
-    Returns an xr.Dataset with that single CMIP variable ready for CMOR.
+    """Open native (if needed) → realize one CMIP variable → verticalize if needed → regrid to 1°.
+
+    Returns an xr.Dataset with the requested CMIP variable ready for CMOR.
+    Ensures hybrid-σ auxiliaries (hyam, hybm, P0, PS, lev/ilev) are present when needed.
     """
     regrid_kwargs = dict(regrid_kwargs or {})
     open_kwargs = dict(open_kwargs or {})
 
+    # 1) Get native dataset
     if isinstance(ds_or_glob, xr.Dataset):
         ds_native = ds_or_glob
     else:
+        # Use your existing native opener (don’t add PS here to avoid mapping lookups)
         ds_native = open_native_for_cmip_vars(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
 
-    # realize -> ensure name is cmip_var
-    ds_tmp = mapping.realize(ds_native, cmip_var)
-    if isinstance(ds_tmp, xr.DataArray):
-        ds_tmp = xr.Dataset({cmip_var: ds_tmp})
-    if cmip_var not in ds_tmp:
-        raise KeyError(f"Mapping produced no '{cmip_var}' variable.")
+    # 2) Realize the target variable
+    ds_v = mapping.realize(ds_native, cmip_var)
+    da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
+    if time_chunk and "time" in da.dims:
+        da = da.chunk({"time": int(time_chunk)})
+    ds_vars = xr.Dataset({cmip_var: da})
 
-    if time_chunk and "time" in ds_tmp[cmip_var].dims:
-        ds_tmp[cmip_var] = ds_tmp[cmip_var].chunk({"time": int(time_chunk)})
+    # 3) Check whether hybrid-σ is required
+    cfg = mapping.get_cfg(cmip_var) or {}
+    levels = cfg.get("levels", {}) or {}
+    lev_kind = (levels.get("name") or "").lower()
+    is_hybrid = lev_kind in {"standard_hybrid_sigma", "alev", "alevel"}
 
-    # vertical transform if needed
+    # 4) If hybrid: carry PS in the working dataset (so we can regrid it)
+    # and make sure 1-D coefficients are available
+    if is_hybrid:
+        # PS is on (time,ncol) natively; add it so regridding
+        # can produce PS(time,lat,lon)
+        if "PS" in ds_native and "PS" not in ds_vars:
+            ds_vars = ds_vars.assign(PS=ds_native["PS"])
+
+    # 5) Apply vertical transform if needed (plev19, etc.).
+    # Single-var helper already takes cfg + tables_path
     ds_vert = _apply_vertical_if_needed(
-        ds_tmp, ds_native, cmip_var, mapping, tables_path
+        ds_vars, ds_native, cmip_var, mapping, tables_path=tables_path
     )
 
-    # regrid
-    ds_regr = regrid_to_1deg_ds(ds_vert, cmip_var, time_from=ds_native, **regrid_kwargs)
+    # 6) Regrid (include PS if present)
+    names_to_regrid = [cmip_var]
+    if is_hybrid and "PS" in ds_vert:
+        names_to_regrid.append("PS")
+
+    ds_regr = regrid_to_1deg_ds(
+        ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
+    )
+
+    # 7) If hybrid: merge in 1-D hybrid coefficients directly from native (no regridding needed)
+    if is_hybrid:
+        aux = [nm for nm in ("hyam", "hybm", "P0", "ilev", "lev") if nm in ds_native]
+        if aux:
+            ds_regr = ds_regr.merge(ds_native[aux], compat="override")
+
     return ds_regr
 
 
@@ -297,7 +324,7 @@ def realize_regrid_prepare_many(
 
     # 4) Vertical handling for CMIP vars only (do NOT include PS here)
     ds_vert = _apply_vertical_if_needed_many(
-        ds_tmp, ds_native, list(cmip_vars), mapping, tables_path
+        ds_tmp, ds_native, list(cmip_vars), mapping, tables_path=tables_path
     )
 
     # Make sure hybrid coeffs (1D) are still present for CMOR writer

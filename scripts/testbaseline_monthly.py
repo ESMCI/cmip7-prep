@@ -6,8 +6,8 @@ from cmip7_prep.pipeline import realize_regrid_prepare_many, open_native_for_cmi
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.dreq_search import find_variables_by_prefix
 
-basedir = Path(
-    "/glade/derecho/scratch/cmip7/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist/"
+basedir = Path(os.getenv("SCRATCH")) / Path(
+    "archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist/"
 )
 
 # 0) Load mapping (uses packaged data/cesm_to_cmip7.yaml by default)
@@ -45,7 +45,7 @@ ds_cmor = realize_regrid_prepare_many(
     },
 )
 
-outdir = Path("/glade/derecho/scratch/cmip7/CMIP7")
+outdir = Path(os.getenv("SCRATCH")) / Path("CMIP7")
 
 # 3) CMOR write
 with CmorSession(
