@@ -30,7 +30,6 @@
 
   "title": "CESM2 piControl on 1x1 degree grid (regridded)",
   "references": "See CESM2 documentation and CMIP6 references for NCAR/CGD.",
-    "outpath": "/glade/derecho/scratch/cmip7/CMIP7",
   "output_path_template": "<mip_era><activity_id><institution_id><source_id><experiment_id><_member_id><table><variable_id><grid_label>",
     "output_file_template": "<variable_id><table><source_id><experiment_id><run_variant><grid_label>"
 }

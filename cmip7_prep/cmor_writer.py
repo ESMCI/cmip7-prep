@@ -9,6 +9,7 @@ present in the provided dataset. It also supports a packaged default
 
 from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
+import os
 import re
 import types
 import warnings
@@ -410,6 +411,7 @@ class CmorSession(
         self.tables_path = Path(tables_path)
         self.dataset_attrs = dict(dataset_attrs or {})
         self.dataset_json = dataset_json
+        self._dataset_json_path = None
         self._dataset_json_cm = None
         self.tracking_prefix = tracking_prefix
         # logging config
@@ -474,8 +476,9 @@ class CmorSession(
             # caller passed a context manager directly
             self._dataset_json_cm = dj
             p = dj.__enter__()  # ← ENTER the CM, get a Path
-
-        cmor.dataset_json(str(p))
+        self._dataset_json_path = str(p)
+        outdir = os.path.join(os.environ.get("SCRATCH"), "CMIP7")
+        cmor.set_cur_dataset_attribute("outpath", outdir)
 
         try:
             prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
@@ -819,7 +822,6 @@ class CmorSession(
             else:
                 cmor.write(ps_id, np.asarray(ps_filled), store_with=var_id)
             self._pending_ps = None
-
         outdir = Path(outdir)
         outdir.mkdir(parents=True, exist_ok=True)
         outfile = outdir / f"{getattr(vdef, 'name', varname)}.nc"
