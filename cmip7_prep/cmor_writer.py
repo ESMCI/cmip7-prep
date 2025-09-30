@@ -9,7 +9,7 @@ present in the provided dataset. It also supports a packaged default
 
 from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
-import os
+
 import re
 import types
 import warnings
@@ -407,6 +407,7 @@ class CmorSession(
         # NEW: one log per run (session)
         log_dir: Path | str | None = None,
         log_name: str | None = None,
+        outdir: Path,
     ) -> None:
         self.tables_path = Path(tables_path)
         self.dataset_attrs = dict(dataset_attrs or {})
@@ -419,6 +420,7 @@ class CmorSession(
         self._log_name = log_name
         self._log_path: Path | None = None
         self._pending_ps = None
+        self._outdir = outdir
 
     def __enter__(self) -> "CmorSession":
         # Resolve logfile path if requested
@@ -477,8 +479,7 @@ class CmorSession(
             self._dataset_json_cm = dj
             p = dj.__enter__()  # ← ENTER the CM, get a Path
         self._dataset_json_path = str(p)
-        outdir = os.path.join(os.environ.get("SCRATCH"), "CMIP7")
-        cmor.set_cur_dataset_attribute("outpath", outdir)
+        cmor.set_cur_dataset_attribute("outpath", self._outdir)
 
         try:
             prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
@@ -759,7 +760,10 @@ class CmorSession(
     # public API
     # -------------------------
     def write_variable(
-        self, ds: xr.Dataset, varname: str, vdef: Any, outdir: Path
+        self,
+        ds: xr.Dataset,
+        varname: str,
+        vdef: Any,
     ) -> None:
         """Write one variable from ds to a CMOR-compliant NetCDF file."""
         # Pick CMOR table: prefer vdef.table, else vdef.realm (default Amon)
@@ -822,7 +826,7 @@ class CmorSession(
             else:
                 cmor.write(ps_id, np.asarray(ps_filled), store_with=var_id)
             self._pending_ps = None
-        outdir = Path(outdir)
+        outdir = Path(cmor.get_cur_dataset_attribute("outpath"))
         outdir.mkdir(parents=True, exist_ok=True)
         outfile = outdir / f"{getattr(vdef, 'name', varname)}.nc"
         cmor.close(var_id, file_name=str(outfile))
@@ -832,8 +836,6 @@ class CmorSession(
         ds: xr.Dataset,
         cmip_vars: Sequence[str],
         mapping: "Mapping",
-        *,
-        outdir: Path,
     ) -> None:
         """Write multiple CMIP variables from one dataset."""
         for v in cmip_vars:
@@ -850,7 +852,7 @@ class CmorSession(
             )
             # pylint: disable=broad-exception-caught
             try:
-                self.write_variable(ds, v, vdef, outdir=outdir)
+                self.write_variable(ds, v, vdef)
             except Exception as e:
                 warnings.warn(f"[cmor] skipping {v} due to error: {e}", RuntimeWarning)
                 # continue to next variable
