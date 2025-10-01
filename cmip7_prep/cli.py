@@ -65,7 +65,7 @@ def prepare(
                 "positive": None,
             },
         )()
-        cm.write_variable(ds_out, var, vdef, outdir=outdir)
+        cm.write_variable(ds_out, var, vdef)
 
 
 def main(argv: list[str] | None = None) -> int:
