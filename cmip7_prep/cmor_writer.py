@@ -360,6 +360,7 @@ def _sigma_mid_and_bounds(
         raise ValueError(f"sigma mid {mid} not monotonic.")
     if not is_strictly_monotonic(bnds):
         raise ValueError(f"sigma bounds {bnds} not monotonic.")
+
     return mid, bnds
 
 
@@ -430,7 +431,6 @@ class CmorSession(
             fname = self._log_name or f"cmor_{ts}.log"
             self._log_dir.mkdir(parents=True, exist_ok=True)
             self._log_path = (self._log_dir / fname).resolve()
-        print(f"Creating CMOR data with Tables path {self.tables_path}")
 
         # Setup CMOR; pass logfile if CMOR supports it, else fall back
         try:
@@ -779,7 +779,6 @@ class CmorSession(
         )
 
         table_filename = _resolve_table_filename(self.tables_path, table_key)
-        print(f"table_filename is {table_filename} table_key {table_key}")
         cmor.load_table(table_filename)
 
         data = ds[vdef.name]

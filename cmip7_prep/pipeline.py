@@ -246,7 +246,11 @@ def realize_regrid_prepare(
 
     # 7) If hybrid: merge in 1-D hybrid coefficients directly from native (no regridding needed)
     if is_hybrid:
-        aux = [nm for nm in ("hyam", "hybm", "P0", "ilev", "lev") if nm in ds_native]
+        aux = [
+            nm
+            for nm in ("hyai", "hybi", "hyam", "hybm", "P0", "ilev", "lev")
+            if nm in ds_native
+        ]
         if aux:
             ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 

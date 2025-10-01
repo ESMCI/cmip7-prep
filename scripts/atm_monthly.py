@@ -67,6 +67,7 @@ def process_one_var(varname: str) -> tuple[str, str]:
             log_dir=log_dir,
             log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
             dataset_attrs={"institution_id": "NCAR"},  # plus your other attrs if needed
+            outdir=OUTDIR,
         ) as cm:
             # vdef from mapping cfg
             cfg = mapping.get_cfg(varname)
@@ -87,7 +88,7 @@ def process_one_var(varname: str) -> tuple[str, str]:
             )()
 
             # Your writer expects a dataset with varname present:
-            cm.write_variable(ds_cmor, varname, vdef, outdir=OUTDIR)
+            cm.write_variable(ds_cmor, varname, vdef)
 
         return (varname, "ok")
     except Exception as e:  # keep task alive; report failure

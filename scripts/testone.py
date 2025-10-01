@@ -17,7 +17,7 @@ TABLES = Path("/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables")
 mapping = Mapping.from_packaged_default()
 OUTDIR = scratch + "/CMIP7"
 
-cmip_vars = ["tas"]
+cmip_vars = ["cl"]
 
 ds_native, cmip_vars = open_native_for_cmip_vars(
     cmip_vars,

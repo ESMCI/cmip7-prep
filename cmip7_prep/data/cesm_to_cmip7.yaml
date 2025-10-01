@@ -28,10 +28,6 @@ variables:
       units: "1"
       src_axis_name: lev                 # model midlevel dimension
       src_axis_bnds: ilev                # model interface/bounds dim (if you ever need it)
-      hyam: hyam                         # 1D (lev,)
-      hybm: hybm                         # 1D (lev,)
-      ps: PS                             # (time, lat, lon) — regridded with the rest
-      p0: P0                             # scalar (Pa); default to 100000 if missing
     sources:
       - cesm_var: CLOUD
   cli:
@@ -307,6 +303,7 @@ variables:
     units: "W m-2"
     dims: [time, lat, lon]
     formula: SOLIN - FSNTOAC
+    positive: up
     sources:
       - cesm_var: SOLIN
       - cesm_var: FSNTOAC
