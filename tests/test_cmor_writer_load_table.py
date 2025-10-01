@@ -37,10 +37,12 @@ def test_write_variable_loads_basename_table_and_defines_axes(fake_cmor, tmp_pat
         cw.CmurSession
         if False
         else cw.CmorSession(
-            tables_path=tables_path, dataset_attrs={"institution_id": "NCAR"}
+            tables_path=tables_path,
+            dataset_attrs={"institution_id": "NCAR"},
+            outdir=outdir,
         )
     ) as cm:  # noqa: E701
-        cm.write_variable(ds, "tas", vdef, outdir=outdir)
+        cm.write_variable(ds, "tas", vdef)
 
     # Table basename should be used (resolved by inpath)
     assert fake.last_table == "Amon.json"

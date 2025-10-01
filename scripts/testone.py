@@ -11,7 +11,7 @@ basedir = Path(
     scratch
     + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist/"
 )
-TABLES = "/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables"
+TABLES = Path("/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables")
 
 # 0) Load mapping (uses packaged data/cesm_to_cmip7.yaml by default)
 mapping = Mapping.from_packaged_default()
@@ -76,8 +76,7 @@ with CmorSession(
             "levels": cfg.get("levels", None),
         },
     )()
-
     # Your writer expects a dataset with varname present:
-    cm.write_variable(ds_cmor, varname, vdef, outdir=OUTDIR)
+    cm.write_variable(ds_cmor, varname, vdef)
 
 print("ok")

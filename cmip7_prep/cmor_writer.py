@@ -9,7 +9,6 @@ present in the provided dataset. It also supports a packaged default
 
 from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
-
 import re
 import types
 import warnings
@@ -407,12 +406,11 @@ class CmorSession(
         # NEW: one log per run (session)
         log_dir: Path | str | None = None,
         log_name: str | None = None,
-        outdir: Path,
+        outdir: Path | str | None = None,
     ) -> None:
         self.tables_path = Path(tables_path)
         self.dataset_attrs = dict(dataset_attrs or {})
         self.dataset_json = dataset_json
-        self._dataset_json_path = None
         self._dataset_json_cm = None
         self.tracking_prefix = tracking_prefix
         # logging config
@@ -420,7 +418,8 @@ class CmorSession(
         self._log_name = log_name
         self._log_path: Path | None = None
         self._pending_ps = None
-        self._outdir = outdir
+        self._outdir = Path(outdir) if outdir is not None else Path.cwd() / "CMIP7"
+        self._outdir.mkdir(parents=True, exist_ok=True)
 
     def __enter__(self) -> "CmorSession":
         # Resolve logfile path if requested
@@ -429,7 +428,7 @@ class CmorSession(
             fname = self._log_name or f"cmor_{ts}.log"
             self._log_dir.mkdir(parents=True, exist_ok=True)
             self._log_path = (self._log_dir / fname).resolve()
-            print(f"Creating CMOR data with logs to {self._log_path}")
+        print(f"Creating CMOR data with Tables path {self.tables_path}")
 
         # Setup CMOR; pass logfile if CMOR supports it, else fall back
         try:
@@ -478,9 +477,9 @@ class CmorSession(
             # caller passed a context manager directly
             self._dataset_json_cm = dj
             p = dj.__enter__()  # ← ENTER the CM, get a Path
-        self._dataset_json_path = str(p)
-        cmor.set_cur_dataset_attribute("outpath", self._outdir)
-
+        cmor.dataset_json(str(p))
+        cmor.set_cur_dataset_attribute("outpath", str(self._outdir))
+        print(f"outpath set to {self._outdir}")
         try:
             prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
         except Exception:  # pylint: disable=broad-except
@@ -772,7 +771,7 @@ class CmorSession(
         )
 
         table_filename = _resolve_table_filename(self.tables_path, table_key)
-
+        print(f"table_filename is {table_filename} table_key {table_key}")
         cmor.load_table(table_filename)
 
         data = ds[vdef.name]
@@ -786,13 +785,6 @@ class CmorSession(
             positive=getattr(vdef, "positive", None),
             missing_value=fillv,
         )
-        # Optional variable attributes (e.g., cell_methods, long_name, standard_name)
-        if getattr(vdef, "cell_methods", None):
-            cmor.set_variable_attribute(var_id, "cell_methods", vdef.cell_methods)
-        if getattr(vdef, "long_name", None):
-            cmor.set_variable_attribute(var_id, "long_name", vdef.long_name)
-        if getattr(vdef, "standard_name", None):
-            cmor.set_variable_attribute(var_id, "standard_name", vdef.standard_name)
         data = ds[varname]
 
         # ---- Prepare time info for this write (local, not cached) ----
@@ -827,7 +819,6 @@ class CmorSession(
                 cmor.write(ps_id, np.asarray(ps_filled), store_with=var_id)
             self._pending_ps = None
         outdir = Path(cmor.get_cur_dataset_attribute("outpath"))
-        outdir.mkdir(parents=True, exist_ok=True)
         outfile = outdir / f"{getattr(vdef, 'name', varname)}.nc"
         cmor.close(var_id, file_name=str(outfile))
 
