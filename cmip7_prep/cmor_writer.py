@@ -9,6 +9,8 @@ present in the provided dataset. It also supports a packaged default
 
 from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
+import json
+import tempfile
 import re
 import types
 import warnings
@@ -477,9 +479,15 @@ class CmorSession(
             # caller passed a context manager directly
             self._dataset_json_cm = dj
             p = dj.__enter__()  # ← ENTER the CM, get a Path
-        cmor.dataset_json(str(p))
-        cmor.set_cur_dataset_attribute("outpath", str(self._outdir))
-        print(f"outpath set to {self._outdir}")
+
+        with open(p, encoding="utf-8") as f:
+            cfg = json.load(f)
+        cfg["outpath"] = str(self._outdir)
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        json.dump(cfg, tmp)
+        tmp.close()
+        cmor.dataset_json(str(tmp.name))
+
         try:
             prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
         except Exception:  # pylint: disable=broad-except
@@ -794,6 +802,7 @@ class CmorSession(
         nt = 0
 
         # ---- Main variable write ----
+
         cmor.write(
             var_id,
             np.asarray(data_filled),
@@ -818,9 +827,8 @@ class CmorSession(
             else:
                 cmor.write(ps_id, np.asarray(ps_filled), store_with=var_id)
             self._pending_ps = None
-        outdir = Path(cmor.get_cur_dataset_attribute("outpath"))
-        outfile = outdir / f"{getattr(vdef, 'name', varname)}.nc"
-        cmor.close(var_id, file_name=str(outfile))
+
+        cmor.close(var_id)
 
     def write_variables(
         self,

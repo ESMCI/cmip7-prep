@@ -88,7 +88,7 @@ jobs:
       - name: Install esmpy (From ESMF repo)
         env:
           ESMFMKFILE: ${{ env.ESMFMKFILE }}
-	  ESMF_ROOT: ${{ env.ESMF_ROOT }}
+          ESMF_ROOT: ${{ env.ESMF_ROOT }}
           LD_LIBRARY_PATH: ${{ env.ESMF_INSTALL_PREFIX }}/lib:${{ env.LD_LIBRARY_PATH }}
         run: |
           poetry run python -m pip  --no-build-isolation --no-deps \
