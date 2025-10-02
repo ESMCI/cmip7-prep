@@ -75,7 +75,7 @@ jobs:
           ESMF_NETCDF: nc-config
           ESMF_INSTALL_PREFIX: $HOME/ESMF
         with:
-          version: 8.8.1
+          version: v8.8.1
           esmpy: true
       - name: Install Poetry
         run: |
