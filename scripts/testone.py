@@ -9,7 +9,7 @@ from datetime import datetime, UTC
 scratch = os.environ.get("SCRATCH")
 basedir = Path(
     scratch
-    + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist/"
+    + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist/"
 )
 TABLES = Path("/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables")
 
