@@ -8,6 +8,13 @@ import numpy as np
 import xarray as xr
 import xesmf as xe
 
+try:
+    import dask.array as _da  # noqa: F401
+
+    _HAS_DASK = True
+except ModuleNotFoundError as e:
+    _HAS_DASK = False
+
 # Default weight maps; override via function args.
 DEFAULT_CONS_MAP = Path(
     "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
@@ -513,7 +520,7 @@ def regrid_to_1deg(
         da2 = da2.astype(dtype)
 
     # keep dask lazy and chunk along time if present
-    if "time" in da2.dims and output_time_chunk:
+    if "time" in da2.dims and output_time_chunk and _HAS_DASK:
         da2 = da2.chunk({"time": output_time_chunk})
 
     spec = _pick_maps(
