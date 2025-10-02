@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import sys
 import warnings
+import logging
 from pathlib import Path
 import xarray as xr
 import numpy as np
@@ -17,6 +18,8 @@ from cmip7_prep.cmor_writer import CmorSession
 #    return f"{category.__name__}: {message}\n"
 # warnings.formatwarning = _short_formatwarning
 
+logging.captureWarnings(False)
+
 
 # pylint: disable=unused-argument,too-many-positional-arguments
 def _one_line_showwarning(message, category, filename, lineno, file=None, line=None):
@@ -25,6 +28,7 @@ def _one_line_showwarning(message, category, filename, lineno, file=None, line=N
 
 warnings.showwarning = _one_line_showwarning
 warnings.simplefilter("always", RuntimeWarning)
+warnings.simplefilter("always", UserWarning)  # include UserWarning too
 
 
 def make_target(out: Path) -> None:

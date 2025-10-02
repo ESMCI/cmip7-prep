@@ -1,6 +1,10 @@
+from __future__ import annotations
 import os
 from pathlib import Path
 import logging
+import re
+from typing import Optional, Tuple
+import sys
 
 import xarray as xr
 from cmip7_prep.mapping_compat import Mapping
@@ -17,19 +21,17 @@ from datetime import datetime, UTC
 import dask
 from dask import delayed
 
-scratch = os.getenv("SCRATCH")
-TABLES = "/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables"
-INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist_amon64"
-TSDIR = (
-    scratch
-    + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
+_DATE_RE = re.compile(
+    r"[\.\-](?P<year>\d{4})"  # year
+    r"(?P<sep>-?)"  # optional hyphen
+    r"(?P<month>0[1-9]|1[0-2])"  # month 01–12
+    r"\.nc(?!\S)"  # literal .nc and then end (or whitespace)
 )
-OUTDIR = scratch + "/CMIP7"
 
-if not os.path.exists(str(OUTDIR)):
-    os.makedirs(str(OUTDIR))
-if not os.path.exists(str(TSDIR)):
-    os.makedirs(str(TSDIR))
+TABLES = "/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables"
+
+scratch = os.getenv("SCRATCH")
+OUTDIR = scratch + "/CMIP7"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -95,12 +97,134 @@ def process_one_var(varname: str) -> tuple[str, str]:
         return (varname, f"ERROR: {e!r}")
 
 
+def link_files(
+    src: Path, dest: Path, pattern: str, *, relative: bool, overwrite: bool
+) -> int:
+    if not src.is_dir():
+        raise SystemExit(f"Error: source directory not found: {src}")
+    dest.mkdir(parents=True, exist_ok=True)
+
+    # Non-recursive: Path.glob does not descend into subdirectories
+    matches = [p for p in src.glob(pattern) if p.is_file()]
+    if not matches:
+        print(f"No matches for pattern {pattern!r} in {src}")
+        return 0
+
+    made = 0
+    for p in matches:
+        link_path = dest / p.name
+
+        if link_path.exists() or link_path.is_symlink():
+            if overwrite:
+                link_path.unlink()
+            else:
+                print(f"Skipping existing: {link_path}")
+                continue
+
+        if relative:
+            # make target path relative to the link's directory
+            target = os.path.relpath(p.resolve(), start=link_path.parent)
+            link_path.symlink_to(target)
+        else:
+            link_path.symlink_to(p.resolve())
+
+        print(f"Linked: {link_path} -> {p}")
+        made += 1
+
+    return made
+
+
+def latest_monthly_file(
+    directory: Path, *, require_consistent_style: bool = True
+) -> Optional[Tuple[Path, int, int]]:
+    """
+    Find the file in `directory` with the most recent YYYYMM.nc or YYYY-MM.nc date in its name.
+    Returns (path, year, month) or None if no matching files are found.
+
+    If `require_consistent_style` is True, raises ValueError if both styles are present.
+    """
+    if not directory.is_dir():
+        raise NotADirectoryError(directory)
+
+    found = []
+    seps = set()
+    print(f"Looking for files in {str(directory)}")
+
+    for p in directory.iterdir():
+        if not p.is_file():
+            continue
+        m = _DATE_RE.search(p.name)
+        if not m:
+            continue
+        year = int(m.group("year"))
+        month = int(m.group("month"))
+        sep = m.group("sep")  # "" or "-"
+        seps.add(sep)
+        found.append((year, month, p))
+
+    if not found:
+        return None
+
+    if require_consistent_style and len(seps) > 1:
+        raise ValueError("Mixed date styles detected (YYYYMM.nc and YYYY-MM.nc).")
+    print(f"Found {len(found)} files in {str(directory)}")
+    # Pick the max by (year, month). If tie, fall back to lexicographic filename to be deterministic.
+    found.sort(key=lambda t: (t[0], t[1], t[2].name))
+    year, month, path = found[-1]
+    return path, year, month
+
+
 if __name__ == "__main__":
-    # JPE: THIS MECHANISM is currently broken
+    # JPE: THIS MECHANISM in hf_collection include_pattern is currently broken
     # Only atm monthly 32 bit
     # include_pattern = "*cam.h0a.*"
     # Only atm monthly 64 bit
-    #    include_pattern = "*cam.h0a*"
+    include_pattern = "*cam.h0a*"
+
+    if len(sys.argv) > 2:
+        caseroot = sys.argv[1]
+        cimeroot = sys.argv[2]
+        _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
+        sys.path.append(_LIBDIR)
+
+        from standard_script_setup import *
+        from CIME.case import Case
+
+        with Case(caseroot, read_only=True) as case:
+            inputroot = case.get_value("DOUT_S_ROOT")
+            casename = case.get_value("CASE")
+        # Currently due to a problem in GenTS we need to create another directory and link only files we need
+        INPUTDIR = os.path.join(inputroot, "atm", "hist_amon")
+        link_files(
+            Path(os.path.join(inputroot, "atm", "hist")),
+            Path(INPUTDIR),
+            include_pattern,
+            relative=True,
+            overwrite=False,
+        )
+        TSDIR = Path(inputroot).parent / "timeseries" / casename / "atm" / "hist"
+
+        native = latest_monthly_file(Path(INPUTDIR))
+        if TSDIR.exists():
+            timeseries = latest_monthly_file(TSDIR)
+            if timeseries is not None:
+                _, tsyr, _ = timeseries
+                _, nyr, _ = native
+                if nyr < tsyr + 10:
+                    print(f"Less than 10 years ready, not processing {nyr}, {tsyr}")
+                    sys.exit(0)
+    else:
+        # testing path
+        INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist_amon64"
+        TSDIR = (
+            scratch
+            + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
+        )
+
+    if not os.path.exists(str(OUTDIR)):
+        os.makedirs(str(OUTDIR))
+    if not os.path.exists(str(TSDIR)):
+        os.makedirs(str(TSDIR))
 
     cluster = LocalCluster(n_workers=128, threads_per_worker=1, memory_limit="235GB")
     client = cluster.get_client()
@@ -126,7 +250,7 @@ if __name__ == "__main__":
     # 1) Load requested variables
     ds_native, cmip_vars = open_native_for_cmip_vars(
         cmip_vars,
-        Path(TSDIR + "/*"),
+        Path(TSDIR / "*cam.h0a.*"),
         mapping,
         use_cftime=True,
         parallel=True,
