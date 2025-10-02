@@ -83,9 +83,9 @@ jobs:
           pipx install poetry
           poetry --version
           poetry config virtualenvs.in-project true
+          poetry env use $(python -c "inport sys; print(sys.executable)")
           poetry install --no-interaction --no-ansi
           poetry run python -c "import esmpy; print('ESMPy:', esmpy.__version__)"
-
       - name: Cache virtualenv
         uses: actions/cache@v4
         with:
