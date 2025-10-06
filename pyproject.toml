@@ -17,7 +17,7 @@ netCDF4 = "^1.7.2"
 cftime = "^1.6.4"
 numpy = "^2.0.0"
 pandas = "^2.3.2"
-esmpy = { git = "https://github.com/esmf-org/esmf.git", rev = "v8.9.0", subdirectory = "src/addon/esmpy" }
+esmpy = { git = "https://github.com/esmf-org/esmf.git", rev = "v8.8.1", subdirectory = "src/addon/esmpy" }
 xesmf = "^0.8.10"
 typer = { version = "^0.19.1", extras = ["all"] }
 PyYAML = "^6.0.2"

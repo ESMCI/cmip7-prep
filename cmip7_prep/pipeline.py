@@ -40,6 +40,7 @@ def _collect_required_cesm_vars(
     for v in cmip_vars:
         try:
             cfg = mapping.get_cfg(v) or {}
+            print(f"v is {v} cfg is {cfg}")
         except KeyError:
             print(
                 f"WARNING: skipping '{v}': no mapping found in {mapping.path}",
@@ -95,11 +96,13 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
     for var in cmip_vars:
         rvar = _collect_required_cesm_vars(mapping, [var])
+        print(f"var {var} rvar {rvar}")
         candidates = glob.glob(str(files_glob))
         selected = sorted(
             {p for p in candidates if any(_filename_contains_var(p, v) for v in rvar)}
         )
-
+        if var == "evspsblsoi":
+            print(f"rvar = {rvar}, selected={selected} candidates = {candidates}")
         if selected:
             new_cmip_vars.append(var)
         else:
@@ -213,8 +216,14 @@ def realize_regrid_prepare(
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
     if time_chunk and "time" in da.dims:
         da = da.chunk({"time": int(time_chunk)})
+
     ds_vars = xr.Dataset({cmip_var: da})
 
+    if "area" in ds_native and "area" not in ds_vars and "ncol" in ds_native.dims:
+        ds_vars = ds_vars.assign(area=ds_native["area"])
+    if "landfrac" in ds_native and "landfrac" not in ds_vars:
+        ds_vars = ds_vars.assign(landfrac=ds_native["landfrac"])
+    print(f"ds_vars {ds_vars}")
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
     levels = cfg.get("levels", {}) or {}
@@ -244,6 +253,7 @@ def realize_regrid_prepare(
         ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
     )
 
+    print(f"Here 1 {'areacella' in ds_regr}")
     # 7) If hybrid: merge in 1-D hybrid coefficients directly from native (no regridding needed)
     if is_hybrid:
         aux = [

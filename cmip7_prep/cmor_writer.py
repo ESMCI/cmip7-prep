@@ -381,6 +381,31 @@ def _resolve_table_filename(tables_path: Path, key: str) -> str:
 DatasetJsonLike = Union[str, Path, AbstractContextManager]
 
 
+def _fx_glob_pattern(name: str) -> str:
+    # CMOR filenames vary; this finds most fx files for this var
+    # e.g., *_sftlf_fx_*.nc  or sftlf_fx_*.nc
+    return f"**/*_{name}_fx_*.nc"
+
+
+def _open_existing_fx(outdir: Path, name: str) -> xr.DataArray | None:
+    # Search recursively for an existing fx file for this var
+    for p in outdir.rglob(_fx_glob_pattern(name)):
+        try:
+            ds = xr.open_dataset(p, engine="netcdf4")
+            if name in ds:
+                return ds[name]
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError) as e:
+            # OSError: unreadable/corrupt file, low-level I/O; ValueError: engine/decoding issues
+            warnings.warn(f"[fx] failed to open {p} with netcdf4: {e}", RuntimeWarning)
+        except (ImportError, ModuleNotFoundError) as e:
+            # netCDF4 backend not installed
+            warnings.warn(f"[fx] netcdf4 backend unavailable: {e}", RuntimeWarning)
+
+    return None
+
+
 # ---------------------------------------------------------------------
 # CMOR session
 # ---------------------------------------------------------------------
@@ -423,6 +448,12 @@ class CmorSession(
         self._pending_ps = None
         self._outdir = Path(outdir) if outdir is not None else Path.cwd() / "CMIP7"
         self._outdir.mkdir(parents=True, exist_ok=True)
+        self._fx_written: set[str] = (
+            set()
+        )  # remembers which fx vars were written this run
+        self._fx_cache: dict[str, xr.DataArray] = (
+            {}
+        )  # regridded fx fields cached in-memory
 
     def __enter__(self) -> "CmorSession":
         # Resolve logfile path if requested
@@ -764,6 +795,100 @@ class CmorSession(
         axes_ids.extend([lat_id, lon_id])
         return axes_ids
 
+    def _write_fx_2d(self, ds: xr.Dataset, name: str, units: str) -> None:
+        if name not in ds:
+            return
+        table_filename = _resolve_table_filename(self.tables_path, "fx")
+        cmor.load_table(table_filename)
+
+        lat = ds["lat"].values
+        lon = ds["lon"].values
+        lat_b = ds.get("lat_bnds")
+        lon_b = ds.get("lon_bnds")
+        lat_b = (
+            lat_b.values
+            if isinstance(lat_b, xr.DataArray)
+            else _bounds_from_centers_1d(lat, "lat")
+        )
+        lon_b = (
+            lon_b.values
+            if isinstance(lon_b, xr.DataArray)
+            else _bounds_from_centers_1d(lon, "lon")
+        )
+
+        lat_id = cmor.axis(
+            "latitude", "degrees_north", coord_vals=lat, cell_bounds=lat_b
+        )
+        lon_id = cmor.axis(
+            "longitude", "degrees_east", coord_vals=lon, cell_bounds=lon_b
+        )
+        data_filled, fillv = _filled_for_cmor(ds[name])
+
+        var_id = cmor.variable(name, units, [lat_id, lon_id], missing_value=fillv)
+        print(f"write fx variable {name}")
+        cmor.write(
+            var_id,
+            np.asarray(data_filled),
+        )
+        cmor.close(var_id)
+
+    def ensure_fx_written_and_cached(self, ds_regr: xr.Dataset) -> xr.Dataset:
+        """Ensure sftlf and areacella exist in ds_regr and are written once as fx.
+        If not present in ds_regr, try to read from existing CMOR fx files in outdir.
+        If present in ds_regr but not yet written this run, write and cache them.
+        Returns ds_regr augmented with any missing fx fields.
+        """
+        need = [("sftlf", "%"), ("areacella", "m2")]
+        out = ds_regr
+
+        for name, units in need:
+            # 1) Already cached this run?
+            if name in self._fx_cache:
+                if name not in out:
+                    out = out.assign({name: self._fx_cache[name]})
+                continue
+
+            # 2) Present in regridded dataset? (best case)
+            if name in out:
+                self._fx_cache[name] = out[name]
+                if name not in self._fx_written:
+                    # Convert landfrac to % if needed
+                    if name == "sftlf":
+                        v = out[name]
+                        if (np.nanmax(v.values) <= 1.0) and v.attrs.get(
+                            "units", ""
+                        ) not in ("%", "percent"):
+                            out = out.assign(
+                                {
+                                    name: (v * 100.0).assign_attrs(
+                                        v.attrs | {"units": "%"}
+                                    )
+                                }
+                            )
+                            self._fx_cache[name] = out[name]
+                    self._write_fx_2d(out, name, units)
+                    self._fx_written.add(name)
+                    continue
+
+            # 3) Not present in ds_regr → try reading existing CMOR fx output
+            if self._outdir:
+                fx_da = _open_existing_fx(self._outdir, name)
+                if fx_da is not None:
+                    # Verify grid match (simple equality on lat/lon values)
+                    if (
+                        "lat" in out
+                        and "lon" in out
+                        and np.array_equal(out["lat"].values, fx_da["lat"].values)
+                        and np.array_equal(out["lon"].values, fx_da["lon"].values)
+                    ):
+                        out = out.assign({name: fx_da})
+                        self._fx_cache[name] = out[name]
+                        self._fx_written.add(name)  # already exists on disk
+                        continue
+                # If grid mismatch, you could regrid fx_da here; for now, skip.
+                # 4) Last resort: leave missing; caller may compute it later
+        return out
+
     # public API
     # -------------------------
     def write_variable(
@@ -799,6 +924,8 @@ class CmorSession(
         if time_da is None:
             time_da = ds.get("time")
         nt = 0
+
+        self.ensure_fx_written_and_cached(ds)
 
         # ---- Main variable write ----
 

@@ -87,6 +87,15 @@ variables:
       - cesm_var: QFLX
         scale: -1.0     # flip sign if CESM positive upward
 
+  evspsblsoi:
+    table: Lmon
+    units: kg m-2 s-1
+    long_name: Water Evaporation from Soil
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: QSOIL
+
   hfls:
     table: Amon
     units: "W m-2"
@@ -138,6 +147,14 @@ variables:
     regrid_method: bilinear
     sources:
       - cesm_var: QREFHT
+
+  lai:
+    table: Lmon
+    units: "1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: TLAI
+
 
   pr:
     table: Amon
@@ -432,10 +449,20 @@ variables:
     sources:
       - cesm_var: Z3
 
-fx:
-  areacella:
-    units: m2
-    source: cell_area
-  sftlf:
-    units: '%'
-    source: sftlf
+#  areacella:
+#    table: fx
+#    units: m2
+#    formula: area * 1.e6
+#    standard_name: cell_area
+#    dims: [lat, lon]
+#    sources:
+#      - cesm_var: ZBOT
+#
+#
+#  sftlf:
+#    table: fx
+#    units: '%'
+#    formula: landfrac * 100
+#    dims: [lat, lon]
+#    sources:
+#      - cesm_var: ZBOT

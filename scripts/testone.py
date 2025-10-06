@@ -17,7 +17,7 @@ TABLES = Path("/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables")
 mapping = Mapping.from_packaged_default()
 OUTDIR = scratch + "/CMIP7"
 
-cmip_vars = ["cl"]
+cmip_vars = ["lai"]
 
 ds_native, cmip_vars = open_native_for_cmip_vars(
     cmip_vars,
@@ -27,7 +27,7 @@ ds_native, cmip_vars = open_native_for_cmip_vars(
     parallel=True,
 )
 varname = cmip_vars[0]
-print(f"cmorizing one variable {varname}")
+
 # 2) One call: realize → chunk → regrid → carry time+bounds
 ds_cmor = realize_regrid_prepare(
     mapping,
