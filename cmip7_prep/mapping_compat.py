@@ -98,7 +98,7 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     >>> _safe_eval("x + 2", {"x": 3})
     5
     >>> import numpy as np
-    >>> _safe_eval("np.mean(x)", {"x": [1, 2, 3]})
+    >>> float(_safe_eval("np.mean(x)", {"x": [1, 2, 3]}))
     2.0
     """
     safe_globals = {"__builtins__": {}}

@@ -44,8 +44,8 @@ def make_target(out: Path) -> None:
     ...     out = Path(d) / "grid.nc"
     ...     make_target(out)
     ...     ds = xr.open_dataset(out)
-    ...     print(list(ds.coords))
-    ['lon', 'lat']
+    ...     print(sorted(list(ds.coords)))
+    ['lat', 'lon']
     """
     lat = np.arange(-89.5, 90.5, 1.0)
     lon = np.arange(0.5, 360.5, 1.0)
