@@ -21,6 +21,7 @@ esmpy = { git = "https://github.com/esmf-org/esmf.git", rev = "v8.9.0", subdirec
 xesmf = "^0.8.10"
 typer = { version = "^0.19.1", extras = ["all"] }
 PyYAML = "^6.0.2"
+geocat-comp = "^2025.09.0"
 # CMOR typically comes from conda-forge; if pip isn't viable, install it outside Poetry or via a wheel.
 # cmor = "^3.8.0"
 
