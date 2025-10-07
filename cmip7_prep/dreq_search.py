@@ -35,14 +35,21 @@ _SPLIT = re.compile(r"[;,]\s*|\s*\|\s*")
 
 
 def packaged_dreq_csv(filename: str = "datarequest_v1_2_2_variables.csv") -> Path:
-    """Return a concrete filesystem Path to the packaged data request CSV."""
+    """Return a concrete filesystem Path to the packaged data request CSV.
+    >>> p = packaged_dreq_csv("datarequest_v1_2_2_variables.csv")
+    >>> str(p).endswith("datarequest_v1_2_2_variables.csv")
+    True
+    """
     res = files("cmip7_prep.data").joinpath(filename)
     with as_file(res) as pth:
         return Path(pth)
 
 
 def _normalize_row(raw_row: Mapping[str, Any]) -> dict[str, str]:
-    """Lowercase headers and coerce values to stripped strings (or '')."""
+    """Lowercase headers and coerce values to stripped strings (or '').
+    >>> _normalize_row({"A": " 1 ", "B": None, 2: "x"})
+    {'a': '1', 'b': '', '2': 'x'}
+    """
     return {
         str(k).strip().lower(): ("" if v is None else str(v).strip())
         for k, v in raw_row.items()
@@ -50,7 +57,12 @@ def _normalize_row(raw_row: Mapping[str, Any]) -> dict[str, str]:
 
 
 def _first_nonempty(row: Mapping[str, str], keys: Sequence[str]) -> str:
-    """Return the first non-empty cell among the given keys ('' if none)."""
+    """Return the first non-empty cell among the given keys ('' if none).
+    >>> _first_nonempty({'a': '', 'b': 'foo', 'c': 'bar'}, ['a', 'b', 'c'])
+    'foo'
+    >>> _first_nonempty({'a': '', 'b': '', 'c': ''}, ['a', 'b', 'c'])
+    ''
+    """
     for key in keys:
         val = row.get(key, "")
         if val:
@@ -59,7 +71,12 @@ def _first_nonempty(row: Mapping[str, str], keys: Sequence[str]) -> str:
 
 
 def _split_groups(cell: str) -> list[str]:
-    """Split a groups cell on commas/semicolons/pipes/spaces."""
+    """Split a groups cell on commas/semicolons/pipes/spaces.
+    >>> _split_groups("foo,bar;baz|qux quux")
+    ['foo', 'bar', 'baz', 'qux', 'quux']
+    >>> _split_groups("")
+    []
+    """
     if not cell:
         return []
     toks = [t for t in _SPLIT.split(cell) if t]
@@ -69,7 +86,12 @@ def _split_groups(cell: str) -> list[str]:
 
 
 def _extract_table_from_compound(compound: str) -> str:
-    """Extract the table (e.g., 'Amon') from 'Amon.tas' or 'Amon tas'."""
+    """Extract the table (e.g., 'Amon') from 'Amon.tas' or 'Amon tas'.
+    >>> _extract_table_from_compound("Amon.tas")
+    'Amon'
+    >>> _extract_table_from_compound("Amon tas")
+    'Amon'
+    """
     if not compound:
         return ""
     if "." in compound:
@@ -78,7 +100,14 @@ def _extract_table_from_compound(compound: str) -> str:
 
 
 def _extract_name_from_compound(compound: str) -> str:
-    """Extract the variable name (e.g., 'tas') from 'Amon.tas' or 'Amon tas'."""
+    """Extract the variable name (e.g., 'tas') from 'Amon.tas' or 'Amon tas'.
+    >>> _extract_name_from_compound("Amon.tas")
+    'tas'
+    >>> _extract_name_from_compound("Amon tas")
+    'tas'
+    >>> _extract_name_from_compound("Amon")
+    ''
+    """
     if not compound:
         return ""
     if "." in compound:
@@ -88,7 +117,14 @@ def _extract_name_from_compound(compound: str) -> str:
 
 
 def _detect_dialect(text: str) -> csv.Dialect:
-    """Detect CSV dialect; fallback to a simple comma-delimited dialect."""
+    """Detect CSV dialect; fallback to a simple comma-delimited dialect.
+    >>> d = _detect_dialect("a,b,c\\n1,2,3")
+    >>> d.delimiter
+    ','
+    >>> d2 = _detect_dialect("a;b;c\\n1;2;3")
+    >>> d2.delimiter
+    ';'
+    """
     try:
         return csv.Sniffer().sniff(text, delimiters=",;\t")
     except csv.Error:
@@ -141,6 +177,43 @@ def find_variables_by_prefix(
     -------
     list[str]
         Sorted unique values from *return_field* for rows that match.
+    >>> import tempfile, os
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     path = os.path.join(d, "test.csv")
+    ...     with open(path, "w") as f:
+    ...         f.write("Physical Parameter,CMIP6 Table (legacy),CMIP7 Variable Groups\\n")
+    ...         f.write("tas,Amon,baseline_monthly\\n")
+    ...         f.write("pr,Amon,baseline_monthly\\n")
+    ...         f.write("ps,Amon,baseline_monthly\\n")
+    ...         f.write("ta,Amon,baseline_monthly\\n")
+    ...         f.write("tas,AERmon,baseline_monthly\\n")
+    ...         f.write("mmr,AERmon,baseline_monthly\\n")
+    ...         f.write("clt,Amon,baseline_monthly\\n")
+    ...         f.write("clw,Amon,baseline_monthly\\n")
+    ...         f.write("cli,Amon,baseline_monthly\\n")
+    ...         f.write("clt,AERmon,baseline_monthly\\n")
+    ...         f.write("clw,AERmon,baseline_monthly\\n")
+    ...         f.write("cli,AERmon,baseline_monthly\\n")
+    ...     find_variables_by_prefix(path, "Amon.t")
+    ['ta', 'tas']
+    ...     find_variables_by_prefix(path, "Amon.t", exact=True)
+    ['ta']
+    ...     find_variables_by_prefix(path, "Amon.")
+    ['clt', 'cli', 'clw', 'pr', 'ps', 'ta', 'tas']
+    ...     find_variables_by_prefix(path, "AERmon.")
+    ['clt', 'cli', 'clw', 'mmr', 'tas']
+    ...     find_variables_by_prefix(path, "AERmon.t")
+    ['tas']
+    ...     find_variables_by_prefix(path, "AERmon.t", exact=True)
+    ['tas']
+    ...     find_variables_by_prefix(path, "AERmon.m")
+    ['mmr']
+    ...     find_variables_by_prefix(path, "AERmon.m", exact=True)
+    ['mmr']
+    ...     find_variables_by_prefix(path, "AERmon.m", where={"cmip7 frequency": "monthly"})
+    ['mmr']
+    ...     find_variables_by_prefix(path, "AERmon.m", where={"cmip7 frequency": "daily"})
+    []
     """
     if csv_path is None:
         csv_path = packaged_dreq_csv()
