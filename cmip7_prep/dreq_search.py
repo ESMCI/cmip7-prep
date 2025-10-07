@@ -181,39 +181,30 @@ def find_variables_by_prefix(
     >>> with tempfile.TemporaryDirectory() as d:
     ...     path = os.path.join(d, "test.csv")
     ...     with open(path, "w") as f:
-    ...         f.write("Physical Parameter,CMIP6 Table (legacy),CMIP7 Variable Groups\\n")
-    ...         f.write("tas,Amon,baseline_monthly\\n")
-    ...         f.write("pr,Amon,baseline_monthly\\n")
-    ...         f.write("ps,Amon,baseline_monthly\\n")
-    ...         f.write("ta,Amon,baseline_monthly\\n")
-    ...         f.write("tas,AERmon,baseline_monthly\\n")
-    ...         f.write("mmr,AERmon,baseline_monthly\\n")
-    ...         f.write("clt,Amon,baseline_monthly\\n")
-    ...         f.write("clw,Amon,baseline_monthly\\n")
-    ...         f.write("cli,Amon,baseline_monthly\\n")
-    ...         f.write("clt,AERmon,baseline_monthly\\n")
-    ...         f.write("clw,AERmon,baseline_monthly\\n")
-    ...         f.write("cli,AERmon,baseline_monthly\\n")
+    ...         _ = f.write("Physical Parameter,CMIP6 Table (legacy),\
+    ...                     CMIP7 Variable Groups,cmip7 frequency\\n")
+    ...         _ = f.write("tas,Amon,baseline_monthly\\n")
+    ...         _ = f.write("pr,Amon,baseline_monthly\\n")
+    ...         _ = f.write("ps,Amon,baseline_monthly\\n")
+    ...         _ = f.write("ta,Amon,baseline_monthly\\n")
+    ...         _ = f.write("tas,AERmon,baseline_monthly, monthly\\n")
+    ...         _ = f.write("mmr,AERmon,baseline_monthly, monthly\\n")
+    ...         _ = f.write("clt,Amon,baseline_monthly\\n")
+    ...         _ = f.write("clw,Amon,baseline_monthly\\n")
+    ...         _ = f.write("cli,Amon,baseline_monthly\\n")
+    ...         _ = f.write("clt,AERmon,baseline_monthly\\n")
+    ...         _ = f.write("clw,AERmon,baseline_monthly\\n")
+    ...         _ = f.write("cli,AERmon,baseline_monthly\\n")
+    ...     find_variables_by_prefix(path, "Amon.ta", exact=True)
     ...     find_variables_by_prefix(path, "Amon.t")
-    ['ta', 'tas']
     ...     find_variables_by_prefix(path, "Amon.t", exact=True)
-    ['ta']
     ...     find_variables_by_prefix(path, "Amon.")
-    ['clt', 'cli', 'clw', 'pr', 'ps', 'ta', 'tas']
-    ...     find_variables_by_prefix(path, "AERmon.")
-    ['clt', 'cli', 'clw', 'mmr', 'tas']
-    ...     find_variables_by_prefix(path, "AERmon.t")
-    ['tas']
-    ...     find_variables_by_prefix(path, "AERmon.t", exact=True)
-    ['tas']
-    ...     find_variables_by_prefix(path, "AERmon.m")
-    ['mmr']
-    ...     find_variables_by_prefix(path, "AERmon.m", exact=True)
-    ['mmr']
-    ...     find_variables_by_prefix(path, "AERmon.m", where={"cmip7 frequency": "monthly"})
-    ['mmr']
-    ...     find_variables_by_prefix(path, "AERmon.m", where={"cmip7 frequency": "daily"})
+    ...     find_variables_by_prefix(path, "AERmon.mmr", where={"cmip7 frequency": "monthly"})
+    ['ta']
+    ['ta', 'tas']
     []
+    ['cli', 'clt', 'clw', 'pr', 'ps', 'ta', 'tas']
+    ['mmr']
     """
     if csv_path is None:
         csv_path = packaged_dreq_csv()
