@@ -95,7 +95,7 @@ jobs:
         env:
           ESMFMKFILE: ${{ env.ESMFMKFILE }}
           LD_LIBRARY_PATH: ${{ env.ESMF_INSTALL_PREFIX }}/lib:${{ env.LD_LIBRARY_PATH }}
-        run: poetry run pytest -q --doctest-modules --cov=src --cov-report=xml --cov-report=term-missing
+        run: poetry run pytest -q --doctest-modules
 #     the following can be used by developers to login to the github server in case of errors
 #     see https://github.com/marketplace/actions/debugging-with-tmate for further details
 #      - name: Setup tmate session
