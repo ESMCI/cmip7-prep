@@ -37,6 +37,13 @@ def _read_requested_levels(
     -------
     np.ndarray
         1-D array of requested pressure levels in Pa.
+    >>> import tempfile, json, os
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     path = os.path.join(d, "CMIP7_coordinate.json")
+    ...     with open(path, "w") as f:
+    ...         json.dump({"axis_entry": {"plev19": {"requested": [1000, 500, 100]}}}, f)
+    ...     _read_requested_levels(d, axis_name="plev19")
+    array([1000.,  500.,  100.])
     """
     coord_json_candidates = [
         "CMIP7_coordinate.json",
@@ -74,6 +81,16 @@ def _resolve_p0(ds: xr.Dataset, p0_name: str = "P0") -> float:
       1) Variable `P0` inside the dataset (scalar or size-1 array)
       2) Global attribute `P0`
       3) Default 100000.0 Pa
+    >>> import xarray as xr
+    >>> ds = xr.Dataset({"P0": ((), 95000.0)})
+    >>> _resolve_p0(ds)
+    95000.0
+    >>> ds = xr.Dataset(attrs={"P0": 98000.0})
+    >>> _resolve_p0(ds)
+    98000.0
+    >>> ds = xr.Dataset()
+    >>> _resolve_p0(ds)
+    100000.0
     """
     if p0_name in ds:
         da = ds[p0_name]

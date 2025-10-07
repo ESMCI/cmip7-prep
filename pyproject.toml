@@ -11,7 +11,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.14"
+python = ">=3.10.13,<3.14"
 xarray = "^2024.9.0"
 netCDF4 = "^1.7.2"
 cftime = "^1.6.4"
@@ -22,6 +22,7 @@ xesmf = "^0.8.10"
 typer = { version = "^0.19.1", extras = ["all"] }
 PyYAML = "^6.0.2"
 geocat-comp = "^2025.09.0"
+gents = { git = "https://github.com/AgentOxygen/GenTS", rev = "v0.9.1" }
 # CMOR typically comes from conda-forge; if pip isn't viable, install it outside Poetry or via a wheel.
 # cmor = "^3.8.0"
 
