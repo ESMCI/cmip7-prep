@@ -149,14 +149,14 @@ def _is_radians(vals: np.ndarray, units: str | None) -> bool:
 
     >>> import numpy as np
     >>> arr = np.array([0, np.pi/2, np.pi])
-    >>> _is_radians(arr, units="radian")
+    >>> bool(_is_radians(arr, units="radian"))
     True
-    >>> _is_radians(arr, units="degrees")
+    >>> bool(_is_radians(arr, units="degrees"))
     False
-    >>> _is_radians(arr, units=None)
+    >>> bool(_is_radians(arr, units=None))
     True
     >>> arr = np.array([0, 90, 180])
-    >>> _is_radians(arr, units=None)
+    >>> bool(_is_radians(arr, units=None))
     False
     """
     # ...existing code...
@@ -260,16 +260,16 @@ def is_strictly_monotonic(arr):
     simple test to see if 1d array is strictly monotonic
     >>> import numpy as np
     >>> arr = np.array([1, 2, 3])
-    >>> is_strictly_monotonic(arr)
+    >>> bool(is_strictly_monotonic(arr))
     True
     >>> arr = np.array([3, 2, 1])
-    >>> is_strictly_monotonic(arr)
+    >>> bool(is_strictly_monotonic(arr))
     True
     >>> arr = np.array([1, 2, 2, 3])
-    >>> is_strictly_monotonic(arr)
+    >>> bool(is_strictly_monotonic(arr))
     False
     >>> arr = np.array([3., 2., 2., 1.])
-    >>> is_strictly_monotonic(arr)
+    >>> bool(is_strictly_monotonic(arr))
     False
     """
     # Check for non-decreasing
