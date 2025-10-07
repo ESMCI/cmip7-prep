@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Optional, Dict, Tuple
 import numpy as np
 import xarray as xr
-import xesmf as xe
 
+try:
+    import xesmf as xe
+except ModuleNotFoundError as e:
+    _HAS_XESMF = False
 try:
     import dask.array as _da  # noqa: F401
 

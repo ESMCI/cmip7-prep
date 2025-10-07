@@ -20,7 +20,11 @@ import yaml  # runtime dep
 
 
 def packaged_mapping_resource(filename: str = "cesm_to_cmip7.yaml"):
-    """Context manager yielding a real filesystem path to the packaged mapping file."""
+    """Context manager yielding a real filesystem path to the packaged mapping file
+    >>> with packaged_mapping_resource("cesm_to_cmip7.yaml") as p:
+    ...     str(p).endswith("cesm_to_cmip7.yaml")
+    True
+    """
     res = files("cmip7_prep").joinpath(f"data/{filename}")
     return as_file(res)
 
@@ -45,7 +49,11 @@ class VarConfig:
     standard_name: Optional[str] = None
 
     def as_cfg(self) -> Dict[str, Any]:
-        """Return a plain dict view for convenience in other modules."""
+        """Return a plain dict view for convenience in other modules.
+        >>> vc = VarConfig(name="tas", table="Amon", units="K")
+        >>> sorted(vc.as_cfg().items())
+        [('name', 'tas'), ('table', 'Amon'), ('units', 'K')]
+        """
         d = {
             "name": self.name,
             "table": self.table,
@@ -65,7 +73,14 @@ class VarConfig:
 
 
 def _normalize_table_name(value: Optional[str]) -> Optional[str]:
-    """Return a short CMOR table name like 'Amon' from common inputs."""
+    """Return a short CMOR table name like 'Amon' from common inputs.
+    >>> _normalize_table_name("CMIP6_Amon.json")
+    'Amon'
+    >>> _normalize_table_name("Amon")
+    'Amon'
+    >>> print(_normalize_table_name(None))
+    None
+    """
     if not value:
         return None
     s = str(value)
@@ -79,7 +94,13 @@ def _normalize_table_name(value: Optional[str]) -> Optional[str]:
 
 
 def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
-    """Evaluate a small arithmetic/xarray expression in a restricted environment."""
+    """Evaluate a small arithmetic/xarray expression in a restricted environment.
+    >>> _safe_eval("x + 2", {"x": 3})
+    5
+    >>> import numpy as np
+    >>> _safe_eval("np.mean(x)", {"x": [1, 2, 3]})
+    2.0
+    """
     safe_globals = {"__builtins__": {}}
     locals_safe = {"np": np, "xr": xr}
     locals_safe.update(local_names)

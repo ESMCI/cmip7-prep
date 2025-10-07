@@ -23,6 +23,11 @@ logging.captureWarnings(False)
 
 # pylint: disable=unused-argument,too-many-positional-arguments
 def _one_line_showwarning(message, category, filename, lineno, file=None, line=None):
+    """
+    >>> import sys
+    >>> _one_line_showwarning("Test warning", UserWarning, "file.py", 1, file=sys.stdout)
+    UserWarning: Test warning
+    """
     (file or sys.stderr).write(f"{category.__name__}: {message}\n")
 
 
@@ -32,7 +37,16 @@ warnings.simplefilter("always", UserWarning)  # include UserWarning too
 
 
 def make_target(out: Path) -> None:
-    """Create a canonical 1° grid template with lat/lon and (placeholder) bounds."""
+    """Create a canonical 1° grid template with lat/lon and (placeholder) bounds.
+      >>> import tempfile
+    >>> import xarray as xr
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     out = Path(d) / "grid.nc"
+    ...     make_target(out)
+    ...     ds = xr.open_dataset(out)
+    ...     print(list(ds.coords))
+    ['lon', 'lat']
+    """
     lat = np.arange(-89.5, 90.5, 1.0)
     lon = np.arange(0.5, 360.5, 1.0)
     ds = xr.Dataset(coords={"lat": ("lat", lat), "lon": ("lon", lon)})
