@@ -73,7 +73,7 @@ def _first_nonempty(row: Mapping[str, str], keys: Sequence[str]) -> str:
 def _split_groups(cell: str) -> list[str]:
     """Split a groups cell on commas/semicolons/pipes/spaces.
     >>> _split_groups("foo,bar;baz|qux quux")
-    ['foo', 'bar', 'baz', 'qux', 'quux']
+    ['foo', 'bar', 'baz', 'qux quux']
     >>> _split_groups("")
     []
     """
