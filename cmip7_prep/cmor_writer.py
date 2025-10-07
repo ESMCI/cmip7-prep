@@ -7,7 +7,7 @@ present in the provided dataset. It also supports a packaged default
 `cmor_dataset.json` living under `cmip7_prep/data/`.
 """
 
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractContextManager
 from pathlib import Path
 import json
 import tempfile
@@ -38,30 +38,22 @@ def packaged_dataset_json(filename: str = "cmor_dataset.json"):
     return as_file(res)
 
 
-@contextmanager
-def _as_path_cm(obj):
-    """
-    Yield a Path whether `obj` is already a path-like or a context manager
-    (e.g., importlib.resources.as_file(...)).
-    """
-    # already a path-like → no-op context
-    if isinstance(obj, (str, Path)):
-        yield Path(obj)
-        return
-
-    # context manager that yields a path-like
-    if hasattr(obj, "__enter__") and hasattr(obj, "__exit__"):
-        with obj as p:
-            yield Path(p)
-        return
-
-    raise TypeError(f"Unsupported dataset_json object type: {type(obj)!r}")
-
-
 def _filled_for_cmor(
     da: xr.DataArray, fill: float | None = None
 ) -> tuple[xr.DataArray, float]:
-    """Replace NaNs with CMOR missing value (default 1e20) and return (data, fill)."""
+    """
+    Replace NaNs with CMOR missing value (default 1e20) and return (data, fill).
+    >>> import xarray as xr
+    >>> arr = xr.DataArray([1.0, np.nan, 2.0])
+    >>> _filled_for_cmor(arr, fill=-999.0)
+    (<xarray.DataArray (dim_0: 3)> Size: 24B
+    array([   1., -999.,    2.])
+    Dimensions without coordinates: dim_0
+    Attributes:
+        _FillValue:     -999.0
+        missing_value:  -999.0, -999.0)
+
+    """
     if fill is None:
         # choose fill based on dtype
         f = np.array(
@@ -96,6 +88,10 @@ def _encode_time_to_num(obj, units: str, calendar: str) -> np.ndarray:
       - scalar cftime / python datetime
 
     Always returns float64 ndarray of the same shape as input.
+    >>> import cftime
+    >>> arr = [cftime.DatetimeNoLeap(2000, 1, 1), cftime.DatetimeNoLeap(2000, 1, 2)]
+    >>> _encode_time_to_num(arr, units="days since 2000-01-01", calendar="noleap")
+    array([0., 1.])
     """
     # Normalize to ndarray
     arr = obj.values if hasattr(obj, "values") else np.asarray(obj)
@@ -130,6 +126,14 @@ def _encode_time_bounds_to_num(tb, units: str, calendar: str) -> np.ndarray:
     """
     Encode bounds array of shape (..., 2) to numeric CF time.
     Returns float64 array with same shape.
+    >>> import cftime
+    >>> tb = [
+    ...     [cftime.DatetimeNoLeap(2000, 1, 1), cftime.DatetimeNoLeap(2000, 1, 2)],
+    ...     [cftime.DatetimeNoLeap(2000, 1, 2), cftime.DatetimeNoLeap(2000, 1, 3)]
+    ... ]
+    >>> _encode_time_bounds_to_num(tb, units="days since 2000-01-01", calendar="noleap")
+    array([[0., 1.],
+           [1., 2.]])
     """
     tba = tb.values if hasattr(tb, "values") else np.asarray(tb)
     if tba.ndim < 1 or tba.shape[-1] != 2:
@@ -139,69 +143,28 @@ def _encode_time_bounds_to_num(tb, units: str, calendar: str) -> np.ndarray:
     return np.stack([left, right], axis=-1)
 
 
-def _bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
-    """Compute [n,2] cell bounds from 1-D centers for 'lat' or 'lon'.
-
-    - For 'lat': clamps to [-90, 90]
-    - For 'lon': treats as periodic [0, 360)
-    - Works with non-uniform spacing (uses midpoints between neighbors)
-    """
-    v = np.asarray(vals, dtype="f8").reshape(-1)
-    n = v.size
-    if n < 2:
-        raise ValueError("Need at least 2 points to compute bounds")
-
-    # neighbor midpoints
-    mid = 0.5 * (v[1:] + v[:-1])  # length n-1
-    bounds = np.empty((n, 2), dtype="f8")
-    bounds[1:, 0] = mid
-    bounds[:-1, 1] = mid
-
-    # end caps: extrapolate by half-step at ends
-    first_step = v[1] - v[0]
-    last_step = v[-1] - v[-2]
-    bounds[0, 0] = v[0] - 0.5 * first_step
-    bounds[-1, 1] = v[-1] + 0.5 * last_step
-
-    if kind == "lat":
-        # clamp to physical limits
-        bounds[:, 0] = np.maximum(bounds[:, 0], -90.0)
-        bounds[:, 1] = np.minimum(bounds[:, 1], 90.0)
-    elif kind == "lon":
-        # wrap to [0, 360)
-        bounds = bounds % 360.0
-        # ensure each row is increasing in modulo arithmetic
-        wrap = bounds[:, 1] < bounds[:, 0]
-        if np.any(wrap):
-            bounds[wrap, 1] += 360.0
-    else:
-        raise ValueError("kind must be 'lat' or 'lon'")
-
-    return bounds
-
-
-def _bounds_from_centers(
-    centers: np.ndarray, delta: float, *, clip=None, wrap=None
-) -> np.ndarray:
-    centers = np.asarray(centers, dtype="f8")
-    half = 0.5 * delta
-    left = centers - half
-    right = centers + half
-    if clip is not None:
-        left = np.clip(left, clip[0], clip[1])
-        right = np.clip(right, clip[0], clip[1])
-    if wrap is not None:
-        wmin, wmax = wrap
-        width = wmax - wmin
-        left = (left - wmin) % width + wmin
-        right = (right - wmin) % width + wmin
-    return np.stack([left, right], axis=1)
-
-
 def _is_radians(vals: np.ndarray, units: str | None) -> bool:
+    """
+    Determine if values are in radians based on units.
+
+    >>> import numpy as np
+    >>> arr = np.array([0, np.pi/2, np.pi])
+    >>> _is_radians(arr, units="radian")
+    True
+    >>> _is_radians(arr, units="degrees")
+    False
+    >>> _is_radians(arr, units=None)
+    True
+    >>> arr = np.array([0, 90, 180])
+    >>> _is_radians(arr, units=None)
+    False
+    """
+    # ...existing code...
     u = (units or "").strip().lower()
     if u in {"radian", "radians"}:
         return True
+    if u:
+        return False
     v = np.asarray(vals, dtype="f8")
     # Heuristic: lat in radians typically ≤ ~π/2 in magnitude; lon ≤ ~2π
     # If max |lat| ≤ π and some values are between ~-π and π, assume radians.
@@ -241,6 +204,13 @@ def make_strictly_monotonic(x, direction="increasing"):
     - NaNs split the series into independent segments (left unchanged).
     - If an infinite value appears where a further increase/decrease is required,
       a ValueError is raised because it can't be nudged.
+    >>> import numpy as np
+    >>> arr = np.array([1, 2, 2, 3])
+    >>> make_strictly_monotonic(arr)
+    array([1., 2., 2., 3.])
+    >>> arr = np.array([3, 2, 2, 1])
+    >>> make_strictly_monotonic(arr, direction="decreasing")
+    array([3., 2., 2., 1.])
     """
     y = np.asarray(x, dtype=float).copy()
     if y.ndim != 1:
@@ -286,7 +256,22 @@ def make_strictly_monotonic(x, direction="increasing"):
 
 
 def is_strictly_monotonic(arr):
-    """simple test to see if 1d array is strictly monotonic"""
+    """
+    simple test to see if 1d array is strictly monotonic
+    >>> import numpy as np
+    >>> arr = np.array([1, 2, 3])
+    >>> is_strictly_monotonic(arr)
+    True
+    >>> arr = np.array([3, 2, 1])
+    >>> is_strictly_monotonic(arr)
+    True
+    >>> arr = np.array([1, 2, 2, 3])
+    >>> is_strictly_monotonic(arr)
+    False
+    >>> arr = np.array([3., 2., 2., 1.])
+    >>> is_strictly_monotonic(arr)
+    False
+    """
     # Check for non-decreasing
     is_increasing = np.all(arr[:-1] < arr[1:])
     # Check for non-increasing
@@ -297,7 +282,23 @@ def is_strictly_monotonic(arr):
 def _sigma_mid_and_bounds(
     ds: xr.Dataset, levels: dict
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return (mid_sigma, bounds_sigma) in [0,1] for standard_hybrid_sigma."""
+    """
+    Return (mid_sigma, bounds_sigma) in [0,1] for standard_hybrid_sigma.
+    >>> import numpy as np
+    >>> import xarray as xr
+    >>> ds = xr.Dataset({
+    ...     "hybm": ("mid", [0.2, 0.5, 0.8]),
+    ...     "hybi": ("edge", [0.0, 0.4, 0.6, 1.0])
+    ... })
+    >>> levels = {"hybm": "hybm", "hybi": "hybi"}
+    >>> sigma_mid, sigma_bnds = _sigma_mid_and_bounds(ds, levels)
+    >>> sigma_mid
+    array([0.2, 0.5, 0.8])
+    >>> sigma_bnds
+    array([[0. , 0.4],
+           [0.4, 0.6],
+           [0.6, 1. ]])
+    """
     lev_name = levels.get("src_axis_name", "lev")
     hybm_name = levels.get("hybm", "hybm")  # B mid
     # hyai_name = levels.get("hyai", "hyai")  # A interfaces (optional)

@@ -26,6 +26,12 @@ def _filename_contains_var(path: Union[str, Path], var: str) -> bool:
     True if filename contains the variable as a dot-delimited token: '.var.'.
 
     Example matches: '...cam.h0.TS.0001-01.nc' contains '.TS.' -> True
+    >>> _filename_contains_var("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc", "TS")
+    True
+    >>> _filename_contains_var("b.e30.fredscomp.cam.h1.PS.ne30pg3.001.nc", "TS")
+    False
+    >>> _filename_contains_var(Path("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc"), "TS")
+    True
     """
     name = Path(path).name
     needle = f".{var}."
