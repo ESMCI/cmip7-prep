@@ -102,7 +102,22 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     2.0
     """
     safe_globals = {"__builtins__": {}}
-    locals_safe = {"np": np, "xr": xr}
+    # Add custom formula functions here
+    def verticalSum(arr, capped_at=None, dim='levsoi'):
+        # arr can be a DataArray or an expression
+        if isinstance(arr, xr.DataArray):
+            summed = arr.sum(dim=dim, skipna=True)
+        else:
+            summed = arr  # fallback, should be DataArray
+        if capped_at is not None:
+            summed = xr.where(summed > capped_at, capped_at, summed)
+        return summed
+
+    locals_safe = {
+        "np": np,
+        "xr": xr,
+        "verticalSum": verticalSum,
+    }
     locals_safe.update(local_names)
     # pylint: disable=eval-used
     return eval(expr, safe_globals, locals_safe)

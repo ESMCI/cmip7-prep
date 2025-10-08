@@ -68,7 +68,6 @@ def _collect_required_cesm_vars(
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
-
     return sorted(needed)
 
 
@@ -122,7 +121,6 @@ def open_native_for_cmip_vars(
     )
 
     if not selected:
-        print(f"DEBUG: candidates={candidates} required={required}")
         raise FileNotFoundError(
             f"No files under glob matched required variables {required} with '.VAR.' token."
         )

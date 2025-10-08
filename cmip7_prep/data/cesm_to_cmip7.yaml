@@ -87,6 +87,24 @@ variables:
       - cesm_var: QFLX
         scale: -1.0     # flip sign if CESM positive upward
 
+  evspsblsoi:
+    table: Lmon
+    units: kg m-2 s-1
+    long_name: Water Evaporation from Soil
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: QSOIL
+
+  evspsblveg:
+    table: Lmon
+    units: kg m-2 s-1
+    long_name: Water Evaporation from Soil
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: QVEGE
+
   hfls:
     table: Amon
     units: "W m-2"
@@ -139,6 +157,51 @@ variables:
     sources:
       - cesm_var: QREFHT
 
+  lai:
+    table: Lmon
+    units: "1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: TLAI
+
+  mrfso:
+    table: Lmon
+    units: kg m-2
+    dims: [time, lat, lon]
+    formula: verticalSum(SOILICE, capped_at=5000) 
+    sources:
+      - cesm_var: SOILICE
+        
+  mrro:
+    table: Lmon
+    units: kg m-2 s-1
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: QRUNOFF
+
+  mrros:
+    table: Lmon
+    units: kg m-2 s-1
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: QOVER
+        
+  mrso:
+    table: Lmon
+    units: kg m-2
+    dims: [time, lat, lon]
+    formula: verticalSum(SOILICE + SOILLIQ, capped_at=5000) 
+    sources:
+      - cesm_var: SOILICE
+      - cesm_var: SOILLIQ
+        
+  mrsos:
+    table: Lmon
+    units: kg m-2
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: SOILWATER_10CM
+        
   pr:
     table: Amon
     units: kg m-2 s-1
@@ -432,10 +495,20 @@ variables:
     sources:
       - cesm_var: Z3
 
-fx:
-  areacella:
-    units: m2
-    source: cell_area
-  sftlf:
-    units: '%'
-    source: sftlf
+#  areacella:
+#    table: fx
+#    units: m2
+#    formula: area * 1.e6
+#    standard_name: cell_area
+#    dims: [lat, lon]
+#    sources:
+#      - cesm_var: ZBOT
+#
+#
+#  sftlf:
+#    table: fx
+#    units: '%'
+#    formula: landfrac * 100
+#    dims: [lat, lon]
+#    sources:
+#      - cesm_var: ZBOT

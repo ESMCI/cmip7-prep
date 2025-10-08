@@ -6,14 +6,13 @@ from pathlib import Path
 from typing import Optional, Dict, Tuple
 import numpy as np
 import xarray as xr
-
-try:
-    import xesmf as xe
-except ModuleNotFoundError as e:
-    _HAS_XESMF = False
+import xesmf as xe
+#try:
+#    import xesmf as xe
+#except ModuleNotFoundError as e:
+#    _HAS_XESMF = False
 try:
     import dask.array as _da  # noqa: F401
-
     _HAS_DASK = True
 except ModuleNotFoundError as e:
     _HAS_DASK = False
@@ -426,14 +425,15 @@ def _pick_maps(
         return MapSpec("bilinear", bilin)
     return MapSpec("conservative", cons)
 
-
-def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
-    """Move 'ncol' to the last position; return (da, non_spatial_dims)."""
-    if "ncol" not in da.dims:
-        raise ValueError(f"Expected 'ncol' in dims; got {da.dims}")
-    non_spatial = tuple(d for d in da.dims if d != "ncol")
-    return da.transpose(*non_spatial, "ncol"), non_spatial
-
+def _ensure_ncol_last(da: xr.DataArray):
+    if "ncol" in da.dims:
+        hdim = "ncol"
+    elif "lndgrid" in da.dims:
+        hdim = "lndgrid"
+    else:
+        raise ValueError(f"Expected 'ncol' or 'lndgrid' in dims; got {da.dims}")
+    non_spatial = tuple(d for d in da.dims if d != hdim)
+    return da.transpose(*non_spatial, hdim), non_spatial, hdim
 
 # -------------------------
 # Public API
@@ -516,7 +516,7 @@ def regrid_to_1deg(
 
     var_da = ds_in[varname]  # always a DataArray
 
-    da2, non_spatial = _ensure_ncol_last(var_da)
+    da2, non_spatial, hdim = _ensure_ncol_last(var_da)
 
     # cast to save memory
     if dtype is not None and str(da2.dtype) != dtype:
@@ -540,7 +540,7 @@ def regrid_to_1deg(
         kwargs["output_chunks"] = {"time": output_time_chunk}
 
     da2_2d = (
-        da2.rename({"ncol": "lon"})
+        da2.rename({hdim: "lon"})
         .expand_dims({"lat": 1})  # add a dummy 'lat' of length 1
         .transpose(*non_spatial, "lat", "lon")  # ensure last two dims are ('lat','lon')
     )

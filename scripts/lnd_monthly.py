@@ -175,11 +175,7 @@ def latest_monthly_file(
 
 
 if __name__ == "__main__":
-    # JPE: THIS MECHANISM in hf_collection include_pattern is currently broken
-    # Only atm monthly 32 bit
-    # include_pattern = "*cam.h0a.*"
-    # Only atm monthly 64 bit
-    include_pattern = "*cam.h0a*"
+    include_pattern = "*clm2.h0*"
 
     if len(sys.argv) > 2:
         caseroot = sys.argv[1]
@@ -194,15 +190,9 @@ if __name__ == "__main__":
             inputroot = case.get_value("DOUT_S_ROOT")
             casename = case.get_value("CASE")
         # Currently due to a problem in GenTS we need to create another directory and link only files we need
-        INPUTDIR = os.path.join(inputroot, "atm", "hist")
-        link_files(
-            Path(os.path.join(inputroot, "atm", "hist")),
-            Path(INPUTDIR),
-            include_pattern,
-            relative=True,
-            overwrite=False,
-        )
-        TSDIR = Path(inputroot).parent / "timeseries" / casename / "atm" / "hist"
+        INPUTDIR = os.path.join(inputroot, "lnd", "hist")
+
+        TSDIR = Path(inputroot).parent / "timeseries" / casename / "lnd" / "hist"
 
         native = latest_monthly_file(Path(INPUTDIR))
         if TSDIR.exists():
@@ -215,10 +205,10 @@ if __name__ == "__main__":
                     sys.exit(0)
     else:
         # testing path
-        INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
+        INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
         TSDIR = (
             scratch
-            + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
+            + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
         )
 
     if not os.path.exists(str(OUTDIR)):
@@ -244,13 +234,14 @@ if __name__ == "__main__":
     mapping = Mapping.from_packaged_default()
 
     cmip_vars = find_variables_by_prefix(
-        None, "Amon.", include_groups={"baseline_monthly"}
+        None, "Lmon.", include_groups={"baseline_monthly"}
     )
+    
     print(f"CMORIZING {len(cmip_vars)} variables")
     # 1) Load requested variables
     ds_native, cmip_vars = open_native_for_cmip_vars(
         cmip_vars,
-        Path(TSDIR + "/*cam.h0a.*"),
+        Path(TSDIR + "/*"),
         mapping,
         use_cftime=True,
         parallel=True,
@@ -262,3 +253,4 @@ if __name__ == "__main__":
     for v, status in results:
         print(v, "→", status)
     client.close()
+    
