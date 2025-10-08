@@ -122,6 +122,7 @@ def open_native_for_cmip_vars(
     )
 
     if not selected:
+        print(f"DEBUG: candidates={candidates} required={required}")
         raise FileNotFoundError(
             f"No files under glob matched required variables {required} with '.VAR.' token."
         )
