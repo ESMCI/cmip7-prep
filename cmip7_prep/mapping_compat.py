@@ -289,6 +289,11 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
             raise KeyError(f"source variable {vc.source!r} not found in dataset")
         return ds[vc.source]
 
+    if vc.name == "sftlf":
+        vc.raw_variables = "landfrac"
+    elif vc.name == "areacella":
+        vc.raw_variables = "area"
+
     # 2) identity mapping from a single raw variable
     if (
         vc.raw_variables

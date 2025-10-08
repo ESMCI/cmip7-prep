@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Tuple
+
+# import warnings
 import numpy as np
 import xarray as xr
 import xesmf as xe
@@ -57,6 +59,28 @@ class MapSpec:
 
     method_label: str  # "conservative" or "bilinear"
     path: Path
+
+
+def _pick_from_candidates(ds: xr.Dataset, *names: str) -> xr.DataArray | None:
+    """Return the first present variable among candidate names (case-insensitive)."""
+    for nm in names:
+        if nm in ds:
+            return ds[nm]
+    lower = {k.lower(): k for k in ds.variables}
+    for nm in names:
+        k = lower.get(nm.lower())
+        if k:
+            return ds[k]
+    return None
+
+
+def _normalize_land_aux(da: xr.DataArray, hdim: str) -> xr.DataArray:
+    """Reduce extra dims (e.g., pft) and ensure the unstructured dim is present."""
+    if "pft" in da.dims:
+        da = da.sum("pft")
+    if hdim not in da.dims:
+        raise KeyError(f"land aux var missing required dim {hdim!r}: dims={da.dims}")
+    return da
 
 
 # -------------------------
@@ -228,43 +252,18 @@ def _dst_latlon_1d_from_map(mapfile: Path) -> tuple[np.ndarray, np.ndarray]:
     return lat, lon
 
 
-def _get_dst_latlon_1d(m: xr.Dataset) -> Tuple[np.ndarray, np.ndarray]:
+def _get_dst_latlon_1d() -> Tuple[np.ndarray, np.ndarray]:
     """Return 1D dest lat, lon arrays from weight file.
 
     Prefers 2D center lat/lon (yc_b/xc_b or lat_b/lon_b), reshaped to (ny, nx),
     then converts to 1D centers by taking first column/row, which is valid for
     regular 1° lat/lon weights.
     """
-    lat2d = _read_array(m, "yc_b", "lat_b", "dst_grid_center_lat", "yc", "lat")
-    lon2d = _read_array(m, "xc_b", "lon_b", "dst_grid_center_lon", "xc", "lon")
-    if lat2d is not None and lon2d is not None:
-        # figure out (ny, nx)
-        if "dst_grid_dims" in m:
-            ny, nx = [int(x) for x in np.asarray(m["dst_grid_dims"]).ravel()][-2:]
-        else:
-            # try to infer directly from array size
-            size = int(np.asarray(lat2d).size)
-            # default 1x1 grid size is 180*360
-            if size == 180 * 360:
-                ny, nx = 180, 360
-            else:
-                # fallback: assume square-ish
-                ny = int(round(np.sqrt(size)))
-                nx = size // ny
-        lat2d = np.asarray(lat2d).reshape(ny, nx)
-        lon2d = np.asarray(lon2d).reshape(ny, nx)
-        return lat2d[:, 0].astype("f8"), lon2d[0, :].astype("f8")
-
-    # If 1D lat/lon already present
-    lat1d = _read_array(m, "lat", "yc")
-    lon1d = _read_array(m, "lon", "xc")
-    if lat1d is not None and lon1d is not None and lat1d.ndim == 1 and lon1d.ndim == 1:
-        return np.asarray(lat1d, dtype="f8"), np.asarray(lon1d, dtype="f8")
-
     # Final fallback: fabricate a 1° grid
     ny, nx = 180, 360
     lat = np.linspace(-89.5, 89.5, ny, dtype="f8")
     lon = (np.arange(nx, dtype="f8") + 0.5) * (360.0 / nx)
+
     return lat, lon
 
 
@@ -305,7 +304,7 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
     trigger cf-xarray’s bounds inference on size-1 dimensions."""
     with _open_nc(mapfile) as m:
         nlat_in, nlon_in = _get_src_shape(m)
-        lat_out_1d, lon_out_1d = _get_dst_latlon_1d(m)
+    lat_out_1d, lon_out_1d = _get_dst_latlon_1d()
 
     # --- Dummy INPUT grid (unstructured → represent as 2D with length-1 lat) ---
     lat_in = np.arange(nlat_in, dtype="f8")  # e.g., [0], length can be 1
@@ -375,7 +374,6 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
             "nbnds": ("nbnds", np.array([0, 1], dtype="i4")),
         },
     )
-
     return ds_in, ds_out
 
 
@@ -425,7 +423,8 @@ def _pick_maps(
         return MapSpec("bilinear", bilin)
     return MapSpec("conservative", cons)
 
-def _ensure_ncol_last(da: xr.DataArray):
+def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
+    """Move 'ncol' to the last position; return (da, non_spatial_dims)."""
     if "ncol" in da.dims:
         hdim = "ncol"
     elif "lndgrid" in da.dims:
@@ -443,7 +442,7 @@ def _ensure_ncol_last(da: xr.DataArray):
 
 def regrid_to_1deg_ds(
     ds_in: xr.Dataset,
-    varname: str | list[str],
+    varnames: str | list[str],
     *,
     time_from: xr.Dataset | None = None,
     method: Optional[str] = None,
@@ -453,10 +452,9 @@ def regrid_to_1deg_ds(
     dtype: str | None = "float32",
     output_time_chunk: int | None = 12,
 ) -> xr.Dataset:
-    """Regrid var(s) and return a Dataset. If `carry` is provided, copy those
-    names through unchanged when they are 1-D/non-spatial (no ncol/lat/lon)."""
+    """Regrid var(s) and return a Dataset."""
 
-    names = [varname] if isinstance(varname, str) else list(varname)
+    names = [varnames] if isinstance(varnames, str) else list(varnames)
     out_vars: dict[str, xr.DataArray] = {}
 
     for name in names:
@@ -476,6 +474,20 @@ def regrid_to_1deg_ds(
     # Attach time (and bounds) from the original dataset if requested
     if time_from is not None:
         ds_out = _attach_time_and_bounds(ds_out, time_from)
+
+    # Pick the mapfile you used for conservative/bilinear selection
+    spec = _pick_maps(
+        varnames[0] if isinstance(varnames, list) else varnames,
+        conservative_map=conservative_map,
+        bilinear_map=bilinear_map,
+        force_method="conservative",
+    )  # fx always conservative
+    ds_fx = _regrid_fx_once(spec.path, ds_in)  # ← uses cache
+    if ds_fx:
+        # Don’t overwrite if user already computed and passed them in
+        for name in ("sftlf", "areacella"):
+            if name in ds_fx and name not in ds_out:
+                ds_out[name] = ds_fx[name]
 
     # --- NEW: carry hybrid metadata (or any requested 1-D fields) unchanged ---
     ds_out = _attach_vertical_metadata(ds_out, ds_in)
@@ -547,7 +559,32 @@ def regrid_to_1deg(
     if "time" in da2_2d.dims and output_time_chunk:
         kwargs["output_chunks"] = {"time": output_time_chunk}
 
-    out = regridder(da2_2d, **kwargs)  # current call that returns (*non_spatial, ?, ?)
+    # --- LAND-AWARE path ---
+    if hdim == "lndgrid" and "landfrac" in ds_in:
+        # Build a matching 2D landfrac
+        lf = ds_in["landfrac"]
+        # If landfrac has the unstructured dim, reshape like we did the data
+        if hdim in lf.dims:
+            lf2d = (
+                lf.rename({hdim: "lon"}).expand_dims({"lat": 1}).transpose("lat", "lon")
+            )
+        else:
+            # fallback: broadcast if already 2D (rare on unstructured)
+            lf2d = lf
+
+        # premultiply (intensive × landfrac = extensive over full cell)
+        num = da2_2d * lf2d
+
+        # conservative regrid numerator and denominator
+        out_num = regridder(num, **kwargs)
+        out_den = regridder(lf2d, **kwargs)
+
+        # safe divide; mask where no land
+        out = out_num / xr.where(out_den > 0, out_den, np.nan)
+        out = out.where(out_den > 0)
+    else:
+        # default path (atm or no landfrac available)
+        out = regridder(da2_2d, **kwargs)
 
     # --- NEW: robust lat/lon assignment based on destination grid lengths ---
     lat1d, lon1d = _dst_latlon_1d_from_map(spec.path)
@@ -647,9 +684,167 @@ def _attach_time_and_bounds(ds_out: xr.Dataset, time_from: xr.Dataset) -> xr.Dat
     return ds_out
 
 
+def _first_present(ds: xr.Dataset, names: list[str]) -> str | None:
+    for n in names:
+        if n in ds:
+            return n
+    return None
+
+
+def _sftlf_from_native(ds: xr.Dataset) -> xr.DataArray | None:
+    name = _first_present(ds, ["LANDFRAC", "landfrac", "landmask", "frac_lnd"])
+    if name is None:
+        return None
+    v = ds[name]
+    # If in 0..1, convert to percent; if already 0..100, leave it
+    vmax = float(np.nanmax(np.asarray(v)))
+    out = v * 100.0 if vmax <= 1.0 + 1e-6 else v
+    out = out.clip(min=0.0, max=100.0)
+    out = out.astype("f8")
+    attrs = dict(out.attrs)
+    attrs["units"] = "%"
+    attrs.setdefault("standard_name", "land_area_fraction")
+    attrs.setdefault("long_name", "Percentage of land area")
+    out.attrs = attrs
+    return out
+
+
+def _areacella_from_native(ds: xr.Dataset) -> xr.DataArray | None:
+    name = _first_present(ds, ["area", "AREA", "cell_area"])
+    if name is None:
+        return None
+    v = ds[name].astype("f8")
+    units = (v.attrs.get("units") or "").strip().lower()
+    if units in {"km2", "km^2"}:
+        v = v * 1e6
+    # normalize attrs
+    attrs = dict(v.attrs)
+    attrs["units"] = "m2"
+    attrs.setdefault("standard_name", "cell_area")
+    attrs.setdefault("long_name", "Grid cell area")
+    v.attrs = attrs
+    return v
+
+
+def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
+    pieces = {}
+    sftlf = _sftlf_from_native(ds_native)
+    if sftlf is not None:
+        pieces["sftlf"] = sftlf
+    area = _areacella_from_native(ds_native)
+    if area is not None:
+        pieces["areacella"] = area
+    if not pieces:
+        return xr.Dataset()
+    ds_fx = xr.Dataset(pieces)
+    # normalize horizontal dim name to what your regrid code expects
+    if "lndgrid" in ds_fx.dims and "ncol" not in ds_fx.dims:
+        ds_fx = ds_fx.rename({"lndgrid": "ncol"})
+    return ds_fx
+
+
+def compute_areacella_from_bounds(
+    ds: xr.Dataset, *, radius_m: float = 6_371_000.0
+) -> xr.DataArray:
+    """
+    Compute areacella (m^2) from 1x1 lat/lon bounds.
+    Requires 1D coords 'lat','lon' and bounds 'lat_bnds','lon_bnds' with shape (N,2).
+    """
+
+    lat_b = np.asarray(ds["lat_bnds"].values, dtype="f8")  # (nlat, 2)
+    lon_b = np.asarray(ds["lon_bnds"].values, dtype="f8")  # (nlon, 2)
+
+    # radians
+    lat_b_rad = np.deg2rad(lat_b)
+    lon_b_rad = np.deg2rad(lon_b % 360.0)  # ensure [0,360)
+    dlam = lon_b_rad[:, 1] - lon_b_rad[:, 0]  # (nlon,)
+
+    # Δ(sin φ)
+    sin_phi2_minus_phi1 = np.sin(lat_b_rad[:, 1]) - np.sin(lat_b_rad[:, 0])  # (nlat,)
+
+    # broadcast to 2D (lat,lon)
+    area = (radius_m**2) * sin_phi2_minus_phi1[:, None] * dlam[None, :]
+
+    da = xr.DataArray(
+        area,
+        dims=("lat", "lon"),
+        coords={"lat": ds["lat"], "lon": ds["lon"]},
+        name="areacella",
+        attrs={
+            "standard_name": "cell_area",
+            "long_name": "Grid-Cell Area",
+            "units": "m2",
+        },
+    )
+    return da
+
+
+def _regrid_fx_once(mapfile: Path, ds_native: xr.Dataset) -> xr.Dataset:
+    """Compute & regrid sftlf/areacella once for a given mapfile; cache result."""
+    # already have it?
+    cached = _FXCache.get(mapfile)
+    if cached is not None:
+        return cached
+
+    ds_fx_native = _build_fx_native(ds_native)
+    if not ds_fx_native:
+        _FXCache.put(mapfile, xr.Dataset())
+        return xr.Dataset()
+
+    # Conservative always for areas/fractions
+    regridder = _RegridderCache.get(mapfile, "conservative")
+
+    out_vars = {}
+    for name in ("sftlf", "areacella"):
+        if name not in ds_fx_native:
+            continue
+        da = ds_fx_native[name]
+        # Make a 2D dummy with dims lat,lon like your main regrid path does
+        # Reuse your same reshape trick from regrid_to_1deg (ncol→lon + dummy lat)
+        da2 = (
+            da.rename({"ncol": "lon"})
+            .expand_dims({"lat": 1})
+            .transpose(..., "lat", "lon")
+        )
+        out = regridder(da2)
+        # strip any extra non-spatial dims (FX are horizontal-only)
+        spatial = [d for d in out.dims if d in ("lat", "lon")]
+        out = out.transpose(*spatial)
+        out.name = name
+        out.attrs.update(da.attrs)
+        out_vars[name] = out
+
+    ds_fx = xr.Dataset(out_vars)
+    if "areacella" not in ds_fx and "ncol" in da:
+        print("adding areacella to fx")
+        ds_fx = ds_fx.assign(areacella=compute_areacella_from_bounds(ds_fx))
+
+    _FXCache.put(mapfile, ds_fx)
+    return ds_fx
+
+
 # -------------------------
 # Cache
 # -------------------------
+class _FXCache:
+    """Cache of regridded FX fields (sftlf, areacella) keyed by mapfile."""
+
+    _cache: Dict[Path, xr.Dataset] = {}
+
+    @classmethod
+    def get(cls, key: Path) -> xr.Dataset | None:
+        """get cached variable"""
+        return cls._cache.get(key)
+
+    @classmethod
+    def put(cls, key: Path, ds_fx: xr.Dataset) -> None:
+        """put variable into cache"""
+        cls._cache[key] = ds_fx
+
+    @classmethod
+    def clear(cls) -> None:
+        """clear cache"""
+        cls._cache.clear()
 
 
 class _RegridderCache:

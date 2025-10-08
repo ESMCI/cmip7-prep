@@ -201,7 +201,7 @@ variables:
     dims: [time, lat, lon]
     sources:
       - cesm_var: SOILWATER_10CM
-        
+
   pr:
     table: Amon
     units: kg m-2 s-1
