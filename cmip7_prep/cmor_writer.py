@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Thin CMOR wrapper used by cmip7_prep.
 
 This module centralizes CMOR session setup and writing so that the rest of the
@@ -121,6 +122,7 @@ def _encode_time_to_num(obj, units: str, calendar: str) -> np.ndarray:
 
     return nums.reshape(arr.shape)
 
+
 def _bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
     """Compute [n,2] cell bounds from 1-D centers for 'lat' or 'lon'.
 
@@ -160,6 +162,7 @@ def _bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
         raise ValueError("kind must be 'lat' or 'lon'")
 
     return bounds
+
 
 def _encode_time_bounds_to_num(tb, units: str, calendar: str) -> np.ndarray:
     """
@@ -486,7 +489,7 @@ class CmorSession(
         self._log_name = log_name
         self._log_path: Path | None = None
         self._pending_ps = None
-        self._outdir = Path(outdir) if outdir is not None else Path.cwd() / "CMIP7"
+        self._outdir = Path(outdir or "./CMIP7").resolve()
         self._outdir.mkdir(parents=True, exist_ok=True)
         self._fx_written: set[str] = (
             set()
