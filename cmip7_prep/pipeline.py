@@ -46,7 +46,6 @@ def _collect_required_cesm_vars(
     for v in cmip_vars:
         try:
             cfg = mapping.get_cfg(v) or {}
-            print(f"v is {v} cfg is {cfg}")
         except KeyError:
             print(
                 f"WARNING: skipping '{v}': no mapping found in {mapping.path}",
