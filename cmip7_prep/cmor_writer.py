@@ -121,6 +121,45 @@ def _encode_time_to_num(obj, units: str, calendar: str) -> np.ndarray:
 
     return nums.reshape(arr.shape)
 
+def _bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
+    """Compute [n,2] cell bounds from 1-D centers for 'lat' or 'lon'.
+
+    - For 'lat': clamps to [-90, 90]
+    - For 'lon': treats as periodic [0, 360)
+    - Works with non-uniform spacing (uses midpoints between neighbors)
+    """
+    v = np.asarray(vals, dtype="f8").reshape(-1)
+    n = v.size
+    if n < 2:
+        raise ValueError("Need at least 2 points to compute bounds")
+
+    # neighbor midpoints
+    mid = 0.5 * (v[1:] + v[:-1])  # length n-1
+    bounds = np.empty((n, 2), dtype="f8")
+    bounds[1:, 0] = mid
+    bounds[:-1, 1] = mid
+
+    # end caps: extrapolate by half-step at ends
+    first_step = v[1] - v[0]
+    last_step = v[-1] - v[-2]
+    bounds[0, 0] = v[0] - 0.5 * first_step
+    bounds[-1, 1] = v[-1] + 0.5 * last_step
+
+    if kind == "lat":
+        # clamp to physical limits
+        bounds[:, 0] = np.maximum(bounds[:, 0], -90.0)
+        bounds[:, 1] = np.minimum(bounds[:, 1], 90.0)
+    elif kind == "lon":
+        # wrap to [0, 360)
+        bounds = bounds % 360.0
+        # ensure each row is increasing in modulo arithmetic
+        wrap = bounds[:, 1] < bounds[:, 0]
+        if np.any(wrap):
+            bounds[wrap, 1] += 360.0
+    else:
+        raise ValueError("kind must be 'lat' or 'lon'")
+
+    return bounds
 
 def _encode_time_bounds_to_num(tb, units: str, calendar: str) -> np.ndarray:
     """
