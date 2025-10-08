@@ -68,7 +68,6 @@ def _collect_required_cesm_vars(
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
-
     return sorted(needed)
 
 
@@ -105,7 +104,6 @@ def open_native_for_cmip_vars(
         selected = sorted(
             {p for p in candidates if any(_filename_contains_var(p, v) for v in rvar)}
         )
-
         if selected:
             new_cmip_vars.append(var)
         else:
@@ -122,7 +120,6 @@ def open_native_for_cmip_vars(
     )
 
     if not selected:
-        print(f"DEBUG: candidates={candidates} required={required}")
         raise FileNotFoundError(
             f"No files under glob matched required variables {required} with '.VAR.' token."
         )
@@ -220,8 +217,14 @@ def realize_regrid_prepare(
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
     if time_chunk and "time" in da.dims:
         da = da.chunk({"time": int(time_chunk)})
+
     ds_vars = xr.Dataset({cmip_var: da})
 
+    if "area" in ds_native and "area" not in ds_vars and "ncol" in ds_native.dims:
+        ds_vars = ds_vars.assign(area=ds_native["area"])
+    if "landfrac" in ds_native and "landfrac" not in ds_vars:
+        ds_vars = ds_vars.assign(landfrac=ds_native["landfrac"])
+    print(f"ds_vars {ds_vars}")
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
     levels = cfg.get("levels", {}) or {}
