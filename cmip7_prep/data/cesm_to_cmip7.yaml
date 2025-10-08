@@ -168,10 +168,10 @@ variables:
     table: Lmon
     units: kg m-2
     dims: [time, lat, lon]
-    formula: verticalsum(SOILICE, capped_at=5000) 
+    formula: verticalsum(SOILICE, capped_at=5000)
     sources:
       - cesm_var: SOILICE
-        
+
   mrro:
     table: Lmon
     units: kg m-2 s-1
@@ -185,16 +185,16 @@ variables:
     dims: [time, lat, lon]
     sources:
       - cesm_var: QOVER
-        
+
   mrso:
     table: Lmon
     units: kg m-2
     dims: [time, lat, lon]
-    formula: verticalsum(SOILICE + SOILLIQ, capped_at=5000) 
+    formula: verticalsum(SOILICE + SOILLIQ, capped_at=5000)
     sources:
       - cesm_var: SOILICE
       - cesm_var: SOILLIQ
-        
+
   mrsos:
     table: Lmon
     units: kg m-2

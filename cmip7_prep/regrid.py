@@ -9,12 +9,14 @@ from typing import Optional, Dict, Tuple
 import numpy as np
 import xarray as xr
 import xesmf as xe
-#try:
+
+# try:
 #    import xesmf as xe
-#except ModuleNotFoundError as e:
+# except ModuleNotFoundError as e:
 #    _HAS_XESMF = False
 try:
     import dask.array as _da  # noqa: F401
+
     _HAS_DASK = True
 except ModuleNotFoundError as e:
     _HAS_DASK = False
@@ -423,6 +425,7 @@ def _pick_maps(
         return MapSpec("bilinear", bilin)
     return MapSpec("conservative", cons)
 
+
 def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
     """Move 'ncol' to the last position; return (da, non_spatial_dims)."""
     if "ncol" in da.dims:
@@ -433,6 +436,7 @@ def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
         raise ValueError(f"Expected 'ncol' or 'lndgrid' in dims; got {da.dims}")
     non_spatial = tuple(d for d in da.dims if d != hdim)
     return da.transpose(*non_spatial, hdim), non_spatial, hdim
+
 
 # -------------------------
 # Public API

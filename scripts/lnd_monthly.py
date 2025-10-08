@@ -236,7 +236,7 @@ if __name__ == "__main__":
     cmip_vars = find_variables_by_prefix(
         None, "Lmon.", include_groups={"baseline_monthly"}
     )
-    
+
     print(f"CMORIZING {len(cmip_vars)} variables")
     # 1) Load requested variables
     ds_native, cmip_vars = open_native_for_cmip_vars(
@@ -253,4 +253,3 @@ if __name__ == "__main__":
     for v, status in results:
         print(v, "→", status)
     client.close()
-    

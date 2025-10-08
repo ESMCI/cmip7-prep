@@ -100,13 +100,10 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
     for var in cmip_vars:
         rvar = _collect_required_cesm_vars(mapping, [var])
-        print(f"var {var} rvar {rvar}")
         candidates = glob.glob(str(files_glob))
         selected = sorted(
             {p for p in candidates if any(_filename_contains_var(p, v) for v in rvar)}
         )
-        if var == "evspsblsoi":
-            print(f"rvar = {rvar}, selected={selected} candidates = {candidates}")
         if selected:
             new_cmip_vars.append(var)
         else:
@@ -257,7 +254,6 @@ def realize_regrid_prepare(
         ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
     )
 
-    print(f"Here 1 {'areacella' in ds_regr}")
     # 7) If hybrid: merge in 1-D hybrid coefficients directly from native (no regridding needed)
     if is_hybrid:
         aux = [
