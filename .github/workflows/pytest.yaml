@@ -26,7 +26,8 @@ jobs:
           ESMF_INSTALL_PREFIX: $HOME/ESMF
         with:
           version: latest
-          esmpy: false
+          esmpy: true
+          cache: true
       - name: Install Poetry
         run: |
           python -m pip install --upgrade pip pipx
@@ -35,24 +36,6 @@ jobs:
           poetry config virtualenvs.in-project true
           poetry env use "$(python -c 'import sys; print(sys.executable)')"
           poetry install --no-interaction --no-ansi
-      - name: Pin esmpy to ESMF tag
-        run: |
-          set -euo pipefail
-          echo "using ESMPy tag ${ESMF_VERSION}"
-          # remove any existing esmpy dep and add the exact git subdir tag
-          poetry remove esmpy || true
-          poetry add --lock --no-interaction --directory=$ESMF_DIR/src/addon/esmpy esmpy
-          poetry run python -c "import esmpy; print('ESMPy:', esmpy.__version__)"
-      - name: Cache virtualenv
-        uses: actions/cache@v4
-        with:
-          path: |
-            .venv
-            $HOME/ESMF
-          key: esmf-esmpy-venv-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            esmf-esmpy-venv-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-
-
       - name: Run pytest
         env:
           ESMFMKFILE: ${{ env.ESMFMKFILE }}
