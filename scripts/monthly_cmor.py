@@ -12,6 +12,7 @@ Preserves all comments and error handling from both atm_monthly.py and lnd_month
 """
 from __future__ import annotations
 import argparse
+from email import parser
 import os
 from pathlib import Path
 import logging
@@ -49,6 +50,18 @@ def parse_args():
         description="CMIP7 monthly processing for atm/lnd realms"
     )
     parser.add_argument(
+        "--workers",
+        type=int,
+        default=128,
+        help="Number of Dask workers (default: 128, set to 1 for serial execution)",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing timeseries outputs (default: False)",
+    )
+
+    parser.add_argument(
         "--realm", choices=["atm", "lnd"], required=True, help="Realm to process"
     )
     parser.add_argument("--caseroot", type=str, help="Case root directory")
@@ -56,11 +69,19 @@ def parse_args():
     parser.add_argument(
         "--test", action="store_true", help="Run in test mode with default paths"
     )
+    scratch = os.getenv("SCRATCH")
+    default_outdir = scratch + "/CMIP7" if scratch else "./CMIP7"
     parser.add_argument(
         "--run-freq",
         type=str,
         default="10y",
-        help="Minimum run frequency required (e.g. '10y' or '120m'), default 10y",
+        help="Request run frequency (e.g. '10y' or '120m'), default 10y",
+    )
+    parser.add_argument(
+        "--outdir",
+        type=str,
+        default=default_outdir,
+        help="Output directory for CMORized files (default: $SCRATCH/CMIP7)",
     )
     args = parser.parse_args()
     # Parse run_freq argument
@@ -89,16 +110,16 @@ def parse_args():
     return args
 
 
-@delayed
-def process_one_var(varname: str, mapping, ds_native, OUTDIR) -> tuple[str, str]:
+def process_one_var(
+    varname: str, mapping, ds_native, tables_path, outdir
+) -> tuple[str, str]:
     """Compute+write one CMIP variable. Returns (varname, 'ok' or error message)."""
     try:
-        # Realize → verticalize (if needed) → regrid for a single variable
         ds_cmor = realize_regrid_prepare(
             mapping,
             ds_native,
             varname,
-            tables_path=TABLES,
+            tables_path=tables_path,
             time_chunk=12,
             regrid_kwargs={
                 "output_time_chunk": 12,
@@ -111,15 +132,14 @@ def process_one_var(varname: str, mapping, ds_native, OUTDIR) -> tuple[str, str]
                 ),
             },
         )
-        # Unique log per *run* is in your CmorSession; still fine to reuse here.
-        log_dir = Path(OUTDIR) / "logs"
+        log_dir = Path(outdir) / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         with CmorSession(
-            tables_path=TABLES,
+            tables_path=tables_path,
             log_dir=log_dir,
             log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
             dataset_attrs={"institution_id": "NCAR"},
-            outdir=OUTDIR,
+            outdir=outdir,
         ) as cm:
             cfg = mapping.get_cfg(varname)
             vdef = type(
@@ -141,6 +161,9 @@ def process_one_var(varname: str, mapping, ds_native, OUTDIR) -> tuple[str, str]
         return (varname, "ok")
     except Exception as e:
         return (varname, f"ERROR: {e!r}")
+
+
+process_one_var_delayed = delayed(process_one_var)
 
 
 def latest_monthly_file(
@@ -178,28 +201,9 @@ def latest_monthly_file(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="CMIP7 monthly processing for atm/lnd realms"
-    )
-    parser.add_argument(
-        "--realm", choices=["atm", "lnd"], required=True, help="Realm to process"
-    )
-    parser.add_argument("--caseroot", type=str, help="Case root directory")
-    parser.add_argument("--cimeroot", type=str, help="CIME root directory")
-    parser.add_argument(
-        "--test", action="store_true", help="Run in test mode with default paths"
-    )
-    parser.add_argument(
-        "--run-freq",
-        type=str,
-        default="10y",
-        help="Requested run frequency (e.g. '10y' or '120m'), default 10y",
-    )
-    args = parser.parse_args()
-
     args = parse_args()
     scratch = os.getenv("SCRATCH")
-    OUTDIR = scratch + "/CMIP7"
+    OUTDIR = args.outdir
     # Set realm-specific parameters
     if args.realm == "atm":
         include_pattern = "*cam.h0a*"
@@ -258,8 +262,13 @@ def main():
     if not os.path.exists(str(TSDIR)):
         os.makedirs(str(TSDIR))
     # Dask cluster setup
-    cluster = LocalCluster(n_workers=128, threads_per_worker=1, memory_limit="235GB")
-    client = cluster.get_client()
+    if args.workers == 1:
+        client = None
+    else:
+        cluster = LocalCluster(
+            n_workers=args.workers, threads_per_worker=1, memory_limit="235GB"
+        )
+        client = cluster.get_client()
     input_head_dir = INPUTDIR
     output_head_dir = TSDIR
     hf_collection = HFCollection(input_head_dir, dask_client=client)
@@ -268,9 +277,11 @@ def main():
     ts_collection = TSCollection(
         hf_collection, output_head_dir, ts_orders=None, dask_client=client
     )
-    ts_collection = ts_collection.apply_overwrite("*")
+    if args.overwrite:
+        ts_collection = ts_collection.apply_overwrite("*")
     ts_collection.execute()
     # Load mapping
+    print("Timeseries processing complete, starting CMORization...")
     mapping = Mapping.from_packaged_default()
     cmip_vars = find_variables_by_prefix(
         None, var_prefix, include_groups={"baseline_monthly"}
@@ -284,11 +295,20 @@ def main():
         use_cftime=True,
         parallel=True,
     )
-    futs = [process_one_var(v, mapping, ds_native, TABLES, OUTDIR) for v in cmip_vars]
-    results = dask.compute(*futs)
+    if args.workers == 1:
+        results = [
+            process_one_var(v, mapping, ds_native, TABLES, OUTDIR) for v in cmip_vars
+        ]
+    else:
+        futs = [
+            process_one_var_delayed(v, mapping, ds_native, TABLES, OUTDIR)
+            for v in cmip_vars
+        ]
+        results = dask.compute(*futs)
+        if client:
+            client.close()
     for v, status in results:
         print(v, "→", status)
-    client.close()
 
 
 if __name__ == "__main__":
