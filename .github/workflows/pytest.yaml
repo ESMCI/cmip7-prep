@@ -41,8 +41,7 @@ jobs:
           echo "using ESMPy tag ${ESMF_VERSION}"
           # remove any existing esmpy dep and add the exact git subdir tag
           poetry remove esmpy || true
-          poetry add --lock --no-interaction \
-            "esmpy@git+https://github.com/esmf-org/esmf.git@${ESMF_VERSION}#subdirectory=src/addon/esmpy"
+          poetry add --lock --no-interaction --directory=$ESMF_DIR/src/addon/esmpy esmpy
           poetry run python -c "import esmpy; print('ESMPy:', esmpy.__version__)"
       - name: Cache virtualenv
         uses: actions/cache@v4
