@@ -32,6 +32,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Install local project
+        run: |
+          pip install .
       - name: Run pytest
         env:
           ESMFMKFILE: ${{ env.ESMFMKFILE }}
