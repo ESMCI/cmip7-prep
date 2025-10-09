@@ -35,6 +35,10 @@ jobs:
       - name: Install local project
         run: |
           pip install .
+      - name: Clean Python cache
+        run: |
+          find . -name "__pycache__" -type d -exec rm -rf {} +
+          find . -name "*.pyc" -delete
       - name: Run pytest
         env:
           ESMFMKFILE: ${{ env.ESMFMKFILE }}
