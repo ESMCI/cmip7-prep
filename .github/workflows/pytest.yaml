@@ -30,14 +30,14 @@ jobs:
       - name: Pin esmpy to ESMF tag
         run: |
           set -euo pipefail
-#          VER=$(awk -F= '/^ESMF_VERSION_STRING[[:space:]]*=/{gsub(/[[:space:]]*/,"",$2); print $2}' "$MK")
-#          # Normalize to plain semver if needed (drop anything after first non-semver char)
-#          VER_CLEAN=$(python - "$VER" <<'PY'
-#import re, sys
-##
-#print(m.group(1) if m else v)
-#PY
-#)
+          #          VER=$(awk -F= '/^ESMF_VERSION_STRING[[:space:]]*=/{gsub(/[[:space:]]*/,"",$2); print $2}' "$MK")
+          #          # Normalize to plain semver if needed (drop anything after first non-semver char)
+          #          VER_CLEAN=$(python - "$VER" <<'PY'
+          #import re, sys
+          ##
+          #print(m.group(1) if m else v)
+          #PY
+          #)
           TAG="v8.9.0"
           echo "using ESMPy tag ${TAG}"
 
