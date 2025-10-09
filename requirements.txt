@@ -1,0 +1,10 @@
+xarray
+netCDF4
+h5netcdf
+dask
+pyyaml
+click
+esmpy
+pytest
+xesmf
+geocat-comp
