@@ -15,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.12'
           cache: 'pip'
       - name: Install NetCDF
         run: sudo apt-get update && sudo apt-get install -y libnetcdf-dev libnetcdff-dev
@@ -30,18 +30,16 @@ jobs:
       - name: Pin esmpy to ESMF tag
         run: |
           set -euo pipefail
-          MK="$HOME/ESMF/lib/esmf.mk"
-          VER=$(awk -F= '/^ESMF_VERSION_STRING[[:space:]]*=/{gsub(/[[:space:]]*/,"",$2); print $2}' "$MK")
-          # Normalize to plain semver if needed (drop anything after first non-semver char)
-          VER_CLEAN=$(python - "$VER" <<'PY'
-import re, sys
-v=sys.argv[1]
-m=re.match(r'^(\d+\.\d+\.\d+)', v)
-print(m.group(1) if m else v)
-PY
-)
-          TAG="v${VER_CLEAN}"
-          echo "Detected ESMF ${VER} -> using ESMPy tag ${TAG}"
+#          VER=$(awk -F= '/^ESMF_VERSION_STRING[[:space:]]*=/{gsub(/[[:space:]]*/,"",$2); print $2}' "$MK")
+#          # Normalize to plain semver if needed (drop anything after first non-semver char)
+#          VER_CLEAN=$(python - "$VER" <<'PY'
+#import re, sys
+##
+#print(m.group(1) if m else v)
+#PY
+#)
+          TAG="v8.9.0"
+          echo "using ESMPy tag ${TAG}"
 
           # remove any existing esmpy dep and add the exact git subdir tag
           poetry remove esmpy || true
