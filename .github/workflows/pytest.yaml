@@ -34,6 +34,7 @@ jobs:
           pip install -r requirements.txt
       - name: Install local project
         run: |
+          pip uninstall -y cmip7-prep || true
           pip install .
       - name: Clean Python cache
         run: |
