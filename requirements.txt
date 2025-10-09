@@ -6,3 +6,4 @@ pyyaml
 click
 esmpy
 pytest
+xesmf
