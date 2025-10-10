@@ -31,6 +31,7 @@ from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
 from dask.distributed import Client
 from dask import delayed
+import dask.array as da
 import dask
 
 # Regex for date extraction from filenames
@@ -288,27 +289,40 @@ def main():
     )
     print(f"CMORIZING {len(cmip_vars)} variables")
     # Load requested variables
-    ds_native, cmip_vars = open_native_for_cmip_vars(
-        cmip_vars,
-        Path(str(TSDIR) + f"/*{include_pattern}*"),
-        mapping,
-        use_cftime=True,
-        parallel=True,
-    )
     if args.workers == 1:
+        ds_native, cmip_vars = open_native_for_cmip_vars(
+            cmip_vars,
+            Path(str(TSDIR) + f"/*{include_pattern}*"),
+            mapping,
+            use_cftime=True,
+            parallel=False,
+        )
         results = [
             process_one_var(v, mapping, ds_native, TABLES, OUTDIR) for v in cmip_vars
         ]
     else:
-        futs = [
-            process_one_var_delayed(v, mapping, ds_native, TABLES, OUTDIR)
-            for v in cmip_vars
-        ]
+        futs = []
+        for cmip_var in cmip_vars:
+            ds_native, var = open_native_for_cmip_vars(
+                [cmip_var],
+                Path(str(TSDIR) + f"/*{include_pattern}*"),
+                mapping,
+                use_cftime=True,
+                parallel=True,
+            )
+            if var:
+                ds_native = ds_native.unify_chunks()
+                futs.append(
+                    process_one_var_delayed(
+                        cmip_var, mapping, ds_native, TABLES, OUTDIR
+                    )
+                )
         results = dask.compute(*futs)
-        if client:
-            client.close()
+
     for v, status in results:
         print(v, "→", status)
+    if client:
+        client.close()
 
 
 if __name__ == "__main__":

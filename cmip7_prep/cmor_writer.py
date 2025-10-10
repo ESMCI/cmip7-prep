@@ -868,7 +868,7 @@ class CmorSession(
         data_filled, fillv = _filled_for_cmor(ds[name])
 
         var_id = cmor.variable(name, units, [lat_id, lon_id], missing_value=fillv)
-        print(f"write fx variable {name}")
+
         cmor.write(
             var_id,
             np.asarray(data_filled),

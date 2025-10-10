@@ -120,9 +120,12 @@ def open_native_for_cmip_vars(
     )
 
     if not selected:
-        raise FileNotFoundError(
-            f"No files under glob matched required variables {required} with '.VAR.' token."
+        warnings.warn(
+            f"[mapping] no native inputs found for {cmip_vars} in"
+            f" {required} using {files_glob} - skipping",
+            RuntimeWarning,
         )
+        return None, None
 
     ds = xr.open_mfdataset(
         selected,
@@ -224,7 +227,7 @@ def realize_regrid_prepare(
         ds_vars = ds_vars.assign(area=ds_native["area"])
     if "landfrac" in ds_native and "landfrac" not in ds_vars:
         ds_vars = ds_vars.assign(landfrac=ds_native["landfrac"])
-    print(f"ds_vars {ds_vars}")
+
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
     levels = cfg.get("levels", {}) or {}
