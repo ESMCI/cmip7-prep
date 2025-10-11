@@ -97,6 +97,9 @@ def open_native_for_cmip_vars(
     xr.Dataset containing only the required CESM variables.
     """
     open_kwargs = dict(open_kwargs or {})
+    # Allow cmip_vars to be a single variable (str) or a list
+    if isinstance(cmip_vars, str):
+        cmip_vars = [cmip_vars]
     new_cmip_vars = []
     for var in cmip_vars:
         rvar = _collect_required_cesm_vars(mapping, [var])
@@ -132,6 +135,7 @@ def open_native_for_cmip_vars(
         combine="by_coords",
         use_cftime=use_cftime,
         parallel=parallel,
+        compat="override",
         **open_kwargs,
     )
     # Convert "lev" and "ilev" units from mb to Pa for downstream operations.

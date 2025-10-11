@@ -112,10 +112,19 @@ def parse_args():
 
 
 def process_one_var(
-    varname: str, mapping, ds_native, tables_path, outdir
+    varname: str, mapping, inputfile, tables_path, outdir
 ) -> tuple[str, str]:
     """Compute+write one CMIP variable. Returns (varname, 'ok' or error message)."""
     try:
+        ds_native, var = open_native_for_cmip_vars(
+            varname,
+            inputfile,
+            mapping,
+            use_cftime=True,
+            parallel=False,
+        )
+        if var is None:
+            return (varname, "ERROR: Source variable(s) not found.")
         ds_cmor = realize_regrid_prepare(
             mapping,
             ds_native,
@@ -289,40 +298,27 @@ def main():
     )
     print(f"CMORIZING {len(cmip_vars)} variables")
     # Load requested variables
+    input_path = Path(str(TSDIR) + f"/*{include_pattern}*")
+
     if args.workers == 1:
-        ds_native, cmip_vars = open_native_for_cmip_vars(
-            cmip_vars,
-            Path(str(TSDIR) + f"/*{include_pattern}*"),
-            mapping,
-            use_cftime=True,
-            parallel=False,
-        )
+
         results = [
-            process_one_var(v, mapping, ds_native, TABLES, OUTDIR) for v in cmip_vars
+            process_one_var(v, mapping, input_path, TABLES, OUTDIR) for v in cmip_vars
         ]
     else:
-        futs = []
-        for cmip_var in cmip_vars:
-            ds_native, var = open_native_for_cmip_vars(
-                [cmip_var],
-                Path(str(TSDIR) + f"/*{include_pattern}*"),
-                mapping,
-                use_cftime=True,
-                parallel=True,
-            )
-            if var:
-                ds_native = ds_native.unify_chunks()
-                futs.append(
-                    process_one_var_delayed(
-                        cmip_var, mapping, ds_native, TABLES, OUTDIR
-                    )
-                )
+        futs = [
+            process_one_var_delayed(var, mapping, input_path, TABLES, OUTDIR)
+            for var in cmip_vars
+        ]
+
         results = dask.compute(*futs)
 
     for v, status in results:
         print(v, "→", status)
     if client:
         client.close()
+    if cluster:
+        cluster.close()
 
 
 if __name__ == "__main__":

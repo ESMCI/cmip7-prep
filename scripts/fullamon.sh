@@ -6,8 +6,9 @@
 #PBS -l walltime=00:30:00
 #PBS -j oe
 
+module load  ncarenv/24.12  gcc/12.4.0  cray-mpich/8.1.29 esmf/8.9.0
 module load conda
-conda activate CMORDEV
+conda activate CMORDEV2
 DIR_TO_ADD="$CONDA_PREFIX/lib/python3.13/site-packages/"
 if [[ ":$PYTHONPATH:" != *":$DIR_TO_ADD:"* ]]; then
     export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$DIR_TO_ADD"
