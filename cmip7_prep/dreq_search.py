@@ -1,3 +1,4 @@
+# pylint: disable=line-too-long
 # cmip7_prep/dreq_search.py
 """Search utilities for the CMIP data request v1.2.2 CSV.
 
@@ -181,30 +182,29 @@ def find_variables_by_prefix(
     >>> with tempfile.TemporaryDirectory() as d:
     ...     path = os.path.join(d, "test.csv")
     ...     with open(path, "w") as f:
-    ...         _ = f.write("Physical Parameter,CMIP6 Table (legacy),\
-    ...                     CMIP7 Variable Groups,cmip7 frequency\\n")
-    ...         _ = f.write("tas,Amon,baseline_monthly\\n")
-    ...         _ = f.write("pr,Amon,baseline_monthly\\n")
-    ...         _ = f.write("ps,Amon,baseline_monthly\\n")
-    ...         _ = f.write("ta,Amon,baseline_monthly\\n")
-    ...         _ = f.write("tas,AERmon,baseline_monthly, monthly\\n")
-    ...         _ = f.write("mmr,AERmon,baseline_monthly, monthly\\n")
-    ...         _ = f.write("clt,Amon,baseline_monthly\\n")
-    ...         _ = f.write("clw,Amon,baseline_monthly\\n")
-    ...         _ = f.write("cli,Amon,baseline_monthly\\n")
-    ...         _ = f.write("clt,AERmon,baseline_monthly\\n")
-    ...         _ = f.write("clw,AERmon,baseline_monthly\\n")
-    ...         _ = f.write("cli,AERmon,baseline_monthly\\n")
-    ...     find_variables_by_prefix(path, "Amon.ta", exact=True)
-    ...     find_variables_by_prefix(path, "Amon.t")
-    ...     find_variables_by_prefix(path, "Amon.t", exact=True)
-    ...     find_variables_by_prefix(path, "Amon.")
-    ...     find_variables_by_prefix(path, "AERmon.mmr", where={"cmip7 frequency": "monthly"})
-    ['ta']
-    ['ta', 'tas']
-    []
-    ['cli', 'clt', 'clw', 'pr', 'ps', 'ta', 'tas']
-    ['mmr']
+    ...         _ = f.write("CMIP6 Compound Name,CMIP7 Compound Name,Branded Variable Name,Physical Parameter,CMIP6 Table (legacy),CMIP7 Variable Groups,List of Experiments\\n")
+    ...         _ = f.write("AERmon.abs550aer,aerosol.abs550aer.tavg-u-hxy-u.mon.GLB,abs550aer_tavg-u-hxy-u,abs550aer,AERmon,aerchemmip_2d_monthly,\\"1pctCO2,piControl,picontrol,historical\\"\\n")
+    ...         _ = f.write("Omon.absscint,ocean.absscint.tavg-op4-hxy-sea.mon.GLB,absscint_tavg-op4-hxy-sea,absscint,Omon,int_ocean_budgets,\\"scenarios,historical,picontrol\\"\\n")
+    ...         _ = f.write("ImonAnt.acabf,landIce.acabf.tavg-u-hxy-is.mon.ATA,acabf_tavg-u-hxy-is,acabf,ImonAnt,landice_antarctica_allfreq,\\"esm-hist,esm-piControl,scen7-hc,picontrol\\"\\n")
+    ...     find_variables_by_prefix(path, "AERmon.", where={"List of Experiments": "picontrol"})
+    ['abs550aer']
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     path = os.path.join(d, "test.csv")
+    ...     with open(path, "w") as f:
+    ...         _ = f.write("CMIP6 Compound Name,CMIP7 Compound Name,Branded Variable Name,Physical Parameter,CMIP6 Table (legacy),CMIP7 Variable Groups,List of Experiments\\n")
+    ...         _ = f.write("Omon.absscint,ocean.absscint.tavg-op4-hxy-sea.mon.GLB,absscint_tavg-op4-hxy-sea,absscint,Omon,int_ocean_budgets,\\"scenarios,historical,picontrol\\"\\n")
+    ...         _ = f.write("ImonAnt.acabf,landIce.acabf.tavg-u-hxy-is.mon.ATA,acabf_tavg-u-hxy-is,acabf,ImonAnt,landice_antarctica_allfreq,\\"esm-hist,esm-piControl,scen7-hc,picontrol\\"\\n")
+    ...     find_variables_by_prefix(path, "ImonAnt.", where={"List of Experiments": "picontrol"})
+    ['acabf']
+    >>> with tempfile.TemporaryDirectory() as d:
+    ...     path = os.path.join(d, "test.csv")
+    ...     with open(path, "w") as f:
+    ...         _ = f.write("CMIP6 Compound Name,CMIP7 Compound Name,Branded Variable Name,Physical Parameter,CMIP6 Table (legacy),CMIP7 Variable Groups,List of Experiments\\n")
+    ...         _ = f.write("AERmon.abs550aer,aerosol.abs550aer.tavg-u-hxy-u.mon.GLB,abs550aer_tavg-u-hxy-u,abs550aer,AERmon,aerchemmip_2d_monthly,\\"1pctCO2,piControl,picontrol,historical\\"\\n")
+    ...         _ = f.write("Omon.absscint,ocean.absscint.tavg-op4-hxy-sea.mon.GLB,absscint_tavg-op4-hxy-sea,absscint,Omon,int_ocean_budgets,\\"scenarios,historical,picontrol\\"\\n")
+    ...         _ = f.write("ImonAnt.acabf,landIce.acabf.tavg-u-hxy-is.mon.ATA,acabf_tavg-u-hxy-is,acabf,ImonAnt,landice_antarctica_allfreq,\\"esm-hist,esm-piControl,scen7-hc,picontrol\\"\\n")
+    ...     find_variables_by_prefix(path, "AERmon.")
+    ['abs550aer']
     """
     if csv_path is None:
         csv_path = packaged_dreq_csv()
@@ -265,6 +265,7 @@ def find_variables_by_prefix(
             continue
 
         name_lc = match_val.lower()
+
         if exact:
             if var_prefix and name_lc != var_prefix_lc:
                 continue
@@ -281,14 +282,27 @@ def find_variables_by_prefix(
                 continue
             k = str(k_raw).strip().lower()
             cell_lc = row.get(k, "").lower()
-            if isinstance(val, (list, tuple, set)):
-                if cell_lc not in {str(v).strip().lower() for v in val}:
-                    ok = False
-                    break
+            # If the cell contains a comma/semicolon/pipe/space-separated list, check for membership
+            if "," in cell_lc or ";" in cell_lc or "|" in cell_lc or " " in cell_lc:
+                items = {x.strip().lower() for x in _split_groups(cell_lc)}
+
+                if isinstance(val, (list, tuple, set)):
+                    if not items & {str(v).strip().lower() for v in val}:
+                        ok = False
+                        break
+                else:
+                    if str(val).strip().lower() not in items:
+                        ok = False
+                        break
             else:
-                if cell_lc != str(val).strip().lower():
-                    ok = False
-                    break
+                if isinstance(val, (list, tuple, set)):
+                    if cell_lc not in {str(v).strip().lower() for v in val}:
+                        ok = False
+                        break
+                else:
+                    if cell_lc != str(val).strip().lower():
+                        ok = False
+                        break
         if not ok:
             continue
 

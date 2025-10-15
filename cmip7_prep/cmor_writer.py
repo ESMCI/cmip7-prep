@@ -18,15 +18,16 @@ import warnings
 from importlib.resources import files, as_file
 from typing import Any, Sequence, Optional, Union
 import datetime as dt
-import cftime
 
-try:
-    import cmor
-except Exception:  # pylint: disable=broad-except
-    cmor = None  # pylint: disable=invalid-name
+import logging
+import cftime
+import cmor
 
 import numpy as np
 import xarray as xr
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 _FILL_DEFAULT = 1.0e20
 _HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
@@ -509,6 +510,7 @@ class CmorSession(
         # Setup CMOR; pass logfile if CMOR supports it, else fall back
         try:
             if self._log_path is not None:
+                logger.info("CMOR logfile: %s", self._log_path)
                 cmor.setup(
                     inpath=str(self.tables_path),
                     netcdf_file_action=getattr(

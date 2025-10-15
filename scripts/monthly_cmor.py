@@ -12,7 +12,9 @@ Preserves all comments and error handling from both atm_monthly.py and lnd_month
 """
 from __future__ import annotations
 import argparse
+from concurrent.futures import as_completed
 from email import parser
+from http import client
 import os
 from pathlib import Path
 import logging
@@ -29,11 +31,15 @@ from cmip7_prep.dreq_search import find_variables_by_prefix
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
-from dask.distributed import Client
+from dask.distributed import wait, as_completed
 from dask import delayed
 import dask.array as da
 import dask
 
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
+logger = logging.getLogger("cmip7_prep.monthly_cmor")
 # Regex for date extraction from filenames
 _DATE_RE = re.compile(
     r"[\.\-](?P<year>\d{4})"  # year
@@ -47,8 +53,14 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 def parse_args():
+
     parser = argparse.ArgumentParser(
         description="CMIP7 monthly processing for atm/lnd realms"
+    )
+    parser.add_argument(
+        "--cmip-vars",
+        nargs="*",
+        help="List of CMIP variable names to process directly (bypasses variable search)",
     )
     parser.add_argument(
         "--workers",
@@ -84,6 +96,11 @@ def parse_args():
         default=default_outdir,
         help="Output directory for CMORized files (default: $SCRATCH/CMIP7)",
     )
+    parser.add_argument(
+        "--skip-timeseries",
+        action="store_true",
+        help="Skip timeseries processing and go directly to CMORization.",
+    )
     args = parser.parse_args()
     # Parse run_freq argument
     run_years = 10
@@ -115,16 +132,21 @@ def process_one_var(
     varname: str, mapping, inputfile, tables_path, outdir
 ) -> tuple[str, str]:
     """Compute+write one CMIP variable. Returns (varname, 'ok' or error message)."""
+    logger.info(f"Starting processing for variable: {varname}")
     try:
+
+        logger.info(f"Loading native data for {varname} from {inputfile}")
         ds_native, var = open_native_for_cmip_vars(
-            varname,
-            inputfile,
-            mapping,
-            use_cftime=True,
-            parallel=False,
+            varname, inputfile, mapping, use_cftime=True, parallel=True
         )
         if var is None:
+            logger.warning(f"Source variable(s) not found for {varname}")
             return (varname, "ERROR: Source variable(s) not found.")
+    except Exception as e:
+        logger.error(f"Exception while reading {varname}: {e!r}")
+        return (varname, f"ERROR: {e!r}")
+    try:
+        logger.info(f"Regridding for {varname}")
         ds_cmor = realize_regrid_prepare(
             mapping,
             ds_native,
@@ -137,13 +159,13 @@ def process_one_var(
                 "bilinear_map": Path(
                     "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
                 ),
-                "conservative_map": Path(
-                    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
-                ),
             },
         )
-        log_dir = Path(outdir) / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Exception while regridding/preparing {varname}: {e!r}")
+    try:
+        logger.info(f"CMOR writing for {varname}")
+        log_dir = outdir + "/logs"  # or set as needed
         with CmorSession(
             tables_path=tables_path,
             log_dir=log_dir,
@@ -167,9 +189,12 @@ def process_one_var(
                     "levels": cfg.get("levels", None),
                 },
             )()
+            print(f"Writing variable {varname} with ds_cmor={ds_cmor}")
             cm.write_variable(ds_cmor, varname, vdef)
+        logger.info(f"Finished processing for {varname}")
         return (varname, "ok")
     except Exception as e:
+        logger.error(f"Exception while processing {varname}: {e!r}")
         return (varname, f"ERROR: {e!r}")
 
 
@@ -274,47 +299,73 @@ def main():
     # Dask cluster setup
     if args.workers == 1:
         client = None
+        cluster = None
     else:
+        ncpus_env = os.getenv("NCPUS")
+        if ncpus_env is not None:
+            ml = 1.0 - float(int(ncpus_env) - 1) / 128.0
+        else:
+            ml = "auto"  # Default memory limit if NCPUS is not set
         cluster = LocalCluster(
-            n_workers=args.workers, threads_per_worker=1, memory_limit="235GB"
+            n_workers=args.workers, threads_per_worker=1, memory_limit=ml
         )
         client = cluster.get_client()
     input_head_dir = INPUTDIR
     output_head_dir = TSDIR
-    hf_collection = HFCollection(input_head_dir, dask_client=client)
-    hf_collection = hf_collection.include_patterns([include_pattern])
-    hf_collection.pull_metadata()
-    ts_collection = TSCollection(
-        hf_collection, output_head_dir, ts_orders=None, dask_client=client
-    )
-    if args.overwrite:
-        ts_collection = ts_collection.apply_overwrite("*")
-    ts_collection.execute()
-    # Load mapping
-    print("Timeseries processing complete, starting CMORization...")
+    if args.skip_timeseries:
+        print("Skipping timeseries processing as per --skip-timeseries flag.")
+    else:
+        hf_collection = HFCollection(input_head_dir, dask_client=client)
+        hf_collection = hf_collection.include_patterns([include_pattern])
+        hf_collection.pull_metadata()
+        ts_collection = TSCollection(
+            hf_collection, output_head_dir, ts_orders=None, dask_client=client
+        )
+        if args.overwrite:
+            ts_collection = ts_collection.apply_overwrite("*")
+        ts_collection.execute()
+        print("Timeseries processing complete, starting CMORization...")
     mapping = Mapping.from_packaged_default()
-    cmip_vars = find_variables_by_prefix(
-        None, var_prefix, include_groups={"baseline_monthly"}
-    )
+    print(f"Finding variables with prefix {var_prefix}")
+    if args.cmip_vars and len(args.cmip_vars) > 0:
+        cmip_vars = args.cmip_vars
+    else:
+        cmip_vars = find_variables_by_prefix(
+            None, var_prefix, where={"List of Experiments": "piControl"}
+        )
     print(f"CMORIZING {len(cmip_vars)} variables")
     # Load requested variables
-    input_path = Path(str(TSDIR) + f"/*{include_pattern}*")
+    if len(cmip_vars) > 0:
+        input_path = Path(str(TSDIR) + f"/*{include_pattern}*")
 
-    if args.workers == 1:
+        if args.workers == 1:
+            results = [
+                process_one_var(v, mapping, input_path, TABLES, OUTDIR)
+                for v in cmip_vars
+            ]
+        else:
+            futs = [
+                process_one_var_delayed(var, mapping, input_path, TABLES, OUTDIR)
+                for var in cmip_vars
+            ]
+            futures = client.compute(futs)
+            wait(
+                futures, timeout="600s"
+            )  # optional soft check; won’t raise, just returns done/pending
 
-        results = [
-            process_one_var(v, mapping, input_path, TABLES, OUTDIR) for v in cmip_vars
-        ]
+            # iterate results; if anything stalls you can call dump_all_stacks(client)
+            results = []
+            for _, result in as_completed(futures, with_results=True):
+                try:
+                    results.append(result)  # (v, status)
+                except Exception as e:
+                    print("Task error:", e)
+                    raise
+
+        for v, status in results:
+            print(v, "→", status)
     else:
-        futs = [
-            process_one_var_delayed(var, mapping, input_path, TABLES, OUTDIR)
-            for var in cmip_vars
-        ]
-
-        results = dask.compute(*futs)
-
-    for v, status in results:
-        print(v, "→", status)
+        print("No results to process.")
     if client:
         client.close()
     if cluster:
