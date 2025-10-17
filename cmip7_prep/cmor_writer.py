@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 """Thin CMOR wrapper used by cmip7_prep.
 
 This module centralizes CMOR session setup and writing so that the rest of the
@@ -8,23 +7,33 @@ present in the provided dataset. It also supports a packaged default
 `cmor_dataset.json` living under `cmip7_prep/data/`.
 """
 
-from contextlib import AbstractContextManager
 from pathlib import Path
 import json
 import tempfile
 import re
 import types
 import warnings
-from importlib.resources import files, as_file
+
+from contextlib import AbstractContextManager
 from typing import Any, Sequence, Optional, Union
 import datetime as dt
 
 import logging
-import cftime
 import cmor
 
 import numpy as np
 import xarray as xr
+from .cmor_utils import (
+    packaged_dataset_json,
+    get_cmor_attr,
+    set_cmor_attr,
+    encode_time_to_num,
+    sigma_mid_and_bounds,
+    bounds_from_centers_1d,
+    resolve_table_filename,
+    filled_for_cmor,
+    open_existing_fx,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,422 +41,7 @@ logger = logging.getLogger(__name__)
 _FILL_DEFAULT = 1.0e20
 _HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
 _UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
-
-
-def packaged_dataset_json(filename: str = "cmor_dataset.json"):
-    """Context manager yielding a real filesystem path to the packaged mapping file."""
-    res = files("cmip7_prep").joinpath(f"data/{filename}")
-    return as_file(res)
-
-
-def _filled_for_cmor(
-    da: xr.DataArray, fill: float | None = None
-) -> tuple[xr.DataArray, float]:
-    """
-    Replace NaNs with CMOR missing value (default 1e20) and return (data, fill).
-    >>> import xarray as xr
-    >>> arr = xr.DataArray([1.0, np.nan, 2.0])
-    >>> _filled_for_cmor(arr, fill=-999.0)
-    (<xarray.DataArray (dim_0: 3)> Size: 24B
-    array([   1., -999.,    2.])
-    Dimensions without coordinates: dim_0
-    Attributes:
-        _FillValue:     -999.0
-        missing_value:  -999.0, -999.0)
-
-    """
-    if fill is None:
-        # choose fill based on dtype
-        f = np.array(
-            _FILL_DEFAULT,
-            dtype=da.dtype if np.issubdtype(da.dtype, np.floating) else "f8",
-        ).item()
-    else:
-        f = np.array(
-            fill, dtype=da.dtype if np.issubdtype(da.dtype, np.floating) else "f8"
-        ).item()
-    # only act on floating types
-    if not np.issubdtype(da.dtype, np.floating):
-        return da, f
-    # replace NaNs with fill
-    da2 = da.where(np.isfinite(da), other=f)
-    # keep attrs helpful for downstream
-    da2.attrs["_FillValue"] = f
-    da2.attrs["missing_value"] = f
-    return da2, f
-
-
-# ---------------------------------------------------------------------
-# Time encoding
-# ---------------------------------------------------------------------
-
-
-def _encode_time_to_num(obj, units: str, calendar: str) -> np.ndarray:
-    """
-    Return numeric CF time for:
-      - xarray.DataArray of cftime or datetime64
-      - numpy.ndarray (any shape) of cftime / datetime64 / python datetime
-      - scalar cftime / python datetime
-
-    Always returns float64 ndarray of the same shape as input.
-    >>> import cftime
-    >>> arr = [cftime.DatetimeNoLeap(2000, 1, 1), cftime.DatetimeNoLeap(2000, 1, 2)]
-    >>> _encode_time_to_num(arr, units="days since 2000-01-01", calendar="noleap")
-    array([0., 1.])
-    """
-    # Normalize to ndarray
-    arr = obj.values if hasattr(obj, "values") else np.asarray(obj)
-
-    # Already numeric → just cast
-    if np.issubdtype(arr.dtype, np.number):
-        return arr.astype("f8", copy=False)
-
-    # datetime64 → list[datetime]
-    if np.issubdtype(arr.dtype, "datetime64"):
-        # convert to python datetime (UTC)
-        ns = arr.astype("datetime64[ns]").astype("int64")
-        out = []
-        epoch = dt.datetime(1970, 1, 1)
-        for n in ns.ravel():
-            out.append(epoch + dt.timedelta(microseconds=n / 1000))
-        seq = out
-
-    # object dtype: cftime or python datetime already
-    elif arr.dtype == object:
-        seq = list(arr.ravel())
-
-    else:
-        raise TypeError(f"Unsupported time dtype {arr.dtype!r} for CF encoding")
-
-    nums = np.asarray(cftime.date2num(seq, units=units, calendar=calendar), dtype="f8")
-
-    return nums.reshape(arr.shape)
-
-
-def _bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
-    """Compute [n,2] cell bounds from 1-D centers for 'lat' or 'lon'.
-
-    - For 'lat': clamps to [-90, 90]
-    - For 'lon': treats as periodic [0, 360)
-    - Works with non-uniform spacing (uses midpoints between neighbors)
-    """
-    v = np.asarray(vals, dtype="f8").reshape(-1)
-    n = v.size
-    if n < 2:
-        raise ValueError("Need at least 2 points to compute bounds")
-
-    # neighbor midpoints
-    mid = 0.5 * (v[1:] + v[:-1])  # length n-1
-    bounds = np.empty((n, 2), dtype="f8")
-    bounds[1:, 0] = mid
-    bounds[:-1, 1] = mid
-
-    # end caps: extrapolate by half-step at ends
-    first_step = v[1] - v[0]
-    last_step = v[-1] - v[-2]
-    bounds[0, 0] = v[0] - 0.5 * first_step
-    bounds[-1, 1] = v[-1] + 0.5 * last_step
-
-    if kind == "lat":
-        # clamp to physical limits
-        bounds[:, 0] = np.maximum(bounds[:, 0], -90.0)
-        bounds[:, 1] = np.minimum(bounds[:, 1], 90.0)
-    elif kind == "lon":
-        # wrap to [0, 360)
-        bounds = bounds % 360.0
-        # ensure each row is increasing in modulo arithmetic
-        wrap = bounds[:, 1] < bounds[:, 0]
-        if np.any(wrap):
-            bounds[wrap, 1] += 360.0
-    else:
-        raise ValueError("kind must be 'lat' or 'lon'")
-
-    return bounds
-
-
-def _encode_time_bounds_to_num(tb, units: str, calendar: str) -> np.ndarray:
-    """
-    Encode bounds array of shape (..., 2) to numeric CF time.
-    Returns float64 array with same shape.
-    >>> import cftime
-    >>> tb = [
-    ...     [cftime.DatetimeNoLeap(2000, 1, 1), cftime.DatetimeNoLeap(2000, 1, 2)],
-    ...     [cftime.DatetimeNoLeap(2000, 1, 2), cftime.DatetimeNoLeap(2000, 1, 3)]
-    ... ]
-    >>> _encode_time_bounds_to_num(tb, units="days since 2000-01-01", calendar="noleap")
-    array([[0., 1.],
-           [1., 2.]])
-    """
-    tba = tb.values if hasattr(tb, "values") else np.asarray(tb)
-    if tba.ndim < 1 or tba.shape[-1] != 2:
-        raise ValueError(f"time bounds must have last dim == 2, got {tba.shape}")
-    left = _encode_time_to_num(tba[..., 0], units, calendar)
-    right = _encode_time_to_num(tba[..., 1], units, calendar)
-    return np.stack([left, right], axis=-1)
-
-
-def _is_radians(vals: np.ndarray, units: str | None) -> bool:
-    """
-    Determine if values are in radians based on units.
-
-    >>> import numpy as np
-    >>> arr = np.array([0, np.pi/2, np.pi])
-    >>> bool(_is_radians(arr, units="radian"))
-    True
-    >>> bool(_is_radians(arr, units="degrees"))
-    False
-    >>> bool(_is_radians(arr, units=None))
-    True
-    >>> arr = np.array([0, 90, 180])
-    >>> bool(_is_radians(arr, units=None))
-    False
-    """
-    # ...existing code...
-    u = (units or "").strip().lower()
-    if u in {"radian", "radians"}:
-        return True
-    if u:
-        return False
-    v = np.asarray(vals, dtype="f8")
-    # Heuristic: lat in radians typically ≤ ~π/2 in magnitude; lon ≤ ~2π
-    # If max |lat| ≤ π and some values are between ~-π and π, assume radians.
-    return np.nanmax(np.abs(v)) <= (np.pi + 1e-6)
-
-
-# --- CMOR attribute compat layer (handles both API variants) ---
-def _set_attr(name: str, value) -> None:
-    try:
-        cmor.set_cur_dataset_attribute(name, value)  # new API
-    except AttributeError:  # fallback for older CMOR
-        cmor.setGblAttr(name, value)  # type: ignore[attr-defined]
-
-
-def _get_attr(name: str):
-    try:
-        return cmor.get_cur_dataset_attribute(name)  # new API
-    except AttributeError:  # fallback for older CMOR
-        return cmor.getGblAttr(name)  # type: ignore[attr-defined]
-
-
-def make_strictly_monotonic(x, direction="increasing"):
-    """
-    Return a float copy of x with strictly monotonic values by minimally nudging
-    entries when needed.
-
-    Parameters
-    ----------
-    x : array_like
-        1-D array.
-    direction : {"increasing", "decreasing"}
-        Desired strict monotonic direction.
-
-    Notes
-    -----
-    - Uses np.nextafter(prev, ±inf) to bump the *smallest possible* amount.
-    - NaNs split the series into independent segments (left unchanged).
-    - If an infinite value appears where a further increase/decrease is required,
-      a ValueError is raised because it can't be nudged.
-    >>> import numpy as np
-    >>> arr = np.array([1, 2, 2, 3])
-    >>> make_strictly_monotonic(arr)
-    array([1., 2., 2., 3.])
-    >>> arr = np.array([3, 2, 2, 1])
-    >>> make_strictly_monotonic(arr, direction="decreasing")
-    array([3., 2., 2., 1.])
-    """
-    y = np.asarray(x, dtype=float).copy()
-    if y.ndim != 1:
-        raise ValueError(f"x must be 1-D {y.ndim}")
-
-    inc = direction.lower().startswith("inc")
-    n = y.size
-    i = 0
-    while i < n:
-        # skip NaNs; treat each finite segment independently
-        if not np.isfinite(y[i]):
-            i += 1
-            continue
-        # find contiguous finite segment [i:j)
-        j = i + 1
-        while j < n and np.isfinite(y[j]):
-            j += 1
-
-        smallest_normal_float = 1.0e-12
-        # enforce strict monotonicity within y[i:j]
-        for k in range(i + 1, j):
-            prev = y[k - 1]
-            curr = y[k]
-            if inc:
-                if prev == np.inf:
-                    if not curr > prev:
-                        raise ValueError(
-                            "Cannot make sequence strictly increasing past +inf."
-                        )
-                if not curr > prev:
-                    y[k] = max(curr, prev + smallest_normal_float)
-            else:
-                if prev == -np.inf:
-                    if not curr < prev:
-                        raise ValueError(
-                            "Cannot make sequence strictly decreasing past -inf."
-                        )
-                if not curr < prev:
-                    y[k] = min(curr, prev - smallest_normal_float)
-        i = j  # move to next segment
-
-    return y
-
-
-def is_strictly_monotonic(arr):
-    """
-    simple test to see if 1d array is strictly monotonic
-    >>> import numpy as np
-    >>> arr = np.array([1, 2, 3])
-    >>> bool(is_strictly_monotonic(arr))
-    True
-    >>> arr = np.array([3, 2, 1])
-    >>> bool(is_strictly_monotonic(arr))
-    True
-    >>> arr = np.array([1, 2, 2, 3])
-    >>> bool(is_strictly_monotonic(arr))
-    False
-    >>> arr = np.array([3., 2., 2., 1.])
-    >>> bool(is_strictly_monotonic(arr))
-    False
-    """
-    # Check for non-decreasing
-    is_increasing = np.all(arr[:-1] < arr[1:])
-    # Check for non-increasing
-    is_decreasing = np.all(arr[:-1] > arr[1:])
-    return is_increasing or is_decreasing
-
-
-def _sigma_mid_and_bounds(
-    ds: xr.Dataset, levels: dict
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Return (mid_sigma, bounds_sigma) in [0,1] for standard_hybrid_sigma.
-    >>> import numpy as np
-    >>> import xarray as xr
-    >>> ds = xr.Dataset({
-    ...     "hybm": ("mid", [0.2, 0.5, 0.8]),
-    ...     "hybi": ("edge", [0.0, 0.4, 0.6, 1.0])
-    ... })
-    >>> levels = {"hybm": "hybm", "hybi": "hybi"}
-    >>> sigma_mid, sigma_bnds = _sigma_mid_and_bounds(ds, levels)
-    >>> sigma_mid
-    array([0.2, 0.5, 0.8])
-    >>> sigma_bnds
-    array([[0. , 0.4],
-           [0.4, 0.6],
-           [0.6, 1. ]])
-    """
-    lev_name = levels.get("src_axis_name", "lev")
-    hybm_name = levels.get("hybm", "hybm")  # B mid
-    # hyai_name = levels.get("hyai", "hyai")  # A interfaces (optional)
-    hybi_name = levels.get("hybi", "hybi")  # B interfaces (preferred)
-    ilev_name = levels.get("src_axis_bnds", "ilev")
-
-    # 1) midpoints: prefer B mid (dimensionless 0..1); fallback to lev if already 0..1
-    if hybm_name in ds:
-        mid = np.asarray(ds[hybm_name].values, dtype="f8")
-        mid = make_strictly_monotonic(mid)
-    elif lev_name in ds:
-        mid_candidate = np.asarray(ds[lev_name].values, dtype="f8")
-        if np.nanmin(mid_candidate) >= 0.0 and np.nanmax(mid_candidate) <= 1.0:
-            mid = mid_candidate
-        else:
-            raise ValueError(f"{lev_name} is not sigma (0..1);")
-    else:
-        raise KeyError("No sigma mid-levels found (need hybm or lev in [0,1]).")
-
-    # 2) bounds: prefer B interfaces; else use ilev if 0..1; else synthesize
-    if hybi_name in ds:
-        edges = np.asarray(ds[hybi_name].values, dtype="f8")
-        edges = make_strictly_monotonic(edges)
-        if edges.ndim == 1 and edges.size == mid.size + 1:
-            bnds = np.column_stack((edges[:-1], edges[1:]))
-        else:
-            raise ValueError(f"{hybi_name} has unexpected shape.")
-    elif ilev_name in ds:
-        ilev = np.asarray(ds[ilev_name].values, dtype="f8")
-        if (
-            np.nanmin(ilev) >= 0.0
-            and np.nanmax(ilev) <= 1.0
-            and ilev.size == mid.size + 1
-        ):
-            bnds = np.column_stack((ilev[:-1], ilev[1:]))
-        else:
-            # synthesize from mid if ilev isn't sigma
-            edges = np.empty(mid.size + 1, dtype="f8")
-            edges[1:-1] = 0.5 * (mid[:-1] + mid[1:])
-            edges[0] = 0.0
-            edges[-1] = 1.0
-            bnds = np.column_stack((edges[:-1], edges[1:]))
-    else:
-        edges = np.empty(mid.size + 1, dtype="f8")
-        edges[1:-1] = 0.5 * (mid[:-1] + mid[1:])
-        edges[0] = 0.0
-        edges[-1] = 1.0
-        bnds = np.column_stack((edges[:-1], edges[1:]))
-
-    # sanity: must be in [0,1]
-    if (
-        np.nanmin(mid) < 0.0
-        or np.nanmax(mid) > 1.0
-        or np.nanmin(bnds) < 0.0
-        or np.nanmax(bnds) > 1.0
-    ):
-        raise ValueError("sigma mid/bounds not in [0,1].")
-
-    if not is_strictly_monotonic(mid):
-        raise ValueError(f"sigma mid {mid} not monotonic.")
-    if not is_strictly_monotonic(bnds):
-        raise ValueError(f"sigma bounds {bnds} not monotonic.")
-
-    return mid, bnds
-
-
-def _resolve_table_filename(tables_path: Path, key: str) -> str:
-    # key like "Amon" or "coordinate"
-    candidates = [
-        tables_path / f"{key}.json",
-        tables_path / f"CMIP7_{key}.json",
-        tables_path / f"CMIP6_{key}.json",
-        tables_path / f"{key.capitalize()}.json",
-    ]
-    for c in candidates:
-        if c.exists():
-            return str(c)
-    return f"{key}.json"
-
-
 DatasetJsonLike = Union[str, Path, AbstractContextManager]
-
-
-def _fx_glob_pattern(name: str) -> str:
-    # CMOR filenames vary; this finds most fx files for this var
-    # e.g., *_sftlf_fx_*.nc  or sftlf_fx_*.nc
-    return f"**/*_{name}_fx_*.nc"
-
-
-def _open_existing_fx(outdir: Path, name: str) -> xr.DataArray | None:
-    # Search recursively for an existing fx file for this var
-    for p in outdir.rglob(_fx_glob_pattern(name)):
-        try:
-            ds = xr.open_dataset(p, engine="netcdf4")
-            if name in ds:
-                return ds[name]
-        except FileNotFoundError:
-            return None
-        except (OSError, ValueError) as e:
-            # OSError: unreadable/corrupt file, low-level I/O; ValueError: engine/decoding issues
-            warnings.warn(f"[fx] failed to open {p} with netcdf4: {e}", RuntimeWarning)
-        except (ImportError, ModuleNotFoundError) as e:
-            # netCDF4 backend not installed
-            warnings.warn(f"[fx] netcdf4 backend unavailable: {e}", RuntimeWarning)
-
-    return None
 
 
 # ---------------------------------------------------------------------
@@ -572,7 +166,7 @@ class CmorSession(
             cmor.set_cur_dataset_attribute("product", "model-output")
 
         # long paragraph; split to keep lines < 100
-        inst = _get_attr("institution_id") or "NCAR"
+        inst = get_cmor_attr("institution_id") or "NCAR"
         license_text = (
             f"CMIP6 model data produced by {inst} is licensed under a Creative Commons "
             "Attribution 4.0 International License "
@@ -592,14 +186,14 @@ class CmorSession(
         cmor.set_cur_dataset_attribute("license", license_text)
 
         # Tell CMOR how to build tracking_id; let CMOR generate it
-        prefix = _get_attr("tracking_prefix")
+        prefix = get_cmor_attr("tracking_prefix")
         if not (isinstance(prefix, str) and prefix.startswith("hdl:")):
-            _set_attr("tracking_prefix", "hdl:21.14100/")
+            set_cmor_attr("tracking_prefix", "hdl:21.14100/")
 
         # If a non-handle tracking_id snuck in (e.g., bare UUID from JSON), clear it
-        tid = _get_attr("tracking_id")
+        tid = get_cmor_attr("tracking_id")
         if isinstance(tid, str) and not tid.startswith("hdl:21.14100/"):
-            _set_attr(
+            set_cmor_attr(
                 "tracking_id", ""
             )  # empty lets CMOR regenerate from tracking_prefix
 
@@ -641,7 +235,7 @@ class CmorSession(
             cal = time_da.attrs.get(
                 "calendar", time_da.encoding.get("calendar", "noleap")
             )
-            tvals = _encode_time_to_num(time_da, units, cal)
+            tvals = encode_time_to_num(time_da, units, cal)
 
             bname = time_da.attrs.get("bounds")
             tb = (
@@ -653,7 +247,7 @@ class CmorSession(
                     else (dsi["time_bnds"] if "time_bnds" in dsi else None)
                 )
             )
-            tbnum = _encode_time_to_num(tb, units, cal) if tb is not None else None
+            tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
             return tvals, tbnum, str(units)
 
         def _get_1d_with_bounds(dsi: xr.Dataset, name: str, units_default: str):
@@ -680,8 +274,10 @@ class CmorSession(
                     b = np.stack([lower, upper], axis=-1)
                 else:
                     b = np.array([[vals[0] - 0.5, vals[0] + 0.5]], dtype="f8")
+
             return vals, b, units
 
+        axes_ids = []
         var_name = getattr(vdef, "name", None)
         if var_name is None or var_name not in ds:
             raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
@@ -689,20 +285,28 @@ class CmorSession(
         var_dims = list(var_da.dims)
         alev_id = None
         plev_id = None
-        # ---- horizontal axes (use CMOR names) ----
-        if "lat" not in ds or "lon" not in ds:
-            raise KeyError(
-                "Expected 'lat' and 'lon' in dataset for CMOR horizontal axes."
-            )
-        lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
-        lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
-
+        lat_id = None
+        lon_id = None
+        if "xh" in var_dims and "yh" in var_dims:
+            # MOM6 grid with 2D lat/lon; define xh/yh axes and grid
+            lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "yh", "degrees_north")
+            lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "xh", "degrees_east")
+        else:
+            # --- horizontal axes (use CMOR names) ----
+            if "lat" not in ds or "lon" not in ds:
+                raise KeyError(
+                    "Expected 'lat' and 'lon' in dataset for CMOR horizontal axes."
+                )
+            lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
+            lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
+        logger.info("write lat axis")
         lat_id = cmor.axis(
             table_entry="latitude",
             units="degrees_north",
             coord_vals=lat_vals,
             cell_bounds=lat_bnds,
         )
+        logger.info("write lon axis")
         lon_id = cmor.axis(
             table_entry="longitude",
             units="degrees_east",
@@ -714,6 +318,7 @@ class CmorSession(
         time_id = None
         tvals, tbnds, t_units = _get_time_and_bounds(ds)
         if tvals is not None:
+            logger.info("write time axis")
             time_id = cmor.axis(
                 table_entry="time",
                 units=t_units,
@@ -736,7 +341,7 @@ class CmorSession(
             ps_name = levels.get("ps", "PS")
 
             # 0) sigma mid and bounds (0..1)
-            sigma_mid, sigma_bnds = _sigma_mid_and_bounds(ds, levels)
+            sigma_mid, sigma_bnds = sigma_mid_and_bounds(ds, levels)
 
             # 1) define axis using sigma
             alev_id = cmor.axis(
@@ -829,21 +434,16 @@ class CmorSession(
                 cell_bounds=pb if pb is not None else None,
             )
 
-        axes_ids = []
-        if "time" in var_dims:
-            axes_ids.append(time_id)
-        if alev_id is not None:
-            axes_ids.append(alev_id)
-        if plev_id is not None:
-            axes_ids.append(plev_id)
+        for axis_id in (time_id, alev_id, plev_id, lat_id, lon_id):
+            if axis_id is not None:
+                axes_ids.append(axis_id)
 
-        axes_ids.extend([lat_id, lon_id])
         return axes_ids
 
     def _write_fx_2d(self, ds: xr.Dataset, name: str, units: str) -> None:
         if name not in ds:
             return
-        table_filename = _resolve_table_filename(self.tables_path, "fx")
+        table_filename = resolve_table_filename(self.tables_path, "fx")
         cmor.load_table(table_filename)
 
         lat = ds["lat"].values
@@ -853,12 +453,12 @@ class CmorSession(
         lat_b = (
             lat_b.values
             if isinstance(lat_b, xr.DataArray)
-            else _bounds_from_centers_1d(lat, "lat")
+            else bounds_from_centers_1d(lat, "lat")
         )
         lon_b = (
             lon_b.values
             if isinstance(lon_b, xr.DataArray)
-            else _bounds_from_centers_1d(lon, "lon")
+            else bounds_from_centers_1d(lon, "lon")
         )
 
         lat_id = cmor.axis(
@@ -867,7 +467,7 @@ class CmorSession(
         lon_id = cmor.axis(
             "longitude", "degrees_east", coord_vals=lon, cell_bounds=lon_b
         )
-        data_filled, fillv = _filled_for_cmor(ds[name])
+        data_filled, fillv = filled_for_cmor(ds[name])
 
         var_id = cmor.variable(name, units, [lat_id, lon_id], missing_value=fillv)
 
@@ -917,7 +517,7 @@ class CmorSession(
 
             # 3) Not present in ds_regr → try reading existing CMOR fx output
             if self._outdir:
-                fx_da = _open_existing_fx(self._outdir, name)
+                fx_da = open_existing_fx(self._outdir, name)
                 if fx_da is not None:
                     # Verify grid match (simple equality on lat/lon values)
                     if (
@@ -948,11 +548,11 @@ class CmorSession(
             getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "Amon"
         )
 
-        table_filename = _resolve_table_filename(self.tables_path, table_key)
+        table_filename = resolve_table_filename(self.tables_path, table_key)
         cmor.load_table(table_filename)
 
         data = ds[vdef.name]
-        data_filled, fillv = _filled_for_cmor(data)
+        data_filled, fillv = filled_for_cmor(data)
         axes_ids = self._define_axes(ds, vdef)
         units = getattr(vdef, "units", "") or ""
         var_id = cmor.variable(
@@ -987,7 +587,7 @@ class CmorSession(
                 nt_ps = int(ps_da.sizes["time"])
             else:
                 nt_ps = 0
-            ps_filled, _ = _filled_for_cmor(ps_da)
+            ps_filled, _ = filled_for_cmor(ps_da)
             if nt_ps > 0:
                 cmor.write(
                     ps_id,

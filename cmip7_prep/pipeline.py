@@ -32,6 +32,8 @@ def _filename_contains_var(path: Union[str, Path], var: str) -> bool:
     False
     >>> _filename_contains_var(Path("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc"), "TS")
     True
+    >>> _filename_contains_var("wrkflw.mom6.h.native.sos.000101-001012.nc", "sos")
+    True
     """
     name = Path(path).name
     needle = f".{var}."
