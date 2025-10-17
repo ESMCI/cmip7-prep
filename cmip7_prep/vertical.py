@@ -199,3 +199,52 @@ def to_plev19(
         ds_out = ds_out.drop_vars(drop)
 
     return ds_out
+
+
+def remap_isopycnal_to_olevel(so_native, z_iface, olevel_bnds, fill_value=np.nan):
+    """
+    so_native: DataArray [time, k_native, y, x]
+    z_iface:   DataArray [time, k_native+1, y, x]  (depth m, positive down)
+    olevel_bnds: 1D ndarray [k_target, 2]          (depth bounds m, positive down)
+    returns: so_olevel [time, k_target, y, x]
+    """
+
+    k_t = olevel_bnds.shape[0]
+    # native layer bounds, thickness
+    zn0 = z_iface.isel(k_iface=slice(0, -1))
+    zn1 = z_iface.isel(k_iface=slice(1, None))
+    dz_native = (zn1 - zn0).clip(min=0.0)
+
+    # allocate output
+    out = xr.full_like(
+        so_native.isel(k_native=slice(0, k_t)).rename(k_native="olevel"), fill_value
+    ).isel(olevel=slice(0, k_t))
+    out = out.assign_coords(olevel=np.arange(k_t))
+
+    # vectorized overlap (broadcast to [time, k_native, k_target, y, x])
+    # target bounds to arrays we can broadcast
+    zb0 = xr.DataArray(olevel_bnds[:, 0], dims=["olevel"])
+    zb1 = xr.DataArray(olevel_bnds[:, 1], dims=["olevel"])
+
+    # expand dims for broadcasting
+    zn0e = zn0.expand_dims({"olevel": k_t}, axis=1)
+    zn1e = zn1.expand_dims({"olevel": k_t}, axis=1)
+    dz_n = dz_native.expand_dims({"olevel": k_t}, axis=1)
+    zb0e = zb0.reshape((1, k_t, 1, 1)).broadcast_like(zn0e)
+    zb1e = zb1.reshape((1, k_t, 1, 1)).broadcast_like(zn0e)
+
+    # overlap thickness between native [zn0,zn1] and target [zb0,zb1]
+    top = xr.ufuncs.maximum(zn0e, zb0e)
+    bottom = xr.ufuncs.minimum(zn1e, zb1e)
+    overlap = (bottom - top).clip(min=0.0)
+
+    weights = overlap / dz_n.where(dz_n > 0)
+    # normalize per target bin: sum_k (w_k) may be < 1 near boundaries
+    wsum = weights.sum(dim="k_native")
+    so_wsum = (weights * so_native.expand_dims({"olevel": k_t}, axis=1)).sum(
+        dim="k_native"
+    )
+
+    out_vals = so_wsum.where(wsum > 0) / wsum.where(wsum > 0)
+    out[:] = out_vals.transpose("time", "olevel", "y", "x")
+    return out

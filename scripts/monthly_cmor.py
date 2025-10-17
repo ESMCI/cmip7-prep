@@ -75,7 +75,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--realm", choices=["atm", "lnd"], required=True, help="Realm to process"
+        "--realm", choices=["atm", "lnd", "ocn"], required=True, help="Realm to process"
     )
     parser.add_argument("--caseroot", type=str, help="Case root directory")
     parser.add_argument("--cimeroot", type=str, help="CIME root directory")
@@ -146,21 +146,26 @@ def process_one_var(
         logger.error(f"Exception while reading {varname}: {e!r}")
         return (varname, f"ERROR: {e!r}")
     try:
-        logger.info(f"Regridding for {varname}")
-        ds_cmor = realize_regrid_prepare(
-            mapping,
-            ds_native,
-            varname,
-            tables_path=tables_path,
-            time_chunk=12,
-            regrid_kwargs={
-                "output_time_chunk": 12,
-                "dtype": "float32",
-                "bilinear_map": Path(
-                    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
-                ),
-            },
-        )
+        if "ncol" in ds_native.dims or "lndgrid" in ds_native.dims:
+            logger.info(f"Regridding for {varname}")
+            ds_cmor = realize_regrid_prepare(
+                mapping,
+                ds_native,
+                varname,
+                tables_path=tables_path,
+                time_chunk=12,
+                regrid_kwargs={
+                    "output_time_chunk": 12,
+                    "dtype": "float32",
+                    "bilinear_map": Path(
+                        "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+                    ),
+                },
+            )
+        else:
+            logger.info(f"Skipping regrid/prepare for ocean variable {varname}")
+            ds_cmor = ds_native
+
     except Exception as e:
         logger.error(f"Exception while regridding/preparing {varname}: {e!r}")
     try:
@@ -189,7 +194,7 @@ def process_one_var(
                     "levels": cfg.get("levels", None),
                 },
             )()
-            print(f"Writing variable {varname} with ds_cmor={ds_cmor}")
+            print(f"Writing variable {varname}")
             cm.write_variable(ds_cmor, varname, vdef)
         logger.info(f"Finished processing for {varname}")
         return (varname, "ok")
@@ -241,13 +246,18 @@ def main():
     OUTDIR = args.outdir
     # Set realm-specific parameters
     if args.realm == "atm":
-        include_pattern = "*cam.h0a*"
+        include_patterns = ["*cam.h0a*"]
         var_prefix = "Amon."
         subdir = "atm"
-    else:
-        include_pattern = "*clm2.h0*"
+    elif args.realm == "lnd":
+        include_patterns = ["*clm2.h0*"]
         var_prefix = "Lmon."
         subdir = "lnd"
+    elif args.realm == "ocn":
+        # we do not want to match static files
+        include_patterns = ["*mom6.h.rho2.*", "*mom6.h.native.*", "*mom6.h.sfc.*"]
+        var_prefix = "Omon."
+        subdir = "ocn"
     # Setup input/output directories
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot
@@ -285,11 +295,17 @@ def main():
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
             )
-        else:
+        elif args.realm == "lnd":
             INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
             TSDIR = (
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
+            )
+        elif args.realm == "ocn":
+            INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
+            TSDIR = (
+                scratch
+                + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
             )
     # Ensure output directories exist
     if not os.path.exists(str(OUTDIR)):
@@ -316,15 +332,17 @@ def main():
         print("Skipping timeseries processing as per --skip-timeseries flag.")
     else:
         hf_collection = HFCollection(input_head_dir, dask_client=client)
-        hf_collection = hf_collection.include_patterns([include_pattern])
-        hf_collection.pull_metadata()
-        ts_collection = TSCollection(
-            hf_collection, output_head_dir, ts_orders=None, dask_client=client
-        )
-        if args.overwrite:
-            ts_collection = ts_collection.apply_overwrite("*")
-        ts_collection.execute()
-        print("Timeseries processing complete, starting CMORization...")
+        for include_pattern in include_patterns:
+            logger.info(f"Processing files with pattern: {include_pattern}")
+            hfp_collection = hf_collection.include_patterns([include_pattern])
+            hfp_collection.pull_metadata()
+            ts_collection = TSCollection(
+                hfp_collection, output_head_dir, ts_orders=None, dask_client=client
+            )
+            if args.overwrite:
+                ts_collection = ts_collection.apply_overwrite("*")
+            ts_collection.execute()
+            print("Timeseries processing complete, starting CMORization...")
     mapping = Mapping.from_packaged_default()
     print(f"Finding variables with prefix {var_prefix}")
     if args.cmip_vars and len(args.cmip_vars) > 0:
@@ -336,7 +354,10 @@ def main():
     print(f"CMORIZING {len(cmip_vars)} variables")
     # Load requested variables
     if len(cmip_vars) > 0:
-        input_path = Path(str(TSDIR) + f"/*{include_pattern}*")
+        if len(include_patterns) == 1:
+            input_path = Path(str(TSDIR) + f"/*{include_patterns[0]}*")
+        else:
+            input_path = Path(str(TSDIR) + f"/*")
 
         if args.workers == 1:
             results = [
