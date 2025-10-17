@@ -42,6 +42,7 @@ jobs:
           ./configure --prefix=$HOME/cmor --with-netcdf=/usr/local --with-udunits2=/usr/local
           make
           make install
+          pip install .
       - name: Run pytest
         env:
           PYTHONPATH: ${{ github.workspace }}
