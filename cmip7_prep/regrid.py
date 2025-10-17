@@ -4,11 +4,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Tuple
+import logging
 
 # import warnings
 import numpy as np
 import xarray as xr
 import xesmf as xe
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # try:
 #    import xesmf as xe
@@ -489,7 +493,7 @@ def regrid_to_1deg_ds(
     ds_fx = _regrid_fx_once(spec.path, ds_in)  # ← uses cache
     if ds_fx:
         # Don’t overwrite if user already computed and passed them in
-        for name in ("sftlf", "areacella"):
+        for name in "sftlf":
             if name in ds_fx and name not in ds_out:
                 ds_out[name] = ds_fx[name]
 
@@ -819,9 +823,9 @@ def _regrid_fx_once(mapfile: Path, ds_native: xr.Dataset) -> xr.Dataset:
         out_vars[name] = out
 
     ds_fx = xr.Dataset(out_vars)
-    if "areacella" not in ds_fx and "ncol" in da:
-        print("adding areacella to fx")
-        ds_fx = ds_fx.assign(areacella=compute_areacella_from_bounds(ds_fx))
+
+    logger.info("adding areacella to fx")
+    ds_fx = ds_fx.assign(areacella=compute_areacella_from_bounds(ds_fx))
 
     _FXCache.put(mapfile, ds_fx)
     return ds_fx

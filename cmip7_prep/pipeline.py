@@ -229,8 +229,6 @@ def realize_regrid_prepare(
 
     ds_vars = xr.Dataset({cmip_var: da})
 
-    if "area" in ds_native and "area" not in ds_vars and "ncol" in ds_native.dims:
-        ds_vars = ds_vars.assign(area=ds_native["area"])
     if "landfrac" in ds_native and "landfrac" not in ds_vars:
         ds_vars = ds_vars.assign(landfrac=ds_native["landfrac"])
 
