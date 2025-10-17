@@ -20,7 +20,8 @@ jobs:
       - name: Install NetCDF
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libnetcdf-dev libnetcdff-dev libudunits2-dev libjson-c-dev
+          sudo apt-get install -y build-essential libnetcdf-dev libnetcdff-dev libudunits2-dev \
+               libjson-c-dev libuuid-dev
       - name: Install ESMF
         uses: esmf-org/install-esmf-action@v1
         env:
