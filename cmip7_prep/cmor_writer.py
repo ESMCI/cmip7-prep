@@ -10,7 +10,6 @@ present in the provided dataset. It also supports a packaged default
 from pathlib import Path
 import json
 import tempfile
-import re
 import types
 import warnings
 
@@ -38,9 +37,7 @@ from .cmor_utils import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-_FILL_DEFAULT = 1.0e20
-_HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
-_UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
+
 DatasetJsonLike = Union[str, Path, AbstractContextManager]
 
 
