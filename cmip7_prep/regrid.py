@@ -5,11 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Tuple
 import logging
+import xarray as xr
+import xesmf as xe
 
 # import warnings
 import numpy as np
-import xarray as xr
-import xesmf as xe
+from cmip7_prep.cmor_utils import bounds_from_centers_1d
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -490,10 +492,19 @@ def regrid_to_1deg_ds(
         bilinear_map=bilinear_map,
         force_method="conservative",
     )  # fx always conservative
+    print(f"using fx map: {spec.path}")
     ds_fx = _regrid_fx_once(spec.path, ds_in)  # ← uses cache
     if ds_fx:
         # Don’t overwrite if user already computed and passed them in
-        for name in "sftlf":
+        for name in (
+            "sftlf",
+            "areacella",
+            "orog",
+            "lat",
+            "lon",
+            "lat_bnds",
+            "lon_bnds",
+        ):
             if name in ds_fx and name not in ds_out:
                 ds_out[name] = ds_fx[name]
 
@@ -568,30 +579,47 @@ def regrid_to_1deg(
         kwargs["output_chunks"] = {"time": output_time_chunk}
 
     # --- LAND-AWARE path ---
-    if hdim == "lndgrid" and "landfrac" in ds_in:
-        # Build a matching 2D landfrac
-        lf = ds_in["landfrac"]
-        # If landfrac has the unstructured dim, reshape like we did the data
-        if hdim in lf.dims:
-            lf2d = (
-                lf.rename({hdim: "lon"}).expand_dims({"lat": 1}).transpose("lat", "lon")
+    if hdim == "lndgrid" and ("landfrac" in ds_in or "sftlf" in ds_in):
+        # Use landfrac if present, else sftlf (convert to fraction)
+        if "landfrac" in ds_in:
+            lf_src = ds_in["landfrac"]
+        else:
+            lf_src = ds_in["sftlf"] / 100.0
+
+        # Reshape source landfrac to match data
+        if hdim in lf_src.dims:
+            lf2d_src = (
+                lf_src.rename({hdim: "lon"})
+                .expand_dims({"lat": 1})
+                .transpose("lat", "lon")
             )
         else:
-            # fallback: broadcast if already 2D (rare on unstructured)
-            lf2d = lf
+            lf2d_src = lf_src
 
-        # premultiply (intensive × landfrac = extensive over full cell)
-        num = da2_2d * lf2d
+        # Normalize source field by source landfrac
+        norm_src = da2_2d / xr.where(lf2d_src > 0, lf2d_src, np.nan)
 
-        # conservative regrid numerator and denominator
-        out_num = regridder(num, **kwargs)
-        out_den = regridder(lf2d, **kwargs)
+        # Regrid normalized field and landfrac
+        out_norm = regridder(norm_src, **kwargs)
+        out_lf = regridder(lf2d_src, **kwargs)
 
-        # safe divide; mask where no land
-        out = out_num / xr.where(out_den > 0, out_den, np.nan)
-        out = out.where(out_den > 0)
+        # Get destination landfrac (sftlf) if available
+        lat1d, lon1d = _dst_latlon_1d_from_map(spec.path)
+        ds_fx = _regrid_fx_once(spec.path, ds_in)
+        if "sftlf" in ds_fx:
+            lf_dst = ds_fx["sftlf"] / 100.0
+            # Broadcast to match output dims if needed
+            if set(lf_dst.dims) != set(["lat", "lon"]):
+                lf_dst = lf_dst.broadcast_like(out_norm)
+        else:
+            lf_dst = out_lf  # fallback: use regridded source landfrac
+
+        # Renormalize to destination landfrac
+        out = out_norm * lf_dst
+        # Mask where destination landfrac is zero
+        out = out.where(lf_dst > 0)
     else:
-        # default path (atm or no landfrac available)
+        # default path (atm or no landfrac/sftlf available)
         out = regridder(da2_2d, **kwargs)
 
     # --- NEW: robust lat/lon assignment based on destination grid lengths ---
@@ -717,31 +745,11 @@ def _sftlf_from_native(ds: xr.Dataset) -> xr.DataArray | None:
     return out
 
 
-def _areacella_from_native(ds: xr.Dataset) -> xr.DataArray | None:
-    name = _first_present(ds, ["area", "AREA", "cell_area"])
-    if name is None:
-        return None
-    v = ds[name].astype("f8")
-    units = (v.attrs.get("units") or "").strip().lower()
-    if units in {"km2", "km^2"}:
-        v = v * 1e6
-    # normalize attrs
-    attrs = dict(v.attrs)
-    attrs["units"] = "m2"
-    attrs.setdefault("standard_name", "cell_area")
-    attrs.setdefault("long_name", "Grid cell area")
-    v.attrs = attrs
-    return v
-
-
 def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
     pieces = {}
     sftlf = _sftlf_from_native(ds_native)
     if sftlf is not None:
         pieces["sftlf"] = sftlf
-    area = _areacella_from_native(ds_native)
-    if area is not None:
-        pieces["areacella"] = area
     if not pieces:
         return xr.Dataset()
     ds_fx = xr.Dataset(pieces)
@@ -758,15 +766,45 @@ def compute_areacella_from_bounds(
     Compute areacella (m^2) from 1x1 lat/lon bounds.
     Requires 1D coords 'lat','lon' and bounds 'lat_bnds','lon_bnds' with shape (N,2).
     """
-
+    logger.info("computing areacella from lat/lon bounds")
+    if "lat_bnds" not in ds:
+        lat_bnds = bounds_from_centers_1d(ds["lat"].values, kind="lat")
+        ds["lat_bnds"] = xr.DataArray(
+            lat_bnds,
+            dims=("lat", "bnds"),
+            attrs={"long_name": "latitude cell boundaries", "units": "degrees_north"},
+        )
+    if "lon_bnds" not in ds:
+        lon_bnds = bounds_from_centers_1d(ds["lon"].values, kind="lon")
+        ds["lon_bnds"] = xr.DataArray(
+            lon_bnds,
+            dims=("lon", "bnds"),
+            attrs={"long_name": "longitude cell boundaries", "units": "degrees_east"},
+        )
     lat_b = np.asarray(ds["lat_bnds"].values, dtype="f8")  # (nlat, 2)
     lon_b = np.asarray(ds["lon_bnds"].values, dtype="f8")  # (nlon, 2)
+
+    # Validation: check shape
+    if lat_b.ndim != 2 or lat_b.shape[1] != 2:
+        raise ValueError(f"lat_bnds must have shape (nlat, 2), got {lat_b.shape}")
+    if lon_b.ndim != 2 or lon_b.shape[1] != 2:
+        raise ValueError(f"lon_bnds must have shape (nlon, 2), got {lon_b.shape}")
+
+    # Check for non-monotonic bounds across grid
+    if not np.all(np.diff(lat_b[:, 0]) >= 0):
+        logger.warning("lat_bnds[:, 0] is not monotonic increasing.")
+    if not np.all(np.diff(lat_b[:, 1]) >= 0):
+        logger.warning("lat_bnds[:, 1] is not monotonic increasing.")
+    if not np.all(np.diff(lon_b[:, 0]) >= 0):
+        logger.warning("lon_bnds[:, 0] is not monotonic increasing.")
+    if not np.all(np.diff(lon_b[:, 1]) >= 0):
+        logger.warning("lon_bnds[:, 1] is not monotonic increasing.")
 
     # radians
     lat_b_rad = np.deg2rad(lat_b)
     lon_b_rad = np.deg2rad(lon_b % 360.0)  # ensure [0,360)
     dlam = lon_b_rad[:, 1] - lon_b_rad[:, 0]  # (nlon,)
-
+    dlam = np.where(dlam < 0, dlam + 2 * np.pi, dlam)
     # Δ(sin φ)
     sin_phi2_minus_phi1 = np.sin(lat_b_rad[:, 1]) - np.sin(lat_b_rad[:, 0])  # (nlat,)
 

@@ -146,6 +146,7 @@ def process_one_var(
         logger.error(f"Exception while reading {varname}: {e!r}")
         return (varname, f"ERROR: {e!r}")
     try:
+        print(f"Regrid/prepare for {varname}")
         if "ncol" in ds_native.dims or "lndgrid" in ds_native.dims:
             logger.info(f"Regridding for {varname}")
             ds_cmor = realize_regrid_prepare(
