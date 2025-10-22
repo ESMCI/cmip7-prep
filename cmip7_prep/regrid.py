@@ -513,6 +513,31 @@ def regrid_to_1deg_ds(
     return ds_out
 
 
+def _normalize_land_field(da2: xr.DataArray, ds_in: xr.Dataset) -> xr.DataArray:
+    """Normalize source field by source landfrac."""
+    logger.info("Normalizing land field by source landfrac")
+    if "landfrac" not in ds_in:
+        raise ValueError("Missing required variables for land normalization: landfrac")
+    landfrac = ds_in["landfrac"].fillna(0)
+    norm_src = da2.fillna(0) * landfrac
+    return norm_src
+
+
+def _denormalize_land_field(
+    out_norm: xr.DataArray, ds_in: xr.Dataset, mapfile: Path
+) -> xr.DataArray:
+    """Denormalize field by destination landfrac."""
+    logger.info("Denormalizing land field")
+    ds_fx = _regrid_fx_once(mapfile, ds_in)
+    if "sftlf" not in ds_fx:
+        raise ValueError(
+            "Missing required variables for land denormalization: landfrac"
+        )
+    landfrac = ds_fx["sftlf"].fillna(0) / 100.0  # percent to fraction
+    out = out_norm / landfrac.where(landfrac > 0)
+    return out
+
+
 def regrid_to_1deg(
     ds_in: xr.Dataset,
     varname: str,
@@ -548,6 +573,8 @@ def regrid_to_1deg(
     var_da = ds_in[varname]  # always a DataArray
 
     da2, non_spatial, hdim = _ensure_ncol_last(var_da)
+    if hdim == "lndgrid":
+        da2 = _normalize_land_field(da2, ds_in)
 
     # cast to save memory
     if dtype is not None and str(da2.dtype) != dtype:
@@ -575,49 +602,10 @@ def regrid_to_1deg(
         .expand_dims({"lat": 1})  # add a dummy 'lat' of length 1
         .transpose(*non_spatial, "lat", "lon")  # ensure last two dims are ('lat','lon')
     )
-    if "time" in da2_2d.dims and output_time_chunk:
-        kwargs["output_chunks"] = {"time": output_time_chunk}
 
-    # --- LAND-AWARE path ---
-    if hdim == "lndgrid" and ("landfrac" in ds_in or "sftlf" in ds_in):
-        # Use landfrac if present, else sftlf (convert to fraction)
-        if "landfrac" in ds_in:
-            lf_src = ds_in["landfrac"]
-        else:
-            lf_src = ds_in["sftlf"] / 100.0
-
-        # Reshape source landfrac to match data
-        if hdim in lf_src.dims:
-            lf2d_src = (
-                lf_src.rename({hdim: "lon"})
-                .expand_dims({"lat": 1})
-                .transpose("lat", "lon")
-            )
-        else:
-            lf2d_src = lf_src
-
-        # Normalize source field by source landfrac
-        norm_src = da2_2d / xr.where(lf2d_src > 0, lf2d_src, np.nan)
-
-        # Regrid normalized field and landfrac
-        out_norm = regridder(norm_src, **kwargs)
-        out_lf = regridder(lf2d_src, **kwargs)
-
-        # Get destination landfrac (sftlf) if available
-        lat1d, lon1d = _dst_latlon_1d_from_map(spec.path)
-        ds_fx = _regrid_fx_once(spec.path, ds_in)
-        if "sftlf" in ds_fx:
-            lf_dst = ds_fx["sftlf"] / 100.0
-            # Broadcast to match output dims if needed
-            if set(lf_dst.dims) != set(["lat", "lon"]):
-                lf_dst = lf_dst.broadcast_like(out_norm)
-        else:
-            lf_dst = out_lf  # fallback: use regridded source landfrac
-
-        # Renormalize to destination landfrac
-        out = out_norm * lf_dst
-        # Mask where destination landfrac is zero
-        out = out.where(lf_dst > 0)
+    out_norm = regridder(da2_2d, **kwargs)
+    if hdim == "lndgrid":
+        out = _denormalize_land_field(out_norm, ds_in, spec.path)
     else:
         # default path (atm or no landfrac/sftlf available)
         out = regridder(da2_2d, **kwargs)
@@ -754,8 +742,7 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
         return xr.Dataset()
     ds_fx = xr.Dataset(pieces)
     # normalize horizontal dim name to what your regrid code expects
-    if "lndgrid" in ds_fx.dims and "ncol" not in ds_fx.dims:
-        ds_fx = ds_fx.rename({"lndgrid": "ncol"})
+    #    ds_fx = ds_fx.rename({"lndgrid": "ncol"})
     return ds_fx
 
 
@@ -826,45 +813,46 @@ def compute_areacella_from_bounds(
 
 
 def _regrid_fx_once(mapfile: Path, ds_native: xr.Dataset) -> xr.Dataset:
-    """Compute & regrid sftlf/areacella once for a given mapfile; cache result."""
-    # already have it?
+    """Compute & regrid sftlf/areacella once for a given mapfile; cache result.
+
+    sftlf is regridded from source; areacella is computed on the destination grid.
+    """
     cached = _FXCache.get(mapfile)
     if cached is not None:
         return cached
 
     ds_fx_native = _build_fx_native(ds_native)
-    if not ds_fx_native:
-        _FXCache.put(mapfile, xr.Dataset())
-        return xr.Dataset()
-
-    # Conservative always for areas/fractions
-    regridder = _RegridderCache.get(mapfile, "conservative")
-
     out_vars = {}
-    for name in ("sftlf", "areacella"):
-        if name not in ds_fx_native:
-            continue
-        da = ds_fx_native[name]
-        # Make a 2D dummy with dims lat,lon like your main regrid path does
-        # Reuse your same reshape trick from regrid_to_1deg (ncol→lon + dummy lat)
+
+    # Regrid sftlf from source if present
+    if "sftlf" in ds_fx_native:
+        regridder = _RegridderCache.get(mapfile, "conservative")
+        da = ds_fx_native["sftlf"]
         da2 = (
-            da.rename({"ncol": "lon"})
+            da.rename({"lndgrid": "lon"})
             .expand_dims({"lat": 1})
             .transpose(..., "lat", "lon")
         )
         out = regridder(da2)
-        # strip any extra non-spatial dims (FX are horizontal-only)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
-        out.name = name
+        out.name = "sftlf"
         out.attrs.update(da.attrs)
-        out_vars[name] = out
+        out_vars["sftlf"] = out
+
+    # Always compute areacella on the destination grid, not by regridding
+    # Use the destination grid from the mapfile
+    lat1d, lon1d = _dst_latlon_1d_from_map(mapfile)
+    ds_grid = xr.Dataset(
+        coords={
+            "lat": ("lat", lat1d, {"units": "degrees_north"}),
+            "lon": ("lon", lon1d, {"units": "degrees_east"}),
+        }
+    )
+    areacella = compute_areacella_from_bounds(ds_grid)
+    out_vars["areacella"] = areacella
 
     ds_fx = xr.Dataset(out_vars)
-
-    logger.info("adding areacella to fx")
-    ds_fx = ds_fx.assign(areacella=compute_areacella_from_bounds(ds_fx))
-
     _FXCache.put(mapfile, ds_fx)
     return ds_fx
 

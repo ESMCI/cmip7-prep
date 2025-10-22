@@ -8,6 +8,7 @@ present in the provided dataset. It also supports a packaged default
 """
 
 from pathlib import Path
+import collections.abc
 import json
 import tempfile
 import types
@@ -33,6 +34,8 @@ from .cmor_utils import (
     filled_for_cmor,
     open_existing_fx,
 )
+
+# from .mom6_static import compute_cell_bounds_from_corners
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -81,6 +84,7 @@ class CmorSession(
         self._log_name = log_name
         self._log_path: Path | None = None
         self._pending_ps = None
+
         self._outdir = Path(outdir or "./CMIP7").resolve()
         self._outdir.mkdir(parents=True, exist_ok=True)
         self._fx_written: set[str] = (
@@ -89,6 +93,8 @@ class CmorSession(
         self._fx_cache: dict[str, xr.DataArray] = (
             {}
         )  # regridded fx fields cached in-memory
+
+        # Attach grid mapping attribute to variable if ocean
 
     def __enter__(self) -> "CmorSession":
         # Resolve logfile path if requested
@@ -284,18 +290,59 @@ class CmorSession(
         plev_id = None
         lat_id = None
         lon_id = None
+
+        print(f"[CMOR axis debug] var_dims: {var_dims}")
         if "xh" in var_dims and "yh" in var_dims:
-            # MOM6 grid with 2D lat/lon; define xh/yh axes and grid
-            lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "yh", "degrees_north")
-            lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "xh", "degrees_east")
-        else:
-            # --- horizontal axes (use CMOR names) ----
-            if "lat" not in ds or "lon" not in ds:
-                raise KeyError(
-                    "Expected 'lat' and 'lon' in dataset for CMOR horizontal axes."
-                )
-            lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
-            lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
+            # MOM6/curvilinear grid: register xh/yh as generic axes (i/j), not as lat/lon
+            # Define the native grid using the coordinate arrays
+            print(
+                f"[CMOR axis debug] Defining unstructured grid for variable {var_name}."
+            )
+            i_id = cmor.axis(
+                table_entry="i",
+                units="1",
+                length=ds["xh"].size,
+            )
+            j_id = cmor.axis(
+                table_entry="j",
+                units="1",
+                length=ds["yh"].size,
+            )
+            print("[CMOR axis debug] Defining unstructured grid_id.")
+            grid_id = cmor.grid(
+                axis_ids=[j_id, i_id],  # note CMOR wants fastest varying last
+                longitude=ds["geolon"].values,
+                latitude=ds["geolat"].values,
+                longitude_vertices=ds["geolon_c"].values,
+                latitude_vertices=ds["geolat_c"].values,
+            )
+
+            # No lat/lon axis registration for curvilinear grid
+            # 2D geolat/geolon should be written as auxiliary variables elsewhere
+            # Map axes for dimension order
+            dim_to_axis = {"time": None, "i": i_id, "j": j_id, "xh": i_id, "yh": j_id}
+            axes_ids = []
+            for d in var_dims:
+                axis_id = dim_to_axis.get(d)
+                if axis_id is None and d != "time":
+                    raise KeyError(
+                        f"No axis ID found for dimension '{d}'"
+                        f" in variable '{var_name}' (curvilinear)"
+                    )
+                axes_ids.append(axis_id)
+            print(f"[CMOR axis debug] Appending grid_id: {grid_id}")
+            axes_ids.append(grid_id)
+            print(f"[CMOR axis debug] axes_ids: {axes_ids}")
+            return axes_ids
+
+        # --- horizontal axes (use CMOR names) ----
+        if "lat" not in ds or "lon" not in ds:
+            raise KeyError(
+                "Expected 'lat' and 'lon' in dataset for CMOR horizontal axes."
+            )
+        lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
+        lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
+
         logger.info("write lat axis")
         lat_id = cmor.axis(
             table_entry="latitude",
@@ -431,10 +478,27 @@ class CmorSession(
                 cell_bounds=pb if pb is not None else None,
             )
 
-        for axis_id in (time_id, alev_id, plev_id, lat_id, lon_id):
-            if axis_id is not None:
-                axes_ids.append(axis_id)
-
+        # Map dimension names to axis IDs
+        dim_to_axis = {
+            "time": time_id,
+            "alev": alev_id,  # hybrid sigma
+            "lev": alev_id,  # sometimes used for hybrid
+            "plev": plev_id,
+            "lat": lat_id,
+            "latitude": lat_id,
+            "lon": lon_id,
+            "longitude": lon_id,
+            "xh": lon_id,  # MOM6
+            "yh": lat_id,  # MOM6
+        }
+        axes_ids = []
+        for d in var_dims:
+            axis_id = dim_to_axis.get(d)
+            if axis_id is None:
+                raise KeyError(
+                    f"No axis ID found for dimension '{d}' in variable '{var_name}'"
+                )
+            axes_ids.append(axis_id)
         return axes_ids
 
     def _write_fx_2d(self, ds: xr.Dataset, name: str, units: str) -> None:
@@ -550,8 +614,23 @@ class CmorSession(
 
         data = ds[vdef.name]
         data_filled, fillv = filled_for_cmor(data)
+        logger.info("Define axes")
         axes_ids = self._define_axes(ds, vdef)
         units = getattr(vdef, "units", "") or ""
+        # Debug logging for axis mapping
+
+        # Try to get axis table entries for each axis_id
+        # pylint: disable=broad-exception-caught
+        try:
+            for i, aid in enumerate(axes_ids):
+                entry = cmor.axis_entry(aid) if hasattr(cmor, "axis_entry") else None
+                logger.info(
+                    "[CMOR DEBUG] axis %d: id=%s, table_entry=%s", i, aid, entry
+                )
+        except (
+            Exception
+        ) as e:  # Broad except needed: cmor.axis_entry may raise various errors
+            logger.warning("[CMOR DEBUG] Could not retrieve axis table entries: %s", e)
         var_id = cmor.variable(
             getattr(vdef, "name", varname),
             units,
@@ -602,7 +681,7 @@ class CmorSession(
         self,
         ds: xr.Dataset,
         cmip_vars: Sequence[str],
-        mapping: "Mapping",
+        mapping: collections.abc.Mapping,
     ) -> None:
         """Write multiple CMIP variables from one dataset."""
         for v in cmip_vars:

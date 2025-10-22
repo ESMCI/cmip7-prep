@@ -6,7 +6,7 @@ from cmip7_prep import cmor_writer as cw
 def test_session_sets_tracking_prefix_and_normalizes_license_product(fake_cmor):
     """test tracking_prefix and license strings"""
     fake, tables_path = fake_cmor
-
+    print("Running test_session_sets_tracking_prefix_and_normalizes_license_product")
     # No tracking_id provided; product wrong to test normalization
     sess = cw.CmorSession(
         tables_path=tables_path,

@@ -231,6 +231,8 @@ def realize_regrid_prepare(
 
     if "landfrac" in ds_native and "landfrac" not in ds_vars:
         ds_vars = ds_vars.assign(landfrac=ds_native["landfrac"])
+    if "area" in ds_native and "area" not in ds_vars:
+        ds_vars = ds_vars.assign(area=ds_native["area"])
 
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}

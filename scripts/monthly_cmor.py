@@ -28,6 +28,7 @@ from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.dreq_search import find_variables_by_prefix
+from cmip7_prep.mom6_static import load_mom6_static
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
@@ -53,9 +54,15 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 def parse_args():
-
     parser = argparse.ArgumentParser(
         description="CMIP7 monthly processing for atm/lnd realms"
+    )
+
+    parser.add_argument(
+        "--static-grid",
+        type=str,
+        default=None,
+        help="Path to static grid file for MOM variables (optional)",
     )
     parser.add_argument(
         "--cmip-vars",
@@ -129,7 +136,7 @@ def parse_args():
 
 
 def process_one_var(
-    varname: str, mapping, inputfile, tables_path, outdir
+    varname: str, mapping, inputfile, tables_path, outdir, mom6_grid=None
 ) -> tuple[str, str]:
     """Compute+write one CMIP variable. Returns (varname, 'ok' or error message)."""
     logger.info(f"Starting processing for variable: {varname}")
@@ -142,6 +149,13 @@ def process_one_var(
         if var is None:
             logger.warning(f"Source variable(s) not found for {varname}")
             return (varname, "ERROR: Source variable(s) not found.")
+        # Example usage: attach MOM6 grid info for ocn realm
+        if mom6_grid is not None:
+            logger.info(f"MOM6 grid info available for {varname}")
+            # You can use mom6_grid['geolat'], mom6_grid['geolon'], etc. here
+            # For example, attach to ds_native as needed:
+            # ds_native['geolat'] = (('yh','xh'), mom6_grid['geolat'])
+            # ds_native['geolon'] = (('yh','xh'), mom6_grid['geolon'])
     except Exception as e:
         logger.error(f"Exception while reading {varname}: {e!r}")
         return (varname, f"ERROR: {e!r}")
@@ -166,7 +180,18 @@ def process_one_var(
         else:
             logger.info(f"Skipping regrid/prepare for ocean variable {varname}")
             ds_cmor = ds_native
-
+            # Attach only cell center arrays and bounds for CMOR
+            if mom6_grid is not None:
+                geolat = mom6_grid[0]
+                geolon = mom6_grid[1]
+                geolat_c = mom6_grid[2]
+                geolon_c = mom6_grid[3]
+                ncell = geolat.size
+                # 2D for reference, 1D for CMOR axes
+                ds_cmor["geolat"] = (("yh", "xh"), geolat)
+                ds_cmor["geolon"] = (("yh", "xh"), geolon)
+                ds_cmor["geolat_c"] = (("yhp", "xhp"), geolat_c)
+                ds_cmor["geolon_c"] = (("yhp", "xhp"), geolon_c)
     except Exception as e:
         logger.error(f"Exception while regridding/preparing {varname}: {e!r}")
     try:
@@ -245,7 +270,8 @@ def main():
     args = parse_args()
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
-    # Set realm-specific parameters
+
+    mom6_grid = None
     if args.realm == "atm":
         include_patterns = ["*cam.h0a*"]
         var_prefix = "Amon."
@@ -259,6 +285,8 @@ def main():
         include_patterns = ["*mom6.h.rho2.*", "*mom6.h.native.*", "*mom6.h.sfc.*"]
         var_prefix = "Omon."
         subdir = "ocn"
+        if not args.static_grid:
+            ocn_static_grid = "/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc"
     # Setup input/output directories
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot
@@ -308,11 +336,15 @@ def main():
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
             )
-    # Ensure output directories exist
+
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
     if not os.path.exists(str(TSDIR)):
         os.makedirs(str(TSDIR))
+    # Load MOM6 static grid if needed (ocn realm)
+    if args.realm == "ocn" and ocn_static_grid:
+        mom6_grid = load_mom6_static(ocn_static_grid)
+        print(f"Using MOM static grid file: {ocn_static_grid}")
     # Dask cluster setup
     if args.workers == 1:
         client = None
@@ -362,12 +394,16 @@ def main():
 
         if args.workers == 1:
             results = [
-                process_one_var(v, mapping, input_path, TABLES, OUTDIR)
+                process_one_var(
+                    v, mapping, input_path, TABLES, OUTDIR, mom6_grid=mom6_grid
+                )
                 for v in cmip_vars
             ]
         else:
             futs = [
-                process_one_var_delayed(var, mapping, input_path, TABLES, OUTDIR)
+                process_one_var_delayed(
+                    var, mapping, input_path, TABLES, OUTDIR, mom6_grid=mom6_grid
+                )
                 for var in cmip_vars
             ]
             futures = client.compute(futs)
