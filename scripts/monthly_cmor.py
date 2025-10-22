@@ -28,6 +28,7 @@ from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.dreq_search import find_variables_by_prefix
+from cmip7_prep.mom6_static import load_mom6_static
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
@@ -53,9 +54,15 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 def parse_args():
-
     parser = argparse.ArgumentParser(
         description="CMIP7 monthly processing for atm/lnd realms"
+    )
+
+    parser.add_argument(
+        "--static-grid",
+        type=str,
+        default=None,
+        help="Path to static grid file for MOM variables (optional)",
     )
     parser.add_argument(
         "--cmip-vars",
@@ -75,7 +82,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--realm", choices=["atm", "lnd"], required=True, help="Realm to process"
+        "--realm", choices=["atm", "lnd", "ocn"], required=True, help="Realm to process"
     )
     parser.add_argument("--caseroot", type=str, help="Case root directory")
     parser.add_argument("--cimeroot", type=str, help="CIME root directory")
@@ -129,7 +136,7 @@ def parse_args():
 
 
 def process_one_var(
-    varname: str, mapping, inputfile, tables_path, outdir
+    varname: str, mapping, inputfile, tables_path, outdir, mom6_grid=None
 ) -> tuple[str, str]:
     """Compute+write one CMIP variable. Returns (varname, 'ok' or error message)."""
     logger.info(f"Starting processing for variable: {varname}")
@@ -142,25 +149,49 @@ def process_one_var(
         if var is None:
             logger.warning(f"Source variable(s) not found for {varname}")
             return (varname, "ERROR: Source variable(s) not found.")
+        # Example usage: attach MOM6 grid info for ocn realm
+        if mom6_grid is not None:
+            logger.info(f"MOM6 grid info available for {varname}")
+            # You can use mom6_grid['geolat'], mom6_grid['geolon'], etc. here
+            # For example, attach to ds_native as needed:
+            # ds_native['geolat'] = (('yh','xh'), mom6_grid['geolat'])
+            # ds_native['geolon'] = (('yh','xh'), mom6_grid['geolon'])
     except Exception as e:
         logger.error(f"Exception while reading {varname}: {e!r}")
         return (varname, f"ERROR: {e!r}")
     try:
-        logger.info(f"Regridding for {varname}")
-        ds_cmor = realize_regrid_prepare(
-            mapping,
-            ds_native,
-            varname,
-            tables_path=tables_path,
-            time_chunk=12,
-            regrid_kwargs={
-                "output_time_chunk": 12,
-                "dtype": "float32",
-                "bilinear_map": Path(
-                    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
-                ),
-            },
-        )
+        print(f"Regrid/prepare for {varname}")
+        if "ncol" in ds_native.dims or "lndgrid" in ds_native.dims:
+            logger.info(f"Regridding for {varname}")
+            ds_cmor = realize_regrid_prepare(
+                mapping,
+                ds_native,
+                varname,
+                tables_path=tables_path,
+                time_chunk=12,
+                regrid_kwargs={
+                    "output_time_chunk": 12,
+                    "dtype": "float32",
+                    "bilinear_map": Path(
+                        "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+                    ),
+                },
+            )
+        else:
+            logger.info(f"Skipping regrid/prepare for ocean variable {varname}")
+            ds_cmor = ds_native
+            # Attach only cell center arrays and bounds for CMOR
+            if mom6_grid is not None:
+                geolat = mom6_grid[0]
+                geolon = mom6_grid[1]
+                geolat_c = mom6_grid[2]
+                geolon_c = mom6_grid[3]
+                ncell = geolat.size
+                # 2D for reference, 1D for CMOR axes
+                ds_cmor["geolat"] = (("yh", "xh"), geolat)
+                ds_cmor["geolon"] = (("yh", "xh"), geolon)
+                ds_cmor["geolat_c"] = (("yhp", "xhp"), geolat_c)
+                ds_cmor["geolon_c"] = (("yhp", "xhp"), geolon_c)
     except Exception as e:
         logger.error(f"Exception while regridding/preparing {varname}: {e!r}")
     try:
@@ -189,7 +220,7 @@ def process_one_var(
                     "levels": cfg.get("levels", None),
                 },
             )()
-            print(f"Writing variable {varname} with ds_cmor={ds_cmor}")
+            print(f"Writing variable {varname}")
             cm.write_variable(ds_cmor, varname, vdef)
         logger.info(f"Finished processing for {varname}")
         return (varname, "ok")
@@ -239,15 +270,23 @@ def main():
     args = parse_args()
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
-    # Set realm-specific parameters
+
+    mom6_grid = None
     if args.realm == "atm":
-        include_pattern = "*cam.h0a*"
+        include_patterns = ["*cam.h0a*"]
         var_prefix = "Amon."
         subdir = "atm"
-    else:
-        include_pattern = "*clm2.h0*"
+    elif args.realm == "lnd":
+        include_patterns = ["*clm2.h0*"]
         var_prefix = "Lmon."
         subdir = "lnd"
+    elif args.realm == "ocn":
+        # we do not want to match static files
+        include_patterns = ["*mom6.h.rho2.*", "*mom6.h.native.*", "*mom6.h.sfc.*"]
+        var_prefix = "Omon."
+        subdir = "ocn"
+        if not args.static_grid:
+            ocn_static_grid = "/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc"
     # Setup input/output directories
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot
@@ -285,17 +324,27 @@ def main():
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
             )
-        else:
+        elif args.realm == "lnd":
             INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
             TSDIR = (
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
             )
-    # Ensure output directories exist
+        elif args.realm == "ocn":
+            INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
+            TSDIR = (
+                scratch
+                + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
+            )
+
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
     if not os.path.exists(str(TSDIR)):
         os.makedirs(str(TSDIR))
+    # Load MOM6 static grid if needed (ocn realm)
+    if args.realm == "ocn" and ocn_static_grid:
+        mom6_grid = load_mom6_static(ocn_static_grid)
+        print(f"Using MOM static grid file: {ocn_static_grid}")
     # Dask cluster setup
     if args.workers == 1:
         client = None
@@ -316,15 +365,17 @@ def main():
         print("Skipping timeseries processing as per --skip-timeseries flag.")
     else:
         hf_collection = HFCollection(input_head_dir, dask_client=client)
-        hf_collection = hf_collection.include_patterns([include_pattern])
-        hf_collection.pull_metadata()
-        ts_collection = TSCollection(
-            hf_collection, output_head_dir, ts_orders=None, dask_client=client
-        )
-        if args.overwrite:
-            ts_collection = ts_collection.apply_overwrite("*")
-        ts_collection.execute()
-        print("Timeseries processing complete, starting CMORization...")
+        for include_pattern in include_patterns:
+            logger.info(f"Processing files with pattern: {include_pattern}")
+            hfp_collection = hf_collection.include_patterns([include_pattern])
+            hfp_collection.pull_metadata()
+            ts_collection = TSCollection(
+                hfp_collection, output_head_dir, ts_orders=None, dask_client=client
+            )
+            if args.overwrite:
+                ts_collection = ts_collection.apply_overwrite("*")
+            ts_collection.execute()
+            print("Timeseries processing complete, starting CMORization...")
     mapping = Mapping.from_packaged_default()
     print(f"Finding variables with prefix {var_prefix}")
     if args.cmip_vars and len(args.cmip_vars) > 0:
@@ -336,16 +387,23 @@ def main():
     print(f"CMORIZING {len(cmip_vars)} variables")
     # Load requested variables
     if len(cmip_vars) > 0:
-        input_path = Path(str(TSDIR) + f"/*{include_pattern}*")
+        if len(include_patterns) == 1:
+            input_path = Path(str(TSDIR) + f"/*{include_patterns[0]}*")
+        else:
+            input_path = Path(str(TSDIR) + f"/*")
 
         if args.workers == 1:
             results = [
-                process_one_var(v, mapping, input_path, TABLES, OUTDIR)
+                process_one_var(
+                    v, mapping, input_path, TABLES, OUTDIR, mom6_grid=mom6_grid
+                )
                 for v in cmip_vars
             ]
         else:
             futs = [
-                process_one_var_delayed(var, mapping, input_path, TABLES, OUTDIR)
+                process_one_var_delayed(
+                    var, mapping, input_path, TABLES, OUTDIR, mom6_grid=mom6_grid
+                )
                 for var in cmip_vars
             ]
             futures = client.compute(futs)

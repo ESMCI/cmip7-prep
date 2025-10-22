@@ -371,6 +371,13 @@ variables:
       - cesm_var: SOLIN
       - cesm_var: FSNTOAC
 
+  sos:
+    table: Omon
+    units: "1e-3"
+    dims: [time, j, i]
+    sources:
+      - cesm_var: sos
+
   sfcWind:
     table: Amon
     units: "m s-1"

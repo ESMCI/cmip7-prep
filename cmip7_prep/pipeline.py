@@ -32,6 +32,8 @@ def _filename_contains_var(path: Union[str, Path], var: str) -> bool:
     False
     >>> _filename_contains_var(Path("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc"), "TS")
     True
+    >>> _filename_contains_var("wrkflw.mom6.h.native.sos.000101-001012.nc", "sos")
+    True
     """
     name = Path(path).name
     needle = f".{var}."
@@ -227,10 +229,10 @@ def realize_regrid_prepare(
 
     ds_vars = xr.Dataset({cmip_var: da})
 
-    if "area" in ds_native and "area" not in ds_vars and "ncol" in ds_native.dims:
-        ds_vars = ds_vars.assign(area=ds_native["area"])
     if "landfrac" in ds_native and "landfrac" not in ds_vars:
         ds_vars = ds_vars.assign(landfrac=ds_native["landfrac"])
+    if "area" in ds_native and "area" not in ds_vars:
+        ds_vars = ds_vars.assign(area=ds_native["area"])
 
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
