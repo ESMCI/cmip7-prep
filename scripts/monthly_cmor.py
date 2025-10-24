@@ -291,6 +291,7 @@ def main():
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot
         cimeroot = args.cimeroot
+        sys.path.append(cimeroot)
         _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
         sys.path.append(_LIBDIR)
         try:
