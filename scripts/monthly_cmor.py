@@ -22,6 +22,7 @@ import re
 from typing import Optional, Tuple
 import sys
 from datetime import datetime, UTC
+import glob
 
 import xarray as xr
 from cmip7_prep.mapping_compat import Mapping
@@ -305,6 +306,9 @@ def main():
         INPUTDIR = os.path.join(inputroot, subdir, "hist")
         TSDIR = Path(inputroot).parent / "timeseries" / casename / subdir / "hist"
         native = latest_monthly_file(Path(INPUTDIR))
+        if native is None:
+            print(f"No output files found in {INPUTDIR}")
+            sys.exit(0)
         if TSDIR.exists():
             timeseries = latest_monthly_file(TSDIR)
             if timeseries is not None:
@@ -365,6 +369,14 @@ def main():
     if args.skip_timeseries:
         print("Skipping timeseries processing as per --skip-timeseries flag.")
     else:
+        cnt = 0
+        for include_pattern in include_patterns:
+            cnt = cnt + len(glob.glob(os.path.join(input_head_dir, include_pattern)))
+        if cnt == 0:
+            logger.warning(
+                f"No input files to process in {input_head_dir} with {include_patterns}"
+            )
+            sys.exit(0)
         hf_collection = HFCollection(input_head_dir, dask_client=client)
         for include_pattern in include_patterns:
             logger.info(f"Processing files with pattern: {include_pattern}")
