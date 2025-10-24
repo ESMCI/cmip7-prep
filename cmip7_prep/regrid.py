@@ -28,11 +28,19 @@ except ModuleNotFoundError as e:
     _HAS_DASK = False
 
 # Default weight maps; override via function args.
-DEFAULT_CONS_MAP = Path(
-    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
+INPUTDATA_DIR = Path("/glade/campaign/cesm/cesmdata/inputdata/")
+DEFAULT_CONS_MAP_NE30 = Path(
+    INPUTDATA_DIR / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
 )
-DEFAULT_BILIN_MAP = Path(
-    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+DEFAULT_BILIN_MAP_NE30 = Path(
+    INPUTDATA_DIR / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+)  # optional bilinear map
+
+DEFAULT_CONS_MAP_T232 = Path(
+    INPUTDATA_DIR / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc"
+)
+DEFAULT_BILIN_MAP_T232 = Path(
+    INPUTDATA_DIR / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc"
 )  # optional bilinear map
 
 # Variables treated as "intensive" → prefer bilinear when available.
@@ -413,10 +421,15 @@ def _pick_maps(
     conservative_map: Optional[Path] = None,
     bilinear_map: Optional[Path] = None,
     force_method: Optional[str] = None,
+    realm: Optional[str] = None,
 ) -> MapSpec:
     """Choose which precomputed map file to use for a variable."""
-    cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP
-    bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP
+    if realm == "ocn":
+        cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_T232
+        bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_T232
+    else:
+        cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_NE30
+        bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30
 
     if force_method:
         if force_method not in {"conservative", "bilinear"}:
@@ -484,13 +497,19 @@ def regrid_to_1deg_ds(
     # Attach time (and bounds) from the original dataset if requested
     if time_from is not None:
         ds_out = _attach_time_and_bounds(ds_out, time_from)
-
+    if "ncol" in ds_in.dims:
+        realm = "atm"
+    elif "lndgrid" in ds_in.dims:
+        realm = "lnd"
+    else:
+        realm = "ocn"
     # Pick the mapfile you used for conservative/bilinear selection
     spec = _pick_maps(
         varnames[0] if isinstance(varnames, list) else varnames,
         conservative_map=conservative_map,
         bilinear_map=bilinear_map,
         force_method="conservative",
+        realm=realm,
     )  # fx always conservative
     print(f"using fx map: {spec.path}")
     ds_fx = _regrid_fx_once(spec.path, ds_in)  # ← uses cache
@@ -569,12 +588,22 @@ def regrid_to_1deg(
     """
     if varname not in ds_in:
         raise KeyError(f"{varname!r} not in dataset.")
-
+    realm = None
     var_da = ds_in[varname]  # always a DataArray
-
-    da2, non_spatial, hdim = _ensure_ncol_last(var_da)
-    if hdim == "lndgrid":
-        da2 = _normalize_land_field(da2, ds_in)
+    if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
+        logger.info("Variable has no 'ncol' or 'lndgrid' dim; assuming ocn variable.")
+        hdim = "tripolar"
+        da2 = var_da  # Use the DataArray, not the whole Dataset
+        non_spatial = [d for d in da2.dims if d not in ("yh", "xh")]
+        realm = "ocn"
+        method = method or "bilinear"  # force bilinear for ocn
+    else:
+        da2, non_spatial, hdim = _ensure_ncol_last(var_da)
+        if hdim == "lndgrid":
+            da2 = _normalize_land_field(da2, ds_in)
+            realm = "lnd"
+        elif hdim == "ncol":
+            realm = "atm"
 
     # cast to save memory
     if dtype is not None and str(da2.dtype) != dtype:
@@ -589,6 +618,10 @@ def regrid_to_1deg(
         conservative_map=conservative_map,
         bilinear_map=bilinear_map,
         force_method=method,
+        realm=realm,
+    )
+    print(
+        f"Regridding {varname} using {spec.method_label} map: {spec.path} for realm {realm}"
     )
     regridder = _RegridderCache.get(spec.path, spec.method_label)
 
@@ -596,18 +629,28 @@ def regrid_to_1deg(
     kwargs = {}
     if "time" in da2.dims and output_time_chunk:
         kwargs["output_chunks"] = {"time": output_time_chunk}
-
-    da2_2d = (
-        da2.rename({hdim: "lon"})
-        .expand_dims({"lat": 1})  # add a dummy 'lat' of length 1
-        .transpose(*non_spatial, "lat", "lon")  # ensure last two dims are ('lat','lon')
+    if realm in ("atm", "lnd"):
+        da2_2d = (
+            da2.rename({hdim: "lon"})
+            .expand_dims({"lat": 1})  # add a dummy 'lat' of length 1
+            .transpose(
+                *non_spatial, "lat", "lon"
+            )  # ensure last two dims are ('lat','lon')
+        )
+    else:
+        da2_2d = da2.rename({"xh": "lon", "yh": "lat"}).transpose(
+            *non_spatial, "lon", "lat"
+        )
+        da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
+    print(
+        f"da2_2d range: {da2_2d['lat'].min().item()} to {da2_2d['lat'].max().item()} lat, "
+        f"{da2_2d['lon'].min().item()} to {da2_2d['lon'].max().item()} lon"
     )
-
-    out_norm = regridder(da2_2d, **kwargs)
     if hdim == "lndgrid":
+        out_norm = regridder(da2_2d, **kwargs)
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
     else:
-        # default path (atm or no landfrac/sftlf available)
+        # default path (atm, ocn or no landfrac/sftlf available)
         out = regridder(da2_2d, **kwargs)
 
     # --- NEW: robust lat/lon assignment based on destination grid lengths ---
@@ -898,6 +941,7 @@ class _RegridderCache:
             if not mapfile.exists():
                 raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
             ds_in, ds_out = _make_dummy_grids(mapfile)
+            logger.info("Creating xESMF Regridder from weights: %s", mapfile)
             cls._cache[mapfile] = xe.Regridder(
                 ds_in,
                 ds_out,

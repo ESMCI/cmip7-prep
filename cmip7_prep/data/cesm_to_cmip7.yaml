@@ -374,7 +374,9 @@ variables:
   sos:
     table: Omon
     units: "1e-3"
-    dims: [time, j, i]
+    dims:
+      - [time, lat, lon]
+    regrid_method: conservative
     sources:
       - cesm_var: sos
 

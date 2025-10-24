@@ -47,6 +47,7 @@ class VarConfig:
     regrid_method: Optional[str] = None
     long_name: Optional[str] = None
     standard_name: Optional[str] = None
+    dims: Optional[List[str]] = None
 
     def as_cfg(self) -> Dict[str, Any]:
         """Return a plain dict view for convenience in other modules.
@@ -68,6 +69,7 @@ class VarConfig:
             "regrid_method": self.regrid_method,
             "long_name": self.long_name,
             "standard_name": self.standard_name,
+            "dims": self.dims,
         }
         return {k: v for k, v in d.items() if v is not None}
 
@@ -270,6 +272,7 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
         regrid_method=cfg.get("regrid_method"),
         long_name=cfg.get("long_name"),
         standard_name=cfg.get("standard_name"),
+        dims=cfg.get("dims"),
     )
     return vc
 

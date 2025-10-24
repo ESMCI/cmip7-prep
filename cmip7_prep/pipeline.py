@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Sequence, Union, Dict, List
 import re
+from venv import logger
 import warnings
 import glob
 import sys
@@ -201,6 +202,7 @@ def realize_regrid_prepare(
     *,
     tables_path: Optional[Union[str, Path]] = None,
     time_chunk: Optional[int] = 12,
+    mom6_grid: Optional[Dict[str, xr.DataArray]] = None,
     regrid_kwargs: Optional[dict] = None,
     open_kwargs: Optional[dict] = None,
 ) -> xr.Dataset:
@@ -211,7 +213,7 @@ def realize_regrid_prepare(
     """
     regrid_kwargs = dict(regrid_kwargs or {})
     open_kwargs = dict(open_kwargs or {})
-
+    aux = []
     # 1) Get native dataset
     if isinstance(ds_or_glob, xr.Dataset):
         ds_native = ds_or_glob
@@ -220,7 +222,23 @@ def realize_regrid_prepare(
         ds_native = open_native_for_cmip_vars(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
+    if not "landfrac" in ds_native and not "ncol" in ds_native:
+        logger.info("Variable has no 'landfrac' or 'ncol' dim; assuming ocn variable.")
+        # Add MOM6 grid info if provided
+        if mom6_grid:
+            aux = ["geolat", "geolon", "geolat_c", "geolon_c"]
+            ds_native["geolat"] = xr.DataArray(mom6_grid[0], dims=("yh", "xh"))
+            ds_native["geolon"] = xr.DataArray(mom6_grid[1], dims=("yh", "xh"))
+            ds_native["geolat_c"] = xr.DataArray(mom6_grid[2], dims=("yhp", "xhp"))
+            ds_native["geolon_c"] = xr.DataArray(mom6_grid[3], dims=("yhp", "xhp"))
 
+        else:
+            logger.error("No MOM6 grid info provided; geolat/geolon not added.")
+            return (
+                cmip_var,
+                f"ERROR: MOM6 grid information is required for variable {cmip_var} "
+                "but was not provided.",
+            )
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
@@ -247,7 +265,11 @@ def realize_regrid_prepare(
         # can produce PS(time,lat,lon)
         if "PS" in ds_native and "PS" not in ds_vars:
             ds_vars = ds_vars.assign(PS=ds_native["PS"])
-
+        aux = [
+            nm
+            for nm in ("hyai", "hybi", "hyam", "hybm", "P0", "ilev", "lev")
+            if nm in ds_native
+        ]
     # 5) Apply vertical transform if needed (plev19, etc.).
     # Single-var helper already takes cfg + tables_path
     ds_vert = _apply_vertical_if_needed(
@@ -263,15 +285,8 @@ def realize_regrid_prepare(
         ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
     )
 
-    # 7) If hybrid: merge in 1-D hybrid coefficients directly from native (no regridding needed)
-    if is_hybrid:
-        aux = [
-            nm
-            for nm in ("hyai", "hybi", "hyam", "hybm", "P0", "ilev", "lev")
-            if nm in ds_native
-        ]
-        if aux:
-            ds_regr = ds_regr.merge(ds_native[aux], compat="override")
+    if aux:
+        ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 
     return ds_regr
 
