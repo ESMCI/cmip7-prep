@@ -35,14 +35,27 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Cache CMOR build
+        uses: actions/cache@v4
+        with:
+          path: |
+            $HOME/cmor
+          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}
+          restore-keys: |
+            cmor-${{ runner.os }}-
+
       - name: build and install cmor
         run: |
-          git clone https://github.com/PCMDI/cmor.git $HOME/cmor3-source
-          cd $HOME/cmor3-source
-          ./configure --prefix=$HOME/cmor --with-netcdf=/usr/local --with-udunits2=/usr/local
-          make
-          make install
-          pip install .
+          if [ ! -d "$HOME/cmor" ]; then
+            git clone https://github.com/PCMDI/cmor.git $HOME/cmor3-source
+            cd $HOME/cmor3-source
+            ./configure --prefix=$HOME/cmor --with-netcdf=/usr/local --with-udunits2=/usr/local
+            make
+            make install
+            pip install .
+          else
+            pip install $HOME/cmor
+          fi
       - name: Run pytest
         env:
           PYTHONPATH: ${{ github.workspace }}
@@ -51,4 +64,4 @@ jobs:
         run: |
           #pip uninstall -y cmip7-prep || true
           #pip install .
-          pytest -q --doctest-modules --cov=cmip7_prep --cov-report=xml
+          pytest -q --doctest-modules
