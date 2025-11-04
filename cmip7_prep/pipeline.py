@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Sequence, Union, Dict, List
 import re
-from venv import logger
+import logging
 import warnings
 import glob
 import sys
@@ -16,7 +16,7 @@ from .mapping_compat import Mapping
 from .regrid import regrid_to_1deg_ds
 from .vertical import to_plev19
 
-
+logger = logging.getLogger(__name__)
 # --------------------------- file discovery ---------------------------
 
 _VAR_TOKEN = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z0-9_]+)(?![A-Za-z0-9_])")
@@ -222,7 +222,7 @@ def realize_regrid_prepare(
         ds_native = open_native_for_cmip_vars(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
-    if not "landfrac" in ds_native and not "ncol" in ds_native:
+    if "landfrac" not in ds_native and "ncol" not in ds_native:
         logger.info("Variable has no 'landfrac' or 'ncol' dim; assuming ocn variable.")
         # Add MOM6 grid info if provided
         if mom6_grid:
@@ -234,10 +234,8 @@ def realize_regrid_prepare(
 
         else:
             logger.error("No MOM6 grid info provided; geolat/geolon not added.")
-            return (
-                cmip_var,
-                f"ERROR: MOM6 grid information is required for variable {cmip_var} "
-                "but was not provided.",
+            raise ValueError(
+                f"MOM6 grid information is required for variable {cmip_var} but was not provided."
             )
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)

@@ -244,7 +244,7 @@ def process_one_var(
                 f"Exception while processing {varname} with dims {dims}: {e!r}"
             )
             results.append((varname, f"ERROR: {e!r}"))
-    return results if len(results) > 1 else results[0]
+    return results
 
 
 process_one_var_delayed = delayed(process_one_var)

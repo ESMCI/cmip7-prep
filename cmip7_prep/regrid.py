@@ -511,7 +511,7 @@ def regrid_to_1deg_ds(
         force_method="conservative",
         realm=realm,
     )  # fx always conservative
-    print(f"using fx map: {spec.path}")
+    logger.info("using fx map: %s", spec.path)
     ds_fx = _regrid_fx_once(spec.path, ds_in)  # ← uses cache
     if ds_fx:
         # Don’t overwrite if user already computed and passed them in
@@ -620,8 +620,12 @@ def regrid_to_1deg(
         force_method=method,
         realm=realm,
     )
-    print(
-        f"Regridding {varname} using {spec.method_label} map: {spec.path} for realm {realm}"
+    logger.info(
+        "Regridding %s using %s map: %s for realm %s",
+        varname,
+        spec.method_label,
+        spec.path,
+        realm,
     )
     regridder = _RegridderCache.get(spec.path, spec.method_label)
 
@@ -642,11 +646,15 @@ def regrid_to_1deg(
             *non_spatial, "lon", "lat"
         )
         da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
-    print(
-        f"da2_2d range: {da2_2d['lat'].min().item()} to {da2_2d['lat'].max().item()} lat, "
-        f"{da2_2d['lon'].min().item()} to {da2_2d['lon'].max().item()} lon"
+    logger.info(
+        "da2_2d range: %f to %f lat, %f to %f lon",
+        da2_2d["lat"].min().item(),
+        da2_2d["lat"].max().item(),
+        da2_2d["lon"].min().item(),
+        da2_2d["lon"].max().item(),
     )
-    if hdim == "lndgrid":
+
+    if realm == "lnd":
         out_norm = regridder(da2_2d, **kwargs)
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
     else:
