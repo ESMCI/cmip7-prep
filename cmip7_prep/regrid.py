@@ -323,8 +323,10 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
     lat_out_1d, lon_out_1d = _get_dst_latlon_1d()
 
     # --- Dummy INPUT grid (unstructured → represent as 2D with length-1 lat) ---
-    lat_in = np.arange(nlat_in, dtype="f8")  # e.g., [0], length can be 1
-    lon_in = np.arange(nlon_in, dtype="f8")
+    lat_in = np.arange(
+        -180.0, 180.0, 360.0 / nlat_in, dtype="f8"
+    )  # e.g., [0], length can be 1
+    lon_in = np.arange(0.5, 360.5, 360.0 / nlon_in, dtype="f8")
     ds_in = xr.Dataset(
         data_vars={
             "lat_bnds": (
