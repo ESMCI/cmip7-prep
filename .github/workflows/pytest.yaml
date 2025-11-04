@@ -40,6 +40,7 @@ jobs:
         with:
           path: |
             /home/runner/cmor
+            /home/runner/cmor3-source
             /home/runner/.cache/pip
           key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}
           restore-keys: |
@@ -54,7 +55,11 @@ jobs:
             make
             make install
             pip install .
-          fi
+        else
+          run: |
+            cd /home/runner/cmor3-source
+            pip install .
+        fi
       - name: Run pytest
         env:
           PYTHONPATH: ${{ github.workspace }}
