@@ -55,11 +55,10 @@ jobs:
             make
             make install
             pip install .
-        else
-          run: |
+          else
             cd /home/runner/cmor3-source
             pip install .
-        fi
+          fi
       - name: Run pytest
         env:
           PYTHONPATH: ${{ github.workspace }}
