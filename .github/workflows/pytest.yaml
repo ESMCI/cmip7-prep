@@ -39,7 +39,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            $HOME/cmor
+            /home/runner/cmor
+            /home/runner/.cache/pip
           key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}
           restore-keys: |
             cmor-${{ runner.os }}-
@@ -53,8 +54,6 @@ jobs:
             make
             make install
             pip install .
-          else
-            pip install $HOME/cmor
           fi
       - name: Run pytest
         env:
