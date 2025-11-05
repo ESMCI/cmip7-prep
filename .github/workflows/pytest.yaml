@@ -67,4 +67,4 @@ jobs:
         run: |
           #pip uninstall -y cmip7-prep || true
           #pip install .
-          pytest -q --doctest-modules
+          pytest -q --doctest-modules --cov=cmip7_prep --cov-report=xml
