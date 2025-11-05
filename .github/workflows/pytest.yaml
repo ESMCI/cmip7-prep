@@ -68,3 +68,7 @@ jobs:
           #pip uninstall -y cmip7-prep || true
           #pip install .
           pytest -q --doctest-modules --cov=cmip7_prep --cov-report=xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
