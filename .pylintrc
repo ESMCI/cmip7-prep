@@ -8,7 +8,8 @@ disable=
     too-many-arguments,
     too-many-locals,
     too-many-branches,
-    too-many-statements
+    too-many-statements,
+    invalid-name
 
 [FORMAT]
 max-line-length=100

@@ -46,12 +46,12 @@ def _collect_required_cesm_vars(
 ) -> List[str]:
     """Gather all native CESM vars needed to realize the requested CMIP vars."""
     needed: set[str] = set()
-    for v in cmip_vars:
+    for var in cmip_vars:
         try:
-            cfg = mapping.get_cfg(v) or {}
+            cfg = mapping.get_cfg(var) or {}
         except KeyError:
             print(
-                f"WARNING: skipping '{v}': no mapping found in {mapping.path}",
+                f"WARNING: skipping '{var}': no mapping found in {mapping.path}",
                 file=sys.stderr,
             )
             continue
@@ -59,12 +59,12 @@ def _collect_required_cesm_vars(
         raws = cfg.get("raw_variables") or cfg.get("sources") or []
         if src:
             needed.add(src)
-        for r in raws:
+        for raw in raws:
             # 'sources' items may be dicts with 'cesm_var'
-            if isinstance(r, dict) and "cesm_var" in r:
-                needed.add(r["cesm_var"])
-            elif isinstance(r, str):
-                needed.add(r)
+            if isinstance(raw, dict) and "cesm_var" in raw:
+                needed.add(raw["cesm_var"])
+            elif isinstance(raw, str):
+                needed.add(raw)
         # vertical dependencies if plev19
         levels = cfg.get("levels") or {}
         if (levels.get("name") or "").lower() == "plev19":

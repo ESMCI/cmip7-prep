@@ -156,8 +156,17 @@ def process_one_var(
     for dims in dims_list:
         logger.info(f"Processing {varname} with dims {dims}")
         try:
+            open_kwargs = None
+            if realm == "ocn":
+                open_kwargs = {"decode_timedelta": False}
+
             ds_native, var = open_native_for_cmip_vars(
-                varname, inputfile, mapping, use_cftime=True, parallel=True
+                varname,
+                inputfile,
+                mapping,
+                use_cftime=True,
+                parallel=True,
+                open_kwargs=open_kwargs,
             )
             logger.info(
                 f"ds_native keys: {list(ds_native.keys())} for var {varname} with dims {dims}"
@@ -190,6 +199,7 @@ def process_one_var(
             else:
                 # For lnd/atm or any other dims, use existing logic
                 logger.info(f"Processing {varname} for dims {dims} (atm/lnd or other)")
+                sftlf_path = next(Path(outdir).rglob("sftlf_fx_*.nc"), None)
                 ds_cmor = realize_regrid_prepare(
                     mapping,
                     ds_native,
@@ -200,6 +210,7 @@ def process_one_var(
                     regrid_kwargs={
                         "output_time_chunk": 12,
                         "dtype": "float32",
+                        "sftlf_path": sftlf_path,
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
