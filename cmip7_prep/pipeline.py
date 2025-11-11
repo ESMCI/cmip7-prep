@@ -244,11 +244,9 @@ def realize_regrid_prepare(
         da = da.chunk({"time": int(time_chunk)})
 
     ds_vars = xr.Dataset({cmip_var: da})
-
-    if "landfrac" in ds_native and "landfrac" not in ds_vars:
-        ds_vars = ds_vars.assign(landfrac=ds_native["landfrac"])
-    if "area" in ds_native and "area" not in ds_vars:
-        ds_vars = ds_vars.assign(area=ds_native["area"])
+    for var in ("landfrac", "area", "sftof"):
+        if var in ds_native and var not in ds_vars:
+            ds_vars = ds_vars.assign(**{var: ds_native[var]})
 
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
@@ -278,6 +276,12 @@ def realize_regrid_prepare(
     names_to_regrid = [cmip_var]
     if is_hybrid and "PS" in ds_vert:
         names_to_regrid.append("PS")
+
+    # 7) Rename levgrnd if present to sdepth
+    if "levgrnd" in ds_native.dims and "levgrnd" in ds_vert.coords:
+        ds_vert = ds_vert.rename_dims({"levgrnd": "sdepth"})
+        # Ensure the coordinate variable is also copied
+        ds_vert = ds_vert.assign_coords(sdepth=ds_native["levgrnd"].values)
 
     ds_regr = regrid_to_1deg_ds(
         ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs

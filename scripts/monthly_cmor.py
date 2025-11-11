@@ -29,7 +29,8 @@ from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.dreq_search import find_variables_by_prefix
-from cmip7_prep.mom6_static import load_mom6_static
+from cmip7_prep.mom6_static import load_mom6_grid
+from cmip7_prep.mom6_static import ocean_fx_fields
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
@@ -60,10 +61,16 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--static-grid",
+        "--ocn-grid-file",
+        type=str,
+        default="/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc",
+        help="Path to ocean grid description file for MOM (optional)",
+    )
+    parser.add_argument(
+        "--ocn-static-file",
         type=str,
         default=None,
-        help="Path to static grid file for MOM variables (optional)",
+        help="Path to static file for MOM variables (optional)",
     )
     parser.add_argument(
         "--cmip-vars",
@@ -137,7 +144,14 @@ def parse_args():
 
 
 def process_one_var(
-    varname: str, mapping, inputfile, tables_path, outdir, realm="atm", mom6_grid=None
+    varname: str,
+    mapping,
+    inputfile,
+    tables_path,
+    outdir,
+    realm="atm",
+    mom6_grid=None,
+    ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns list of (varname, 'ok' or error message)."""
     logger.info(f"Starting processing for variable: {varname}")
@@ -168,6 +182,9 @@ def process_one_var(
                 parallel=True,
                 open_kwargs=open_kwargs,
             )
+            # Append ocn_fx_fields to ds_native if available
+            if realm == "ocn" and ocn_fx_fields is not None:
+                ds_native = ds_native.merge(ocn_fx_fields)
             logger.info(
                 f"ds_native keys: {list(ds_native.keys())} for var {varname} with dims {dims}"
             )
@@ -210,7 +227,6 @@ def process_one_var(
                     regrid_kwargs={
                         "output_time_chunk": 12,
                         "dtype": "float32",
-                        "sftlf_path": sftlf_path,
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
@@ -301,6 +317,8 @@ def main():
     OUTDIR = args.outdir
 
     mom6_grid = None
+    ocn_grid = None
+    ocn_fx_fields = None
     if args.realm == "atm":
         include_patterns = ["*cam.h0a*"]
         var_prefix = "Amon."
@@ -314,8 +332,11 @@ def main():
         include_patterns = ["*mom6.h.rho2.*", "*mom6.h.native.*", "*mom6.h.sfc.*"]
         var_prefix = "Omon."
         subdir = "ocn"
-        if not args.static_grid:
-            ocn_static_grid = "/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc"
+        if args.ocn_grid_file:
+            ocn_grid = args.ocn_grid_file
+        if args.ocn_static_file:
+            ocn_static_file = args.ocn_static_file
+            ocn_fx_fields = ocean_fx_fields(ocn_static_file)
     # Setup input/output directories
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot
@@ -375,9 +396,9 @@ def main():
     if not os.path.exists(str(TSDIR)):
         os.makedirs(str(TSDIR))
     # Load MOM6 static grid if needed (ocn realm)
-    if args.realm == "ocn" and ocn_static_grid:
-        mom6_grid = load_mom6_static(ocn_static_grid)
-        logger.info(f"Using MOM static grid file: {ocn_static_grid}")
+    if args.realm == "ocn" and ocn_grid:
+        mom6_grid = load_mom6_grid(ocn_grid)
+        logger.info(f"Using MOM grid file: {ocn_grid}")
     # Dask cluster setup
     if args.workers == 1:
         client = None
@@ -443,6 +464,7 @@ def main():
                     OUTDIR,
                     realm=args.realm,
                     mom6_grid=mom6_grid,
+                    ocn_fx_fields=ocn_fx_fields,
                 )
                 for v in cmip_vars
             ]
@@ -456,6 +478,7 @@ def main():
                     OUTDIR,
                     realm=args.realm,
                     mom6_grid=mom6_grid,
+                    ocn_fx_fields=ocn_fx_fields,
                 )
                 for var in cmip_vars
             ]

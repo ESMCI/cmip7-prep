@@ -290,6 +290,7 @@ class CmorSession(
         plev_id = None
         lat_id = None
         lon_id = None
+        sdepth_id = None
 
         print(f"[CMOR axis debug] var_dims: {var_dims}")
         if "xh" in var_dims and "yh" in var_dims:
@@ -477,12 +478,22 @@ class CmorSession(
                 coord_vals=pvals,
                 cell_bounds=pb if pb is not None else None,
             )
-
+        elif "sdepth" in var_dims:
+            values = ds["sdepth"].values
+            logger.info("write sdepth axis")
+            bnds = bounds_from_centers_1d(values, "sdepth")
+            sdepth_id = cmor.axis(
+                table_entry="sdepth",
+                units="m",
+                coord_vals=np.asarray(values),
+                cell_bounds=bnds,
+            )
         # Map dimension names to axis IDs
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
             "lev": alev_id,  # sometimes used for hybrid
+            "sdepth": sdepth_id,
             "plev": plev_id,
             "lat": lat_id,
             "latitude": lat_id,
@@ -544,7 +555,24 @@ class CmorSession(
         If present in ds_regr but not yet written this run, write and cache them.
         Returns ds_regr augmented with any missing fx fields.
         """
-        need = [("sftlf", "%"), ("areacella", "m2")]
+        need = [
+            ("sftlf", "%"),
+            ("areacella", "m2"),
+            ("sftof", "%"),
+            ("areacello", "m3"),
+            ("mrsofc", "m3 s-1"),
+            ("orog", "m"),
+            ("thkcello", "m"),
+            ("slthick", "m"),
+            ("basin", "m2"),
+            ("deptho", "m"),
+            ("hfgeou", "m"),
+            ("masscello", "m3"),
+            ("thkcello", "m"),
+            ("rootd", "m"),
+            ("sftgif", "%"),
+            ("sftif", "%"),
+        ]  # land fraction, ocean cell area, soil moisture fraction
         out = ds_regr
 
         for name, units in need:
@@ -620,16 +648,14 @@ class CmorSession(
         # Debug logging for axis mapping
 
         # Try to get axis table entries for each axis_id
-        # pylint: disable=broad-exception-caught
         try:
             for i, aid in enumerate(axes_ids):
                 entry = cmor.axis_entry(aid) if hasattr(cmor, "axis_entry") else None
                 logger.info(
                     "[CMOR DEBUG] axis %d: id=%s, table_entry=%s", i, aid, entry
                 )
-        except (
-            Exception
-        ) as e:  # Broad except needed: cmor.axis_entry may raise various errors
+        # pylint: disable=broad-exception-caught
+        except Exception as e:
             logger.warning("[CMOR DEBUG] Could not retrieve axis table entries: %s", e)
         var_id = cmor.variable(
             getattr(vdef, "name", varname),

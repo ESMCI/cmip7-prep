@@ -147,18 +147,18 @@ def _get_src_shape(m: xr.Dataset) -> Tuple[int, int]:
     if a is not None:
         vals = np.asarray(a).ravel().astype(int)
         if vals.size == 1:
-            return (1, int(vals[0]))
+            return (int(vals[0]), 1)
         if vals.size >= 2:
             return (int(vals[-2]), int(vals[-1]))
     # fallbacks for unstructured
     for n in ("src_grid_size", "n_a"):
         if n in m:
             size = int(np.asarray(m[n]).ravel()[0])
-            return (1, size)
+            return (size, 1)
     # very last resort: infer from max index of sparse matrix rows
     if "row" in m:
         size = int(np.asarray(m["row"]).max())
-        return (1, size)
+        return (size, 1)
     raise ValueError("Cannot infer source grid size from weight file.")
 
 

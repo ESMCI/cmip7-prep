@@ -76,6 +76,34 @@ class MapSpec:
     path: Path
 
 
+# --- OCEAN FRACTION (sftof) extraction ---
+def _sftof_from_native(ds: xr.Dataset) -> xr.DataArray | None:
+    """Return sea fraction (sftof) from ocean static grid, using 'wet' mask if present."""
+    # Try common names for ocean fraction
+    for name in ["sftof", "ocnfrac", "wet"]:
+        if name in ds:
+            v = ds[name]
+            # If 'wet', convert 0/1 to percent
+            if name == "wet":
+                vmax = float(np.nanmax(np.asarray(v)))
+                # If 0/1, convert to percent
+                if vmax <= 1.0 + 1e-6:
+                    out = v * 100.0
+                else:
+                    out = v
+            else:
+                out = v
+            out = out.clip(min=0.0, max=100.0)
+            out = out.astype("f8")
+            attrs = dict(out.attrs)
+            attrs["units"] = "%"
+            attrs.setdefault("standard_name", "sea_area_fraction")
+            attrs.setdefault("long_name", "Percentage of sea area")
+            out.attrs = attrs
+            return out
+    return None
+
+
 def _pick_from_candidates(ds: xr.Dataset, *names: str) -> xr.DataArray | None:
     """Return the first present variable among candidate names (case-insensitive)."""
     for nm in names:
@@ -125,37 +153,6 @@ def _attach_vertical_metadata(ds_out: xr.Dataset, ds_src: xr.Dataset) -> xr.Data
         ds_out["lev"].attrs = attrs
 
     return ds_out
-
-
-def _bounds_from_centers_1d(
-    centers: np.ndarray, *, periodic: bool = False, period: float = 360.0
-) -> np.ndarray:
-    """Compute simple 1D bounds from 1D cell centers.
-    For regular spacing this sets bounds[i] = [c[i]-dx/2, c[i]+dx/2].
-    For periodic=True, wrap the last bound to period (e.g., lon 0..360)."""
-
-    centers = np.asarray(centers, dtype="f8").ravel()
-    n = centers.size
-    b = np.empty((n, 2), dtype="f8")
-    if n == 1:
-        # Any small cell is fine for dummy grid; choose +/- 0.5 around center
-        dx = 1.0
-        b[0, 0] = centers[0] - dx / 2.0
-        b[0, 1] = centers[0] + dx / 2.0
-    else:
-        # Estimate dx from adjacent centers (assume uniform spacing)
-        dx = np.diff(centers).mean()
-        b[:, 0] = centers - dx / 2.0
-        b[:, 1] = centers + dx / 2.0
-    if periodic:
-        # Keep within [0, period]
-        b = np.mod(b, period)
-        # Ensure right bound of last cell connects to period exactly
-        # (helps some ESMF periodic checks for 0..360)
-        b[-1, 1] = (
-            period if abs(b[-1, 1] - period) < 1e-6 or b[-1, 1] < 1e-6 else b[-1, 1]
-        )
-    return b
 
 
 # -------------------------
@@ -256,7 +253,6 @@ def regrid_to_1deg_ds(
             keep_attrs=keep_attrs,
             dtype=dtype,
             output_time_chunk=output_time_chunk,
-            sftlf_path=sftlf_path,
         )
 
     ds_out = xr.Dataset(out_vars)
@@ -270,6 +266,9 @@ def regrid_to_1deg_ds(
         realm = "lnd"
     else:
         realm = "ocn"
+    if "sftof" in ds_in:
+        logger.info("Regridding sftof (sea fraction) from source dataset")
+
     # Pick the mapfile you used for conservative/bilinear selection
     spec = _pick_maps(
         varnames[0] if isinstance(varnames, list) else varnames,
@@ -325,25 +324,15 @@ def _denormalize_land_field(
     return out
 
 
-def _denormalize_ocn_field(
-    out_norm: xr.DataArray,
-    ds_in: xr.Dataset,
-    mapfile: Path,
-    sftlf_path: Optional[Path] = None,
-) -> xr.DataArray:
-    """Denormalize field by destination landfrac."""
-    logger.info("Denormalizing ocean field")
-    ds_fx = _regrid_fx_once(mapfile, ds_in, sftlf_path)
-    if "sftlf" not in ds_fx:
-        raise ValueError(
-            "Missing required variables for ocean denormalization: landfrac"
-        )
-    ocnfrac = 1.0 - ds_fx["sftlf"].fillna(0) / 100.0  # percent to fraction
-    omin = float(ocnfrac.min().compute())
-    omax = float(ocnfrac.max().compute())
-    logger.info("ocnfrac range: %f to %f", omin, omax)
-
-    out = np.where(ocnfrac > 0.7, out_norm / ocnfrac, 0)
+def _denormalize_ocn_field(out_norm: xr.DataArray, ds_in: xr.Dataset) -> xr.DataArray:
+    """Denormalize field by destination sftof (sea fraction)."""
+    logger.info("Denormalizing ocean field by destination sftof (sea fraction)")
+    sftof_dst = _sftof_from_native(ds_in)  # fallback: use source if no destination
+    if sftof_dst is not None:
+        frac_dst = sftof_dst / 100.0
+        out = out_norm / frac_dst.where(frac_dst > 0)
+    else:
+        out = out_norm
     return out
 
 
@@ -429,7 +418,6 @@ def regrid_to_1deg(
     keep_attrs: bool = True,
     dtype: str | None = "float32",
     output_time_chunk: int | None = 12,
-    sftlf_path: Optional[Path] = None,
 ) -> xr.DataArray:
     """Regrid a field on (time, ncol[, ...]) to (time, [lev,] lat, lon).
 
@@ -460,6 +448,12 @@ def regrid_to_1deg(
         non_spatial = [d for d in da2.dims if d not in ("yh", "xh")]
         realm = "ocn"
         method = method or "conservative"  # force conservative for ocn
+        # --- OCEAN: Normalize by sftof (sea fraction) if present ---
+        sftof = _sftof_from_native(ds_in)
+        if sftof is not None:
+            logger.info("Normalizing ocean field by source sftof (sea fraction)")
+            frac = sftof / 100.0
+            da2 = da2.fillna(0) * frac
     else:
         da2, non_spatial, hdim = _ensure_ncol_last(var_da)
         if hdim == "lndgrid":
@@ -491,7 +485,7 @@ def regrid_to_1deg(
         realm,
     )
     regridder = RegridderCache.get(spec.path, spec.method_label)
-    print(f"here varname is {varname}")
+
     # tell xESMF to produce chunked output
     kwargs = {}
     if "time" in da2.dims and output_time_chunk:
@@ -504,6 +498,7 @@ def regrid_to_1deg(
                 *non_spatial, "lat", "lon"
             )  # ensure last two dims are ('lat','lon')
         )
+        logger.info("here %s, %s", hdim, da2_2d.dims)
     else:
         da2_2d = da2.rename({"xh": "lon", "yh": "lat"}).transpose(
             *non_spatial, "lat", "lon"
@@ -523,7 +518,7 @@ def regrid_to_1deg(
     if realm == "lnd":
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
     elif realm == "ocn":
-        out = _denormalize_ocn_field(out_norm, ds_in, spec.path, sftlf_path)
+        out = _denormalize_ocn_field(out_norm, ds_in)
     else:
         out = out_norm
 
@@ -536,9 +531,23 @@ def regrid_to_1deg(
     if len(spatial_dims) < 2:
         raise ValueError(f"Unexpected output dims {out.dims}; need two spatial dims.")
 
+    if len(spatial_dims) > 2:
+        logger.warning(
+            "More than two spatial dims found in output: %s; using last two.",
+            spatial_dims,
+        )
+        spatial_dims = spatial_dims[-2:]
     da, db = spatial_dims[-2], spatial_dims[-1]
     na, nb = out.sizes[da], out.sizes[db]
-
+    logger.info(
+        "Output spatial dims: %s (%d), %s (%d); target (lat %d, lon %d)",
+        da,
+        na,
+        db,
+        nb,
+        ny,
+        nx,
+    )
     # Decide mapping by comparing lengths to (ny, nx)
     if na == ny and nb == nx:
         out = out.rename({da: "lat", db: "lon"})
@@ -554,7 +563,7 @@ def regrid_to_1deg(
             choose_lat = da if abs(na - 180) <= abs(nb - 180) else db
             choose_lon = db if choose_lat == da else da
             out = out.rename({choose_lat: "lat", choose_lon: "lon"})
-
+    logger.info("Final output dims: %s", out.dims)
     # assign canonical 1-D coords
     out = out.assign_coords(lat=("lat", lat1d), lon=("lon", lon1d))
 
@@ -655,6 +664,32 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
     sftlf = _sftlf_from_native(ds_native)
     if sftlf is not None:
         pieces["sftlf"] = sftlf
+    # Also extract sftof (sea fraction) if present
+    sftof = None
+    print("ds_native contains:", list(ds_native.data_vars))
+    for name in ["sftof", "ocnfrac", "wet"]:
+        if name in ds_native:
+            logger.info("Extracting sftof from native variable %s", name)
+            v = ds_native[name]
+            # If 'wet', convert 0/1 to percent
+            if name == "wet":
+                vmax = float(np.nanmax(np.asarray(v)))
+                if vmax <= 1.0 + 1e-6:
+                    sftof = v * 100.0
+                else:
+                    sftof = v
+            else:
+                sftof = v
+            sftof = sftof.clip(min=0.0, max=100.0)
+            sftof = sftof.astype("f8")
+            attrs = dict(sftof.attrs)
+            attrs["units"] = "%"
+            attrs.setdefault("standard_name", "sea_area_fraction")
+            attrs.setdefault("long_name", "Percentage of sea area")
+            sftof.attrs = attrs
+            break
+    if sftof is not None:
+        pieces["sftof"] = sftof
     if not pieces:
         return xr.Dataset()
     ds_fx = xr.Dataset(pieces)
@@ -738,7 +773,7 @@ def _regrid_fx_once(
     """
     cached = FXCache.get(mapfile)
     if cached is not None:
-        logger.info("Getting cached fx variables %s", cached)
+        logger.info("Getting cached fx variables")
         return cached
     out_vars = {}
     if sftlf_path:
@@ -762,6 +797,19 @@ def _regrid_fx_once(
         out.name = "sftlf"
         out.attrs.update(da.attrs)
         out_vars["sftlf"] = out
+
+    # Regrid sftof (sea fraction) from source if present
+    if "sftof" in ds_fx_native:
+        logger.info("Regridding sftof (sea fraction) from native")
+        regridder = RegridderCache.get(mapfile, "conservative")
+        da = ds_fx_native["sftof"]
+        da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
+        out = regridder(da2)
+        spatial = [d for d in out.dims if d in ("lat", "lon")]
+        out = out.transpose(*spatial)
+        out.name = "sftof"
+        out.attrs.update(da.attrs)
+        out_vars["sftof"] = out
 
     # Always compute areacella on the destination grid, not by regridding
     # Use the destination grid from the mapfile

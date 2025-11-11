@@ -4,6 +4,30 @@ mom6_static.py: Utilities for reading and extracting grid information from MOM6 
 
 import xarray as xr
 import numpy as np
+from cmip7_prep.regrid import _sftof_from_native
+
+
+def ocean_fx_fields(static_path, out_path=None):
+    """
+    Read MOM6 static grid and write ocean-related fx fields (sftof, areacello, etc).
+    Returns a dict of DataArrays for use in regridding normalization/denormalization.
+    If out_path is given, writes a NetCDF with these fields.
+    """
+
+    ds = xr.open_dataset(static_path)
+    fx = {}
+    # Extract sftof (sea fraction) using the helper
+    sftof = _sftof_from_native(ds)
+    if sftof is not None:
+        fx["sftof"] = sftof
+    # Extract areacello if present
+    if "areacello" in ds:
+        fx["areacello"] = ds["areacello"]
+    # Optionally add other ocean mask/area fields as needed
+    # Save to NetCDF if requested
+    if out_path is not None:
+        xr.Dataset(fx).to_netcdf(out_path)
+    return fx
 
 
 def compute_cell_bounds_from_corners(corner_array):
@@ -32,7 +56,7 @@ def compute_cell_bounds_from_corners(corner_array):
     return bounds
 
 
-def load_mom6_static(static_path):
+def load_mom6_grid(static_path):
     """Load MOM6 static file and return geolat, geolon, geolat_c, geolon_c arrays."""
     ds = xr.open_dataset(static_path)
     # For a supergrid, centers are every other point, bounds are full array

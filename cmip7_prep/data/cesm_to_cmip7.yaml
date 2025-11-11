@@ -1,4 +1,3 @@
-
 # cesm_to_cmip7.yaml — CMIP-keyed schema with CMIP6 compatibility
 #
 # Top-level keys are CMIP variable names.
@@ -42,6 +41,15 @@ variables:
     sources:
       - cesm_var: CLDICE
 
+  cLitter:
+    table: Lmon
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    formula: (TOTLITC + CWD_C)/1000.0
+    sources:
+      - cesm_var: TOTLITC
+      - cesm_var: CWD_C
+
   clivi:
     table: Amon
     units: "kg m-2"
@@ -76,6 +84,47 @@ variables:
     sources:
       - cesm_var: TGCLDLWP
 
+  cProduct:
+    table: Lmon
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    formula: (TOTPRODC + CWD_P)/1000.0
+    sources:
+      - cesm_var: TOTPRODC
+      - cesm_var: CWD_P
+
+  cSoilFast:
+    table: Lmon
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    formula: (SOIL1C)/1000.0
+    sources:
+      - cesm_var: SOIL1C
+
+  cSoilMedium:
+    table: Lmon
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    formula: (SOIL2C)/1000.0
+    sources:
+      - cesm_var: SOIL2C
+
+  cSoilSlow:
+    table: Lmon
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    formula: (SOIL3C)/1000.0
+    sources:
+      - cesm_var: SOIL3C
+
+  cVeg:
+    table: Lmon
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    formula: (TOTVEGC)/1000.0
+    sources:
+      - cesm_var: TOTVEGC
+
   evspsbl:
     table: Amon
     units: kg m-2 s-1
@@ -104,6 +153,33 @@ variables:
     positive: up
     sources:
       - cesm_var: QVEGE
+
+  fFire:
+    table: Lmon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    positive: up
+    formula: COL_FIRE_CLOSS/1000.0
+    sources:
+      - cesm_var: COL_FIRE_CLOSS
+
+  fHarvest:
+    table: Lmon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    positive: up
+    formula: WOOD_HARVESTC/1000.0
+    sources:
+      - cesm_var: WOOD_HARVESTC
+
+  gpp:
+    table: Lmon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    formula: GPP/1000.0
+    positive: down
+    sources:
+      - cesm_var: GPP
 
   hfls:
     table: Amon
@@ -202,6 +278,24 @@ variables:
     sources:
       - cesm_var: SOILWATER_10CM
 
+  nbp:
+    table: Lmon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    formula: NBP/1000.0
+    positive: down
+    sources:
+      - cesm_var: NBP
+
+  npp:
+    table: Lmon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    formula: NPP/1000.0
+    positive: down
+    sources:
+      - cesm_var: NPP
+
   pr:
     table: Amon
     units: kg m-2 s-1
@@ -232,6 +326,13 @@ variables:
       - cesm_var: PRECSC
       - cesm_var: PRECSL
 
+  prveg:
+    table: Lmon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: QINTR
+
   prw:
     table: Amon
     units: "kg m-2"
@@ -248,6 +349,7 @@ variables:
     regrid_method: bilinear
     sources:
       - cesm_var: PSL
+
   ps:
     table: Amon
     units: Pa
@@ -257,13 +359,24 @@ variables:
     regrid_method: bilinear
     sources:
       - cesm_var: PS
-  rlds:
-    table: Amon
-    units: "W m-2"
+
+  ra:
+    table: Lmon
+    units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
+    formula: AR/1000.0
     sources:
-      - cesm_var: FLDS
+      - cesm_var: AR
+
+  rh:
+    table: Lmon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    positive: up
+    formula: HR/1000.0
+    sources:
+      - cesm_var: HR
 
   rldscs:
     table: Amon
@@ -285,6 +398,7 @@ variables:
     sources:
       - cesm_var: FLDS
       - cesm_var: FLNS
+
   rluscs:
     table: Amon
     units: "W m-2"
@@ -371,6 +485,13 @@ variables:
       - cesm_var: SOLIN
       - cesm_var: FSNTOAC
 
+  snld:
+    table: Lmon
+    units: "m"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: SNOW_DEPTH
+
   sos:
     table: Omon
     units: "1e-3"
@@ -440,12 +561,29 @@ variables:
     sources:
       - cesm_var: TAUY
 
+  tran:
+    table: Lmon
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    positive: up
+    formula: QSOIL + QVEGT
+    sources:
+      - cesm_var: QVEGT
+      - cesm_var: QSOIL
+
   ts:
     table: Amon
     units: "K"
     dims: [time, lat, lon]
     sources:
       - cesm_var: TS
+
+  tsl:
+    table: Lmon
+    units: "K"
+    dims: [time, sdepth, lat, lon]
+    sources:
+      - cesm_var: TSOI
 
   ua:
     table: Amon

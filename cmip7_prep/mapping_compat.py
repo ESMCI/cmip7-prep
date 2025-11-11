@@ -217,6 +217,7 @@ class Mapping:
         vc = self._vars[cmip_name]
 
         da = _realize_core(ds, vc)
+        print(f"da is {da}")
         if da is not None:
             if vc.unit_conversion is not None:
                 da = _apply_unit_conversion(da, vc.unit_conversion)
