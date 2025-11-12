@@ -57,6 +57,8 @@ def filled_for_cmor(
     # keep attrs helpful for downstream
     da2.attrs["_FillValue"] = f
     da2.attrs["missing_value"] = f
+    if da2.dtype != np.float32:
+        da2 = da2.astype(np.float32)
     return da2, f
 
 

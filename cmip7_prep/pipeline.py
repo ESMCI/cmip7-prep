@@ -278,7 +278,18 @@ def realize_regrid_prepare(
         names_to_regrid.append("PS")
 
     # 7) Rename levgrnd if present to sdepth
-    if "levgrnd" in ds_native.dims and "levgrnd" in ds_vert.coords:
+
+    # Check if 'levgrnd' is a dimension of any variable in names_to_regrid
+    needs_levgrnd_rename = any(
+        (v in ds_vert and "levgrnd" in getattr(ds_vert[v], "dims", []))
+        for v in names_to_regrid
+    )
+    if (
+        needs_levgrnd_rename
+        and "levgrnd" in ds_native.dims
+        and "levgrnd" in ds_native.coords
+    ):
+        logger.info("Renaming 'levgrnd' dimension to 'sdepth'")
         ds_vert = ds_vert.rename_dims({"levgrnd": "sdepth"})
         # Ensure the coordinate variable is also copied
         ds_vert = ds_vert.assign_coords(sdepth=ds_native["levgrnd"].values)

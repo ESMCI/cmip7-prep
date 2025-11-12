@@ -498,14 +498,13 @@ def regrid_to_1deg(
                 *non_spatial, "lat", "lon"
             )  # ensure last two dims are ('lat','lon')
         )
-        logger.info("here %s, %s", hdim, da2_2d.dims)
     else:
         da2_2d = da2.rename({"xh": "lon", "yh": "lat"}).transpose(
             *non_spatial, "lat", "lon"
         )
 
         da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
-    logger.info(
+    logger.debug(
         "da2_2d range: %f to %f lat, %f to %f lon",
         da2_2d["lat"].min().item(),
         da2_2d["lat"].max().item(),
@@ -666,7 +665,6 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
         pieces["sftlf"] = sftlf
     # Also extract sftof (sea fraction) if present
     sftof = None
-    print("ds_native contains:", list(ds_native.data_vars))
     for name in ["sftof", "ocnfrac", "wet"]:
         if name in ds_native:
             logger.info("Extracting sftof from native variable %s", name)

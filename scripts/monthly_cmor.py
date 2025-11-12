@@ -182,11 +182,15 @@ def process_one_var(
                 parallel=True,
                 open_kwargs=open_kwargs,
             )
+
             # Append ocn_fx_fields to ds_native if available
             if realm == "ocn" and ocn_fx_fields is not None:
                 ds_native = ds_native.merge(ocn_fx_fields)
-            logger.info(
-                f"ds_native keys: {list(ds_native.keys())} for var {varname} with dims {dims}"
+            logger.debug(
+                "ds_native keys: %s for var %s with dims %s",
+                list(ds_native.keys()),
+                varname,
+                dims,
             )
             if var is None:
                 logger.warning(f"Source variable(s) not found for {varname}")
@@ -215,8 +219,9 @@ def process_one_var(
                     )
             else:
                 # For lnd/atm or any other dims, use existing logic
-                logger.info(f"Processing {varname} for dims {dims} (atm/lnd or other)")
-                sftlf_path = next(Path(outdir).rglob("sftlf_fx_*.nc"), None)
+                logger.debug(
+                    "Processing %s for dims %s (atm/lnd or other)", varname, dims
+                )
                 ds_cmor = realize_regrid_prepare(
                     mapping,
                     ds_native,
@@ -232,12 +237,14 @@ def process_one_var(
                 )
         except Exception as e:
             logger.error(
-                f"Exception during regridding of {varname} with dims {dims}: {e!r}"
+                "Exception during regridding of %s with dims %s: %r",
+                varname,
+                dims,
+                e,
             )
             continue
         try:
             # CMORize
-            logger.info(f"CMOR writing for {varname} with dims {dims}")
             log_dir = outdir + "/logs"
             with CmorSession(
                 tables_path=tables_path,
@@ -262,7 +269,9 @@ def process_one_var(
                         "levels": cfg.get("levels", None),
                     },
                 )()
-                logger.info(f"Writing variable {varname} with dims {dims}")
+                logger.info(
+                    f"Writing variable {varname} with dims {dims} and type {ds_cmor[varname].dtype}"
+                )
                 cm.write_variable(ds_cmor, varname, vdef)
             logger.info(f"Finished processing for {varname} with dims {dims}")
             results.append((varname, "ok"))
@@ -428,7 +437,7 @@ def main():
             sys.exit(0)
         hf_collection = HFCollection(input_head_dir, dask_client=client)
         for include_pattern in include_patterns:
-            logger.info(f"Processing files with pattern: {include_pattern}")
+            logger.info("Processing files with pattern: %s", include_pattern)
             hfp_collection = hf_collection.include_patterns([include_pattern])
             hfp_collection.pull_metadata()
             ts_collection = TSCollection(
@@ -491,13 +500,26 @@ def main():
             results = []
             for _, result in as_completed(futures, with_results=True):
                 try:
-                    results.append(result)  # (v, status)
+                    # Handle result types: list of tuples, tuple, or other
+                    if isinstance(result, list):
+                        # If it's a list, check if it's a list of tuples
+                        if all(isinstance(x, tuple) and len(x) == 2 for x in result):
+                            results.extend(result)
+                        else:
+                            # Not a list of tuples, wrap as unknown
+                            results.append((str(result), "unknown"))
+                    elif isinstance(result, tuple) and len(result) == 2:
+                        results.append(result)
+                    else:
+                        # Not a tuple/list, wrap as unknown
+                        results.append((str(result), "unknown"))
                 except Exception as e:
                     logger.error("Task error:", e)
                     raise
 
         for v, status in results:
             logger.info(f"Variable {v} processed with status: {status}")
+
     else:
         logger.info("No results to process.")
     if client:
