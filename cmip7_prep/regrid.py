@@ -320,6 +320,10 @@ def _denormalize_land_field(
             "Missing required variables for land denormalization: landfrac"
         )
     landfrac = ds_fx["sftlf"].fillna(0) / 100.0  # percent to fraction
+    logger.info("sum of regridded landfrac: %s", float(landfrac.sum().values))
+    n_mask = int(ds_in["landmask"].sum().values)
+    n_landfrac = int((landfrac > 0.25).sum().values)
+    logger.info(f"src_mask sum: {n_mask}, landfrac > 0 count: {n_landfrac}")
     out = out_norm / landfrac.where(landfrac > 0)
     return out
 
@@ -439,6 +443,8 @@ def regrid_to_1deg(
     """
     if varname not in ds_in:
         raise KeyError(f"{varname!r} not in dataset.")
+    if "area" in ds_in:
+        logger.info("Area variable found in input dataset for %s", varname)
     realm = None
     var_da = ds_in[varname]  # always a DataArray
     if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
@@ -515,6 +521,10 @@ def regrid_to_1deg(
     out_norm = regridder(da2_2d, **kwargs)
 
     if realm == "lnd":
+        if "area" in ds_in:
+            logger.info("Area variable found in input dataset for denormalization")
+        if "landmask" in ds_in:
+            logger.info("Landmask variable found in input dataset for denormalization")
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
     elif realm == "ocn":
         out = _denormalize_ocn_field(out_norm, ds_in)
@@ -779,16 +789,29 @@ def _regrid_fx_once(
         out_vars["sftlf"] = xr.open_mfdataset(sftlf_path)["sftlf"]
 
     ds_fx_native = _build_fx_native(ds_native)
-
+    # Provide explicit source and destination masks for land
+    src_mask = None
+    dst_mask = None
+    if "landfrac" in ds_native:
+        src_mask = (ds_native["landfrac"] > 0).expand_dims({"lat": 1})
+        d_data_file = "/glade/derecho/scratch/oleson/ANALYSIS/b.e30_beta06.B1850C_LTso.1deg.clm2.h0.evspsblsoi.000101-001012.nc"
+        d_data = xr.open_dataset(d_data_file)
+        dst_mask = d_data.landfrac > 0
+    # For destination, we can use the mask from the destination grid after it's created, but here we use None or a placeholder
+    # If you have a destination landfrac, use it here
+    regridder = RegridderCache.get(
+        mapfile, "conservative", src_mask=src_mask, dst_mask=dst_mask
+    )
     # Regrid sftlf from source if present
     if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
-        regridder = RegridderCache.get(mapfile, "conservative")
         da = ds_fx_native["sftlf"]
         da2 = (
             da.rename({"lndgrid": "lon"})
             .expand_dims({"lat": 1})
             .transpose(..., "lat", "lon")
         )
+        lndarea = (ds_native["landfrac"] * ds_native["area"] * 1e6).sum(dim=("lndgrid"))
+        logger.info("Total land area on source grid: %.3e m^2", lndarea.values)
         out = regridder(da2)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
@@ -799,7 +822,6 @@ def _regrid_fx_once(
     # Regrid sftof (sea fraction) from source if present
     if "sftof" in ds_fx_native:
         logger.info("Regridding sftof (sea fraction) from native")
-        regridder = RegridderCache.get(mapfile, "conservative")
         da = ds_fx_native["sftof"]
         da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
         out = regridder(da2)
@@ -821,6 +843,8 @@ def _regrid_fx_once(
     areacella = compute_areacella_from_bounds(ds_grid)
     out_vars["areacella"] = areacella
 
+    lndarea = (areacella * out_vars["sftlf"] / 100.0).sum(dim=("lat", "lon"))
+    logger.info("Total land area on destination grid: %.3e m^2", float(lndarea.values))
     ds_fx = xr.Dataset(out_vars)
     FXCache.put(mapfile, ds_fx)
     return ds_fx

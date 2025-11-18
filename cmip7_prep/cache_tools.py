@@ -50,11 +50,11 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
     trigger cf-xarray’s bounds inference on size-1 dimensions."""
     with open_nc(mapfile) as m:
         nlon_in, nlat_in = _get_src_shape(m)
-    lat_out_1d, lon_out_1d = _get_dst_latlon_1d()
+    lat_out_1d, lon_out_1d = _get_dst_latlon_1d(mapfile=mapfile)
 
     # --- Dummy INPUT grid (unstructured → represent as 2D with length-1 lat) ---
     lat_in = np.arange(
-        -180.0, 180.0, 360.0 / nlat_in, dtype="f8"
+        -90.0, 90.0, 180.0 / nlat_in, dtype="f8"
     )  # e.g., [0], length can be 1
     lon_in = np.arange(0.5, 360.5, 360.0 / nlon_in, dtype="f8")
     ds_in = xr.Dataset(
@@ -162,18 +162,44 @@ def _get_src_shape(m: xr.Dataset) -> Tuple[int, int]:
     raise ValueError("Cannot infer source grid size from weight file.")
 
 
-def _get_dst_latlon_1d() -> Tuple[np.ndarray, np.ndarray]:
-    """Return 1D dest lat, lon arrays from weight file.
-
-    Prefers 2D center lat/lon (yc_b/xc_b or lat_b/lon_b), reshaped to (ny, nx),
-    then converts to 1D centers by taking first column/row, which is valid for
-    regular 1° lat/lon weights.
-    """
+def _get_dst_latlon_1d(mapfile: Path) -> Tuple[np.ndarray, np.ndarray]:
+    """Return 1D dest lat, lon arrays from mapping (weight) file if available,
+    else fabricate a 1° grid."""
+    try:
+        ds = open_nc(mapfile)
+        # Try common variable names for 2D center lat/lon
+        for lat_name, lon_name in [
+            ("yc_b", "xc_b"),
+            ("lat_b", "lon_b"),
+            ("lat", "lon"),
+        ]:
+            if lat_name in ds and lon_name in ds:
+                lat2d = ds[lat_name].values
+                lon2d = ds[lon_name].values
+                # If 2D, take first column/row for 1D
+                if lat2d.ndim == 2 and lon2d.ndim == 2:
+                    lat1d = lat2d[:, 0]
+                    lon1d = lon2d[0, :]
+                    return lat1d, lon1d
+                # If already 1D
+                if lat2d.ndim == 1 and lon2d.ndim == 1:
+                    logger.info(
+                        "Destination lat/lon read as 1D from %s/%s", lat_name, lon_name
+                    )
+                    lat1d = lat2d[::360]
+                    lon1d = lon2d[:360]
+                    return lat1d, lon1d
+        # Fallback: try to infer from dimensions
+        if "lat" in ds.dims and "lon" in ds.dims:
+            lat = ds["lat"].values
+            lon = ds["lon"].values
+            return lat, lon
+    except Exception as e:
+        logger.warning(f"Could not read lat/lon from mapping file {mapfile}: {e}")
     # Final fallback: fabricate a 1° grid
     ny, nx = 180, 360
     lat = np.linspace(-89.5, 89.5, ny, dtype="f8")
     lon = (np.arange(nx, dtype="f8") + 0.5) * (360.0 / nx)
-
     return lat, lon
 
 
@@ -208,26 +234,58 @@ class RegridderCache:
     then reuse the weight file for the actual mapping.
     """
 
-    _cache: Dict[Path, xe.Regridder] = {}
+    _cache: Dict[tuple, xe.Regridder] = {}
 
     @classmethod
-    def get(cls, mapfile: Path, method_label: str) -> xe.Regridder:
-        """Return a cached regridder for the given weight file and method."""
+    def get(
+        cls,
+        mapfile: Path,
+        method_label: str,
+        src_mask: xr.DataArray | None = None,
+        dst_mask: xr.DataArray | None = None,
+    ) -> xe.Regridder:
+        """Return a cached regridder for the given weight file, method, and masks."""
         mapfile = mapfile.expanduser().resolve()
-        if mapfile not in cls._cache:
+
+        # Build a cache key that includes src_mask and dst_mask presence and identity
+        def mask_id(mask):
+            if mask is None:
+                return None
+            try:
+                return (mask.shape, str(mask.dtype), hash(mask.values.tobytes()))
+            except Exception:
+                return (mask.shape, str(mask.dtype), id(mask))
+
+        src_mask_id = mask_id(src_mask)
+        dst_mask_id = mask_id(dst_mask)
+        cache_key = (str(mapfile), method_label, src_mask_id, dst_mask_id)
+
+        if cache_key not in cls._cache:
             if not mapfile.exists():
                 raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
             ds_in, ds_out = _make_dummy_grids(mapfile)
-            logger.info("Creating xESMF Regridder from weights: %s", mapfile)
-            cls._cache[mapfile] = xe.Regridder(
+
+            # Attach masks to dummy grids if provided
+            if src_mask is not None:
+                ds_in["mask"] = src_mask
+            # if dst_mask is not None:
+            #    ds_out["mask"] = dst_mask
+
+            logger.info(
+                "Creating xESMF Regridder from weights: %s (with masks)", mapfile
+            )
+            # import pdb; pdb.set_trace()
+            cls._cache[cache_key] = xe.Regridder(
                 ds_in,
                 ds_out,
+                weights=str(mapfile),
+                # results seem insensitive to this method choice
                 method=method_label,
                 filename=str(mapfile),  # reuse the ESMF weight file on disk
                 reuse_weights=True,
                 periodic=True,  # 0..360 longitudes
             )
-        return cls._cache[mapfile]
+        return cls._cache[cache_key]
 
     @classmethod
     def clear(cls) -> None:
