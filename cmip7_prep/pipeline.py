@@ -117,11 +117,7 @@ def open_native_for_cmip_vars(
         )
         if selected:
             new_cmip_vars.append(var)
-        else:
-            warnings.warn(
-                f"[mapping] missing native inputs for {var} - skipping",
-                RuntimeWarning,
-            )
+
     required = _collect_required_cesm_vars(mapping, new_cmip_vars)
 
     # keep any file that contains ANY of the required CESM vars as '.var.' in the name
@@ -227,8 +223,9 @@ def realize_regrid_prepare(
         ds_native = open_native_for_cmip_vars(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
-    if "landfrac" not in ds_native and "ncol" not in ds_native:
-        logger.info("Variable has no 'landfrac' or 'ncol' dim; assuming ocn variable.")
+    logger.info("Opened native dataset with dims: %s", ds_native.dims)
+    if "lndgrid" not in ds_native.dims and "ncol" not in ds_native.dims:
+        logger.info("Variable has no 'lndgrid' or 'ncol' dim; assuming ocn variable.")
         # Add MOM6 grid info if provided
         if mom6_grid:
             aux = ["geolat", "geolon", "geolat_c", "geolon_c"]

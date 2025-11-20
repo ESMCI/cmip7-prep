@@ -271,9 +271,7 @@ class RegridderCache:
             # if dst_mask is not None:
             #    ds_out["mask"] = dst_mask
 
-            logger.info(
-                "Creating xESMF Regridder from weights: %s (with masks)", mapfile
-            )
+            logger.info("Creating xESMF Regridder from weights: %s", mapfile)
             # import pdb; pdb.set_trace()
             cls._cache[cache_key] = xe.Regridder(
                 ds_in,

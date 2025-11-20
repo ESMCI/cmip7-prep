@@ -10,4 +10,4 @@ module load conda
 conda activate CMORDEV
 NCPUS=$(cat $PBS_NODEFILE | wc -l)
 
-python ./scripts/monthly_cmor.py --realm lnd --test --workers $NCPUS
+python ./scripts/monthly_cmor.py --realm lnd --test --workers $NCPUS "$@"

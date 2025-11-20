@@ -829,9 +829,11 @@ def _regrid_fx_once(
     )
     areacella = compute_areacella_from_bounds(ds_grid)
     out_vars["areacella"] = areacella
-
-    lndarea = (areacella * out_vars["sftlf"] / 100.0).sum(dim=("lat", "lon"))
-    logger.info("Total land area on destination grid: %.3e m^2", float(lndarea.values))
+    if "sftlf" in out_vars:
+        lndarea = (areacella * out_vars["sftlf"] / 100.0).sum(dim=("lat", "lon"))
+        logger.info(
+            "Total land area on destination grid: %.3e m^2", float(lndarea.values)
+        )
     ds_fx = xr.Dataset(out_vars)
     FXCache.put(mapfile, ds_fx)
     return ds_fx

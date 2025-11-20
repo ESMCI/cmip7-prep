@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import logging
 import re
+from tokenize import group
 from typing import Optional, Tuple
 import sys
 from datetime import datetime, UTC
@@ -111,11 +112,16 @@ def parse_args():
         default=default_outdir,
         help="Output directory for CMORized files (default: $SCRATCH/CMIP7)",
     )
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--skip-cmor", action="store_true", help="Skip the CMORization step."
+    )
+    group.add_argument(
         "--skip-timeseries",
         action="store_true",
-        help="Skip timeseries processing and go directly to CMORization.",
+        help="Skip the timeseries processing step.",
     )
+
     args = parser.parse_args()
     # Parse run_freq argument
     run_years = 10
@@ -236,12 +242,13 @@ def process_one_var(
                     open_kwargs={"decode_timedelta": True},
                 )
         except Exception as e:
-            logger.error(
+            logger.warning(
                 "Exception during regridding of %s with dims %s: %r",
                 varname,
                 dims,
                 e,
             )
+            results.append((varname, f"ERROR during regridding: {e!r}"))
             continue
         try:
             # CMORize
@@ -447,6 +454,10 @@ def main():
                 ts_collection = ts_collection.apply_overwrite("*")
             ts_collection.execute()
             logger.info("Timeseries processing complete, starting CMORization...")
+    if args.skip_cmor:
+        logger.info("Skipping CMORization as per --skip-cmor flag.")
+        sys.exit(0)
+    # Load mapping
     mapping = Mapping.from_packaged_default()
     logger.info(f"Finding variables with prefix {var_prefix}")
     if args.cmip_vars and len(args.cmip_vars) > 0:
