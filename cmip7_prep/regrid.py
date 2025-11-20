@@ -700,7 +700,7 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
 
 
 def compute_areacella_from_bounds(
-    ds: xr.Dataset, *, radius_m: float = 6_371_000.0
+    ds: xr.Dataset, *, radius_m: float = 6_371_220.0
 ) -> xr.DataArray:
     """
     Compute areacella (m^2) from 1x1 lat/lon bounds.

@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Optional, Sequence, Union, Dict, List
 import re
 import logging
-import warnings
 import glob
 import sys
 import xarray as xr
@@ -127,11 +126,7 @@ def open_native_for_cmip_vars(
     )
 
     if not selected:
-        warnings.warn(
-            f"[mapping] no native inputs found for {cmip_vars} in"
-            f" {required} using {files_glob} - skipping",
-            RuntimeWarning,
-        )
+        logger.warning("no native inputs found for %s", cmip_vars)
         return None, None
 
     ds = xr.open_mfdataset(
