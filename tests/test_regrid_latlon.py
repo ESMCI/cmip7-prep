@@ -34,7 +34,7 @@ def test_lat_lon_named_and_sized_correctly(monkeypatch, order):
     # Fake cache → our regridder
     # pylint: disable=protected-access
     monkeypatch.setattr(
-        regrid._RegridderCache,
+        regrid.RegridderCache,
         "get",
         staticmethod(lambda path, method: _FakeRegridder(order)),
     )
@@ -75,7 +75,7 @@ def test_regrid_to_1deg_ds_carries_time_bounds(monkeypatch):
     """regrid_to_1deg_ds propagates time and existing bounds from the source dataset."""
     # pylint: disable=protected-access
     monkeypatch.setattr(
-        regrid._RegridderCache,
+        regrid.RegridderCache,
         "get",
         staticmethod(lambda path, method: _FakeRegridder("yx")),
     )
@@ -123,7 +123,7 @@ def test_attrs_propagated(monkeypatch):
     # fake regridder + lat/lon
     # pylint: disable=protected-access
     monkeypatch.setattr(
-        regrid._RegridderCache, "get", staticmethod(lambda p, m: _FakeRegridder("yx"))
+        regrid.RegridderCache, "get", staticmethod(lambda p, m: _FakeRegridder("yx"))
     )
     lat1d = np.linspace(-89.5, 89.5, 180)
     lon1d = np.arange(360, dtype="f8") + 0.5

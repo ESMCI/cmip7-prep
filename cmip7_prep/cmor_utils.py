@@ -31,8 +31,8 @@ def filled_for_cmor(
     >>> import xarray as xr
     >>> arr = xr.DataArray([1.0, np.nan, 2.0])
     >>> filled_for_cmor(arr, fill=-999.0)
-    (<xarray.DataArray (dim_0: 3)> Size: 24B
-    array([   1., -999.,    2.])
+    (<xarray.DataArray (dim_0: 3)> Size: 12B
+    array([   1., -999.,    2.], dtype=float32)
     Dimensions without coordinates: dim_0
     Attributes:
         _FillValue:     -999.0
@@ -57,6 +57,8 @@ def filled_for_cmor(
     # keep attrs helpful for downstream
     da2.attrs["_FillValue"] = f
     da2.attrs["missing_value"] = f
+    if da2.dtype != np.float32:
+        da2 = da2.astype(np.float32)
     return da2, f
 
 
@@ -116,20 +118,23 @@ def bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
     """
     v = np.asarray(vals, dtype="f8").reshape(-1)
     n = v.size
-    if n < 2:
-        raise ValueError("Need at least 2 points to compute bounds")
+    if n == 1:
+        # Special case: single value, make a cell of width 1 centered on v[0]
+        bounds = np.array([[v[0] - 0.5, v[0] + 0.5]], dtype="f8")
+    elif n < 2:
+        raise ValueError("Need at least 1 point to compute bounds")
+    else:
+        # neighbor midpoints
+        mid = 0.5 * (v[1:] + v[:-1])  # length n-1
+        bounds = np.empty((n, 2), dtype="f8")
+        bounds[1:, 0] = mid
+        bounds[:-1, 1] = mid
 
-    # neighbor midpoints
-    mid = 0.5 * (v[1:] + v[:-1])  # length n-1
-    bounds = np.empty((n, 2), dtype="f8")
-    bounds[1:, 0] = mid
-    bounds[:-1, 1] = mid
-
-    # end caps: extrapolate by half-step at ends
-    first_step = v[1] - v[0]
-    last_step = v[-1] - v[-2]
-    bounds[0, 0] = v[0] - 0.5 * first_step
-    bounds[-1, 1] = v[-1] + 0.5 * last_step
+        # end caps: extrapolate by half-step at ends
+        first_step = v[1] - v[0]
+        last_step = v[-1] - v[-2]
+        bounds[0, 0] = v[0] - 0.5 * first_step
+        bounds[-1, 1] = v[-1] + 0.5 * last_step
 
     if kind == "lat":
         # clamp to physical limits
@@ -142,8 +147,6 @@ def bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
         wrap = bounds[:, 1] < bounds[:, 0]
         if np.any(wrap):
             bounds[wrap, 1] += 360.0
-    else:
-        raise ValueError("kind must be 'lat' or 'lon'")
 
     return bounds
 

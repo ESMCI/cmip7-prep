@@ -6,5 +6,6 @@ pyyaml
 click
 esmpy
 pytest
+pytest-cov
 xesmf
 geocat-comp

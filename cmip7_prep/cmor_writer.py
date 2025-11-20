@@ -290,14 +290,17 @@ class CmorSession(
         plev_id = None
         lat_id = None
         lon_id = None
+        sdepth_id = None
 
-        print(f"[CMOR axis debug] var_dims: {var_dims}")
+        logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
         if "xh" in var_dims and "yh" in var_dims:
             # MOM6/curvilinear grid: register xh/yh as generic axes (i/j), not as lat/lon
             # Define the native grid using the coordinate arrays
-            print(
-                f"[CMOR axis debug] Defining unstructured grid for variable {var_name}."
+            logger.debug(
+                "[CMOR axis debug] Defining unstructured grid for variable %s.",
+                var_name,
             )
+
             i_id = cmor.axis(
                 table_entry="i",
                 units="1",
@@ -308,7 +311,7 @@ class CmorSession(
                 units="1",
                 length=ds["yh"].size,
             )
-            print("[CMOR axis debug] Defining unstructured grid_id.")
+            logger.debug("[CMOR axis debug] Defining unstructured grid_id.")
             grid_id = cmor.grid(
                 axis_ids=[j_id, i_id],  # note CMOR wants fastest varying last
                 longitude=ds["geolon"].values,
@@ -330,9 +333,9 @@ class CmorSession(
                         f" in variable '{var_name}' (curvilinear)"
                     )
                 axes_ids.append(axis_id)
-            print(f"[CMOR axis debug] Appending grid_id: {grid_id}")
+            logger.debug("[CMOR axis debug] Appending grid_id: %s", grid_id)
             axes_ids.append(grid_id)
-            print(f"[CMOR axis debug] axes_ids: {axes_ids}")
+            logger.debug("[CMOR axis debug] axes_ids: %s", axes_ids)
             return axes_ids
 
         # --- horizontal axes (use CMOR names) ----
@@ -477,12 +480,24 @@ class CmorSession(
                 coord_vals=pvals,
                 cell_bounds=pb if pb is not None else None,
             )
-
+        elif "sdepth" in var_dims:
+            values = ds["sdepth"].values
+            logger.info("write sdepth axis")
+            bnds = bounds_from_centers_1d(values, "sdepth")
+            if bnds[0, 0] < 0:
+                bnds[0, 0] = 0.0  # no negative soil depth bounds
+            sdepth_id = cmor.axis(
+                table_entry="sdepth",
+                units="m",
+                coord_vals=np.asarray(values),
+                cell_bounds=bnds,
+            )
         # Map dimension names to axis IDs
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
             "lev": alev_id,  # sometimes used for hybrid
+            "sdepth": sdepth_id,
             "plev": plev_id,
             "lat": lat_id,
             "latitude": lat_id,
@@ -544,7 +559,24 @@ class CmorSession(
         If present in ds_regr but not yet written this run, write and cache them.
         Returns ds_regr augmented with any missing fx fields.
         """
-        need = [("sftlf", "%"), ("areacella", "m2")]
+        need = [
+            ("sftlf", "%"),
+            ("areacella", "m2"),
+            ("sftof", "%"),
+            ("areacello", "m2"),
+            ("mrsofc", "m3 s-1"),
+            ("orog", "m"),
+            ("thkcello", "m"),
+            ("slthick", "m"),
+            ("basin", "m2"),
+            ("deptho", "m"),
+            ("hfgeou", "m"),
+            ("masscello", "m3"),
+            ("thkcello", "m"),
+            ("rootd", "m"),
+            ("sftgif", "%"),
+            ("sftif", "%"),
+        ]  # land fraction, ocean cell area, soil moisture fraction
         out = ds_regr
 
         for name, units in need:
@@ -613,23 +645,22 @@ class CmorSession(
         cmor.load_table(table_filename)
 
         data = ds[vdef.name]
+        logger.info("Prepare data for CMOR %s", data.dtype)  # debug
         data_filled, fillv = filled_for_cmor(data)
-        logger.info("Define axes")
+        logger.info("Define axes data_filled dtype: %s", data_filled.dtype)  # debug
         axes_ids = self._define_axes(ds, vdef)
         units = getattr(vdef, "units", "") or ""
         # Debug logging for axis mapping
 
         # Try to get axis table entries for each axis_id
-        # pylint: disable=broad-exception-caught
         try:
             for i, aid in enumerate(axes_ids):
                 entry = cmor.axis_entry(aid) if hasattr(cmor, "axis_entry") else None
-                logger.info(
+                logger.debug(
                     "[CMOR DEBUG] axis %d: id=%s, table_entry=%s", i, aid, entry
                 )
-        except (
-            Exception
-        ) as e:  # Broad except needed: cmor.axis_entry may raise various errors
+        # pylint: disable=broad-exception-caught
+        except Exception as e:
             logger.warning("[CMOR DEBUG] Could not retrieve axis table entries: %s", e)
         var_id = cmor.variable(
             getattr(vdef, "name", varname),
@@ -638,7 +669,6 @@ class CmorSession(
             positive=getattr(vdef, "positive", None),
             missing_value=fillv,
         )
-        data = ds[varname]
 
         # ---- Prepare time info for this write (local, not cached) ----
         time_da = ds.coords.get("time")

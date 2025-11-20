@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Sequence, Union, Dict, List
 import re
+import logging
 import warnings
 import glob
 import sys
@@ -15,7 +16,7 @@ from .mapping_compat import Mapping
 from .regrid import regrid_to_1deg_ds
 from .vertical import to_plev19
 
-
+logger = logging.getLogger(__name__)
 # --------------------------- file discovery ---------------------------
 
 _VAR_TOKEN = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z0-9_]+)(?![A-Za-z0-9_])")
@@ -45,12 +46,12 @@ def _collect_required_cesm_vars(
 ) -> List[str]:
     """Gather all native CESM vars needed to realize the requested CMIP vars."""
     needed: set[str] = set()
-    for v in cmip_vars:
+    for var in cmip_vars:
         try:
-            cfg = mapping.get_cfg(v) or {}
+            cfg = mapping.get_cfg(var) or {}
         except KeyError:
             print(
-                f"WARNING: skipping '{v}': no mapping found in {mapping.path}",
+                f"WARNING: skipping '{var}': no mapping found in {mapping.path}",
                 file=sys.stderr,
             )
             continue
@@ -58,18 +59,23 @@ def _collect_required_cesm_vars(
         raws = cfg.get("raw_variables") or cfg.get("sources") or []
         if src:
             needed.add(src)
-        for r in raws:
+        for raw in raws:
             # 'sources' items may be dicts with 'cesm_var'
-            if isinstance(r, dict) and "cesm_var" in r:
-                needed.add(r["cesm_var"])
-            elif isinstance(r, str):
-                needed.add(r)
+            if isinstance(raw, dict) and "cesm_var" in raw:
+                needed.add(raw["cesm_var"])
+            elif isinstance(raw, str):
+                needed.add(raw)
         # vertical dependencies if plev19
         levels = cfg.get("levels") or {}
         if (levels.get("name") or "").lower() == "plev19":
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
+        for var in ("area", "landmask"):
+            logger.info(
+                "Adding auxiliary variable '%s' for CMIP var '%s'", var, cmip_vars
+            )
+            needed.add(var)
     return sorted(needed)
 
 
@@ -111,11 +117,7 @@ def open_native_for_cmip_vars(
         )
         if selected:
             new_cmip_vars.append(var)
-        else:
-            warnings.warn(
-                f"[mapping] missing native inputs for {var} - skipping",
-                RuntimeWarning,
-            )
+
     required = _collect_required_cesm_vars(mapping, new_cmip_vars)
 
     # keep any file that contains ANY of the required CESM vars as '.var.' in the name
@@ -201,6 +203,7 @@ def realize_regrid_prepare(
     *,
     tables_path: Optional[Union[str, Path]] = None,
     time_chunk: Optional[int] = 12,
+    mom6_grid: Optional[Dict[str, xr.DataArray]] = None,
     regrid_kwargs: Optional[dict] = None,
     open_kwargs: Optional[dict] = None,
 ) -> xr.Dataset:
@@ -211,7 +214,7 @@ def realize_regrid_prepare(
     """
     regrid_kwargs = dict(regrid_kwargs or {})
     open_kwargs = dict(open_kwargs or {})
-
+    aux = []
     # 1) Get native dataset
     if isinstance(ds_or_glob, xr.Dataset):
         ds_native = ds_or_glob
@@ -220,7 +223,22 @@ def realize_regrid_prepare(
         ds_native = open_native_for_cmip_vars(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
+    logger.info("Opened native dataset with dims: %s", ds_native.dims)
+    if "lndgrid" not in ds_native.dims and "ncol" not in ds_native.dims:
+        logger.info("Variable has no 'lndgrid' or 'ncol' dim; assuming ocn variable.")
+        # Add MOM6 grid info if provided
+        if mom6_grid:
+            aux = ["geolat", "geolon", "geolat_c", "geolon_c"]
+            ds_native["geolat"] = xr.DataArray(mom6_grid[0], dims=("yh", "xh"))
+            ds_native["geolon"] = xr.DataArray(mom6_grid[1], dims=("yh", "xh"))
+            ds_native["geolat_c"] = xr.DataArray(mom6_grid[2], dims=("yhp", "xhp"))
+            ds_native["geolon_c"] = xr.DataArray(mom6_grid[3], dims=("yhp", "xhp"))
 
+        else:
+            logger.error("No MOM6 grid info provided; geolat/geolon not added.")
+            raise ValueError(
+                f"MOM6 grid information is required for variable {cmip_var} but was not provided."
+            )
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
@@ -228,11 +246,9 @@ def realize_regrid_prepare(
         da = da.chunk({"time": int(time_chunk)})
 
     ds_vars = xr.Dataset({cmip_var: da})
-
-    if "landfrac" in ds_native and "landfrac" not in ds_vars:
-        ds_vars = ds_vars.assign(landfrac=ds_native["landfrac"])
-    if "area" in ds_native and "area" not in ds_vars:
-        ds_vars = ds_vars.assign(area=ds_native["area"])
+    for var in ("landfrac", "area", "sftof", "landmask"):
+        if var in ds_native and var not in ds_vars:
+            ds_vars = ds_vars.assign(**{var: ds_native[var]})
 
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
@@ -247,7 +263,11 @@ def realize_regrid_prepare(
         # can produce PS(time,lat,lon)
         if "PS" in ds_native and "PS" not in ds_vars:
             ds_vars = ds_vars.assign(PS=ds_native["PS"])
-
+        aux = [
+            nm
+            for nm in ("hyai", "hybi", "hyam", "hybm", "P0", "ilev", "lev")
+            if nm in ds_native
+        ]
     # 5) Apply vertical transform if needed (plev19, etc.).
     # Single-var helper already takes cfg + tables_path
     ds_vert = _apply_vertical_if_needed(
@@ -259,19 +279,29 @@ def realize_regrid_prepare(
     if is_hybrid and "PS" in ds_vert:
         names_to_regrid.append("PS")
 
+    # 7) Rename levgrnd if present to sdepth
+
+    # Check if 'levgrnd' is a dimension of any variable in names_to_regrid
+    needs_levgrnd_rename = any(
+        (v in ds_vert and "levgrnd" in getattr(ds_vert[v], "dims", []))
+        for v in names_to_regrid
+    )
+    if (
+        needs_levgrnd_rename
+        and "levgrnd" in ds_native.dims
+        and "levgrnd" in ds_native.coords
+    ):
+        logger.info("Renaming 'levgrnd' dimension to 'sdepth'")
+        ds_vert = ds_vert.rename_dims({"levgrnd": "sdepth"})
+        # Ensure the coordinate variable is also copied
+        ds_vert = ds_vert.assign_coords(sdepth=ds_native["levgrnd"].values)
+
     ds_regr = regrid_to_1deg_ds(
         ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
     )
 
-    # 7) If hybrid: merge in 1-D hybrid coefficients directly from native (no regridding needed)
-    if is_hybrid:
-        aux = [
-            nm
-            for nm in ("hyai", "hybi", "hyam", "hybm", "P0", "ilev", "lev")
-            if nm in ds_native
-        ]
-        if aux:
-            ds_regr = ds_regr.merge(ds_native[aux], compat="override")
+    if aux:
+        ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 
     return ds_regr
 

@@ -3,15 +3,14 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Tuple
+from typing import Optional, Tuple
 import logging
 import xarray as xr
-import xesmf as xe
 
 # import warnings
 import numpy as np
 from cmip7_prep.cmor_utils import bounds_from_centers_1d
-
+from cmip7_prep.cache_tools import FXCache, RegridderCache, read_array, open_nc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,11 +27,19 @@ except ModuleNotFoundError as e:
     _HAS_DASK = False
 
 # Default weight maps; override via function args.
-DEFAULT_CONS_MAP = Path(
-    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
+INPUTDATA_DIR = Path("/glade/campaign/cesm/cesmdata/inputdata/")
+DEFAULT_CONS_MAP_NE30 = Path(
+    INPUTDATA_DIR / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
 )
-DEFAULT_BILIN_MAP = Path(
-    "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+DEFAULT_BILIN_MAP_NE30 = Path(
+    INPUTDATA_DIR / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+)  # optional bilinear map
+
+DEFAULT_CONS_MAP_T232 = Path(
+    INPUTDATA_DIR / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc"
+)
+DEFAULT_BILIN_MAP_T232 = Path(
+    INPUTDATA_DIR / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc"
 )  # optional bilinear map
 
 # Variables treated as "intensive" → prefer bilinear when available.
@@ -69,6 +76,34 @@ class MapSpec:
     path: Path
 
 
+# --- OCEAN FRACTION (sftof) extraction ---
+def _sftof_from_native(ds: xr.Dataset) -> xr.DataArray | None:
+    """Return sea fraction (sftof) from ocean static grid, using 'wet' mask if present."""
+    # Try common names for ocean fraction
+    for name in ["sftof", "ocnfrac", "wet"]:
+        if name in ds:
+            v = ds[name]
+            # If 'wet', convert 0/1 to percent
+            if name == "wet":
+                vmax = float(np.nanmax(np.asarray(v)))
+                # If 0/1, convert to percent
+                if vmax <= 1.0 + 1e-6:
+                    out = v * 100.0
+                else:
+                    out = v
+            else:
+                out = v
+            out = out.clip(min=0.0, max=100.0)
+            out = out.astype("f8")
+            attrs = dict(out.attrs)
+            attrs["units"] = "%"
+            attrs.setdefault("standard_name", "sea_area_fraction")
+            attrs.setdefault("long_name", "Percentage of sea area")
+            out.attrs = attrs
+            return out
+    return None
+
+
 def _pick_from_candidates(ds: xr.Dataset, *names: str) -> xr.DataArray | None:
     """Return the first present variable among candidate names (case-insensitive)."""
     for nm in names:
@@ -89,38 +124,6 @@ def _normalize_land_aux(da: xr.DataArray, hdim: str) -> xr.DataArray:
     if hdim not in da.dims:
         raise KeyError(f"land aux var missing required dim {hdim!r}: dims={da.dims}")
     return da
-
-
-# -------------------------
-# NetCDF opener (backends)
-# -------------------------
-def _open_nc(path: Path) -> xr.Dataset:
-    """Open NetCDF with explicit engines and narrow exception handling.
-
-    Tries 'netcdf4' then 'scipy'. Collects the failure reasons and raises a
-    single RuntimeError if neither works.
-    """
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"Weight file not found: {path}")
-
-    errors: dict[str, Exception] = {}
-    for engine in ("netcdf4", "scipy"):
-        try:
-            return xr.open_dataset(str(path), engine=engine)
-        except (ValueError, OSError, ImportError, ModuleNotFoundError) as exc:
-            # ValueError: invalid/unavailable engine or decode issue
-            # OSError: low-level file I/O/HDF5 issues
-            # ImportError/ModuleNotFoundError: backend not installed
-            errors[engine] = exc
-
-    details = "; ".join(
-        f"{eng}: {type(err).__name__}: {err}" for eng, err in errors.items()
-    )
-    raise RuntimeError(
-        f"Could not open {path} with xarray engines ['netcdf4', 'scipy']. "
-        f"Tried both; reasons: {details}"
-    )
 
 
 def _attach_vertical_metadata(ds_out: xr.Dataset, ds_src: xr.Dataset) -> xr.Dataset:
@@ -153,239 +156,6 @@ def _attach_vertical_metadata(ds_out: xr.Dataset, ds_src: xr.Dataset) -> xr.Data
 
 
 # -------------------------
-# Minimal dummy grids from the weight file (based on your approach)
-# -------------------------
-
-
-def _read_array(m: xr.Dataset, *names: str) -> Optional[xr.DataArray]:
-    for n in names:
-        if n in m:
-            return m[n]
-    return None
-
-
-def _get_src_shape(m: xr.Dataset) -> Tuple[int, int]:
-    """Infer the source grid 'shape' expected by xESMF's ds_to_ESMFgrid.
-
-    We provide a dummy 2D shape even when the true source is unstructured.
-    """
-    a = _read_array(m, "src_grid_dims")
-    if a is not None:
-        vals = np.asarray(a).ravel().astype(int)
-        if vals.size == 1:
-            return (1, int(vals[0]))
-        if vals.size >= 2:
-            return (int(vals[-2]), int(vals[-1]))
-    # fallbacks for unstructured
-    for n in ("src_grid_size", "n_a"):
-        if n in m:
-            size = int(np.asarray(m[n]).ravel()[0])
-            return (1, size)
-    # very last resort: infer from max index of sparse matrix rows
-    if "row" in m:
-        size = int(np.asarray(m["row"]).max())
-        return (1, size)
-    raise ValueError("Cannot infer source grid size from weight file.")
-
-
-def _dst_latlon_1d_from_map(mapfile: Path) -> tuple[np.ndarray, np.ndarray]:
-    """Return canonical 1-D (lat, lon) for the destination grid.
-
-    Robust to map files whose stored dst_grid_dims or reshape order is swapped.
-    We derive 1-D axes by taking UNIQUE values from the 2-D center fields.
-    """
-    with _open_nc(mapfile) as m:
-        lat2d = _read_array(m, "yc_b", "lat_b", "dst_grid_center_lat", "yc", "lat")
-        lon2d = _read_array(m, "xc_b", "lon_b", "dst_grid_center_lon", "xc", "lon")
-
-        if lat2d is not None and lon2d is not None:
-            lat2 = np.asarray(lat2d).reshape(-1)  # flatten safely
-            lon2 = np.asarray(lon2d).reshape(-1)
-
-            # Take unique values (rounded to avoid tiny FP noise)
-            lat_unique = np.unique(lat2.round(6))
-            lon_unique = np.unique(lon2.round(6))
-
-            # If either came out descending, sort ascending
-            lat1d = np.sort(lat_unique).astype("f8")
-            lon1d = np.sort(lon_unique).astype("f8")
-
-            # If longitudes are in [-180,180], convert to [0,360)
-            if lon1d.min() < 0.0 or lon1d.max() <= 180.0:
-                lon1d = (lon1d % 360.0).astype("f8")
-                lon1d.sort()
-
-            # Prefer the classic 180/360 lengths if present
-            if lat1d.size == 360 and lon1d.size == 180:
-                # swapped: pick every other for lat (=180) and expand lon to 360 if needed
-                # However, for standard 1° grids stored swapped, lat values repeat; use stride 2.
-                lat1d = lat1d[::2]
-                # For lon 180 centers, mapfile likely only stored 0.5..179.5.
-                # We'll fabricate 0.5..359.5 to be safe.
-                if lon1d.size == 180:
-                    lon1d = np.arange(360, dtype="f8") + 0.5
-
-            # sanity bounds
-            if not (
-                -91.0 <= float(lat1d.min()) <= -89.0
-                and 89.0 <= float(lat1d.max()) <= 91.0
-            ):
-                # If still odd, try the alternative:
-                # extract along the other axis by reshaping via dst_grid_dims
-                # Fallback to canonical 1°
-                lat1d = np.linspace(-89.5, 89.5, 180, dtype="f8")
-            if lon1d.size != 360:
-                lon1d = np.arange(360, dtype="f8") + 0.5
-
-            return lat1d, lon1d
-
-        # 1-D fields present already
-        lat1d = _read_array(m, "lat", "yc")
-        lon1d = _read_array(m, "lon", "xc")
-        if lat1d is not None and lon1d is not None:
-            lat1 = np.sort(np.asarray(lat1d, dtype="f8"))
-            lon1 = np.sort(np.asarray(lon1d, dtype="f8"))
-            if lon1.min() < 0.0 or lon1.max() <= 180.0:
-                lon1 = lon1 % 360.0
-                lon1.sort()
-            if lat1.size == 360:
-                lat1 = lat1[::2]
-            if lon1.size != 360:
-                lon1 = np.arange(360, dtype="f8") + 0.5
-            return lat1, lon1
-
-    # Last resort: fabricate standard 1°
-    lat = np.linspace(-89.5, 89.5, 180, dtype="f8")
-    lon = np.arange(360, dtype="f8") + 0.5
-    return lat, lon
-
-
-def _get_dst_latlon_1d() -> Tuple[np.ndarray, np.ndarray]:
-    """Return 1D dest lat, lon arrays from weight file.
-
-    Prefers 2D center lat/lon (yc_b/xc_b or lat_b/lon_b), reshaped to (ny, nx),
-    then converts to 1D centers by taking first column/row, which is valid for
-    regular 1° lat/lon weights.
-    """
-    # Final fallback: fabricate a 1° grid
-    ny, nx = 180, 360
-    lat = np.linspace(-89.5, 89.5, ny, dtype="f8")
-    lon = (np.arange(nx, dtype="f8") + 0.5) * (360.0 / nx)
-
-    return lat, lon
-
-
-def _bounds_from_centers_1d(
-    centers: np.ndarray, *, periodic: bool = False, period: float = 360.0
-) -> np.ndarray:
-    """Compute simple 1D bounds from 1D cell centers.
-    For regular spacing this sets bounds[i] = [c[i]-dx/2, c[i]+dx/2].
-    For periodic=True, wrap the last bound to period (e.g., lon 0..360)."""
-
-    centers = np.asarray(centers, dtype="f8").ravel()
-    n = centers.size
-    b = np.empty((n, 2), dtype="f8")
-    if n == 1:
-        # Any small cell is fine for dummy grid; choose +/- 0.5 around center
-        dx = 1.0
-        b[0, 0] = centers[0] - dx / 2.0
-        b[0, 1] = centers[0] + dx / 2.0
-    else:
-        # Estimate dx from adjacent centers (assume uniform spacing)
-        dx = np.diff(centers).mean()
-        b[:, 0] = centers - dx / 2.0
-        b[:, 1] = centers + dx / 2.0
-    if periodic:
-        # Keep within [0, period]
-        b = np.mod(b, period)
-        # Ensure right bound of last cell connects to period exactly
-        # (helps some ESMF periodic checks for 0..360)
-        b[-1, 1] = (
-            period if abs(b[-1, 1] - period) < 1e-6 or b[-1, 1] < 1e-6 else b[-1, 1]
-        )
-    return b
-
-
-def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
-    """Construct minimal ds_in/ds_out satisfying xESMF when reusing weights.
-    Adds CF-style bounds for both lat and lon so conservative methods don’t
-    trigger cf-xarray’s bounds inference on size-1 dimensions."""
-    with _open_nc(mapfile) as m:
-        nlat_in, nlon_in = _get_src_shape(m)
-    lat_out_1d, lon_out_1d = _get_dst_latlon_1d()
-
-    # --- Dummy INPUT grid (unstructured → represent as 2D with length-1 lat) ---
-    lat_in = np.arange(nlat_in, dtype="f8")  # e.g., [0], length can be 1
-    lon_in = np.arange(nlon_in, dtype="f8")
-    ds_in = xr.Dataset(
-        data_vars={
-            "lat_bnds": (
-                ("lat", "nbnds"),
-                _bounds_from_centers_1d(lat_in, periodic=False),
-            ),
-            "lon_bnds": (
-                ("lon", "nbnds"),
-                _bounds_from_centers_1d(lon_in, periodic=False),
-            ),
-        },
-        coords={
-            "lat": (
-                "lat",
-                lat_in,
-                {
-                    "units": "degrees_north",
-                    "standard_name": "latitude",
-                    "bounds": "lat_bnds",
-                },
-            ),
-            "lon": (
-                "lon",
-                lon_in,
-                {
-                    "units": "degrees_east",
-                    "standard_name": "longitude",
-                    "bounds": "lon_bnds",
-                },
-            ),
-            "nbnds": ("nbnds", np.array([0, 1], dtype="i4")),
-        },
-    )
-
-    # --- OUTPUT grid from weights (canonical 1° lat/lon) ---
-    lat_out_bnds = _bounds_from_centers_1d(lat_out_1d, periodic=False)
-    lon_out_bnds = _bounds_from_centers_1d(lon_out_1d, periodic=True, period=360.0)
-
-    ds_out = xr.Dataset(
-        data_vars={
-            "lat_bnds": (("lat", "nbnds"), lat_out_bnds),
-            "lon_bnds": (("lon", "nbnds"), lon_out_bnds),
-        },
-        coords={
-            "lat": (
-                "lat",
-                lat_out_1d,
-                {
-                    "units": "degrees_north",
-                    "standard_name": "latitude",
-                    "bounds": "lat_bnds",
-                },
-            ),
-            "lon": (
-                "lon",
-                lon_out_1d,
-                {
-                    "units": "degrees_east",
-                    "standard_name": "longitude",
-                    "bounds": "lon_bnds",
-                },
-            ),
-            "nbnds": ("nbnds", np.array([0, 1], dtype="i4")),
-        },
-    )
-    return ds_in, ds_out
-
-
-# -------------------------
 # Selection & utilities
 # -------------------------
 
@@ -413,10 +183,15 @@ def _pick_maps(
     conservative_map: Optional[Path] = None,
     bilinear_map: Optional[Path] = None,
     force_method: Optional[str] = None,
+    realm: Optional[str] = None,
 ) -> MapSpec:
     """Choose which precomputed map file to use for a variable."""
-    cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP
-    bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP
+    if realm == "ocn":
+        cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_T232
+        bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_T232
+    else:
+        cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_NE30
+        bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30
 
     if force_method:
         if force_method not in {"conservative", "bilinear"}:
@@ -461,6 +236,7 @@ def regrid_to_1deg_ds(
     keep_attrs: bool = True,
     dtype: str | None = "float32",
     output_time_chunk: int | None = 12,
+    sftlf_path: Optional[Path] = None,
 ) -> xr.Dataset:
     """Regrid var(s) and return a Dataset."""
 
@@ -484,6 +260,14 @@ def regrid_to_1deg_ds(
     # Attach time (and bounds) from the original dataset if requested
     if time_from is not None:
         ds_out = _attach_time_and_bounds(ds_out, time_from)
+    if "ncol" in ds_in.dims:
+        realm = "atm"
+    elif "lndgrid" in ds_in.dims:
+        realm = "lnd"
+    else:
+        realm = "ocn"
+    if "sftof" in ds_in:
+        logger.info("Regridding sftof (sea fraction) from source dataset")
 
     # Pick the mapfile you used for conservative/bilinear selection
     spec = _pick_maps(
@@ -491,9 +275,11 @@ def regrid_to_1deg_ds(
         conservative_map=conservative_map,
         bilinear_map=bilinear_map,
         force_method="conservative",
+        realm=realm,
     )  # fx always conservative
-    print(f"using fx map: {spec.path}")
-    ds_fx = _regrid_fx_once(spec.path, ds_in)  # ← uses cache
+    logger.info("using fx map: %s", spec.path)
+    ds_fx = _regrid_fx_once(spec.path, ds_in, sftlf_path)  # ← uses cache
+
     if ds_fx:
         # Don’t overwrite if user already computed and passed them in
         for name in (
@@ -534,8 +320,94 @@ def _denormalize_land_field(
             "Missing required variables for land denormalization: landfrac"
         )
     landfrac = ds_fx["sftlf"].fillna(0) / 100.0  # percent to fraction
+    logger.debug("sum of regridded landfrac: %s", float(landfrac.sum().values))
+
     out = out_norm / landfrac.where(landfrac > 0)
     return out
+
+
+def _denormalize_ocn_field(out_norm: xr.DataArray, ds_in: xr.Dataset) -> xr.DataArray:
+    """Denormalize field by destination sftof (sea fraction)."""
+    logger.info("Denormalizing ocean field by destination sftof (sea fraction)")
+    sftof_dst = _sftof_from_native(ds_in)  # fallback: use source if no destination
+    if sftof_dst is not None:
+        frac_dst = sftof_dst / 100.0
+        out = out_norm / frac_dst.where(frac_dst > 0)
+    else:
+        out = out_norm
+    return out
+
+
+def _dst_latlon_1d_from_map(mapfile: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Return canonical 1-D (lat, lon) for the destination grid.
+
+    Robust to map files whose stored dst_grid_dims or reshape order is swapped.
+    We derive 1-D axes by taking UNIQUE values from the 2-D center fields.
+    """
+    with open_nc(mapfile) as m:
+        lat2d = read_array(m, "yc_b", "lat_b", "dst_grid_center_lat", "yc", "lat")
+        lon2d = read_array(m, "xc_b", "lon_b", "dst_grid_center_lon", "xc", "lon")
+
+        if lat2d is not None and lon2d is not None:
+            lat2 = np.asarray(lat2d).reshape(-1)  # flatten safely
+            lon2 = np.asarray(lon2d).reshape(-1)
+
+            # Take unique values (rounded to avoid tiny FP noise)
+            lat_unique = np.unique(lat2.round(6))
+            lon_unique = np.unique(lon2.round(6))
+
+            # If either came out descending, sort ascending
+            lat1d = np.sort(lat_unique).astype("f8")
+            lon1d = np.sort(lon_unique).astype("f8")
+
+            # If longitudes are in [-180,180], convert to [0,360)
+            if lon1d.min() < 0.0 or lon1d.max() <= 180.0:
+                lon1d = (lon1d % 360.0).astype("f8")
+                lon1d.sort()
+
+            # Prefer the classic 180/360 lengths if present
+            if lat1d.size == 360 and lon1d.size == 180:
+                # swapped: pick every other for lat (=180) and expand lon to 360 if needed
+                # However, for standard 1° grids stored swapped, lat values repeat; use stride 2.
+                lat1d = lat1d[::2]
+                # For lon 180 centers, mapfile likely only stored 0.5..179.5.
+                # We'll fabricate 0.5..359.5 to be safe.
+                if lon1d.size == 180:
+                    lon1d = np.arange(360, dtype="f8") + 0.5
+
+            # sanity bounds
+            if not (
+                -91.0 <= float(lat1d.min()) <= -89.0
+                and 89.0 <= float(lat1d.max()) <= 91.0
+            ):
+                # If still odd, try the alternative:
+                # extract along the other axis by reshaping via dst_grid_dims
+                # Fallback to canonical 1°
+                lat1d = np.linspace(-89.5, 89.5, 180, dtype="f8")
+            if lon1d.size != 360:
+                lon1d = np.arange(360, dtype="f8") + 0.5
+
+            return lat1d, lon1d
+
+        # 1-D fields present already
+        lat1d = read_array(m, "lat", "yc")
+        lon1d = read_array(m, "lon", "xc")
+        if lat1d is not None and lon1d is not None:
+            lat1 = np.sort(np.asarray(lat1d, dtype="f8"))
+            lon1 = np.sort(np.asarray(lon1d, dtype="f8"))
+            if lon1.min() < 0.0 or lon1.max() <= 180.0:
+                lon1 = lon1 % 360.0
+                lon1.sort()
+            if lat1.size == 360:
+                lat1 = lat1[::2]
+            if lon1.size != 360:
+                lon1 = np.arange(360, dtype="f8") + 0.5
+            return lat1, lon1
+
+    # Last resort: fabricate standard 1°
+    lat = np.linspace(-89.5, 89.5, 180, dtype="f8")
+    lon = np.arange(360, dtype="f8") + 0.5
+    return lat, lon
 
 
 def regrid_to_1deg(
@@ -570,11 +442,28 @@ def regrid_to_1deg(
     if varname not in ds_in:
         raise KeyError(f"{varname!r} not in dataset.")
 
+    realm = None
     var_da = ds_in[varname]  # always a DataArray
-
-    da2, non_spatial, hdim = _ensure_ncol_last(var_da)
-    if hdim == "lndgrid":
-        da2 = _normalize_land_field(da2, ds_in)
+    if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
+        logger.info("Variable has no 'ncol' or 'lndgrid' dim; assuming ocn variable.")
+        hdim = "tripolar"
+        da2 = var_da  # Use the DataArray, not the whole Dataset
+        non_spatial = [d for d in da2.dims if d not in ("yh", "xh")]
+        realm = "ocn"
+        method = method or "conservative"  # force conservative for ocn
+        # --- OCEAN: Normalize by sftof (sea fraction) if present ---
+        sftof = _sftof_from_native(ds_in)
+        if sftof is not None:
+            logger.info("Normalizing ocean field by source sftof (sea fraction)")
+            frac = sftof / 100.0
+            da2 = da2.fillna(0) * frac
+    else:
+        da2, non_spatial, hdim = _ensure_ncol_last(var_da)
+        if hdim == "lndgrid":
+            da2 = _normalize_land_field(da2, ds_in)
+            realm = "lnd"
+        elif hdim == "ncol":
+            realm = "atm"
 
     # cast to save memory
     if dtype is not None and str(da2.dtype) != dtype:
@@ -589,26 +478,51 @@ def regrid_to_1deg(
         conservative_map=conservative_map,
         bilinear_map=bilinear_map,
         force_method=method,
+        realm=realm,
     )
-    regridder = _RegridderCache.get(spec.path, spec.method_label)
+    logger.info(
+        "Regridding %s using %s map: %s for realm %s",
+        varname,
+        spec.method_label,
+        spec.path,
+        realm,
+    )
+    regridder = RegridderCache.get(spec.path, spec.method_label)
 
     # tell xESMF to produce chunked output
     kwargs = {}
     if "time" in da2.dims and output_time_chunk:
         kwargs["output_chunks"] = {"time": output_time_chunk}
+    if realm in ("atm", "lnd"):
+        da2_2d = (
+            da2.rename({hdim: "lon"})
+            .expand_dims({"lat": 1})  # add a dummy 'lat' of length 1
+            .transpose(
+                *non_spatial, "lat", "lon"
+            )  # ensure last two dims are ('lat','lon')
+        )
+    else:
+        da2_2d = da2.rename({"xh": "lon", "yh": "lat"}).transpose(
+            *non_spatial, "lat", "lon"
+        )
 
-    da2_2d = (
-        da2.rename({hdim: "lon"})
-        .expand_dims({"lat": 1})  # add a dummy 'lat' of length 1
-        .transpose(*non_spatial, "lat", "lon")  # ensure last two dims are ('lat','lon')
+        da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
+    logger.debug(
+        "da2_2d range: %f to %f lat, %f to %f lon",
+        da2_2d["lat"].min().item(),
+        da2_2d["lat"].max().item(),
+        da2_2d["lon"].min().item(),
+        da2_2d["lon"].max().item(),
     )
 
-    out_norm = regridder(da2_2d, **kwargs)
-    if hdim == "lndgrid":
+    out_norm = regridder(da2_2d, skipna=True, **kwargs)
+
+    if realm == "lnd":
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
+    elif realm == "ocn":
+        out = _denormalize_ocn_field(out_norm, ds_in)
     else:
-        # default path (atm or no landfrac/sftlf available)
-        out = regridder(da2_2d, **kwargs)
+        out = out_norm
 
     # --- NEW: robust lat/lon assignment based on destination grid lengths ---
     lat1d, lon1d = _dst_latlon_1d_from_map(spec.path)
@@ -619,9 +533,23 @@ def regrid_to_1deg(
     if len(spatial_dims) < 2:
         raise ValueError(f"Unexpected output dims {out.dims}; need two spatial dims.")
 
+    if len(spatial_dims) > 2:
+        logger.warning(
+            "More than two spatial dims found in output: %s; using last two.",
+            spatial_dims,
+        )
+        spatial_dims = spatial_dims[-2:]
     da, db = spatial_dims[-2], spatial_dims[-1]
     na, nb = out.sizes[da], out.sizes[db]
-
+    logger.debug(
+        "Output spatial dims: %s (%d), %s (%d); target (lat %d, lon %d)",
+        da,
+        na,
+        db,
+        nb,
+        ny,
+        nx,
+    )
     # Decide mapping by comparing lengths to (ny, nx)
     if na == ny and nb == nx:
         out = out.rename({da: "lat", db: "lon"})
@@ -637,7 +565,7 @@ def regrid_to_1deg(
             choose_lat = da if abs(na - 180) <= abs(nb - 180) else db
             choose_lon = db if choose_lat == da else da
             out = out.rename({choose_lat: "lat", choose_lon: "lon"})
-
+    logger.debug("Final output dims: %s", out.dims)
     # assign canonical 1-D coords
     out = out.assign_coords(lat=("lat", lat1d), lon=("lon", lon1d))
 
@@ -738,6 +666,31 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
     sftlf = _sftlf_from_native(ds_native)
     if sftlf is not None:
         pieces["sftlf"] = sftlf
+    # Also extract sftof (sea fraction) if present
+    sftof = None
+    for name in ["sftof", "ocnfrac", "wet"]:
+        if name in ds_native:
+            logger.info("Extracting sftof from native variable %s", name)
+            v = ds_native[name]
+            # If 'wet', convert 0/1 to percent
+            if name == "wet":
+                vmax = float(np.nanmax(np.asarray(v)))
+                if vmax <= 1.0 + 1e-6:
+                    sftof = v * 100.0
+                else:
+                    sftof = v
+            else:
+                sftof = v
+            sftof = sftof.clip(min=0.0, max=100.0)
+            sftof = sftof.astype("f8")
+            attrs = dict(sftof.attrs)
+            attrs["units"] = "%"
+            attrs.setdefault("standard_name", "sea_area_fraction")
+            attrs.setdefault("long_name", "Percentage of sea area")
+            sftof.attrs = attrs
+            break
+    if sftof is not None:
+        pieces["sftof"] = sftof
     if not pieces:
         return xr.Dataset()
     ds_fx = xr.Dataset(pieces)
@@ -812,33 +765,58 @@ def compute_areacella_from_bounds(
     return da
 
 
-def _regrid_fx_once(mapfile: Path, ds_native: xr.Dataset) -> xr.Dataset:
+def _regrid_fx_once(
+    mapfile: Path, ds_native: xr.Dataset, sftlf_path: Path | None = None
+) -> xr.Dataset:
     """Compute & regrid sftlf/areacella once for a given mapfile; cache result.
 
     sftlf is regridded from source; areacella is computed on the destination grid.
     """
-    cached = _FXCache.get(mapfile)
+    cached = FXCache.get(mapfile)
     if cached is not None:
+        logger.info("Getting cached fx variables")
         return cached
+    out_vars = {}
+    if sftlf_path:
+        logger.info("Getting sftlf from output path %s", sftlf_path)
+        out_vars["sftlf"] = xr.open_mfdataset(sftlf_path)["sftlf"]
 
     ds_fx_native = _build_fx_native(ds_native)
-    out_vars = {}
 
+    regridder = RegridderCache.get(
+        mapfile,
+        "conservative",
+    )
     # Regrid sftlf from source if present
-    if "sftlf" in ds_fx_native:
-        regridder = _RegridderCache.get(mapfile, "conservative")
+    if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
         da = ds_fx_native["sftlf"]
         da2 = (
             da.rename({"lndgrid": "lon"})
             .expand_dims({"lat": 1})
             .transpose(..., "lat", "lon")
         )
-        out = regridder(da2)
+        lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
+            dim=("lndgrid")
+        )
+        logger.info("Total land area on source grid: %.3e m^2", lndarea.values)
+        out = regridder(da2, skipna=True)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
         out.name = "sftlf"
         out.attrs.update(da.attrs)
         out_vars["sftlf"] = out
+
+    # Regrid sftof (sea fraction) from source if present
+    if "sftof" in ds_fx_native:
+        logger.info("Regridding sftof (sea fraction) from native")
+        da = ds_fx_native["sftof"]
+        da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
+        out = regridder(da2, skipna=True)
+        spatial = [d for d in out.dims if d in ("lat", "lon")]
+        out = out.transpose(*spatial)
+        out.name = "sftof"
+        out.attrs.update(da.attrs)
+        out_vars["sftof"] = out
 
     # Always compute areacella on the destination grid, not by regridding
     # Use the destination grid from the mapfile
@@ -851,64 +829,11 @@ def _regrid_fx_once(mapfile: Path, ds_native: xr.Dataset) -> xr.Dataset:
     )
     areacella = compute_areacella_from_bounds(ds_grid)
     out_vars["areacella"] = areacella
-
+    if "sftlf" in out_vars:
+        lndarea = (areacella * out_vars["sftlf"] / 100.0).sum(dim=("lat", "lon"))
+        logger.info(
+            "Total land area on destination grid: %.3e m^2", float(lndarea.values)
+        )
     ds_fx = xr.Dataset(out_vars)
-    _FXCache.put(mapfile, ds_fx)
+    FXCache.put(mapfile, ds_fx)
     return ds_fx
-
-
-# -------------------------
-# Cache
-# -------------------------
-class _FXCache:
-    """Cache of regridded FX fields (sftlf, areacella) keyed by mapfile."""
-
-    _cache: Dict[Path, xr.Dataset] = {}
-
-    @classmethod
-    def get(cls, key: Path) -> xr.Dataset | None:
-        """get cached variable"""
-        return cls._cache.get(key)
-
-    @classmethod
-    def put(cls, key: Path, ds_fx: xr.Dataset) -> None:
-        """put variable into cache"""
-        cls._cache[key] = ds_fx
-
-    @classmethod
-    def clear(cls) -> None:
-        """clear cache"""
-        cls._cache.clear()
-
-
-class _RegridderCache:
-    """Cache of xESMF Regridders constructed from weight files.
-
-    We build minimal `ds_in`/`ds_out` from the weight file to satisfy CF checks,
-    then reuse the weight file for the actual mapping.
-    """
-
-    _cache: Dict[Path, xe.Regridder] = {}
-
-    @classmethod
-    def get(cls, mapfile: Path, method_label: str) -> xe.Regridder:
-        """Return a cached regridder for the given weight file and method."""
-        mapfile = mapfile.expanduser().resolve()
-        if mapfile not in cls._cache:
-            if not mapfile.exists():
-                raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
-            ds_in, ds_out = _make_dummy_grids(mapfile)
-            cls._cache[mapfile] = xe.Regridder(
-                ds_in,
-                ds_out,
-                method=method_label,
-                filename=str(mapfile),  # reuse the ESMF weight file on disk
-                reuse_weights=True,
-                periodic=True,  # 0..360 longitudes
-            )
-        return cls._cache[mapfile]
-
-    @classmethod
-    def clear(cls) -> None:
-        """Clear all cached regridders (useful for tests or releasing resources)."""
-        cls._cache.clear()

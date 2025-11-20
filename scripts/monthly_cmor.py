@@ -29,7 +29,8 @@ from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.dreq_search import find_variables_by_prefix
-from cmip7_prep.mom6_static import load_mom6_static
+from cmip7_prep.mom6_static import load_mom6_grid
+from cmip7_prep.mom6_static import ocean_fx_fields
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
@@ -60,10 +61,16 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--static-grid",
+        "--ocn-grid-file",
+        type=str,
+        default="/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc",
+        help="Path to ocean grid description file for MOM (optional)",
+    )
+    parser.add_argument(
+        "--ocn-static-file",
         type=str,
         default=None,
-        help="Path to static grid file for MOM variables (optional)",
+        help="Path to static file for MOM variables (optional)",
     )
     parser.add_argument(
         "--cmip-vars",
@@ -104,11 +111,16 @@ def parse_args():
         default=default_outdir,
         help="Output directory for CMORized files (default: $SCRATCH/CMIP7)",
     )
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--skip-cmor", action="store_true", help="Skip the CMORization step."
+    )
+    group.add_argument(
         "--skip-timeseries",
         action="store_true",
-        help="Skip timeseries processing and go directly to CMORization.",
+        help="Skip the timeseries processing step.",
     )
+
     args = parser.parse_args()
     # Parse run_freq argument
     run_years = 10
@@ -119,17 +131,17 @@ def parse_args():
             run_years = int(run_freq[:-1])
             run_months = run_years * 12
         except Exception:
-            print(f"Invalid --run-freq value: {run_freq}")
+            logger.error(f"Invalid --run-freq value: {run_freq}")
             sys.exit(1)
     elif run_freq.endswith("m"):
         try:
             run_months = int(run_freq[:-1])
             run_years = run_months // 12
         except Exception:
-            print(f"Invalid --run-freq value: {run_freq}")
+            logger.error(f"Invalid --run-freq value: {run_freq}")
             sys.exit(1)
     else:
-        print(f"Invalid --run-freq value: {run_freq}")
+        logger.error(f"Invalid --run-freq value: {run_freq}")
         sys.exit(1)
     args.run_years = run_years
     args.run_months = run_months
@@ -137,97 +149,140 @@ def parse_args():
 
 
 def process_one_var(
-    varname: str, mapping, inputfile, tables_path, outdir, mom6_grid=None
-) -> tuple[str, str]:
-    """Compute+write one CMIP variable. Returns (varname, 'ok' or error message)."""
+    varname: str,
+    mapping,
+    inputfile,
+    tables_path,
+    outdir,
+    realm="atm",
+    mom6_grid=None,
+    ocn_fx_fields=None,
+) -> list[tuple[str, str]]:
+    """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     logger.info(f"Starting processing for variable: {varname}")
+    results = [(varname, "started")]
     try:
+        cfg = mapping.get_cfg(varname)
+    except Exception as e:
+        logger.error(f"Error retrieving config for {varname}: {e}")
+        results.append((varname, f"ERROR: {e}"))
+        return results
 
-        logger.info(f"Loading native data for {varname} from {inputfile}")
-        ds_native, var = open_native_for_cmip_vars(
-            varname, inputfile, mapping, use_cftime=True, parallel=True
-        )
-        if var is None:
-            logger.warning(f"Source variable(s) not found for {varname}")
-            return (varname, "ERROR: Source variable(s) not found.")
-        # Example usage: attach MOM6 grid info for ocn realm
-        if mom6_grid is not None:
-            logger.info(f"MOM6 grid info available for {varname}")
-            # You can use mom6_grid['geolat'], mom6_grid['geolon'], etc. here
-            # For example, attach to ds_native as needed:
-            # ds_native['geolat'] = (('yh','xh'), mom6_grid['geolat'])
-            # ds_native['geolon'] = (('yh','xh'), mom6_grid['geolon'])
-    except Exception as e:
-        logger.error(f"Exception while reading {varname}: {e!r}")
-        return (varname, f"ERROR: {e!r}")
-    try:
-        print(f"Regrid/prepare for {varname}")
-        if "ncol" in ds_native.dims or "lndgrid" in ds_native.dims:
-            logger.info(f"Regridding for {varname}")
-            ds_cmor = realize_regrid_prepare(
-                mapping,
-                ds_native,
+    dims_list = cfg.get("dims")
+    # If dims is a single list (atm/lnd), wrap in a list for uniformity
+    if dims_list and len(dims_list) > 0 and isinstance(dims_list[0], str):
+        dims_list = [dims_list]
+    for dims in dims_list:
+        logger.info(f"Processing {varname} with dims {dims}")
+        try:
+            open_kwargs = None
+            if realm == "ocn":
+                open_kwargs = {"decode_timedelta": False}
+
+            ds_native, var = open_native_for_cmip_vars(
                 varname,
-                tables_path=tables_path,
-                time_chunk=12,
-                regrid_kwargs={
-                    "output_time_chunk": 12,
-                    "dtype": "float32",
-                    "bilinear_map": Path(
-                        "/glade/campaign/cesm/cesmdata/inputdata/cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
-                    ),
-                },
+                inputfile,
+                mapping,
+                use_cftime=True,
+                parallel=True,
+                open_kwargs=open_kwargs,
             )
-        else:
-            logger.info(f"Skipping regrid/prepare for ocean variable {varname}")
-            ds_cmor = ds_native
-            # Attach only cell center arrays and bounds for CMOR
-            if mom6_grid is not None:
-                geolat = mom6_grid[0]
-                geolon = mom6_grid[1]
-                geolat_c = mom6_grid[2]
-                geolon_c = mom6_grid[3]
-                ncell = geolat.size
-                # 2D for reference, 1D for CMOR axes
-                ds_cmor["geolat"] = (("yh", "xh"), geolat)
-                ds_cmor["geolon"] = (("yh", "xh"), geolon)
-                ds_cmor["geolat_c"] = (("yhp", "xhp"), geolat_c)
-                ds_cmor["geolon_c"] = (("yhp", "xhp"), geolon_c)
-    except Exception as e:
-        logger.error(f"Exception while regridding/preparing {varname}: {e!r}")
-    try:
-        logger.info(f"CMOR writing for {varname}")
-        log_dir = outdir + "/logs"  # or set as needed
-        with CmorSession(
-            tables_path=tables_path,
-            log_dir=log_dir,
-            log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
-            dataset_attrs={"institution_id": "NCAR"},
-            outdir=outdir,
-        ) as cm:
-            cfg = mapping.get_cfg(varname)
-            vdef = type(
-                "VDef",
-                (),
-                {
-                    "name": varname,
-                    "table": cfg.get("table", "Amon"),
-                    "units": cfg.get("units", ""),
-                    "dims": cfg.get("dims", []),
-                    "positive": cfg.get("positive", None),
-                    "cell_methods": cfg.get("cell_methods", None),
-                    "long_name": cfg.get("long_name", None),
-                    "standard_name": cfg.get("standard_name", None),
-                    "levels": cfg.get("levels", None),
-                },
-            )()
-            print(f"Writing variable {varname}")
-            cm.write_variable(ds_cmor, varname, vdef)
-        logger.info(f"Finished processing for {varname}")
-        return (varname, "ok")
-    except Exception as e:
-        logger.error(f"Exception while processing {varname}: {e!r}")
-        return (varname, f"ERROR: {e!r}")
+
+            # Append ocn_fx_fields to ds_native if available
+            if realm == "ocn" and ocn_fx_fields is not None:
+                ds_native = ds_native.merge(ocn_fx_fields)
+            logger.debug(
+                "ds_native keys: %s for var %s with dims %s",
+                list(ds_native.keys()),
+                varname,
+                dims,
+            )
+            if var is None:
+                logger.warning(f"Source variable(s) not found for {varname}")
+                results.append((varname, "ERROR: Source variable(s) not found."))
+                continue
+
+            # --- OCN: distinguish native vs regridded by dims ---
+            if "xh" in dims and "yh" in dims:
+                logger.info(f"Preparing native grid output for mom6 variable {varname}")
+                ds_cmor = ds_native
+                results.append((varname, "analyzed native mom6 grid"))
+                if mom6_grid is not None:
+                    logger.info(f"Add geolat to ds_cmor")
+
+                    ds_cmor["geolat"] = xr.DataArray(mom6_grid[0], dims=("yh", "xh"))
+                    ds_cmor["geolon"] = xr.DataArray(mom6_grid[1], dims=("yh", "xh"))
+                    ds_cmor["geolat_c"] = xr.DataArray(
+                        mom6_grid[2], dims=("yhp", "xhp")
+                    )
+                    ds_cmor["geolon_c"] = xr.DataArray(
+                        mom6_grid[3], dims=("yhp", "xhp")
+                    )
+            else:
+                # For lnd/atm or any other dims, use existing logic
+                logger.debug(
+                    "Processing %s for dims %s (atm/lnd or other)", varname, dims
+                )
+                ds_cmor = realize_regrid_prepare(
+                    mapping,
+                    ds_native,
+                    varname,
+                    tables_path=tables_path,
+                    time_chunk=12,
+                    mom6_grid=mom6_grid,
+                    regrid_kwargs={
+                        "output_time_chunk": 12,
+                        "dtype": "float32",
+                    },
+                    open_kwargs={"decode_timedelta": True},
+                )
+        except Exception as e:
+            logger.warning(
+                "Exception during regridding of %s with dims %s: %r",
+                varname,
+                dims,
+                e,
+            )
+            results.append((varname, f"ERROR during regridding: {e!r}"))
+            continue
+        try:
+            # CMORize
+            log_dir = outdir + "/logs"
+            with CmorSession(
+                tables_path=tables_path,
+                log_dir=log_dir,
+                log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
+                dataset_attrs={"institution_id": "NCAR"},
+                outdir=outdir,
+            ) as cm:
+
+                vdef = type(
+                    "VDef",
+                    (),
+                    {
+                        "name": varname,
+                        "table": cfg.get("table", "Amon"),
+                        "units": cfg.get("units", ""),
+                        "dims": dims,
+                        "positive": cfg.get("positive", None),
+                        "cell_methods": cfg.get("cell_methods", None),
+                        "long_name": cfg.get("long_name", None),
+                        "standard_name": cfg.get("standard_name", None),
+                        "levels": cfg.get("levels", None),
+                    },
+                )()
+                logger.info(
+                    f"Writing variable {varname} with dims {dims} and type {ds_cmor[varname].dtype}"
+                )
+                cm.write_variable(ds_cmor, varname, vdef)
+            logger.info(f"Finished processing for {varname} with dims {dims}")
+            results.append((varname, "ok"))
+        except Exception as e:
+            logger.error(
+                f"Exception while processing {varname} with dims {dims}: {e!r}"
+            )
+            results.append((varname, f"ERROR: {e!r}"))
+    return results
 
 
 process_one_var_delayed = delayed(process_one_var)
@@ -245,7 +300,7 @@ def latest_monthly_file(
         raise NotADirectoryError(directory)
     found = []
     seps = set()
-    print(f"Looking for files in {str(directory)}")
+    logger.debug(f"Looking for files in {str(directory)}")
     for p in directory.iterdir():
         if not p.is_file():
             continue
@@ -261,7 +316,7 @@ def latest_monthly_file(
         return None
     if require_consistent_style and len(seps) > 1:
         raise ValueError("Mixed date styles detected (YYYYMM.nc and YYYY-MM.nc).")
-    print(f"Found {len(found)} files in {str(directory)}")
+    logger.debug(f"Found {len(found)} files in {str(directory)}")
     found.sort(key=lambda t: (t[0], t[1], t[2].name))
     year, month, path = found[-1]
     return path, year, month
@@ -273,6 +328,8 @@ def main():
     OUTDIR = args.outdir
 
     mom6_grid = None
+    ocn_grid = None
+    ocn_fx_fields = None
     if args.realm == "atm":
         include_patterns = ["*cam.h0a*"]
         var_prefix = "Amon."
@@ -286,8 +343,10 @@ def main():
         include_patterns = ["*mom6.h.rho2.*", "*mom6.h.native.*", "*mom6.h.sfc.*"]
         var_prefix = "Omon."
         subdir = "ocn"
-        if not args.static_grid:
-            ocn_static_grid = "/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc"
+        if args.ocn_grid_file:
+            ocn_grid = args.ocn_grid_file
+        if args.ocn_static_file:
+            ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
     # Setup input/output directories
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot
@@ -298,7 +357,7 @@ def main():
         try:
             from CIME.case import Case
         except ImportError as e:
-            print(f"Error importing CIME modules: {e}")
+            logger.warning(f"Error importing CIME modules: {e}")
             sys.exit(1)
         with Case(caseroot, read_only=True) as case:
             inputroot = case.get_value("DOUT_S_ROOT")
@@ -317,7 +376,7 @@ def main():
                 # Calculate span in months
                 span_months = (nyr - tsyr) * 12
                 if span_months < args.run_months:
-                    print(
+                    logger.info(
                         f"Less than required run frequency ready ({span_months} months, need {args.run_months}), not processing {nyr}, {tsyr}"
                     )
                     sys.exit(0)
@@ -347,9 +406,9 @@ def main():
     if not os.path.exists(str(TSDIR)):
         os.makedirs(str(TSDIR))
     # Load MOM6 static grid if needed (ocn realm)
-    if args.realm == "ocn" and ocn_static_grid:
-        mom6_grid = load_mom6_static(ocn_static_grid)
-        print(f"Using MOM static grid file: {ocn_static_grid}")
+    if args.realm == "ocn" and ocn_grid:
+        mom6_grid = load_mom6_grid(ocn_grid)
+        logger.info(f"Using MOM grid file: {ocn_grid}")
     # Dask cluster setup
     if args.workers == 1:
         client = None
@@ -367,7 +426,7 @@ def main():
     input_head_dir = INPUTDIR
     output_head_dir = TSDIR
     if args.skip_timeseries:
-        print("Skipping timeseries processing as per --skip-timeseries flag.")
+        logger.info("Skipping timeseries processing as per --skip-timeseries flag.")
     else:
         cnt = 0
         for include_pattern in include_patterns:
@@ -379,7 +438,7 @@ def main():
             sys.exit(0)
         hf_collection = HFCollection(input_head_dir, dask_client=client)
         for include_pattern in include_patterns:
-            logger.info(f"Processing files with pattern: {include_pattern}")
+            logger.info("Processing files with pattern: %s", include_pattern)
             hfp_collection = hf_collection.include_patterns([include_pattern])
             hfp_collection.pull_metadata()
             ts_collection = TSCollection(
@@ -388,16 +447,20 @@ def main():
             if args.overwrite:
                 ts_collection = ts_collection.apply_overwrite("*")
             ts_collection.execute()
-            print("Timeseries processing complete, starting CMORization...")
+            logger.info("Timeseries processing complete, starting CMORization...")
+    if args.skip_cmor:
+        logger.info("Skipping CMORization as per --skip-cmor flag.")
+        sys.exit(0)
+    # Load mapping
     mapping = Mapping.from_packaged_default()
-    print(f"Finding variables with prefix {var_prefix}")
+    logger.info(f"Finding variables with prefix {var_prefix}")
     if args.cmip_vars and len(args.cmip_vars) > 0:
         cmip_vars = args.cmip_vars
     else:
         cmip_vars = find_variables_by_prefix(
             None, var_prefix, where={"List of Experiments": "piControl"}
         )
-    print(f"CMORIZING {len(cmip_vars)} variables")
+    logger.info(f"CMORIZING {len(cmip_vars)} variables")
     # Load requested variables
     if len(cmip_vars) > 0:
         if len(include_patterns) == 1:
@@ -408,14 +471,28 @@ def main():
         if args.workers == 1:
             results = [
                 process_one_var(
-                    v, mapping, input_path, TABLES, OUTDIR, mom6_grid=mom6_grid
+                    v,
+                    mapping,
+                    input_path,
+                    TABLES,
+                    OUTDIR,
+                    realm=args.realm,
+                    mom6_grid=mom6_grid,
+                    ocn_fx_fields=ocn_fx_fields,
                 )
                 for v in cmip_vars
             ]
         else:
             futs = [
                 process_one_var_delayed(
-                    var, mapping, input_path, TABLES, OUTDIR, mom6_grid=mom6_grid
+                    var,
+                    mapping,
+                    input_path,
+                    TABLES,
+                    OUTDIR,
+                    realm=args.realm,
+                    mom6_grid=mom6_grid,
+                    ocn_fx_fields=ocn_fx_fields,
                 )
                 for var in cmip_vars
             ]
@@ -428,15 +505,28 @@ def main():
             results = []
             for _, result in as_completed(futures, with_results=True):
                 try:
-                    results.append(result)  # (v, status)
+                    # Handle result types: list of tuples, tuple, or other
+                    if isinstance(result, list):
+                        # If it's a list, check if it's a list of tuples
+                        if all(isinstance(x, tuple) and len(x) == 2 for x in result):
+                            results.extend(result)
+                        else:
+                            # Not a list of tuples, wrap as unknown
+                            results.append((str(result), "unknown"))
+                    elif isinstance(result, tuple) and len(result) == 2:
+                        results.append(result)
+                    else:
+                        # Not a tuple/list, wrap as unknown
+                        results.append((str(result), "unknown"))
                 except Exception as e:
-                    print("Task error:", e)
+                    logger.error("Task error:", e)
                     raise
 
         for v, status in results:
-            print(v, "→", status)
+            logger.info(f"Variable {v} processed with status: {status}")
+
     else:
-        print("No results to process.")
+        logger.info("No results to process.")
     if client:
         client.close()
     if cluster:
