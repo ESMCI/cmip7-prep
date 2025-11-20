@@ -320,10 +320,8 @@ def _denormalize_land_field(
             "Missing required variables for land denormalization: landfrac"
         )
     landfrac = ds_fx["sftlf"].fillna(0) / 100.0  # percent to fraction
-    logger.info("sum of regridded landfrac: %s", float(landfrac.sum().values))
-    n_mask = int(ds_in["landmask"].sum().values)
-    n_landfrac = int((landfrac > 0.25).sum().values)
-    logger.info(f"src_mask sum: {n_mask}, landfrac > 0 count: {n_landfrac}")
+    logger.debug("sum of regridded landfrac: %s", float(landfrac.sum().values))
+
     out = out_norm / landfrac.where(landfrac > 0)
     return out
 
@@ -443,8 +441,7 @@ def regrid_to_1deg(
     """
     if varname not in ds_in:
         raise KeyError(f"{varname!r} not in dataset.")
-    if "area" in ds_in:
-        logger.info("Area variable found in input dataset for %s", varname)
+
     realm = None
     var_da = ds_in[varname]  # always a DataArray
     if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
@@ -518,13 +515,9 @@ def regrid_to_1deg(
         da2_2d["lon"].max().item(),
     )
 
-    out_norm = regridder(da2_2d, **kwargs)
+    out_norm = regridder(da2_2d, skipna=True, **kwargs)
 
     if realm == "lnd":
-        if "area" in ds_in:
-            logger.info("Area variable found in input dataset for denormalization")
-        if "landmask" in ds_in:
-            logger.info("Landmask variable found in input dataset for denormalization")
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
     elif realm == "ocn":
         out = _denormalize_ocn_field(out_norm, ds_in)
@@ -548,7 +541,7 @@ def regrid_to_1deg(
         spatial_dims = spatial_dims[-2:]
     da, db = spatial_dims[-2], spatial_dims[-1]
     na, nb = out.sizes[da], out.sizes[db]
-    logger.info(
+    logger.debug(
         "Output spatial dims: %s (%d), %s (%d); target (lat %d, lon %d)",
         da,
         na,
@@ -572,7 +565,7 @@ def regrid_to_1deg(
             choose_lat = da if abs(na - 180) <= abs(nb - 180) else db
             choose_lon = db if choose_lat == da else da
             out = out.rename({choose_lat: "lat", choose_lon: "lon"})
-    logger.info("Final output dims: %s", out.dims)
+    logger.debug("Final output dims: %s", out.dims)
     # assign canonical 1-D coords
     out = out.assign_coords(lat=("lat", lat1d), lon=("lon", lon1d))
 
@@ -789,18 +782,10 @@ def _regrid_fx_once(
         out_vars["sftlf"] = xr.open_mfdataset(sftlf_path)["sftlf"]
 
     ds_fx_native = _build_fx_native(ds_native)
-    # Provide explicit source and destination masks for land
-    src_mask = None
-    dst_mask = None
-    if "landfrac" in ds_native:
-        src_mask = (ds_native["landfrac"] > 0).expand_dims({"lat": 1})
-        d_data_file = "/glade/derecho/scratch/oleson/ANALYSIS/b.e30_beta06.B1850C_LTso.1deg.clm2.h0.evspsblsoi.000101-001012.nc"
-        d_data = xr.open_dataset(d_data_file)
-        dst_mask = d_data.landfrac > 0
-    # For destination, we can use the mask from the destination grid after it's created, but here we use None or a placeholder
-    # If you have a destination landfrac, use it here
+
     regridder = RegridderCache.get(
-        mapfile, "conservative", src_mask=src_mask, dst_mask=dst_mask
+        mapfile,
+        "conservative",
     )
     # Regrid sftlf from source if present
     if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
@@ -810,9 +795,11 @@ def _regrid_fx_once(
             .expand_dims({"lat": 1})
             .transpose(..., "lat", "lon")
         )
-        lndarea = (ds_native["landfrac"] * ds_native["area"] * 1e6).sum(dim=("lndgrid"))
+        lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
+            dim=("lndgrid")
+        )
         logger.info("Total land area on source grid: %.3e m^2", lndarea.values)
-        out = regridder(da2)
+        out = regridder(da2, skipna=True)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
         out.name = "sftlf"
@@ -824,7 +811,7 @@ def _regrid_fx_once(
         logger.info("Regridding sftof (sea fraction) from native")
         da = ds_fx_native["sftof"]
         da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
-        out = regridder(da2)
+        out = regridder(da2, skipna=True)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
         out.name = "sftof"

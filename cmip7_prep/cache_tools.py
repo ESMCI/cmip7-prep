@@ -194,8 +194,8 @@ def _get_dst_latlon_1d(mapfile: Path) -> Tuple[np.ndarray, np.ndarray]:
             lat = ds["lat"].values
             lon = ds["lon"].values
             return lat, lon
-    except Exception as e:
-        logger.warning(f"Could not read lat/lon from mapping file {mapfile}: {e}")
+    except (AttributeError, KeyError, IndexError, ValueError) as e:
+        logger.warning("Could not read lat/lon from mapping file %s: %s", mapfile, e)
     # Final fallback: fabricate a 1° grid
     ny, nx = 180, 360
     lat = np.linspace(-89.5, 89.5, ny, dtype="f8")
@@ -253,7 +253,7 @@ class RegridderCache:
                 return None
             try:
                 return (mask.shape, str(mask.dtype), hash(mask.values.tobytes()))
-            except Exception:
+            except (AttributeError, TypeError, ValueError):
                 return (mask.shape, str(mask.dtype), id(mask))
 
         src_mask_id = mask_id(src_mask)
