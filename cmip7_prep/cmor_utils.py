@@ -31,8 +31,8 @@ def filled_for_cmor(
     >>> import xarray as xr
     >>> arr = xr.DataArray([1.0, np.nan, 2.0])
     >>> filled_for_cmor(arr, fill=-999.0)
-    (<xarray.DataArray (dim_0: 3)> Size: 24B
-    array([   1., -999.,    2.])
+    (<xarray.DataArray (dim_0: 3)> Size: 12B
+    array([   1., -999.,    2.], dtype=float32)
     Dimensions without coordinates: dim_0
     Attributes:
         _FillValue:     -999.0

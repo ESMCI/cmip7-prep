@@ -19,7 +19,6 @@ import os
 from pathlib import Path
 import logging
 import re
-from tokenize import group
 from typing import Optional, Tuple
 import sys
 from datetime import datetime, UTC
@@ -159,7 +158,7 @@ def process_one_var(
     mom6_grid=None,
     ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
-    """Compute+write one CMIP variable. Returns list of (varname, 'ok' or error message)."""
+    """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     logger.info(f"Starting processing for variable: {varname}")
     results = [(varname, "started")]
     try:
@@ -171,7 +170,7 @@ def process_one_var(
 
     dims_list = cfg.get("dims")
     # If dims is a single list (atm/lnd), wrap in a list for uniformity
-    if dims_list and isinstance(dims_list[0], str):
+    if dims_list and len(dims_list) > 0 and isinstance(dims_list[0], str):
         dims_list = [dims_list]
     for dims in dims_list:
         logger.info(f"Processing {varname} with dims {dims}")
@@ -210,10 +209,6 @@ def process_one_var(
                 results.append((varname, "analyzed native mom6 grid"))
                 if mom6_grid is not None:
                     logger.info(f"Add geolat to ds_cmor")
-
-                    def _extract_array(val):
-                        # If val is a tuple, return the first element, else return as is
-                        return val[0] if isinstance(val, tuple) else val
 
                     ds_cmor["geolat"] = xr.DataArray(mom6_grid[0], dims=("yh", "xh"))
                     ds_cmor["geolon"] = xr.DataArray(mom6_grid[1], dims=("yh", "xh"))
@@ -351,8 +346,7 @@ def main():
         if args.ocn_grid_file:
             ocn_grid = args.ocn_grid_file
         if args.ocn_static_file:
-            ocn_static_file = args.ocn_static_file
-            ocn_fx_fields = ocean_fx_fields(ocn_static_file)
+            ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
     # Setup input/output directories
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot

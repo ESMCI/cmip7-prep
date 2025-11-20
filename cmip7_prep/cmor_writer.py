@@ -563,7 +563,7 @@ class CmorSession(
             ("sftlf", "%"),
             ("areacella", "m2"),
             ("sftof", "%"),
-            ("areacello", "m3"),
+            ("areacello", "m2"),
             ("mrsofc", "m3 s-1"),
             ("orog", "m"),
             ("thkcello", "m"),

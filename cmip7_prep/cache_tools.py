@@ -241,35 +241,18 @@ class RegridderCache:
         cls,
         mapfile: Path,
         method_label: str,
-        src_mask: xr.DataArray | None = None,
-        dst_mask: xr.DataArray | None = None,
     ) -> xe.Regridder:
         """Return a cached regridder for the given weight file, method, and masks."""
         mapfile = mapfile.expanduser().resolve()
 
-        # Build a cache key that includes src_mask and dst_mask presence and identity
-        def mask_id(mask):
-            if mask is None:
-                return None
-            try:
-                return (mask.shape, str(mask.dtype), hash(mask.values.tobytes()))
-            except (AttributeError, TypeError, ValueError):
-                return (mask.shape, str(mask.dtype), id(mask))
+        # Build a cache key
 
-        src_mask_id = mask_id(src_mask)
-        dst_mask_id = mask_id(dst_mask)
-        cache_key = (str(mapfile), method_label, src_mask_id, dst_mask_id)
+        cache_key = (str(mapfile), method_label)
 
         if cache_key not in cls._cache:
             if not mapfile.exists():
                 raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
             ds_in, ds_out = _make_dummy_grids(mapfile)
-
-            # Attach masks to dummy grids if provided
-            if src_mask is not None:
-                ds_in["mask"] = src_mask
-            # if dst_mask is not None:
-            #    ds_out["mask"] = dst_mask
 
             logger.info("Creating xESMF Regridder from weights: %s", mapfile)
             # import pdb; pdb.set_trace()
