@@ -802,6 +802,7 @@ def _regrid_fx_once(
         out = regridder(da2, skipna=True, na_thres=1.0)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
+        out.name = "sftlf"
         out.attrs.update(da.attrs)
         out_vars["sftlf"] = out
 
