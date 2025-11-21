@@ -319,7 +319,7 @@ def _denormalize_land_field(
         raise ValueError(
             "Missing required variables for land denormalization: landfrac"
         )
-    landfrac = ds_fx["sftlf"].fillna(0) / 100.0  # percent to fraction
+    landfrac = ds_fx["sftlf"] / 100.0  # percent to fraction
     logger.debug("sum of regridded landfrac: %s", float(landfrac.sum().values))
 
     out = out_norm / landfrac.where(landfrac > 0)
@@ -704,6 +704,7 @@ def compute_areacella_from_bounds(
 ) -> xr.DataArray:
     """
     Compute areacella (m^2) from 1x1 lat/lon bounds.
+    Earth radius matches that in CESM shr_const_mod.F90
     Requires 1D coords 'lat','lon' and bounds 'lat_bnds','lon_bnds' with shape (N,2).
     """
     logger.info("computing areacella from lat/lon bounds")
