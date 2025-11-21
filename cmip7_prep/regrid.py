@@ -515,7 +515,7 @@ def regrid_to_1deg(
         da2_2d["lon"].max().item(),
     )
 
-    out_norm = regridder(da2_2d, skipna=True, **kwargs)
+    out_norm = regridder(da2_2d, skipna=True, na_thres=1.0, **kwargs)
 
     if realm == "lnd":
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
@@ -789,7 +789,7 @@ def _regrid_fx_once(
     )
     # Regrid sftlf from source if present
     if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
-        da = ds_fx_native["sftlf"]
+        da = ds_fx_native["sftlf"].fillna(0)
         da2 = (
             da.rename({"lndgrid": "lon"})
             .expand_dims({"lat": 1})
@@ -799,10 +799,9 @@ def _regrid_fx_once(
             dim=("lndgrid")
         )
         logger.info("Total land area on source grid: %.3e m^2", lndarea.values)
-        out = regridder(da2, skipna=True)
+        out = regridder(da2, skipna=True, na_thres=1.0)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
-        out.name = "sftlf"
         out.attrs.update(da.attrs)
         out_vars["sftlf"] = out
 
@@ -811,7 +810,7 @@ def _regrid_fx_once(
         logger.info("Regridding sftof (sea fraction) from native")
         da = ds_fx_native["sftof"]
         da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
-        out = regridder(da2, skipna=True)
+        out = regridder(da2, skipna=True, na_thres=1.0)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
         out.name = "sftof"
