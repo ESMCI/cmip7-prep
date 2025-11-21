@@ -236,6 +236,9 @@ def process_one_var(
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
+        except AttributeError:
+            results.append((varname, f"ERROR cesm input variable not found"))
+            continue
         except Exception as e:
             logger.warning(
                 "Exception during regridding of %s with dims %s: %r",

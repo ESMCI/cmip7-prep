@@ -319,7 +319,7 @@ def _denormalize_land_field(
         raise ValueError(
             "Missing required variables for land denormalization: landfrac"
         )
-    landfrac = ds_fx["sftlf"].fillna(0) / 100.0  # percent to fraction
+    landfrac = ds_fx["sftlf"] / 100.0  # percent to fraction
     logger.debug("sum of regridded landfrac: %s", float(landfrac.sum().values))
 
     out = out_norm / landfrac.where(landfrac > 0)
@@ -515,7 +515,7 @@ def regrid_to_1deg(
         da2_2d["lon"].max().item(),
     )
 
-    out_norm = regridder(da2_2d, skipna=True, **kwargs)
+    out_norm = regridder(da2_2d, skipna=True, na_thres=1.0, **kwargs)
 
     if realm == "lnd":
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
@@ -700,10 +700,11 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
 
 
 def compute_areacella_from_bounds(
-    ds: xr.Dataset, *, radius_m: float = 6_371_000.0
+    ds: xr.Dataset, *, radius_m: float = 6_371_220.0
 ) -> xr.DataArray:
     """
     Compute areacella (m^2) from 1x1 lat/lon bounds.
+    Earth radius matches that in CESM shr_const_mod.F90
     Requires 1D coords 'lat','lon' and bounds 'lat_bnds','lon_bnds' with shape (N,2).
     """
     logger.info("computing areacella from lat/lon bounds")
@@ -789,7 +790,7 @@ def _regrid_fx_once(
     )
     # Regrid sftlf from source if present
     if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
-        da = ds_fx_native["sftlf"]
+        da = ds_fx_native["sftlf"].fillna(0)
         da2 = (
             da.rename({"lndgrid": "lon"})
             .expand_dims({"lat": 1})
@@ -799,7 +800,7 @@ def _regrid_fx_once(
             dim=("lndgrid")
         )
         logger.info("Total land area on source grid: %.3e m^2", lndarea.values)
-        out = regridder(da2, skipna=True)
+        out = regridder(da2, skipna=True, na_thres=1.0)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
         out.name = "sftlf"
@@ -811,7 +812,7 @@ def _regrid_fx_once(
         logger.info("Regridding sftof (sea fraction) from native")
         da = ds_fx_native["sftof"]
         da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
-        out = regridder(da2, skipna=True)
+        out = regridder(da2, skipna=True, na_thres=1.0)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
         out.name = "sftof"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#PBS -l select=1:ncpus=128:mem=235GB
+#PBS -l select=1:ncpus=128:mem=235GB:mpiprocs=128
 #PBS -N fullamon_cmor_processing
 #PBS -A CESM0024
 #PBS -q develop
