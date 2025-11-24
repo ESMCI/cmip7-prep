@@ -326,10 +326,20 @@ def _denormalize_land_field(
     return out
 
 
-def _denormalize_ocn_field(out_norm: xr.DataArray, ds_in: xr.Dataset) -> xr.DataArray:
+def _denormalize_ocn_field(
+    out_norm: xr.DataArray, ds_in: xr.Dataset, mapfile: Path
+) -> xr.DataArray:
     """Denormalize field by destination sftof (sea fraction)."""
     logger.info("Denormalizing ocean field by destination sftof (sea fraction)")
-    sftof_dst = _sftof_from_native(ds_in)  # fallback: use source if no destination
+    ds_fx = _regrid_fx_once(mapfile, ds_in)
+    if "sftof" not in ds_fx:
+        logger.warning(
+            "Destination sftof not found; falling back to source sftof if available."
+        )
+        sftof_dst = _sftof_from_native(ds_in)
+    else:
+        sftof_dst = ds_fx["sftof"]
+    logger.info("sftof_dst dims: %s", sftof_dst.dims if sftof_dst is not None else None)
     if sftof_dst is not None:
         frac_dst = sftof_dst / 100.0
         out = out_norm / frac_dst.where(frac_dst > 0)
@@ -459,10 +469,15 @@ def regrid_to_1deg(
             da2 = da2.fillna(0) * frac
     else:
         da2, non_spatial, hdim = _ensure_ncol_last(var_da)
-        if hdim == "lndgrid":
-            da2 = _normalize_land_field(da2, ds_in)
-            realm = "lnd"
-        elif hdim == "ncol":
+        # _ensure_ncol_last returns (da, non_spatial, hdim),
+        # but the code expects only (da, non_spatial)
+        # Fix: Only unpack (da2, non_spatial), and set hdim separately if needed
+        # Actually, the function returns three values, so update usage to match
+        # If hdim is needed, keep as is, but ensure downstream code expects three values
+        # If only two values are needed, change to:
+        # da2, non_spatial = _ensure_ncol_last(var_da)[:2]
+        # For now, keep unpacking three values, but ensure all usages match
+        if hdim == "ncol":
             realm = "atm"
 
     # cast to save memory
@@ -507,7 +522,7 @@ def regrid_to_1deg(
         )
 
         da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
-    logger.debug(
+    logger.info(
         "da2_2d range: %f to %f lat, %f to %f lon",
         da2_2d["lat"].min().item(),
         da2_2d["lat"].max().item(),
@@ -516,11 +531,12 @@ def regrid_to_1deg(
     )
 
     out_norm = regridder(da2_2d, skipna=True, na_thres=1.0, **kwargs)
-
+    logger.info("Regridding complete. out_norms dims: %s", out_norm.dims)
     if realm == "lnd":
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
     elif realm == "ocn":
-        out = _denormalize_ocn_field(out_norm, ds_in)
+        out = _denormalize_ocn_field(out_norm, ds_in, spec.path)
+        logger.info("Denormalized ocean field. out dims: %s", out.dims)
     else:
         out = out_norm
 
@@ -788,26 +804,16 @@ def _regrid_fx_once(
         mapfile,
         "conservative",
     )
-    # Regrid sftlf from source if present
-    if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
-        da = ds_fx_native["sftlf"].fillna(0)
-        da2 = (
-            da.rename({"lndgrid": "lon"})
-            .expand_dims({"lat": 1})
-            .transpose(..., "lat", "lon")
-        )
-        lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
-            dim=("lndgrid")
-        )
-        logger.info("Total land area on source grid: %.3e m^2", lndarea.values)
-        out = regridder(da2, skipna=True, na_thres=1.0)
-        spatial = [d for d in out.dims if d in ("lat", "lon")]
-        out = out.transpose(*spatial)
-        out.name = "sftlf"
-        out.attrs.update(da.attrs)
-        out_vars["sftlf"] = out
 
-    # Regrid sftof (sea fraction) from source if present
+    # Add native grid fields to FXCache
+    native_fx = {}
+    for key in ["sftof", "deptho", "areacello"]:
+        if key in ds_fx_native:
+            native_fx[f"{key}_native"] = ds_fx_native[key]
+    if native_fx:
+        FXCache.put(f"{mapfile}_native", xr.Dataset(native_fx))
+
+    # Regrid sftof from source if present
     if "sftof" in ds_fx_native:
         logger.info("Regridding sftof (sea fraction) from native")
         da = ds_fx_native["sftof"]
@@ -819,6 +825,29 @@ def _regrid_fx_once(
         out.attrs.update(da.attrs)
         out_vars["sftof"] = out
 
+    # Regrid deptho from source if present
+    if "deptho" in ds_fx_native:
+        logger.info("Regridding deptho from native")
+        da = ds_fx_native["deptho"]
+        da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
+        out = regridder(da2, skipna=True, na_thres=1.0)
+        spatial = [d for d in out.dims if d in ("lat", "lon")]
+        out = out.transpose(*spatial)
+        out.name = "deptho"
+        out.attrs.update(da.attrs)
+        out_vars["deptho"] = out
+
+    # Regrid areacello from source if present
+    if "areacello" in ds_fx_native:
+        logger.info("Regridding areacello from native")
+        da = ds_fx_native["areacello"]
+        da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
+        out = regridder(da2, skipna=True, na_thres=1.0)
+        spatial = [d for d in out.dims if d in ("lat", "lon")]
+        out = out.transpose(*spatial)
+        out.name = "areacello"
+        out.attrs.update(da.attrs)
+        out_vars["areacello"] = out
     # Always compute areacella on the destination grid, not by regridding
     # Use the destination grid from the mapfile
     lat1d, lon1d = _dst_latlon_1d_from_map(mapfile)

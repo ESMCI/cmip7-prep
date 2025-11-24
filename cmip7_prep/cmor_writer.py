@@ -554,7 +554,7 @@ class CmorSession(
         cmor.close(var_id)
 
     def ensure_fx_written_and_cached(self, ds_regr: xr.Dataset) -> xr.Dataset:
-        """Ensure sftlf and areacella exist in ds_regr and are written once as fx.
+        """Ensure <fx variables> exist in ds_regr and are written once as fx.
         If not present in ds_regr, try to read from existing CMOR fx files in outdir.
         If present in ds_regr but not yet written this run, write and cache them.
         Returns ds_regr augmented with any missing fx fields.
@@ -578,6 +578,12 @@ class CmorSession(
             ("sftif", "%"),
         ]  # land fraction, ocean cell area, soil moisture fraction
         out = ds_regr
+
+        # Write sftof_native if present (native grid sea fraction)
+        if "sftof_native" in ds_regr and "sftof_native" not in self._fx_written:
+            logger.info("Writing fx variable sftof_native")
+            self._write_fx_2d(ds_regr, "sftof_native", "%")
+            self._fx_written.add("sftof_native")
 
         for name, units in need:
             # 1) Already cached this run?
@@ -675,7 +681,9 @@ class CmorSession(
         if time_da is None:
             time_da = ds.get("time")
         nt = 0
-
+        logger.info(
+            "Insure fx variables are written and cached: %s", list(ds.variables.keys())
+        )  # debug
         self.ensure_fx_written_and_cached(ds)
 
         # ---- Main variable write ----

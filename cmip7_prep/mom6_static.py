@@ -20,7 +20,10 @@ def ocean_fx_fields(static_path, out_path=None):
     sftof = _sftof_from_native(ds)
     if sftof is not None:
         fx["sftof"] = sftof
-    # Extract areacello if present
+    # Extract deptho if present
+    if "deptho" in ds:
+        fx["deptho"] = ds["deptho"]
+    # Ensure areacello is included (already present above, but keep for clarity)
     if "areacello" in ds:
         fx["areacello"] = ds["areacello"]
     # Optionally add other ocean mask/area fields as needed

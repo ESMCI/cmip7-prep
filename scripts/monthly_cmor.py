@@ -207,9 +207,11 @@ def process_one_var(
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
                 ds_cmor = ds_native
                 results.append((varname, "analyzed native mom6 grid"))
+                # Attach ocn_fx_fields to ds_cmor for writing
+                if ocn_fx_fields is not None:
+                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
                 if mom6_grid is not None:
                     logger.info(f"Add geolat to ds_cmor")
-
                     ds_cmor["geolat"] = xr.DataArray(mom6_grid[0], dims=("yh", "xh"))
                     ds_cmor["geolon"] = xr.DataArray(mom6_grid[1], dims=("yh", "xh"))
                     ds_cmor["geolat_c"] = xr.DataArray(
@@ -236,6 +238,9 @@ def process_one_var(
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
+                # Attach ocn_fx_fields to regridded output for writing
+                if ocn_fx_fields is not None:
+                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
         except AttributeError:
             results.append((varname, f"ERROR cesm input variable not found"))
             continue
@@ -350,6 +355,9 @@ def main():
             ocn_grid = args.ocn_grid_file
         if args.ocn_static_file:
             ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
+            logger.info(
+                f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
+            )
     # Setup input/output directories
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot
