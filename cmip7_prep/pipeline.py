@@ -70,7 +70,7 @@ def _collect_required_cesm_vars(
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
-        for var in ("area", "landmask"):
+        for var in ("area", "landmask", "landfrac"):
             logger.info(
                 "Adding auxiliary variable '%s' for CMIP var '%s'", var, cmip_vars
             )
@@ -241,7 +241,7 @@ def realize_regrid_prepare(
         da = da.chunk({"time": int(time_chunk)})
 
     ds_vars = xr.Dataset({cmip_var: da})
-    for var in ("landfrac", "area", "sftof", "landmask"):
+    for var in ("landfrac", "area", "sftof", "landmask", "wet"):
         if var in ds_native and var not in ds_vars:
             ds_vars = ds_vars.assign(**{var: ds_native[var]})
 

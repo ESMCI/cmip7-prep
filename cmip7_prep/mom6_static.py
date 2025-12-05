@@ -7,7 +7,7 @@ import numpy as np
 from cmip7_prep.regrid import _sftof_from_native
 
 
-def ocean_fx_fields(static_path, out_path=None):
+def ocean_fx_fields(static_path):
     """
     Read MOM6 static grid and write ocean-related fx fields (sftof, areacello, etc).
     Returns a dict of DataArrays for use in regridding normalization/denormalization.
@@ -27,9 +27,7 @@ def ocean_fx_fields(static_path, out_path=None):
     if "areacello" in ds:
         fx["areacello"] = ds["areacello"]
     # Optionally add other ocean mask/area fields as needed
-    # Save to NetCDF if requested
-    if out_path is not None:
-        xr.Dataset(fx).to_netcdf(out_path)
+
     return fx
 
 
@@ -41,7 +39,6 @@ def compute_cell_bounds_from_corners(corner_array):
     """
     # For each cell, get the 4 corners and compute min/max
     ny, nx = corner_array.shape[0] - 1, corner_array.shape[1] - 1
-    print(f"nx = {nx}, ny = {ny}")
     bounds = np.empty((ny * nx, 2), dtype=corner_array.dtype)
     idx = 0
     for j in range(ny):
@@ -55,7 +52,6 @@ def compute_cell_bounds_from_corners(corner_array):
             bounds[idx, 0] = np.nanmin(cell_corners)
             bounds[idx, 1] = np.nanmax(cell_corners)
             idx += 1
-    print(f"[MOM6 bounds debug] ny: {ny}, nx: {nx}, bounds shape: {bounds.shape}")
     return bounds
 
 
@@ -74,13 +70,5 @@ def load_mom6_grid(static_path):
     geolon = np.mod(geolon, 360.0)
     geolon_c = np.mod(geolon_c, 360.0)
     # Compute bounds arrays using corners
-    lat_bnds = compute_cell_bounds_from_corners(geolat_c)
-    lon_bnds = compute_cell_bounds_from_corners(geolon_c)
-    # Debug: print min, max, and check monotonicity
-    print(
-        f"lat_bnds shape: {lat_bnds.shape}, min: {np.nanmin(lat_bnds)}, max: {np.nanmax(lat_bnds)}"
-    )
-    print(
-        f"lon_bnds shape: {lon_bnds.shape}, min: {np.nanmin(lon_bnds)}, max: {np.nanmax(lon_bnds)}"
-    )
+
     return geolat, geolon, geolat_c, geolon_c

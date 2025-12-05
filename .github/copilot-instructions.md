@@ -26,10 +26,10 @@
 - **CMORization:**
   - Table and attribute handling in `cmor_writer.py`
   - CMOR tables expected in `Tables/` directory
-- **CLI Entrypoint:**
-  - Main CLI in `cli.py` (uses `click`)
-  - Example: `poetry run cmip7-prep prepare --var TS ...`
-- **Testing:**
+**CLI Entrypoint:**
+  - Main CLI is provided by the `cmip7-prep` Python package (installed via Poetry)
+  - Usage examples and argument patterns are documented in the README
+  - There is no `cli.py` file and no `prepare` command; use the documented subcommands and options
   - Pytest tests in `tests/`, use realistic data and mocks
   - No test data generation; tests expect files in `data/`
 
@@ -42,14 +42,7 @@
   - Output: CMORized NetCDF files in `out/`
 
 ## Examples
-- Prepare a variable:
-  ```sh
-  poetry run cmip7-prep prepare --var TS --realm Amon --dreq-export data_request_v1.2.2.csv --mapping-yaml cesm_to_cmip7.yaml --cmor-tables Tables --outdir out --in-files cam.h1.TS.ne30pg3.*.nc
-  ```
-- Validate output:
-  ```sh
-  PrePARE --table-path Tables out/*.nc
-  ```
+See the README for up-to-date usage examples. The CLI does not use a `prepare` command; use the available subcommands and options as documented.
 
 ## Tips for AI Agents
 - Always check for required config/data files before running workflows

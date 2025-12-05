@@ -125,6 +125,16 @@ variables:
     sources:
       - cesm_var: TOTVEGC
 
+  deptho:
+    table: fx
+    units: "m"
+    long_name: Sea Floor Depth
+    standard_name: depth_below_sea_level
+    dims: [yh, xh]
+    regrid_method: conservative
+    sources:
+      - cesm_var: deptho
+
   evspsbl:
     table: Amon
     units: kg m-2 s-1
@@ -495,7 +505,7 @@ variables:
   sos:
     table: Omon
     units: "1e-3"
-    dims: [time, yh, xh]
+    dims: [time, latitude, longitude]
     regrid_method: conservative
     sources:
       - cesm_var: sos
@@ -506,6 +516,14 @@ variables:
     dims: [time, lat, lon]
     sources:
       - cesm_var: U10
+
+  sftlf:
+    table: fx
+    units: "%"
+    dims: [lat, lon]
+    formula: LANDFRAC * 100.0
+    sources:
+      - cesm_var: LANDFRAC
 
   ta:
     table: Amon

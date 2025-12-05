@@ -216,7 +216,7 @@ def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
     else:
         raise ValueError(f"Expected 'ncol' or 'lndgrid' in dims; got {da.dims}")
     non_spatial = tuple(d for d in da.dims if d != hdim)
-    return da.transpose(*non_spatial, hdim), non_spatial, hdim
+    return da.transpose(*non_spatial, hdim), non_spatial
 
 
 # -------------------------
@@ -266,8 +266,6 @@ def regrid_to_1deg_ds(
         realm = "lnd"
     else:
         realm = "ocn"
-    if "sftof" in ds_in:
-        logger.info("Regridding sftof (sea fraction) from source dataset")
 
     # Pick the mapfile you used for conservative/bilinear selection
     spec = _pick_maps(
@@ -284,6 +282,7 @@ def regrid_to_1deg_ds(
         # Don’t overwrite if user already computed and passed them in
         for name in (
             "sftlf",
+            "sftof",
             "areacella",
             "orog",
             "lat",
@@ -313,7 +312,7 @@ def _denormalize_land_field(
     out_norm: xr.DataArray, ds_in: xr.Dataset, mapfile: Path
 ) -> xr.DataArray:
     """Denormalize field by destination landfrac."""
-    logger.info("Denormalizing land field")
+    logger.info("Denormalizing land field ")
     ds_fx = _regrid_fx_once(mapfile, ds_in)
     if "sftlf" not in ds_fx:
         raise ValueError(
@@ -450,7 +449,7 @@ def regrid_to_1deg(
         If set and 'time' present, make xESMF return chunked output along 'time'.
     """
     if varname not in ds_in:
-        raise KeyError(f"{varname!r} not in dataset.")
+        raise KeyError(f"{varname!r} not in dataset: variables {list(ds_in.variables)}")
 
     realm = None
     var_da = ds_in[varname]  # always a DataArray
@@ -468,17 +467,17 @@ def regrid_to_1deg(
             frac = sftof / 100.0
             da2 = da2.fillna(0) * frac
     else:
-        da2, non_spatial, hdim = _ensure_ncol_last(var_da)
-        # _ensure_ncol_last returns (da, non_spatial, hdim),
-        # but the code expects only (da, non_spatial)
-        # Fix: Only unpack (da2, non_spatial), and set hdim separately if needed
-        # Actually, the function returns three values, so update usage to match
-        # If hdim is needed, keep as is, but ensure downstream code expects three values
-        # If only two values are needed, change to:
-        # da2, non_spatial = _ensure_ncol_last(var_da)[:2]
-        # For now, keep unpacking three values, but ensure all usages match
-        if hdim == "ncol":
+        da2, non_spatial = _ensure_ncol_last(var_da)
+        # For land/atm, set realm and hdim
+        if "ncol" in var_da.dims:
             realm = "atm"
+            hdim = "ncol"
+        elif "lndgrid" in var_da.dims:
+            realm = "lnd"
+            hdim = "lndgrid"
+        else:
+            # Fallback: use last dim
+            hdim = da2.dims[-1]
 
     # cast to save memory
     if dtype is not None and str(da2.dtype) != dtype:
@@ -712,6 +711,7 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
     ds_fx = xr.Dataset(pieces)
     # normalize horizontal dim name to what your regrid code expects
     #    ds_fx = ds_fx.rename({"lndgrid": "ncol"})
+    logger.info("sftlf in ds_fx: %s", "sftlf" in ds_fx)
     return ds_fx
 
 
@@ -810,20 +810,40 @@ def _regrid_fx_once(
     for key in ["sftof", "deptho", "areacello"]:
         if key in ds_fx_native:
             native_fx[f"{key}_native"] = ds_fx_native[key]
-    if native_fx:
-        FXCache.put(f"{mapfile}_native", xr.Dataset(native_fx))
-
-    # Regrid sftof from source if present
+    # Always cache sftof_native if present
     if "sftof" in ds_fx_native:
-        logger.info("Regridding sftof (sea fraction) from native")
-        da = ds_fx_native["sftof"]
-        da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
+        native_fx["sftof_native"] = ds_fx_native["sftof"]
+    if native_fx:
+        FXCache.put(mapfile, xr.Dataset(native_fx))
+    # Regrid sftlf from source if present
+    if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
+        da = ds_fx_native["sftlf"].fillna(0)
+        da2 = (
+            da.rename({"lndgrid": "lon"})
+            .expand_dims({"lat": 1})
+            .transpose(..., "lat", "lon")
+        )
+        lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
+            dim=("lndgrid")
+        )
+        logger.info("Total land area on source grid: %.3e m^2", lndarea.values)
         out = regridder(da2, skipna=True, na_thres=1.0)
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
-        out.name = "sftof"
+        out.name = "sftlf"
         out.attrs.update(da.attrs)
-        out_vars["sftof"] = out
+        out_vars["sftlf"] = out
+    # For regridded grid, set sftof = 1 - sftlf
+    if "sftlf" in out_vars:
+        logger.info("Computing regridded sftof as 1 - sftlf")
+        sftlf = out_vars["sftlf"]
+        sftof = (1.0 - sftlf / 100.0) * 100.0
+        sftof = sftof.clip(min=0.0, max=100.0)
+        sftof.name = "sftof"
+        sftof.attrs["units"] = "%"
+        sftof.attrs.setdefault("standard_name", "sea_area_fraction")
+        sftof.attrs.setdefault("long_name", "Percentage of sea area")
+        out_vars["sftof"] = sftof
 
     # Regrid deptho from source if present
     if "deptho" in ds_fx_native:

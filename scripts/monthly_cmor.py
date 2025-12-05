@@ -13,8 +13,7 @@ Preserves all comments and error handling from both atm_monthly.py and lnd_month
 from __future__ import annotations
 import argparse
 from concurrent.futures import as_completed
-from email import parser
-from http import client
+
 import os
 from pathlib import Path
 import logging
@@ -23,8 +22,10 @@ from typing import Optional, Tuple
 import sys
 from datetime import datetime, UTC
 import glob
-
+import numpy as np
 import xarray as xr
+
+from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
@@ -36,8 +37,6 @@ from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
 from dask.distributed import wait, as_completed
 from dask import delayed
-import dask.array as da
-import dask
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
@@ -203,23 +202,14 @@ def process_one_var(
                 continue
 
             # --- OCN: distinguish native vs regridded by dims ---
-            if "xh" in dims and "yh" in dims:
+            if "latitude" in dims and "longitude" in dims:
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
                 ds_cmor = ds_native
                 results.append((varname, "analyzed native mom6 grid"))
                 # Attach ocn_fx_fields to ds_cmor for writing
                 if ocn_fx_fields is not None:
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
-                if mom6_grid is not None:
-                    logger.info(f"Add geolat to ds_cmor")
-                    ds_cmor["geolat"] = xr.DataArray(mom6_grid[0], dims=("yh", "xh"))
-                    ds_cmor["geolon"] = xr.DataArray(mom6_grid[1], dims=("yh", "xh"))
-                    ds_cmor["geolat_c"] = xr.DataArray(
-                        mom6_grid[2], dims=("yhp", "xhp")
-                    )
-                    ds_cmor["geolon_c"] = xr.DataArray(
-                        mom6_grid[3], dims=("yhp", "xhp")
-                    )
+
             else:
                 # For lnd/atm or any other dims, use existing logic
                 logger.debug(
@@ -290,6 +280,7 @@ def process_one_var(
                 f"Exception while processing {varname} with dims {dims}: {e!r}"
             )
             results.append((varname, f"ERROR: {e!r}"))
+    logger.info(f"Completed all processing for variable: {varname}, results {results}")
     return results
 
 
@@ -532,7 +523,7 @@ def main():
                 except Exception as e:
                     logger.error("Task error:", e)
                     raise
-
+        logger.info("CMORization complete. Summary of results:%s", results)
         for v, status in results:
             logger.info(f"Variable {v} processed with status: {status}")
 
