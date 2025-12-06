@@ -472,7 +472,9 @@ def main():
 
         if args.workers == 1:
             results = [
-                process_one_var(
+                item
+                for v in cmip_vars
+                for item in process_one_var(
                     v,
                     mapping,
                     input_path,
@@ -484,6 +486,7 @@ def main():
                 )
                 for v in cmip_vars
             ]
+
         else:
             futs = [
                 process_one_var_delayed(
@@ -523,7 +526,7 @@ def main():
                 except Exception as e:
                     logger.error("Task error:", e)
                     raise
-        logger.info("CMORization complete. Summary of results:%s", results)
+
         for v, status in results:
             logger.info(f"Variable {v} processed with status: {status}")
 
