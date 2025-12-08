@@ -24,8 +24,8 @@
 
   "calendar": "noleap",
   "frequency": "mon",
-  "grid": "data mapped to a 1x1 degree.",
 
+  "grid": "data mapped to a 1x1 degree.",
   "grid_label": "gr",
 
   "title": "CESM3 piControl on 1x1 degree grid (regridded from ne30np3 se grid)",

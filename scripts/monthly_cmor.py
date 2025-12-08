@@ -13,8 +13,7 @@ Preserves all comments and error handling from both atm_monthly.py and lnd_month
 from __future__ import annotations
 import argparse
 from concurrent.futures import as_completed
-from email import parser
-from http import client
+
 import os
 from pathlib import Path
 import logging
@@ -23,8 +22,10 @@ from typing import Optional, Tuple
 import sys
 from datetime import datetime, UTC
 import glob
-
+import numpy as np
 import xarray as xr
+
+from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
@@ -36,8 +37,6 @@ from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
 from dask.distributed import wait, as_completed
 from dask import delayed
-import dask.array as da
-import dask
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
@@ -111,11 +110,11 @@ def parse_args():
         default=default_outdir,
         help="Output directory for CMORized files (default: $SCRATCH/CMIP7)",
     )
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
+    # group = parser.add_mutually_exclusive_group()
+    parser.add_argument(
         "--skip-cmor", action="store_true", help="Skip the CMORization step."
     )
-    group.add_argument(
+    parser.add_argument(
         "--skip-timeseries",
         action="store_true",
         help="Skip the timeseries processing step.",
@@ -187,11 +186,11 @@ def process_one_var(
                 parallel=True,
                 open_kwargs=open_kwargs,
             )
-
+            logger.info("realm is %s", realm)
             # Append ocn_fx_fields to ds_native if available
             if realm == "ocn" and ocn_fx_fields is not None:
                 ds_native = ds_native.merge(ocn_fx_fields)
-            logger.debug(
+            logger.info(
                 "ds_native keys: %s for var %s with dims %s",
                 list(ds_native.keys()),
                 varname,
@@ -201,23 +200,15 @@ def process_one_var(
                 logger.warning(f"Source variable(s) not found for {varname}")
                 results.append((varname, "ERROR: Source variable(s) not found."))
                 continue
-
             # --- OCN: distinguish native vs regridded by dims ---
-            if "xh" in dims and "yh" in dims:
+            if "latitude" in dims and "longitude" in dims:
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
                 ds_cmor = ds_native
                 results.append((varname, "analyzed native mom6 grid"))
-                if mom6_grid is not None:
-                    logger.info(f"Add geolat to ds_cmor")
+                # Attach ocn_fx_fields to ds_cmor for writing
+                if ocn_fx_fields is not None:
+                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
 
-                    ds_cmor["geolat"] = xr.DataArray(mom6_grid[0], dims=("yh", "xh"))
-                    ds_cmor["geolon"] = xr.DataArray(mom6_grid[1], dims=("yh", "xh"))
-                    ds_cmor["geolat_c"] = xr.DataArray(
-                        mom6_grid[2], dims=("yhp", "xhp")
-                    )
-                    ds_cmor["geolon_c"] = xr.DataArray(
-                        mom6_grid[3], dims=("yhp", "xhp")
-                    )
             else:
                 # For lnd/atm or any other dims, use existing logic
                 logger.debug(
@@ -236,6 +227,9 @@ def process_one_var(
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
+                # Attach ocn_fx_fields to regridded output for writing
+                if ocn_fx_fields is not None:
+                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
         except AttributeError:
             results.append((varname, f"ERROR cesm input variable not found"))
             continue
@@ -285,6 +279,7 @@ def process_one_var(
                 f"Exception while processing {varname} with dims {dims}: {e!r}"
             )
             results.append((varname, f"ERROR: {e!r}"))
+    logger.info(f"Completed all processing for variable: {varname}, results {results}")
     return results
 
 
@@ -343,13 +338,16 @@ def main():
         subdir = "lnd"
     elif args.realm == "ocn":
         # we do not want to match static files
-        include_patterns = ["*mom6.h.rho2.*", "*mom6.h.native.*", "*mom6.h.sfc.*"]
+        include_patterns = ["*mom6.h.sfc.*", "*mom6.h.z.*"]
         var_prefix = "Omon."
         subdir = "ocn"
         if args.ocn_grid_file:
             ocn_grid = args.ocn_grid_file
         if args.ocn_static_file:
             ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
+            logger.info(
+                f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
+            )
     # Setup input/output directories
     if args.caseroot and args.cimeroot:
         caseroot = args.caseroot
@@ -451,9 +449,7 @@ def main():
                 ts_collection = ts_collection.apply_overwrite("*")
             ts_collection.execute()
             logger.info("Timeseries processing complete, starting CMORization...")
-    if args.skip_cmor:
-        logger.info("Skipping CMORization as per --skip-cmor flag.")
-        sys.exit(0)
+
     # Load mapping
     mapping = Mapping.from_packaged_default()
     logger.info(f"Finding variables with prefix {var_prefix}")
@@ -464,6 +460,9 @@ def main():
             None, var_prefix, where={"List of Experiments": "piControl"}
         )
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
+    if args.skip_cmor:
+        logger.info("Skipping CMORization as per --skip-cmor flag. %s", cmip_vars)
+        sys.exit(0)
     # Load requested variables
     if len(cmip_vars) > 0:
         if len(include_patterns) == 1:
@@ -473,7 +472,9 @@ def main():
 
         if args.workers == 1:
             results = [
-                process_one_var(
+                item
+                for v in cmip_vars
+                for item in process_one_var(
                     v,
                     mapping,
                     input_path,
@@ -485,6 +486,7 @@ def main():
                 )
                 for v in cmip_vars
             ]
+
         else:
             futs = [
                 process_one_var_delayed(
@@ -501,7 +503,7 @@ def main():
             ]
             futures = client.compute(futs)
             wait(
-                futures, timeout="600s"
+                futures, timeout="1200s"
             )  # optional soft check; won’t raise, just returns done/pending
 
             # iterate results; if anything stalls you can call dump_all_stacks(client)

@@ -207,7 +207,8 @@ def _get_dst_latlon_1d(mapfile: Path) -> Tuple[np.ndarray, np.ndarray]:
 # Cache
 # -------------------------
 class FXCache:
-    """Cache of regridded FX fields (sftlf, areacella) keyed by mapfile."""
+    """Cache of regridded FX fields (sftlf, areacella,
+    areacello, sftof, deptho) keyed by mapfile."""
 
     _cache: Dict[Path, xr.Dataset] = {}
 
@@ -219,6 +220,7 @@ class FXCache:
     @classmethod
     def put(cls, key: Path, ds_fx: xr.Dataset) -> None:
         """put variable into cache"""
+        logger.info("Caching FX fields : %s", ds_fx.data_vars.keys())
         cls._cache[key] = ds_fx
 
     @classmethod

@@ -143,12 +143,28 @@ def bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
     elif kind == "lon":
         # wrap to [0, 360)
         bounds = bounds % 360.0
-        # ensure each row is increasing in modulo arithmetic
-        wrap = bounds[:, 1] < bounds[:, 0]
-        if np.any(wrap):
-            bounds[wrap, 1] += 360.0
+        # ensure continuity: each cell's upper bound matches next cell's lower bound
+        for i in range(bounds.shape[0] - 1):
+            bounds[i, 1] = bounds[i + 1, 0]
+        # For the last cell, ensure wrap to 360 if needed
+        if bounds[-1, 1] < bounds[-1, 0]:
+            bounds[-1, 1] = 360.0
+        # Postprocessing: round bounds to 8 decimals for continuity
+        bounds = np.round(bounds, 8)
 
     return bounds
+
+
+def roll_for_monotonic_with_bounds(lon, lon_bnds):
+    """Roll lon and lon_bnds together so both are strictly increasing and aligned."""
+    d = np.diff(lon)
+    k = np.where(d < 0)[0]
+    if k.size:
+        shift = k[0] + 1
+        lon = np.roll(lon, -shift)
+        lon_bnds = np.roll(lon_bnds, -shift, axis=0)
+        return lon, lon_bnds, -shift
+    return lon, lon_bnds, 0
 
 
 # --- CMOR attribute compat layer (handles both API variants) ---

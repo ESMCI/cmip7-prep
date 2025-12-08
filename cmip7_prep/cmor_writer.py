@@ -33,6 +33,7 @@ from .cmor_utils import (
     resolve_table_filename,
     filled_for_cmor,
     open_existing_fx,
+    roll_for_monotonic_with_bounds,
 )
 
 # from .mom6_static import compute_cell_bounds_from_corners
@@ -84,7 +85,8 @@ class CmorSession(
         self._log_name = log_name
         self._log_path: Path | None = None
         self._pending_ps = None
-
+        self.primarytable: Optional[str] = None
+        self.currenttable: Optional[str] = None
         self._outdir = Path(outdir or "./CMIP7").resolve()
         self._outdir.mkdir(parents=True, exist_ok=True)
         self._fx_written: set[str] = (
@@ -214,6 +216,15 @@ class CmorSession(
     # -------------------------
     # internal helpers
     # -------------------------
+    def load_table(self, tables_path: Path, key: str) -> dict:
+        """Load CMOR table JSON for a given key by searching common patterns."""
+        if key == self.currenttable:
+            return {}  # already loaded
+        table_filename = resolve_table_filename(tables_path, key)
+        self.currenttable = key
+        logger.info("Loading CMOR table: %s", table_filename)
+        return cmor.load_table(table_filename)
+
     def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
         """Define CMOR axis IDs for the variable in ds according to the CMOR tables.
 
@@ -226,7 +237,9 @@ class CmorSession(
         """
 
         # ---- helpers ----
+
         def _get_time_and_bounds(dsi: xr.Dataset):
+
             time_da = (
                 dsi.coords["time"]
                 if "time" in dsi.coords
@@ -234,13 +247,19 @@ class CmorSession(
             )
             if time_da is None:
                 return None, None, None
-            units = time_da.attrs.get("units", "days since 1850-01-01")
+
+            units = time_da.attrs.get(
+                "units", time_da.encoding.get("units", "days since 1850-01-01")
+            )
+            # spinup run calendar adjustment
             cal = time_da.attrs.get(
                 "calendar", time_da.encoding.get("calendar", "noleap")
             )
+
             tvals = encode_time_to_num(time_da, units, cal)
 
             bname = time_da.attrs.get("bounds")
+
             tb = (
                 dsi[bname]
                 if isinstance(bname, str) and bname in dsi
@@ -251,34 +270,19 @@ class CmorSession(
                 )
             )
             tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
+
             return tvals, tbnum, str(units)
 
         def _get_1d_with_bounds(dsi: xr.Dataset, name: str, units_default: str):
             da = dsi.coords[name] if name in dsi.coords else dsi[name]
             vals = np.asarray(da.values, dtype="f8")
             units = da.attrs.get("units", units_default)
-
-            # try common names; else synthesize conservative bounds
-            cand = (f"{name}_bnds", f"{name}_bounds")
-            b = None
-            for cn in cand:
-                if cn in dsi:
-                    b = np.asarray(dsi[cn].values, dtype="f8")
-                    break
-            if b is None:
-                dv = np.diff(vals)
-                if vals.size >= 2:
-                    lower = np.concatenate(
-                        ([vals[0] - dv[0] / 2.0], vals[:-1] + dv / 2.0)
-                    )
-                    upper = np.concatenate(
-                        (vals[1:] - dv / 2.0, [vals[-1] + dv[-1] / 2.0])
-                    )
-                    b = np.stack([lower, upper], axis=-1)
-                else:
-                    b = np.array([[vals[0] - 0.5, vals[0] + 0.5]], dtype="f8")
-
-            return vals, b, units
+            # Compute bounds
+            bnds = bounds_from_centers_1d(vals, name)
+            # For longitude, ensure monotonicity and alignment
+            if name == "lon":
+                vals, bnds, _ = roll_for_monotonic_with_bounds(vals, bnds)
+            return vals, bnds, units
 
         axes_ids = []
         var_name = getattr(vdef, "name", None)
@@ -291,6 +295,7 @@ class CmorSession(
         lat_id = None
         lon_id = None
         sdepth_id = None
+        lev_id = None
 
         logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
         if "xh" in var_dims and "yh" in var_dims:
@@ -300,69 +305,71 @@ class CmorSession(
                 "[CMOR axis debug] Defining unstructured grid for variable %s.",
                 var_name,
             )
+            logger.info("[CMOR axis debug] write geolon axes")
 
+            geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
+            if not geo_path.exists():
+                raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
+            ds_geo = xr.open_dataset(geo_path)
+            lat_vals_1d = ds_geo["lath"].values
+            lon_raw = np.mod(ds_geo["lonh"].values, 360.0)
+            lon_bnds_raw = bounds_from_centers_1d(lon_raw, "lon")
+            lon_vals_1d, lon_bnds, shift = roll_for_monotonic_with_bounds(
+                lon_raw, lon_bnds_raw
+            )
+            # Fix first and last bounds to wrap correctly
+            if lon_bnds.shape[0] > 1:
+                # Ensure bounds are strictly increasing and wrap at dateline
+                if lon_bnds[0, 0] > 0.0:
+                    # Set first lower bound to 0, last upper bound to 360
+                    lon_bnds[0, 0] = 0.0
+                    lon_bnds[-1, 1] = 360.0
+                # Also correct first upper bound to match the first cell
+                lon_bnds[0, 1] = lon_bnds[1, 0]
+            # Print lon_bnds for a range (debug)
             i_id = cmor.axis(
-                table_entry="i",
-                units="1",
-                length=ds["xh"].size,
+                table_entry="latitude",
+                units="degrees_north",
+                coord_vals=lat_vals_1d,
+                cell_bounds=bounds_from_centers_1d(lat_vals_1d, "lat"),
             )
+            logger.info("[CMOR axis debug] write geolat axes")
             j_id = cmor.axis(
-                table_entry="j",
-                units="1",
-                length=ds["yh"].size,
+                table_entry="longitude",
+                units="degrees_east",
+                coord_vals=lon_vals_1d,
+                cell_bounds=lon_bnds,
             )
-            logger.debug("[CMOR axis debug] Defining unstructured grid_id.")
-            grid_id = cmor.grid(
-                axis_ids=[j_id, i_id],  # note CMOR wants fastest varying last
-                longitude=ds["geolon"].values,
-                latitude=ds["geolat"].values,
-                longitude_vertices=ds["geolon_c"].values,
-                latitude_vertices=ds["geolat_c"].values,
-            )
-
-            # No lat/lon axis registration for curvilinear grid
-            # 2D geolat/geolon should be written as auxiliary variables elsewhere
-            # Map axes for dimension order
-            dim_to_axis = {"time": None, "i": i_id, "j": j_id, "xh": i_id, "yh": j_id}
-            axes_ids = []
-            for d in var_dims:
-                axis_id = dim_to_axis.get(d)
-                if axis_id is None and d != "time":
-                    raise KeyError(
-                        f"No axis ID found for dimension '{d}'"
-                        f" in variable '{var_name}' (curvilinear)"
-                    )
-                axes_ids.append(axis_id)
-            logger.debug("[CMOR axis debug] Appending grid_id: %s", grid_id)
-            axes_ids.append(grid_id)
-            logger.debug("[CMOR axis debug] axes_ids: %s", axes_ids)
-            return axes_ids
-
+            axes_ids.extend([j_id, i_id])
+            ds[var_name] = var_da.roll(xh=-shift, roll_coords=True)
+            # rename dims xh and yh to longitude and latitude
+            ds[var_name] = ds[var_name].rename({"xh": "longitude", "yh": "latitude"})
+            var_da = ds[var_name]
+            var_dims = list(var_da.dims)
         # --- horizontal axes (use CMOR names) ----
-        if "lat" not in ds or "lon" not in ds:
-            raise KeyError(
-                "Expected 'lat' and 'lon' in dataset for CMOR horizontal axes."
-            )
-        lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
-        lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
+        elif "lat" in var_dims and "lon" in var_dims:
+            logger.info("*** Define horizontal axes")
+            lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
+            lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
 
-        logger.info("write lat axis")
-        lat_id = cmor.axis(
-            table_entry="latitude",
-            units="degrees_north",
-            coord_vals=lat_vals,
-            cell_bounds=lat_bnds,
-        )
-        logger.info("write lon axis")
-        lon_id = cmor.axis(
-            table_entry="longitude",
-            units="degrees_east",
-            coord_vals=lon_vals,
-            cell_bounds=lon_bnds,
-        )
+            logger.info("write lat axis")
+            lat_id = cmor.axis(
+                table_entry="latitude",
+                units="degrees_north",
+                coord_vals=lat_vals,
+                cell_bounds=lat_bnds,
+            )
+            logger.info("write lon axis")
+            lon_id = cmor.axis(
+                table_entry="longitude",
+                units="degrees_east",
+                coord_vals=lon_vals,
+                cell_bounds=lon_bnds,
+            )
 
         # ---- time axis ----
         time_id = None
+        self.load_table(self.tables_path, self.primarytable)
         tvals, tbnds, t_units = _get_time_and_bounds(ds)
         if tvals is not None:
             logger.info("write time axis")
@@ -372,6 +379,7 @@ class CmorSession(
                 coord_vals=tvals,
                 cell_bounds=tbnds if tbnds is not None else None,
             )
+            logger.info("time axis id: %s", time_id)
         # --- vertical: standard_hybrid_sigma ---
         levels = getattr(vdef, "levels", {}) or {}
 
@@ -492,17 +500,28 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+        elif "z_l" in var_dims:
+            values = ds["z_l"].values
+            logger.info("write z_l axis")
+            bnds = bounds_from_centers_1d(values, "z_l")
+            lev_id = cmor.axis(
+                table_entry="depth_coord",
+                units="m",
+                coord_vals=np.asarray(values),
+                cell_bounds=bnds,
+            )
         # Map dimension names to axis IDs
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
             "lev": alev_id,  # sometimes used for hybrid
             "sdepth": sdepth_id,
+            "z_l": lev_id,
             "plev": plev_id,
             "lat": lat_id,
-            "latitude": lat_id,
+            "latitude": lat_id if lat_id is not None else i_id,
             "lon": lon_id,
-            "longitude": lon_id,
+            "longitude": lon_id if lon_id is not None else j_id,
             "xh": lon_id,  # MOM6
             "yh": lat_id,  # MOM6
         }
@@ -511,50 +530,102 @@ class CmorSession(
             axis_id = dim_to_axis.get(d)
             if axis_id is None:
                 raise KeyError(
-                    f"No axis ID found for dimension '{d}' in variable '{var_name}'"
+                    f"No axis ID found for dimension '{d}' in variable '{var_name}' {var_dims}"
                 )
             axes_ids.append(axis_id)
+        self.load_table(self.tables_path, self.primarytable)
         return axes_ids
 
     def _write_fx_2d(self, ds: xr.Dataset, name: str, units: str) -> None:
         if name not in ds:
             return
-        table_filename = resolve_table_filename(self.tables_path, "fx")
-        cmor.load_table(table_filename)
 
-        lat = ds["lat"].values
-        lon = ds["lon"].values
-        lat_b = ds.get("lat_bnds")
-        lon_b = ds.get("lon_bnds")
-        lat_b = (
-            lat_b.values
-            if isinstance(lat_b, xr.DataArray)
-            else bounds_from_centers_1d(lat, "lat")
-        )
-        lon_b = (
-            lon_b.values
-            if isinstance(lon_b, xr.DataArray)
-            else bounds_from_centers_1d(lon, "lon")
-        )
+        # Handle curvilinear grid (yh, xh) for deptho
+        da = ds[name]
+        logger.info("FX variable %s dims: %s", name, da.dims)
+        if set(da.dims) == {"xh", "yh"}:
+            self.load_table(self.tables_path, "Ofx")
+            geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
+            ds_geo = xr.open_dataset(geo_path)
+            lat = ds_geo["lath"].values
+            lon_raw = np.mod(ds_geo["lonh"].values, 360.0)
+            lon_bnds_raw = bounds_from_centers_1d(lon_raw, "lon")
+            lon_vals_1d, lon_bnds, shift = roll_for_monotonic_with_bounds(
+                lon_raw, lon_bnds_raw
+            )
+            if lon_bnds.shape[0] > 1:
+                # Ensure bounds are strictly increasing and wrap at dateline
+                if lon_bnds[0, 0] > 0.0:
+                    # Set first lower bound to 0, last upper bound to 360
+                    lon_bnds[0, 0] = 0.0
+                    lon_bnds[-1, 1] = 360.0
+                # Also correct first upper bound to match the first cell
+                lon_bnds[0, 1] = lon_bnds[1, 0]
+            # Print lon_bnds for a range (debug)
+            data = np.roll(da.values, -shift, axis=1)
+            # Assign new dims for writing
+            data_filled, fillv = filled_for_cmor(
+                xr.DataArray(data, dims=["latitude", "longitude"])
+            )
+            lat_b = bounds_from_centers_1d(lat, "lat")
 
-        lat_id = cmor.axis(
-            "latitude", "degrees_north", coord_vals=lat, cell_bounds=lat_b
-        )
-        lon_id = cmor.axis(
-            "longitude", "degrees_east", coord_vals=lon, cell_bounds=lon_b
-        )
-        data_filled, fillv = filled_for_cmor(ds[name])
+            lat_id = cmor.axis(
+                "latitude", "degrees_north", coord_vals=lat, cell_bounds=lat_b
+            )
+            logger.info("FX variable %s define lat_id %s", name, lat_id)
 
+            lon_id = cmor.axis(
+                "longitude",
+                "degrees_east",
+                coord_vals=lon_vals_1d,
+                cell_bounds=lon_bnds,
+            )
+            logger.info("FX variable %s define lon_id %s", name, lon_id)
+            logger.info("Writing fx variable %s on curvilinear grid", name)
+            cmor.set_cur_dataset_attribute("grid", "curvilinear")
+            cmor.set_cur_dataset_attribute("grid_label", "gn")
+        else:
+            cmor.set_cur_dataset_attribute("grid", "1x1 degree")
+            cmor.set_cur_dataset_attribute("grid_label", "gr")
+            if name in ("areacella", "sftlf"):
+                self.load_table(self.tables_path, "fx")
+            elif name in ("sftof", "deptho", "areacello"):
+                self.load_table(self.tables_path, "Ofx")
+            lat = ds["lat"].values
+            lon = ds["lon"].values
+            lat_b = ds.get("lat_bnds")
+            lon_b = ds.get("lon_bnds")
+            lat_b = (
+                lat_b.values
+                if isinstance(lat_b, xr.DataArray)
+                else bounds_from_centers_1d(lat, "lat")
+            )
+            lon_b = (
+                lon_b.values
+                if isinstance(lon_b, xr.DataArray)
+                else bounds_from_centers_1d(lon, "lon")
+            )
+            lat_id = cmor.axis(
+                "latitude", "degrees_north", coord_vals=lat, cell_bounds=lat_b
+            )
+            lon_id = cmor.axis(
+                "longitude", "degrees_east", coord_vals=lon, cell_bounds=lon_b
+            )
+            data_filled, fillv = filled_for_cmor(da)
+        logger.info("Writing fx variable %s", name)
         var_id = cmor.variable(name, units, [lat_id, lon_id], missing_value=fillv)
+        if cmor.has_variable_attribute(var_id, "outputpath"):
+            logger.info(
+                "CMOR variable object has outputpath attribute: %s",
+                cmor.get_variable_attribute(var_id, "outputpath"),
+            )
 
-        cmor.write(
-            var_id,
-            np.asarray(data_filled),
-        )
+        cmor.write(var_id, np.asarray(data_filled))
         cmor.close(var_id)
+        logger.info("Finished writing fx variable %s", name)
 
     def ensure_fx_written_and_cached(self, ds_regr: xr.Dataset) -> xr.Dataset:
-        """Ensure sftlf and areacella exist in ds_regr and are written once as fx.
+        """Ensure <fx variables> exist in ds_regr and are written once as fx.
         If not present in ds_regr, try to read from existing CMOR fx files in outdir.
         If present in ds_regr but not yet written this run, write and cache them.
         Returns ds_regr augmented with any missing fx fields.
@@ -563,6 +634,7 @@ class CmorSession(
             ("sftlf", "%"),
             ("areacella", "m2"),
             ("sftof", "%"),
+            ("wet", "%"),
             ("areacello", "m2"),
             ("mrsofc", "m3 s-1"),
             ("orog", "m"),
@@ -578,6 +650,13 @@ class CmorSession(
             ("sftif", "%"),
         ]  # land fraction, ocean cell area, soil moisture fraction
         out = ds_regr
+
+        # Write sftof if present (native grid sea fraction: wet)
+        if "sftof" in ds_regr and "sftof" not in self._fx_written:
+            logger.info("Writing fx variable sftof")
+            self.load_table(self.tables_path, "Ofx")
+            self._write_fx_2d(ds_regr, "sftof", "%")
+            self._fx_written.add("sftof")
 
         for name, units in need:
             # 1) Already cached this run?
@@ -637,31 +716,39 @@ class CmorSession(
     ) -> None:
         """Write one variable from ds to a CMOR-compliant NetCDF file."""
         # Pick CMOR table: prefer vdef.table, else vdef.realm (default Amon)
-        table_key = (
+        self.primarytable = (
             getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "Amon"
         )
 
-        table_filename = resolve_table_filename(self.tables_path, table_key)
-        cmor.load_table(table_filename)
-
+        logger.info("Using CMOR table key: %s", self.primarytable)  # debug
+        self.load_table(self.tables_path, self.primarytable)
         data = ds[vdef.name]
+        logger.info("Ensure fx variables are written and cached")  # debug
+        self.ensure_fx_written_and_cached(ds)
+
+        units = getattr(vdef, "units", "") or ""
+        self.load_table(self.tables_path, self.primarytable)
+        logger.info("Define CMOR axes for variable %s", vdef.name)  # debug
+        axes_ids = self._define_axes(ds, vdef)
         logger.info("Prepare data for CMOR %s", data.dtype)  # debug
         data_filled, fillv = filled_for_cmor(data)
-        logger.info("Define axes data_filled dtype: %s", data_filled.dtype)  # debug
-        axes_ids = self._define_axes(ds, vdef)
-        units = getattr(vdef, "units", "") or ""
+
         # Debug logging for axis mapping
 
         # Try to get axis table entries for each axis_id
         try:
             for i, aid in enumerate(axes_ids):
                 entry = cmor.axis_entry(aid) if hasattr(cmor, "axis_entry") else None
-                logger.debug(
+                logger.info(
                     "[CMOR DEBUG] axis %d: id=%s, table_entry=%s", i, aid, entry
                 )
         # pylint: disable=broad-exception-caught
         except Exception as e:
             logger.warning("[CMOR DEBUG] Could not retrieve axis table entries: %s", e)
+
+        logger.info("Define variable %s with units %s", varname, units)  # debug
+
+        self.load_table(self.tables_path, self.primarytable)
         var_id = cmor.variable(
             getattr(vdef, "name", varname),
             units,
@@ -669,14 +756,21 @@ class CmorSession(
             positive=getattr(vdef, "positive", None),
             missing_value=fillv,
         )
-
+        logger.info("Now define time dimension and write data")  # debug
+        if "lat" in data.dims and "lon" in data.dims:
+            cmor.set_cur_dataset_attribute("grid", "1x1 degree")
+            cmor.set_cur_dataset_attribute("grid_label", "gr")
+        else:
+            cmor.set_cur_dataset_attribute("grid", "curvilinear")
+            cmor.set_cur_dataset_attribute("grid_label", "gn")
         # ---- Prepare time info for this write (local, not cached) ----
         time_da = ds.coords.get("time")
         if time_da is None:
             time_da = ds.get("time")
         nt = 0
-
-        self.ensure_fx_written_and_cached(ds)
+        logger.info(
+            "Insure fx variables are written and cached: %s", list(ds.variables.keys())
+        )  # debug
 
         # ---- Main variable write ----
 
