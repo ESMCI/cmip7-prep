@@ -110,11 +110,11 @@ def parse_args():
         default=default_outdir,
         help="Output directory for CMORized files (default: $SCRATCH/CMIP7)",
     )
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
+    # group = parser.add_mutually_exclusive_group()
+    parser.add_argument(
         "--skip-cmor", action="store_true", help="Skip the CMORization step."
     )
-    group.add_argument(
+    parser.add_argument(
         "--skip-timeseries",
         action="store_true",
         help="Skip the timeseries processing step.",
@@ -186,11 +186,11 @@ def process_one_var(
                 parallel=True,
                 open_kwargs=open_kwargs,
             )
-
+            logger.info("realm is %s", realm)
             # Append ocn_fx_fields to ds_native if available
             if realm == "ocn" and ocn_fx_fields is not None:
                 ds_native = ds_native.merge(ocn_fx_fields)
-            logger.debug(
+            logger.info(
                 "ds_native keys: %s for var %s with dims %s",
                 list(ds_native.keys()),
                 varname,
@@ -200,7 +200,6 @@ def process_one_var(
                 logger.warning(f"Source variable(s) not found for {varname}")
                 results.append((varname, "ERROR: Source variable(s) not found."))
                 continue
-
             # --- OCN: distinguish native vs regridded by dims ---
             if "latitude" in dims and "longitude" in dims:
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
@@ -339,7 +338,7 @@ def main():
         subdir = "lnd"
     elif args.realm == "ocn":
         # we do not want to match static files
-        include_patterns = ["*mom6.h.rho2.*", "*mom6.h.native.*", "*mom6.h.sfc.*"]
+        include_patterns = ["*mom6.h.sfc.*", "*mom6.h.z.*"]
         var_prefix = "Omon."
         subdir = "ocn"
         if args.ocn_grid_file:
@@ -450,9 +449,7 @@ def main():
                 ts_collection = ts_collection.apply_overwrite("*")
             ts_collection.execute()
             logger.info("Timeseries processing complete, starting CMORization...")
-    if args.skip_cmor:
-        logger.info("Skipping CMORization as per --skip-cmor flag.")
-        sys.exit(0)
+
     # Load mapping
     mapping = Mapping.from_packaged_default()
     logger.info(f"Finding variables with prefix {var_prefix}")
@@ -463,6 +460,9 @@ def main():
             None, var_prefix, where={"List of Experiments": "piControl"}
         )
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
+    if args.skip_cmor:
+        logger.info("Skipping CMORization as per --skip-cmor flag. %s", cmip_vars)
+        sys.exit(0)
     # Load requested variables
     if len(cmip_vars) > 0:
         if len(include_patterns) == 1:
@@ -503,7 +503,7 @@ def main():
             ]
             futures = client.compute(futs)
             wait(
-                futures, timeout="600s"
+                futures, timeout="1200s"
             )  # optional soft check; won’t raise, just returns done/pending
 
             # iterate results; if anything stalls you can call dump_all_stacks(client)

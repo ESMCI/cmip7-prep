@@ -8,7 +8,6 @@
 # This allows direct reuse of CMIP6 tables while supporting newer expressive mappings.
 
 dataset_overrides:
-  grid_label: gr1
   institution_id: NCAR
   source_id: CESM3
   nominal_resolution: 100 km
@@ -249,6 +248,14 @@ variables:
     dims: [time, lat, lon]
     sources:
       - cesm_var: TLAI
+
+  mlotst:
+    table: Omon
+    units: "m"
+    long_name: "Ocean Mixed Layer Thickness Defined by Sigma T"
+    dims: [time, latitude, longitude]
+    sources:
+      -cesm_var: mlotst
 
   mrfso:
     table: Lmon
@@ -505,10 +512,32 @@ variables:
   sos:
     table: Omon
     units: "1e-3"
-    dims: [time, latitude, longitude]
+    dims:
+      - [time, latitude, longitude]   # for curvilinear grids
+      - [time, lat, lon]
     regrid_method: conservative
     sources:
       - cesm_var: sos
+
+  sos_max:
+    table: Omon
+    units: "1e-3"
+    dims:
+      - [time, latitude, longitude]   # for curvilinear grids
+      - [time, lat, lon]
+    regrid_method: conservative
+    sources:
+      - cesm_var: sos_max
+
+  sos_min:
+    table: Omon
+    units: "1e-3"
+    dims:
+      - [time, latitude, longitude]   # for curvilinear grids
+      - [time, lat, lon]
+    regrid_method: conservative
+    sources:
+      - cesm_var: sos_min
 
   sfcWind:
     table: Amon
@@ -578,6 +607,16 @@ variables:
     sources:
       - cesm_var: TAUY
 
+  tos:
+    table: Omon
+    units: "K"
+    dims:
+      - [time, latitude, longitude]
+      - [time, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: tos
+
   tran:
     table: Lmon
     units: "kg m-2 s-1"
@@ -639,6 +678,13 @@ variables:
     sources:
       - cesm_var: VBOT
 
+  volcello:
+    table: Omon
+    units: "m3"
+    dims: [time, z_l, latitude, longitude]
+    sources:
+      - cesm_var: volcello
+
   wap:
     table: Amon
     units: "Pa s-1"
@@ -658,6 +704,22 @@ variables:
       units: Pa
     sources:
       - cesm_var: Z3
+
+  zos:
+    table: Omon
+    units: "m"
+    dims: [time, latitude, longitude]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: zos
+
+  zossq:
+    table: Omon
+    units: "m2"
+    dims: [time, latitude, longitude]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: zossq
 
 #  areacella:
 #    table: fx

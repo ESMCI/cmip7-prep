@@ -330,14 +330,29 @@ def _denormalize_ocn_field(
 ) -> xr.DataArray:
     """Denormalize field by destination sftof (sea fraction)."""
     logger.info("Denormalizing ocean field by destination sftof (sea fraction)")
-    ds_fx = _regrid_fx_once(mapfile, ds_in)
-    if "sftof" not in ds_fx:
-        logger.warning(
-            "Destination sftof not found; falling back to source sftof if available."
-        )
-        sftof_dst = _sftof_from_native(ds_in)
-    else:
-        sftof_dst = ds_fx["sftof"]
+    # Try to find an existing regridded sftof file first
+    sftof_dst = None
+    outdir = Path(mapfile).parent.parent.parent / "Ofx" / "sftof" / "gr"
+    # This path logic may need adjustment for your output structure
+    if outdir.exists():
+        files = list(outdir.glob("sftof_Ofx_*.nc"))
+        if files:
+            try:
+                ds_fx_file = xr.open_dataset(files[0])
+                if "sftof" in ds_fx_file:
+                    sftof_dst = ds_fx_file["sftof"]
+
+            # pylint: disable=broad-exception-caught
+            except Exception as err:
+                logger.warning("Failed to read regridded sftof file: %s", err)
+    if sftof_dst is None:
+        ds_fx = _regrid_fx_once(mapfile, ds_in)
+        if "sftof" in ds_fx:
+            sftof_dst = ds_fx["sftof"]
+        else:
+            logger.warning(
+                "Destination sftof not found; falling back to source sftof if available."
+            )
     logger.info("sftof_dst dims: %s", sftof_dst.dims if sftof_dst is not None else None)
     if sftof_dst is not None:
         frac_dst = sftof_dst / 100.0

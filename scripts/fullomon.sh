@@ -13,5 +13,6 @@ echo "Running on $NCPUS"
 module load conda
 conda activate CMORDEV
 
-poetry run python ./scripts/monthly_cmor.py --realm ocn --test --workers $NCPUS --cmip-vars sos --skip-timeseries\
-    --ocn-static-file /glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1.mom6.h.static.nc
+poetry run python ./scripts/monthly_cmor.py --realm ocn --test --workers $NCPUS \
+    --ocn-static-file /glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1.mom6.h.static.nc \
+    "$@"

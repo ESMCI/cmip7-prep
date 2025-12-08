@@ -295,6 +295,7 @@ class CmorSession(
         lat_id = None
         lon_id = None
         sdepth_id = None
+        lev_id = None
 
         logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
         if "xh" in var_dims and "yh" in var_dims:
@@ -499,12 +500,23 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+        elif "z_l" in var_dims:
+            values = ds["z_l"].values
+            logger.info("write z_l axis")
+            bnds = bounds_from_centers_1d(values, "z_l")
+            lev_id = cmor.axis(
+                table_entry="depth_coord",
+                units="m",
+                coord_vals=np.asarray(values),
+                cell_bounds=bnds,
+            )
         # Map dimension names to axis IDs
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
             "lev": alev_id,  # sometimes used for hybrid
             "sdepth": sdepth_id,
+            "z_l": lev_id,
             "plev": plev_id,
             "lat": lat_id,
             "latitude": lat_id if lat_id is not None else i_id,
@@ -570,9 +582,12 @@ class CmorSession(
             )
             logger.info("FX variable %s define lon_id %s", name, lon_id)
             logger.info("Writing fx variable %s on curvilinear grid", name)
-
+            cmor.set_cur_dataset_attribute("grid", "curvilinear")
+            cmor.set_cur_dataset_attribute("grid_label", "gn")
         else:
-            if name == "sftlf":
+            cmor.set_cur_dataset_attribute("grid", "1x1 degree")
+            cmor.set_cur_dataset_attribute("grid_label", "gr")
+            if name in ("areacella", "sftlf"):
                 self.load_table(self.tables_path, "fx")
             elif name in ("sftof", "deptho", "areacello"):
                 self.load_table(self.tables_path, "Ofx")
@@ -599,6 +614,11 @@ class CmorSession(
             data_filled, fillv = filled_for_cmor(da)
         logger.info("Writing fx variable %s", name)
         var_id = cmor.variable(name, units, [lat_id, lon_id], missing_value=fillv)
+        if cmor.has_variable_attribute(var_id, "outputpath"):
+            logger.info(
+                "CMOR variable object has outputpath attribute: %s",
+                cmor.get_variable_attribute(var_id, "outputpath"),
+            )
 
         cmor.write(var_id, np.asarray(data_filled))
         cmor.close(var_id)
@@ -699,6 +719,7 @@ class CmorSession(
         self.primarytable = (
             getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "Amon"
         )
+
         logger.info("Using CMOR table key: %s", self.primarytable)  # debug
         self.load_table(self.tables_path, self.primarytable)
         data = ds[vdef.name]
@@ -736,7 +757,12 @@ class CmorSession(
             missing_value=fillv,
         )
         logger.info("Now define time dimension and write data")  # debug
-
+        if "lat" in data.dims and "lon" in data.dims:
+            cmor.set_cur_dataset_attribute("grid", "1x1 degree")
+            cmor.set_cur_dataset_attribute("grid_label", "gr")
+        else:
+            cmor.set_cur_dataset_attribute("grid", "curvilinear")
+            cmor.set_cur_dataset_attribute("grid_label", "gn")
         # ---- Prepare time info for this write (local, not cached) ----
         time_da = ds.coords.get("time")
         if time_da is None:
