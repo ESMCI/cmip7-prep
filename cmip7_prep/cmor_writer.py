@@ -172,24 +172,7 @@ class CmorSession(
 
         # long paragraph; split to keep lines < 100
         inst = get_cmor_attr("institution_id") or "NCAR"
-        license_text = (
-            f"CMIP6 model data produced by {inst} is licensed under a Creative Commons "
-            "Attribution 4.0 International License "
-            "(https://creativecommons.org/licenses/by/4.0/). "
-            "Consult https://pcmdi.llnl.gov/CMIP6/TermsOfUse for terms of use "
-            "governing CMIP6 output, including citation requirements and proper "
-            "acknowledgment. Further information about this data, including some "
-            "limitations, can be found via the further_info_url (recorded as a "
-            "global attribute in this file). The data producers and data providers "
-            "make no warranty, either express or implied, including, but not "
-            "limited to, warranties of merchantability and fitness for a "
-            "particular purpose. All liabilities arising from the supply of the "
-            "information (including any liability arising in negligence) are "
-            "excluded to the fullest extent permitted by law."
-        )
-
-        cmor.set_cur_dataset_attribute("license", license_text)
-
+        cmor.set_cur_dataset_attribute("institution_id", inst)
         # Tell CMOR how to build tracking_id; let CMOR generate it
         prefix = get_cmor_attr("tracking_prefix")
         if not (isinstance(prefix, str) and prefix.startswith("hdl:")):
@@ -202,6 +185,10 @@ class CmorSession(
                 "tracking_id", ""
             )  # empty lets CMOR regenerate from tracking_prefix
 
+        cmor.set_cur_dataset_attribute("_controlled_vocabulary_file", "CMIP7_CV.json")
+        cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
+        cmor.set_cur_dataset_attribute("_FORMULA_VAR_FILE", "CMIP7_formula_terms.json")
+        logger.info("CMOR session initialized")
         return self
 
     def __exit__(self, exc_type, exc, tb):
@@ -222,7 +209,6 @@ class CmorSession(
             return {}  # already loaded
         table_filename = resolve_table_filename(tables_path, key)
         self.currenttable = key
-        logger.info("Loading CMOR table: %s", table_filename)
         return cmor.load_table(table_filename)
 
     def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
@@ -288,7 +274,7 @@ class CmorSession(
         var_name = getattr(vdef, "name", None)
         if var_name is None or var_name not in ds:
             raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
-        var_da = ds[var_name]
+        var_da = ds[str(var_name)]
         var_dims = list(var_da.dims)
         alev_id = None
         plev_id = None
@@ -389,6 +375,7 @@ class CmorSession(
             "alev",
         } or "lev" in var_dims:
             # names in the native ds
+            logger.info("*** Define hybrid sigma axis")
             hyam_name = levels.get("hyam", "hyam")  # A mid (dimensionless)
             hybm_name = levels.get("hybm", "hybm")  # B mid (dimensionless)
             hyai_name = levels.get("hyai", "hyai")  # A interfaces (optional)
@@ -405,7 +392,9 @@ class CmorSession(
                 coord_vals=sigma_mid,
                 cell_bounds=sigma_bnds,
             )
-
+            cmor.set_cur_dataset_attribute(
+                "vertical_label", "alevel"
+            )  # or another valid value
             # 2) z-factors: a(lev), b(lev), p0(scalar), ps(time,lat,lon)
 
             cmor.zfactor(
@@ -481,7 +470,9 @@ class CmorSession(
                 # Accept entries like plev19, plev7h, plev27, etc.
                 if key.lower().startswith("plev"):
                     table_entry = key
-
+            if pb is None:
+                pb = bounds_from_centers_1d(pvals, "plev")
+            logger.info("cell bounds for plev: %s", pb)
             plev_id = cmor.axis(
                 table_entry=table_entry,
                 units="Pa",
@@ -711,19 +702,24 @@ class CmorSession(
     def write_variable(
         self,
         ds: xr.Dataset,
-        varname: str,
+        cmip_var: object,
         vdef: Any,
     ) -> None:
         """Write one variable from ds to a CMOR-compliant NetCDF file."""
         # Pick CMOR table: prefer vdef.table, else vdef.realm (default Amon)
         self.primarytable = (
-            getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "Amon"
+            getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "atmos"
         )
 
-        logger.info("Using CMOR table key: %s", self.primarytable)  # debug
+        logger.info(
+            "Using CMOR table key: %s %s", self.tables_path, self.primarytable
+        )  # debug
         self.load_table(self.tables_path, self.primarytable)
-        data = ds[vdef.name]
-        logger.info("Ensure fx variables are written and cached")  # debug
+        varname = getattr(cmip_var, "physical_parameter").name
+        logger.info("Preparing to write variable: %s", varname)  # debug
+        data = ds[str(varname)]
+
+        logger.info("Ensure fx variables are written and cached %s", data)  # debug
         self.ensure_fx_written_and_cached(ds)
 
         units = getattr(vdef, "units", "") or ""
@@ -734,8 +730,8 @@ class CmorSession(
         data_filled, fillv = filled_for_cmor(data)
 
         # Debug logging for axis mapping
+        self.load_table(self.tables_path, "coordinate")
 
-        # Try to get axis table entries for each axis_id
         try:
             for i, aid in enumerate(axes_ids):
                 entry = cmor.axis_entry(aid) if hasattr(cmor, "axis_entry") else None
@@ -746,11 +742,18 @@ class CmorSession(
         except Exception as e:
             logger.warning("[CMOR DEBUG] Could not retrieve axis table entries: %s", e)
 
-        logger.info("Define variable %s with units %s", varname, units)  # debug
-
         self.load_table(self.tables_path, self.primarytable)
+
+        var_entry = getattr(cmip_var, "branded_variable_name", varname)
+        if hasattr(var_entry, "name"):
+            var_entry = var_entry.name
+        elif hasattr(var_entry, "value"):
+            var_entry = var_entry.value
+        else:
+            var_entry = str(var_entry)
+        logger.info("Define CMOR variable %s", var_entry)  # debug
         var_id = cmor.variable(
-            getattr(vdef, "name", varname),
+            var_entry,
             units,
             axes_ids,
             positive=getattr(vdef, "positive", None),

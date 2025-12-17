@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import json
 import os
-
+import logging
 import numpy as np
 import xarray as xr
 from geocat.comp import interp_hybrid_to_pressure
+
+
+logger = logging.getLogger(__name__)
 
 
 def _read_requested_levels(
@@ -53,6 +56,7 @@ def _read_requested_levels(
     coord_json = None
     for name in coord_json_candidates:
         candidate = os.path.join(str(tables_path), name)
+        logger.info("Checking for coordinate JSON: %s", candidate)
         if os.path.exists(candidate):
             coord_json = candidate
             break

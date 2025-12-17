@@ -105,11 +105,18 @@ def open_native_for_cmip_vars(
     """
     open_kwargs = dict(open_kwargs or {})
     # Allow cmip_vars to be a single variable (str) or a list
-    if isinstance(cmip_vars, str):
+    if not isinstance(cmip_vars, list):
         cmip_vars = [cmip_vars]
     new_cmip_vars = []
+    logger.info("Opening native files for CMIP vars: %s %s", cmip_vars, type(cmip_vars))
     for var in cmip_vars:
+        logger.info("Processing CMIP var collecting cesm vars'%s'", var)
         rvar = _collect_required_cesm_vars(mapping, [var])
+        logger.info(
+            "Looking for native files for CMIP var '%s' needing CESM vars: %s",
+            var,
+            rvar,
+        )
         candidates = glob.glob(str(files_glob))
         selected = sorted(
             {p for p in candidates if any(_filename_contains_var(p, v) for v in rvar)}
@@ -128,7 +135,8 @@ def open_native_for_cmip_vars(
     if not selected:
         logger.warning("no native inputs found for %s", cmip_vars)
         return None, None
-
+    logger.info("Opening native files for CESM vars: %s", required)
+    logger.info("Selected files:\n%s", "\n".join(selected))
     ds = xr.open_mfdataset(
         selected,
         combine="by_coords",
@@ -211,6 +219,7 @@ def realize_regrid_prepare(
     open_kwargs = dict(open_kwargs or {})
     aux = []
     # 1) Get native dataset
+
     if isinstance(ds_or_glob, xr.Dataset):
         ds_native = ds_or_glob
     else:
@@ -247,6 +256,7 @@ def realize_regrid_prepare(
 
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
+    logger.info("Mapping cfg for %s: %s", cmip_var, cfg)
     levels = cfg.get("levels", {}) or {}
     lev_kind = (levels.get("name") or "").lower()
     is_hybrid = lev_kind in {"standard_hybrid_sigma", "alev", "alevel"}
@@ -270,12 +280,14 @@ def realize_regrid_prepare(
     )
 
     # 6) Regrid (include PS if present)
-    names_to_regrid = [cmip_var]
+    names_to_regrid = [str(cmip_var)]
     if is_hybrid and "PS" in ds_vert:
         names_to_regrid.append("PS")
 
     # 7) Rename levgrnd if present to sdepth
-
+    logger.info(
+        "Checking for 'levgrnd' dimension in variables to regrid. %s", names_to_regrid
+    )
     # Check if 'levgrnd' is a dimension of any variable in names_to_regrid
     needs_levgrnd_rename = any(
         (v in ds_vert and "levgrnd" in getattr(ds_vert[v], "dims", []))
@@ -290,11 +302,11 @@ def realize_regrid_prepare(
         ds_vert = ds_vert.rename_dims({"levgrnd": "sdepth"})
         # Ensure the coordinate variable is also copied
         ds_vert = ds_vert.assign_coords(sdepth=ds_native["levgrnd"].values)
-
+    logger.info("Regridding variables: %s", names_to_regrid)
     ds_regr = regrid_to_1deg_ds(
         ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
     )
-
+    logger.info("Regridded dataset dims: %s", ds_regr.dims)
     if aux:
         ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 
