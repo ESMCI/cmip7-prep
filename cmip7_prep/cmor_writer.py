@@ -472,7 +472,7 @@ class CmorSession(
                     table_entry = key
             if pb is None:
                 pb = bounds_from_centers_1d(pvals, "plev")
-            logger.info("cell bounds for plev: %s", pb)
+
             plev_id = cmor.axis(
                 table_entry=table_entry,
                 units="Pa",
@@ -535,7 +535,7 @@ class CmorSession(
         da = ds[name]
         logger.info("FX variable %s dims: %s", name, da.dims)
         if set(da.dims) == {"xh", "yh"}:
-            self.load_table(self.tables_path, "Ofx")
+            self.load_table(self.tables_path, "ocean")
             geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
             ds_geo = xr.open_dataset(geo_path)
             lat = ds_geo["lath"].values
@@ -578,10 +578,10 @@ class CmorSession(
         else:
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
             cmor.set_cur_dataset_attribute("grid_label", "gr")
-            if name in ("areacella", "sftlf"):
-                self.load_table(self.tables_path, "fx")
-            elif name in ("sftof", "deptho", "areacello"):
-                self.load_table(self.tables_path, "Ofx")
+            if name in ("areacella_ti-u-hxy-u", "sftlf_ti-u-hxy-u"):
+                self.load_table(self.tables_path, "land")
+            elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
+                self.load_table(self.tables_path, "ocean")
             lat = ds["lat"].values
             lon = ds["lon"].values
             lat_b = ds.get("lat_bnds")
@@ -622,11 +622,11 @@ class CmorSession(
         Returns ds_regr augmented with any missing fx fields.
         """
         need = [
-            ("sftlf", "%"),
-            ("areacella", "m2"),
-            ("sftof", "%"),
+            ("sftlf_ti-u-hxy-u", "%"),
+            ("areacella_ti-u-hxy-u", "m2"),
+            ("sftof_ti-u-hxy-u", "%"),
             ("wet", "%"),
-            ("areacello", "m2"),
+            ("areacello_ti-u-hxy-u", "m2"),
             ("mrsofc", "m3 s-1"),
             ("orog", "m"),
             ("thkcello", "m"),
@@ -642,12 +642,12 @@ class CmorSession(
         ]  # land fraction, ocean cell area, soil moisture fraction
         out = ds_regr
 
-        # Write sftof if present (native grid sea fraction: wet)
-        if "sftof" in ds_regr and "sftof" not in self._fx_written:
-            logger.info("Writing fx variable sftof")
-            self.load_table(self.tables_path, "Ofx")
-            self._write_fx_2d(ds_regr, "sftof", "%")
-            self._fx_written.add("sftof")
+        # Write sftof_ti-u-hxy-u if present (native grid sea fraction: wet)
+        if "sftof_ti-u-hxy-u" in ds_regr and "sftof_ti-u-hxy-u" not in self._fx_written:
+            logger.info("Writing fx variable sftof_ti-u-hxy-u")
+            self.load_table(self.tables_path, "ocean")
+            self._write_fx_2d(ds_regr, "sftof_ti-u-hxy-u", "%")
+            self._fx_written.add("sftof_ti-u-hxy-u")
 
         for name, units in need:
             # 1) Already cached this run?
@@ -661,7 +661,7 @@ class CmorSession(
                 self._fx_cache[name] = out[name]
                 if name not in self._fx_written:
                     # Convert landfrac to % if needed
-                    if name == "sftlf":
+                    if name == "sftlf_ti-u-hxy-u":
                         v = out[name]
                         if (np.nanmax(v.values) <= 1.0) and v.attrs.get(
                             "units", ""
@@ -680,7 +680,10 @@ class CmorSession(
 
             # 3) Not present in ds_regr → try reading existing CMOR fx output
             if self._outdir:
-                fx_da = open_existing_fx(self._outdir, name)
+                try:
+                    fx_da = open_existing_fx(self._outdir, name)
+                except FileNotFoundError:
+                    fx_da = None
                 if fx_da is not None:
                     # Verify grid match (simple equality on lat/lon values)
                     if (
@@ -719,7 +722,7 @@ class CmorSession(
         logger.info("Preparing to write variable: %s", varname)  # debug
         data = ds[str(varname)]
 
-        logger.info("Ensure fx variables are written and cached %s", data)  # debug
+        logger.info("Ensure fx variables are written and cached")  # debug
         self.ensure_fx_written_and_cached(ds)
 
         units = getattr(vdef, "units", "") or ""
@@ -728,19 +731,6 @@ class CmorSession(
         axes_ids = self._define_axes(ds, vdef)
         logger.info("Prepare data for CMOR %s", data.dtype)  # debug
         data_filled, fillv = filled_for_cmor(data)
-
-        # Debug logging for axis mapping
-        self.load_table(self.tables_path, "coordinate")
-
-        try:
-            for i, aid in enumerate(axes_ids):
-                entry = cmor.axis_entry(aid) if hasattr(cmor, "axis_entry") else None
-                logger.info(
-                    "[CMOR DEBUG] axis %d: id=%s, table_entry=%s", i, aid, entry
-                )
-        # pylint: disable=broad-exception-caught
-        except Exception as e:
-            logger.warning("[CMOR DEBUG] Could not retrieve axis table entries: %s", e)
 
         self.load_table(self.tables_path, self.primarytable)
 
@@ -771,12 +761,9 @@ class CmorSession(
         if time_da is None:
             time_da = ds.get("time")
         nt = 0
-        logger.info(
-            "Insure fx variables are written and cached: %s", list(ds.variables.keys())
-        )  # debug
 
         # ---- Main variable write ----
-
+        logger.info("Writing CMOR variable %s", var_id)  # debug
         cmor.write(
             var_id,
             np.asarray(data_filled),

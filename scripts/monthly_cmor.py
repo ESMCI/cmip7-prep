@@ -91,7 +91,19 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--realm", choices=["atm", "lnd", "ocn"], required=True, help="Realm to process"
+        "--realm",
+        choices=[
+            "atmos",
+            "land",
+            "ocean",
+            "seaIce",
+            "landIce",
+            "aerosol",
+            "atmosChem",
+            "ocnBgchem",
+        ],
+        required=True,
+        help="Realm to process",
     )
     parser.add_argument("--caseroot", type=str, help="Case root directory")
     parser.add_argument("--cimeroot", type=str, help="CIME root directory")
@@ -161,12 +173,13 @@ def process_one_var(
     inputfile,
     tables_path,
     outdir,
-    realm="atm",
+    realm="atmos",
     mom6_grid=None,
     ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.physical_parameter.name
+
     logger.info(f"Starting processing for variable: {varname}")
     results = [(str(varname), "started")]
     try:
@@ -184,7 +197,7 @@ def process_one_var(
         logger.info(f"Processing {varname} with dims {dims}")
         try:
             open_kwargs = None
-            if realm == "ocn":
+            if realm == "ocean":
                 open_kwargs = {"decode_timedelta": False}
             logger.info("Opening native data for variable %s", varname)
             ds_native, var = open_native_for_cmip_vars(
@@ -197,7 +210,7 @@ def process_one_var(
             )
             logger.info("realm is %s", realm)
             # Append ocn_fx_fields to ds_native if available
-            if realm == "ocn" and ocn_fx_fields is not None:
+            if realm == "ocean" and ocn_fx_fields is not None:
                 ds_native = ds_native.merge(ocn_fx_fields)
             logger.info(
                 "ds_native keys: %s for var %s with dims %s",
@@ -265,26 +278,31 @@ def process_one_var(
                 varname = cmip_var.attributes["branded_variable_name"]
 
                 logger.info(f"Writing CMOR variable {varname.name}")
+                shortname = str(getattr(cmip_var, "physical_parameter").name)
                 vdef = type(
                     "VDef",
                     (),
                     {
-                        "name": getattr(cmip_var, "physical_parameter").name,
-                        "dims": dims,
+                        "name": shortname,
                         "table": cfg.get("table", "atmos"),
+                        "units": cfg.get("units", ""),
+                        "dims": dims,
+                        "positive": cfg.get("positive", None),
+                        "cell_methods": cfg.get("cell_methods", None),
+                        "long_name": cfg.get("long_name", None),
+                        "standard_name": cfg.get("standard_name", None),
                         "levels": cfg.get("levels", None),
-                        "units": cfg.get("units", None),
                     },
                 )()
                 logger.info(f"Writing variable {varname} with dims {dims} ")
                 cm.write_variable(ds_cmor, cmip_var, vdef)
             logger.info(f"Finished processing for {varname} with dims {dims}")
-            results.append((varname, "ok"))
+            results.append((shortname, "ok"))
         except Exception as e:
             logger.error(
                 f"Exception while processing {varname} with dims {dims}: {e!r}"
             )
-            results.append((varname, f"ERROR: {e!r}"))
+            results.append((str(varname), f"ERROR: {e!r}"))
     logger.info(f"Completed all processing for variable: {varname}, results {results}")
     return results
 
@@ -334,20 +352,17 @@ def main():
     mom6_grid = None
     ocn_grid = None
     ocn_fx_fields = None
-    if args.realm == "atm":
+    if args.realm == "atmos":
         include_patterns = ["*cam.h0a*"]
-        realm = "atmos"
         frequency = "mon"
         subdir = "atm"
-    elif args.realm == "lnd":
+    elif args.realm == "land":
         include_patterns = ["*clm2.h0*"]
-        realm = "land"
         frequency = "mon"
         subdir = "lnd"
-    elif args.realm == "ocn":
+    elif args.realm == "ocean":
         # we do not want to match static files
         include_patterns = ["*mom6.h.sfc.*", "*mom6.h.z.*"]
-        realm = "ocean"
         frequency = "mon"
         subdir = "ocn"
         if args.ocn_grid_file:
@@ -392,19 +407,19 @@ def main():
                     sys.exit(0)
     else:
         # testing path
-        if args.realm == "atm":
+        if args.realm == "atmos":
             INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
             TSDIR = (
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
             )
-        elif args.realm == "lnd":
+        elif args.realm == "land":
             INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
             TSDIR = (
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
             )
-        elif args.realm == "ocn":
+        elif args.realm == "ocean":
             INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
             TSDIR = (
                 scratch
@@ -416,7 +431,7 @@ def main():
     if not os.path.exists(str(TSDIR)):
         os.makedirs(str(TSDIR))
     # Load MOM6 static grid if needed (ocn realm)
-    if args.realm == "ocn" and ocn_grid:
+    if args.realm == "ocean" and ocn_grid:
         mom6_grid = load_mom6_grid(ocn_grid)
         logger.info(f"Using MOM grid file: {ocn_grid}")
     # Dask cluster setup
@@ -472,13 +487,12 @@ def main():
         # cmip_vars = find_variables_by_realm_and_frequency(None, realm, frequency)
         content_dic = dt.get_transformed_content()
         logger.info("Content dic obtained")
-        realm = "atmos"
         DR = dr.DataRequest.from_separated_inputs(**content_dic)
         cmip_vars = DR.find_variables(
             skip_if_missing=False,
             operation="all",
             cmip7_frequency=frequency,
-            modelling_realm=realm,
+            modelling_realm=args.realm,
             experiment=args.experiment,
             priority_level="Core",
         )
@@ -561,7 +575,7 @@ def main():
                     logger.error("Task error:", e)
                     raise
 
-        for v, status in results:
+        for v, status in set(results):
             logger.info(f"Variable {v} processed with status: {status}")
 
     else:

@@ -108,7 +108,7 @@ def open_native_for_cmip_vars(
     if not isinstance(cmip_vars, list):
         cmip_vars = [cmip_vars]
     new_cmip_vars = []
-    logger.info("Opening native files for CMIP vars: %s %s", cmip_vars, type(cmip_vars))
+
     for var in cmip_vars:
         logger.info("Processing CMIP var collecting cesm vars'%s'", var)
         rvar = _collect_required_cesm_vars(mapping, [var])
@@ -168,6 +168,7 @@ def _apply_vertical_if_needed(
     """Apply vertical transforms (e.g., plev19) to a single CMIP variable if required."""
     cfg = mapping.get_cfg(cmip_var) or {}
     levels = cfg.get("levels") or {}
+    logger.info("levels for %s: %s", cmip_var, levels)
     if (levels.get("name") or "").lower() != "plev19":
         return ds_var
     if not tables_path:
@@ -175,11 +176,15 @@ def _apply_vertical_if_needed(
 
     need = ["PS", "hyam", "hybm", "P0"]
     base = xr.Dataset({k: ds_native[k] for k in need if k in ds_native})
-    base[cmip_var] = ds_var[cmip_var]
+
+    base[str(cmip_var)] = ds_var[str(cmip_var)]
+    logger.info("Applying plev19 vertical transform for variable: %s", cmip_var)
+
     v_plev = to_plev19(
         base, cmip_var, tables_path
     )  # returns dataset with var on 'plev'
-    return xr.Dataset({cmip_var: v_plev[cmip_var]})
+    logger.info("After vertical transform : %s", cmip_var)
+    return xr.Dataset({str(cmip_var): v_plev[str(cmip_var)]})
 
 
 def _apply_vertical_if_needed_many(
@@ -250,7 +255,7 @@ def realize_regrid_prepare(
         da = da.chunk({"time": int(time_chunk)})
 
     ds_vars = xr.Dataset({cmip_var: da})
-    for var in ("landfrac", "area", "sftof", "landmask", "wet"):
+    for var in ("landfrac", "area", "landmask", "wet"):
         if var in ds_native and var not in ds_vars:
             ds_vars = ds_vars.assign(**{var: ds_native[var]})
 
@@ -275,10 +280,11 @@ def realize_regrid_prepare(
         ]
     # 5) Apply vertical transform if needed (plev19, etc.).
     # Single-var helper already takes cfg + tables_path
+    logger.info("Applying vertical handling if needed for variable: %s", cmip_var)
     ds_vert = _apply_vertical_if_needed(
         ds_vars, ds_native, cmip_var, mapping, tables_path=tables_path
     )
-
+    logger.info("After vertical handling, dataset dims: %s", ds_vert.dims)
     # 6) Regrid (include PS if present)
     names_to_regrid = [str(cmip_var)]
     if is_hybrid and "PS" in ds_vert:

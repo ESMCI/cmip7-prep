@@ -41,7 +41,7 @@ variables:
       - cesm_var: CLDICE
 
   cLitter:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (TOTLITC + CWD_C)/1000.0
@@ -84,7 +84,7 @@ variables:
       - cesm_var: TGCLDLWP
 
   cProduct:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (TOTPRODC + CWD_P)/1000.0
@@ -93,7 +93,7 @@ variables:
       - cesm_var: CWD_P
 
   cSoilFast:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (SOIL1C)/1000.0
@@ -101,7 +101,7 @@ variables:
       - cesm_var: SOIL1C
 
   cSoilMedium:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (SOIL2C)/1000.0
@@ -109,7 +109,7 @@ variables:
       - cesm_var: SOIL2C
 
   cSoilSlow:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (SOIL3C)/1000.0
@@ -117,7 +117,7 @@ variables:
       - cesm_var: SOIL3C
 
   cVeg:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (TOTVEGC)/1000.0
@@ -146,7 +146,7 @@ variables:
         scale: -1.0     # flip sign if CESM positive upward
 
   evspsblsoi:
-    table: Lmon
+    table: land
     units: kg m-2 s-1
     long_name: Water Evaporation from Soil
     dims: [time, lat, lon]
@@ -155,7 +155,7 @@ variables:
       - cesm_var: QSOIL
 
   evspsblveg:
-    table: Lmon
+    table: land
     units: kg m-2 s-1
     long_name: Water Evaporation from Soil
     dims: [time, lat, lon]
@@ -164,7 +164,7 @@ variables:
       - cesm_var: QVEGE
 
   fFire:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -173,7 +173,7 @@ variables:
       - cesm_var: COL_FIRE_CLOSS
 
   fHarvest:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -182,7 +182,7 @@ variables:
       - cesm_var: WOOD_HARVESTC
 
   gpp:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     formula: GPP/1000.0
@@ -243,7 +243,7 @@ variables:
       - cesm_var: QREFHT
 
   lai:
-    table: Lmon
+    table: land
     units: "1"
     dims: [time, lat, lon]
     sources:
@@ -258,7 +258,7 @@ variables:
       -cesm_var: mlotst
 
   mrfso:
-    table: Lmon
+    table: land
     units: kg m-2
     dims: [time, lat, lon]
     formula: verticalsum(SOILICE, capped_at=5000)
@@ -266,21 +266,21 @@ variables:
       - cesm_var: SOILICE
 
   mrro:
-    table: Lmon
+    table: land
     units: kg m-2 s-1
     dims: [time, lat, lon]
     sources:
       - cesm_var: QRUNOFF
 
   mrros:
-    table: Lmon
+    table: land
     units: kg m-2 s-1
     dims: [time, lat, lon]
     sources:
       - cesm_var: QOVER
 
   mrso:
-    table: Lmon
+    table: land
     units: kg m-2
     dims: [time, lat, lon]
     formula: verticalsum(SOILICE + SOILLIQ, capped_at=5000)
@@ -289,14 +289,14 @@ variables:
       - cesm_var: SOILLIQ
 
   mrsos:
-    table: Lmon
+    table: land
     units: kg m-2
     dims: [time, lat, lon]
     sources:
       - cesm_var: SOILWATER_10CM
 
   nbp:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     formula: NBP/1000.0
@@ -305,7 +305,7 @@ variables:
       - cesm_var: NBP
 
   npp:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     formula: NPP/1000.0
@@ -344,7 +344,7 @@ variables:
       - cesm_var: PRECSL
 
   prveg:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     sources:
@@ -377,7 +377,7 @@ variables:
       - cesm_var: PS
 
   ra:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -386,7 +386,7 @@ variables:
       - cesm_var: AR
 
   rh:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -502,7 +502,7 @@ variables:
       - cesm_var: FSNTOAC
 
   snld:
-    table: Lmon
+    table: land
     units: "m"
     dims: [time, lat, lon]
     sources:
@@ -617,7 +617,7 @@ variables:
       - cesm_var: tos
 
   tran:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -634,7 +634,7 @@ variables:
       - cesm_var: TS
 
   tsl:
-    table: Lmon
+    table: land
     units: "K"
     dims: [time, sdepth, lat, lon]
     sources:
@@ -694,7 +694,7 @@ variables:
     sources:
       - cesm_var: OMEGA
 
-  zg_tavg-p19-hxy-air:
+  zg:
     table: atmos
     units: "m"
     dims: [time, plev, lat, lon]

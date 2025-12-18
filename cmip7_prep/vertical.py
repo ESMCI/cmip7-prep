@@ -75,6 +75,7 @@ def _read_requested_levels(
         raise KeyError(f"Axis entry '{axis_name}' not found in {coord_json}") from exc
 
     levels = np.asarray(req, dtype="f8")
+
     return levels
 
 
@@ -166,7 +167,7 @@ def to_plev19(
     is not importable in the environment, it will raise ImportError with guidance.
     """
 
-    required = [var, ps_name, hyam_name, hybm_name]
+    required = [str(var), ps_name, hyam_name, hybm_name]
     missing = [name for name in required if name not in ds]
     if missing:
         raise KeyError(f"Missing required variables in dataset: {missing}")
@@ -176,7 +177,7 @@ def to_plev19(
 
     # geocat-comp performs log-pressure interpolation internally
     out_da = interp_hybrid_to_pressure(
-        ds[var],
+        ds[str(var)],
         ds[ps_name],
         ds[hyam_name],
         ds[hybm_name],
@@ -195,7 +196,7 @@ def to_plev19(
 
     # Assemble return dataset
     ds_out = ds.copy()
-    ds_out[var] = out_da
+    ds_out[str(var)] = out_da
 
     # Optionally drop hybrid coefficients and P0 if present
     drop = [n for n in (hyam_name, hybm_name, p0_name) if n in ds_out.variables]
