@@ -434,19 +434,9 @@ def main():
     if args.realm == "ocean" and ocn_grid:
         mom6_grid = load_mom6_grid(ocn_grid)
         logger.info(f"Using MOM grid file: {ocn_grid}")
-    # Dask cluster setup
-    if args.workers == 1:
-        client = None
-        cluster = None
-    else:
-        ncpus_env = os.getenv("NCPUS")
-        if ncpus_env is not None:
-            ml = 1.0 - float(int(ncpus_env) - 1) / 128.0
-        else:
-            ml = "auto"  # Default memory limit if NCPUS is not set
-        cluster = LocalCluster(
-            n_workers=args.workers, threads_per_worker=1, memory_limit=ml
-        )
+        # Dask cluster setup
+
+        """
         client = cluster.get_client()
     input_head_dir = INPUTDIR
     output_head_dir = TSDIR
@@ -473,39 +463,58 @@ def main():
                 ts_collection = ts_collection.apply_overwrite("*")
             ts_collection.execute()
             logger.info("Timeseries processing complete, starting CMORization...")
-
+ """
     # Load mapping
     mapping = Mapping.from_packaged_default()
     cmip_vars = []
     # logger.info(f"Finding variables with prefix {var_prefix}")
-    if args.cmip_vars and len(args.cmip_vars) > 0:
-        cmip_vars = args.cmip_vars
-    else:
-        # cmip_vars = find_variables_by_prefix(
-        #    None, var_prefix, where={"List of Experiments": "piControl"}
-        # )
-        # cmip_vars = find_variables_by_realm_and_frequency(None, realm, frequency)
-        content_dic = dt.get_transformed_content()
-        logger.info("Content dic obtained")
-        DR = dr.DataRequest.from_separated_inputs(**content_dic)
-        cmip_vars = DR.find_variables(
-            skip_if_missing=False,
-            operation="all",
-            cmip7_frequency=frequency,
-            modelling_realm=args.realm,
-            experiment=args.experiment,
-            priority_level="Core",
-        )
 
-        # for variable in DR.get_variables():
-        #    logger.info("variable %s, realm %s, frequency %s", variable.physical_parameter, variable.modelling_realm, variable.cmip7_frequency.name)
-        #    if (
-        #        realm in variable.modelling_realm
-        #        and frequency in str(variable.cmip7_frequency.name)
-        #    ):
-        #        cmip_vars.append(variable)
+    # cmip_vars = find_variables_by_prefix(
+    #    None, var_prefix, where={"List of Experiments": "piControl"}
+    # )
+    # cmip_vars = find_variables_by_realm_and_frequency(None, realm, frequency)
+    logger.info("Loading data request content %s", args.realm)
+    content_dic = dt.get_transformed_content()
+    logger.info("Content dic obtained")
+    DR = dr.DataRequest.from_separated_inputs(**content_dic)
+    cmip_vars = DR.find_variables(
+        skip_if_missing=False,
+        operation="all",
+        cmip7_frequency=frequency,
+        modelling_realm=args.realm,
+        experiment=args.experiment,
+    )
+
+    # for variable in DR.get_variables():
+    #    logger.info("variable %s, realm %s, frequency %s", variable.physical_parameter, variable.modelling_realm, variable.cmip7_frequency.name)
+    #    if (
+    #        realm in variable.modelling_realm
+    #        and frequency in str(variable.cmip7_frequency.name)
+    #    ):
+    #        cmip_vars.append(variable)
+    if args.cmip_vars:
+        tmp_cmip_vars = cmip_vars
+        cmip_vars = []
+        for var in tmp_cmip_vars:
+            if var.physical_parameter.name in args.cmip_vars:
+                cmip_vars.append(var)
 
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
+    if args.workers == 1:
+        client = None
+        cluster = None
+    else:
+        ncpus_env = os.getenv("NCPUS")
+        if ncpus_env is not None:
+            ml = 1.0 - float(int(ncpus_env) - 1) / 128.0
+        else:
+            ml = "auto"  # Default memory limit if NCPUS is not set
+        cluster = LocalCluster(
+            n_workers=min(args.workers, len(cmip_vars)),
+            threads_per_worker=1,
+            memory_limit=ml,
+        )
+        client = cluster.get_client()
     if args.skip_cmor:
         logger.info("Skipping CMORization as per --skip-cmor flag.")
         for var in cmip_vars.physical_parameter.name:

@@ -250,7 +250,7 @@ variables:
       - cesm_var: TLAI
 
   mlotst:
-    table: Omon
+    table: ocean
     units: "m"
     long_name: "Ocean Mixed Layer Thickness Defined by Sigma T"
     dims: [time, latitude, longitude]
@@ -509,7 +509,7 @@ variables:
       - cesm_var: SNOW_DEPTH
 
   sos:
-    table: Omon
+    table: ocean
     units: "1e-3"
     dims:
       - [time, latitude, longitude]   # for curvilinear grids
@@ -519,7 +519,7 @@ variables:
       - cesm_var: sos
 
   sos_max:
-    table: Omon
+    table: ocean
     units: "1e-3"
     dims:
       - [time, latitude, longitude]   # for curvilinear grids
@@ -529,7 +529,7 @@ variables:
       - cesm_var: sos_max
 
   sos_min:
-    table: Omon
+    table: ocean
     units: "1e-3"
     dims:
       - [time, latitude, longitude]   # for curvilinear grids
@@ -607,7 +607,7 @@ variables:
       - cesm_var: TAUY
 
   tos:
-    table: Omon
+    table: ocean
     units: "K"
     dims:
       - [time, latitude, longitude]
@@ -678,7 +678,7 @@ variables:
       - cesm_var: VBOT
 
   volcello:
-    table: Omon
+    table: ocean
     units: "m3"
     dims: [time, z_l, latitude, longitude]
     sources:
@@ -705,7 +705,7 @@ variables:
       - cesm_var: Z3
 
   zos:
-    table: Omon
+    table: ocean
     units: "m"
     dims: [time, latitude, longitude]
     regrid_method: bilinear
@@ -713,7 +713,7 @@ variables:
       - cesm_var: zos
 
   zossq:
-    table: Omon
+    table: ocean
     units: "m2"
     dims: [time, latitude, longitude]
     regrid_method: bilinear
