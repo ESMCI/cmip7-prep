@@ -358,7 +358,12 @@ class CmorSession(
         self.load_table(self.tables_path, self.primarytable)
         tvals, tbnds, t_units = _get_time_and_bounds(ds)
         if tvals is not None:
-            logger.info("write time axis")
+            if "days since 0001-01-01" in t_units:
+                # CMOR prefers "days since 1850-01-01 00:00:00"
+                t_units = "days since 1850-01-01 00:00:00"
+            logger.info(
+                "write time axis: units=%s, values=%s, bounds=%s", t_units, tvals, tbnds
+            )
             time_id = cmor.axis(
                 table_entry="time",
                 units=t_units,
@@ -575,6 +580,8 @@ class CmorSession(
             logger.info("Writing fx variable %s on curvilinear grid", name)
             cmor.set_cur_dataset_attribute("grid", "curvilinear")
             cmor.set_cur_dataset_attribute("grid_label", "gn")
+            if name == "deptho":
+                name = "deptho_ti-u-hxy-sea"
         else:
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
             cmor.set_cur_dataset_attribute("grid_label", "gr")
@@ -582,6 +589,8 @@ class CmorSession(
                 self.load_table(self.tables_path, "land")
             elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
                 self.load_table(self.tables_path, "ocean")
+                if name == "deptho":
+                    name = "deptho_ti-u-hxy-sea"
             lat = ds["lat"].values
             lon = ds["lon"].values
             lat_b = ds.get("lat_bnds")
@@ -603,14 +612,15 @@ class CmorSession(
                 "longitude", "degrees_east", coord_vals=lon, cell_bounds=lon_b
             )
             data_filled, fillv = filled_for_cmor(da)
-        logger.info("Writing fx variable %s", name)
+        logger.info("Defining fx variable %s", name)
+
         var_id = cmor.variable(name, units, [lat_id, lon_id], missing_value=fillv)
         if cmor.has_variable_attribute(var_id, "outputpath"):
             logger.info(
                 "CMOR variable object has outputpath attribute: %s",
                 cmor.get_variable_attribute(var_id, "outputpath"),
             )
-
+        logger.info("Now writing FX variable %s id: %s", name, var_id)
         cmor.write(var_id, np.asarray(data_filled))
         cmor.close(var_id)
         logger.info("Finished writing fx variable %s", name)

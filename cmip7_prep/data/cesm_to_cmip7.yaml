@@ -606,6 +606,36 @@ variables:
     sources:
       - cesm_var: TAUY
 
+  tdps:
+    table: atmos
+    units: "K"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: TD
+
+  tnhus:
+    table: atmos
+    units: "kg kg-1"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: Q
+
+  tnt:
+    table: atmos
+    units: "K s-1"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: T
+
   tos:
     table: ocean
     units: "K"

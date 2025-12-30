@@ -362,7 +362,7 @@ def main():
         subdir = "lnd"
     elif args.realm == "ocean":
         # we do not want to match static files
-        include_patterns = ["*mom6.h.sfc.*", "*mom6.h.z.*"]
+        include_patterns = ["*mom6.h.z.*", "*mom6.h.native.*"]
         frequency = "mon"
         subdir = "ocn"
         if args.ocn_grid_file:
@@ -436,34 +436,6 @@ def main():
         logger.info(f"Using MOM grid file: {ocn_grid}")
         # Dask cluster setup
 
-        """
-        client = cluster.get_client()
-    input_head_dir = INPUTDIR
-    output_head_dir = TSDIR
-    if args.skip_timeseries:
-        logger.info("Skipping timeseries processing as per --skip-timeseries flag.")
-    else:
-        cnt = 0
-        for include_pattern in include_patterns:
-            cnt = cnt + len(glob.glob(os.path.join(input_head_dir, include_pattern)))
-        if cnt == 0:
-            logger.warning(
-                f"No input files to process in {input_head_dir} with {include_patterns}"
-            )
-            sys.exit(0)
-        hf_collection = HFCollection(input_head_dir, dask_client=client)
-        for include_pattern in include_patterns:
-            logger.info("Processing files with pattern: %s", include_pattern)
-            hfp_collection = hf_collection.include_patterns([include_pattern])
-            hfp_collection.pull_metadata()
-            ts_collection = TSCollection(
-                hfp_collection, output_head_dir, ts_orders=None, dask_client=client
-            )
-            if args.overwrite:
-                ts_collection = ts_collection.apply_overwrite("*")
-            ts_collection.execute()
-            logger.info("Timeseries processing complete, starting CMORization...")
- """
     # Load mapping
     mapping = Mapping.from_packaged_default()
     cmip_vars = []
