@@ -338,7 +338,7 @@ def main():
         subdir = "lnd"
     elif args.realm == "ocn":
         # we do not want to match static files
-        include_patterns = ["*mom6.h.sfc.*", "*mom6.h.z.*"]
+        include_patterns = ["*mom6.h.native.*", "*mom6.h.z.*"]
         var_prefix = "Omon."
         subdir = "ocn"
         if args.ocn_grid_file:
