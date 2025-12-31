@@ -13,6 +13,14 @@ dataset_overrides:
   nominal_resolution: 100 km
 
 variables:
+  agessc:
+    table: ocean
+    long_name: "Ideal Age of Sea Water"
+    units: "yr"
+    dims: [time, olevel, latitude, longitude]
+    sources:
+      - cesm_var: agessc
+
   cl:
     table: atmos
     units: "%"
@@ -134,6 +142,15 @@ variables:
     sources:
       - cesm_var: deptho
 
+  evs:
+    table: ocean
+    units: kg m-2 s-1
+    long_name: Evaporation over ice free ocean
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: evs
+
   evspsbl:
     table: atmos
     units: kg m-2 s-1
@@ -180,6 +197,15 @@ variables:
     formula: WOOD_HARVESTC/1000.0
     sources:
       - cesm_var: WOOD_HARVESTC
+
+  ficeberg:
+    table: ocean
+    units: "kg m-2 s-1"
+    long_name: "Iceberg Freshwater Flux"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: ficeberg
 
   gpp:
     table: land
@@ -512,7 +538,7 @@ variables:
     table: ocean
     units: "1e-3"
     dims:
-      - [time, latitude, longitude]   # for curvilinear grids
+      - [time, latitude, longitude]
       - [time, lat, lon]
     regrid_method: conservative
     sources:

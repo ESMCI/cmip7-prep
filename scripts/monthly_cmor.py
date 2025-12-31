@@ -226,7 +226,7 @@ def process_one_var(
             if "latitude" in dims and "longitude" in dims:
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
                 ds_cmor = ds_native
-                results.append((varname, "analyzed native mom6 grid"))
+                results.append((str(varname), "analyzed native mom6 grid"))
                 # Attach ocn_fx_fields to ds_cmor for writing
                 if ocn_fx_fields is not None:
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
@@ -275,9 +275,9 @@ def process_one_var(
                 dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
                 outdir=outdir,
             ) as cm:
-                varname = cmip_var.attributes["branded_variable_name"]
+                cmip7name = cmip_var.attributes["branded_variable_name"]
 
-                logger.info(f"Writing CMOR variable {varname.name}")
+                logger.info(f"Writing CMOR variable {cmip7name.name}")
                 shortname = str(getattr(cmip_var, "physical_parameter").name)
                 vdef = type(
                     "VDef",
@@ -362,7 +362,7 @@ def main():
         subdir = "lnd"
     elif args.realm == "ocean":
         # we do not want to match static files
-        include_patterns = ["*mom6.h.z.*", "*mom6.h.native.*"]
+        include_patterns = ["*mom6.h.native.*"]
         frequency = "mon"
         subdir = "ocn"
         if args.ocn_grid_file:
@@ -468,7 +468,13 @@ def main():
         tmp_cmip_vars = cmip_vars
         cmip_vars = []
         for var in tmp_cmip_vars:
+            logger.info(
+                "Checking variable %s in %s",
+                var.physical_parameter.name,
+                args.cmip_vars,
+            )
             if var.physical_parameter.name in args.cmip_vars:
+                logger.info("Adding variable %s", var.physical_parameter.name)
                 cmip_vars.append(var)
 
     logger.info(f"CMORIZING {len(cmip_vars)} variables")

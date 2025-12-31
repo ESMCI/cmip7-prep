@@ -154,7 +154,7 @@ class CmorSession(
             # caller passed a context manager directly
             self._dataset_json_cm = dj
             p = dj.__enter__()  # ← ENTER the CM, get a Path
-
+        logger.info("Using dataset JSON: %s", p)
         with open(p, encoding="utf-8") as f:
             cfg = json.load(f)
         cfg["outpath"] = str(self._outdir)
@@ -184,9 +184,11 @@ class CmorSession(
             set_cmor_attr(
                 "tracking_id", ""
             )  # empty lets CMOR regenerate from tracking_prefix
-
+        logger.info("set _controlled_vocabulary_file:")
         cmor.set_cur_dataset_attribute("_controlled_vocabulary_file", "CMIP7_CV.json")
+        logger.info("set _axis_entry_file:")
         cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
+        logger.info("set _formula_var_file:")
         cmor.set_cur_dataset_attribute("_FORMULA_VAR_FILE", "CMIP7_formula_terms.json")
         logger.info("CMOR session initialized")
         return self
@@ -358,12 +360,6 @@ class CmorSession(
         self.load_table(self.tables_path, self.primarytable)
         tvals, tbnds, t_units = _get_time_and_bounds(ds)
         if tvals is not None:
-            if "days since 0001-01-01" in t_units:
-                # CMOR prefers "days since 1850-01-01 00:00:00"
-                t_units = "days since 1850-01-01 00:00:00"
-            logger.info(
-                "write time axis: units=%s, values=%s, bounds=%s", t_units, tvals, tbnds
-            )
             time_id = cmor.axis(
                 table_entry="time",
                 units=t_units,
@@ -506,6 +502,22 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+        elif "zl" in var_dims:
+            ds[var_name] = ds[var_name].rename({"zl": "olevel"})
+            var_dims = list(ds[var_name].dims)
+            cmor.set_cur_dataset_attribute("vertical_label", "olevel")
+            logger.info("*** Define olevel axis")
+            values = ds["olevel"].values
+            logger.info("write olevel axis")
+            zi = ds["zi"].values
+            bnds = np.column_stack((zi[:-1], zi[1:]))
+            lev_id = cmor.axis(
+                table_entry="depth_coord",
+                units="m",
+                coord_vals=np.asarray(values),
+                cell_bounds=bnds,
+            )
+
         # Map dimension names to axis IDs
         dim_to_axis = {
             "time": time_id,
@@ -513,6 +525,7 @@ class CmorSession(
             "lev": alev_id,  # sometimes used for hybrid
             "sdepth": sdepth_id,
             "z_l": lev_id,
+            "olevel": lev_id,
             "plev": plev_id,
             "lat": lat_id,
             "latitude": lat_id if lat_id is not None else i_id,
@@ -530,6 +543,7 @@ class CmorSession(
                 )
             axes_ids.append(axis_id)
         self.load_table(self.tables_path, self.primarytable)
+
         return axes_ids
 
     def _write_fx_2d(self, ds: xr.Dataset, name: str, units: str) -> None:
@@ -741,7 +755,8 @@ class CmorSession(
         axes_ids = self._define_axes(ds, vdef)
         logger.info("Prepare data for CMOR %s", data.dtype)  # debug
         data_filled, fillv = filled_for_cmor(data)
-
+        if "zl" in data_filled.dims:
+            data_filled = data_filled.rename({"zl": "olevel"})
         self.load_table(self.tables_path, self.primarytable)
 
         var_entry = getattr(cmip_var, "branded_variable_name", varname)
@@ -751,6 +766,7 @@ class CmorSession(
             var_entry = var_entry.value
         else:
             var_entry = str(var_entry)
+
         logger.info("Define CMOR variable %s", var_entry)  # debug
         var_id = cmor.variable(
             var_entry,

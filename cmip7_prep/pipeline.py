@@ -21,9 +21,12 @@ logger = logging.getLogger(__name__)
 _VAR_TOKEN = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z0-9_]+)(?![A-Za-z0-9_])")
 
 
-def _filename_contains_var(path: Union[str, Path], var: str) -> bool:
+def _filename_contains_var(
+    path: Union[str, Path], var: str, fname_pattern: Optional[str] = None
+) -> bool:
     """
-    True if filename contains the variable as a dot-delimited token: '.var.'.
+    True if filename contains the variable as a dot-delimited token: '.var.'
+    or matches the optional fname_pattern substring.
 
     Example matches: '...cam.h0.TS.0001-01.nc' contains '.TS.' -> True
     >>> _filename_contains_var("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc", "TS")
@@ -32,11 +35,17 @@ def _filename_contains_var(path: Union[str, Path], var: str) -> bool:
     False
     >>> _filename_contains_var(Path("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc"), "TS")
     True
-    >>> _filename_contains_var("wrkflw.mom6.h.native.sos.000101-001012.nc", "sos")
+    >>> _filename_contains_var("wrkflw.mom6.h.native.sos.000101-001012.nc",
+    ...           "sos", fname_pattern=".sfc.")
+    False
+    >>> _filename_contains_var("file.TS.001.nc", "TS", fname_pattern=".001.")
     True
     """
     name = Path(path).name
     needle = f".{var}."
+    if fname_pattern is not None:
+        return fname_pattern in name and needle in name
+
     return needle in name
 
 
