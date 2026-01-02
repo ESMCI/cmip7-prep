@@ -13,8 +13,16 @@ dataset_overrides:
   nominal_resolution: 100 km
 
 variables:
+  agessc:
+    table: ocean
+    long_name: "Ideal Age of Sea Water"
+    units: "yr"
+    dims: [time, olevel, latitude, longitude]
+    sources:
+      - cesm_var: agessc
+
   cl:
-    table: Amon
+    table: atmos
     units: "%"
     long_name: Cloud Area Fraction
     standard_name: cloud_area_fraction
@@ -29,7 +37,7 @@ variables:
     sources:
       - cesm_var: CLOUD
   cli:
-    table: Amon
+    table: atmos
     units: "kg kg-1"
     dims: [time, lev, lat, lon]
     levels:
@@ -41,7 +49,7 @@ variables:
       - cesm_var: CLDICE
 
   cLitter:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (TOTLITC + CWD_C)/1000.0
@@ -50,14 +58,14 @@ variables:
       - cesm_var: CWD_C
 
   clivi:
-    table: Amon
+    table: atmos
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
       - cesm_var: TGCLDIWP
 
   clt:
-    table: Amon
+    table: atmos
     units: "%"
     dims: [time, lat, lon]
     formula: CLDTOT * 100
@@ -65,7 +73,7 @@ variables:
       - cesm_var: CLDTOT
 
   clw:
-    table: Amon
+    table: atmos
     units: "kg kg-1"
     dims: [time, lev, lat, lon]
     levels:
@@ -77,14 +85,14 @@ variables:
       - cesm_var: CLDLIQ
 
   clwvi:
-    table: Amon
+    table: atmos
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
       - cesm_var: TGCLDLWP
 
   cProduct:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (TOTPRODC + CWD_P)/1000.0
@@ -93,7 +101,7 @@ variables:
       - cesm_var: CWD_P
 
   cSoilFast:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (SOIL1C)/1000.0
@@ -101,7 +109,7 @@ variables:
       - cesm_var: SOIL1C
 
   cSoilMedium:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (SOIL2C)/1000.0
@@ -109,7 +117,7 @@ variables:
       - cesm_var: SOIL2C
 
   cSoilSlow:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (SOIL3C)/1000.0
@@ -117,7 +125,7 @@ variables:
       - cesm_var: SOIL3C
 
   cVeg:
-    table: Lmon
+    table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     formula: (TOTVEGC)/1000.0
@@ -134,8 +142,17 @@ variables:
     sources:
       - cesm_var: deptho
 
+  evs:
+    table: ocean
+    units: kg m-2 s-1
+    long_name: Evaporation over ice free ocean
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: evs
+
   evspsbl:
-    table: Amon
+    table: atmos
     units: kg m-2 s-1
     long_name: Evaporation
     cell_methods: "time: mean"
@@ -146,7 +163,7 @@ variables:
         scale: -1.0     # flip sign if CESM positive upward
 
   evspsblsoi:
-    table: Lmon
+    table: land
     units: kg m-2 s-1
     long_name: Water Evaporation from Soil
     dims: [time, lat, lon]
@@ -155,7 +172,7 @@ variables:
       - cesm_var: QSOIL
 
   evspsblveg:
-    table: Lmon
+    table: land
     units: kg m-2 s-1
     long_name: Water Evaporation from Soil
     dims: [time, lat, lon]
@@ -164,7 +181,7 @@ variables:
       - cesm_var: QVEGE
 
   fFire:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -173,7 +190,7 @@ variables:
       - cesm_var: COL_FIRE_CLOSS
 
   fHarvest:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -181,8 +198,17 @@ variables:
     sources:
       - cesm_var: WOOD_HARVESTC
 
+  ficeberg:
+    table: ocean
+    units: "kg m-2 s-1"
+    long_name: "Iceberg Freshwater Flux"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: ficeberg
+
   gpp:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     formula: GPP/1000.0
@@ -191,7 +217,7 @@ variables:
       - cesm_var: GPP
 
   hfls:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -199,7 +225,7 @@ variables:
       - cesm_var: LHFLX
 
   hfss:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -207,7 +233,7 @@ variables:
       - cesm_var: SHFLX
 
   hur:
-    table: Amon
+    table: atmos
     units: "%"
     dims: [time, plev, lat, lon]
     levels:
@@ -217,14 +243,14 @@ variables:
       - cesm_var: RELHUM
 
   hurs:
-    table: Amon
+    table: atmos
     units: "%"
     dims: [time, lat, lon]
     sources:
       - cesm_var: RHREFHT
 
   hus:
-    table: Amon
+    table: atmos
     units: "kg kg-1"
     dims: [time, plev, lat, lon]
     levels:
@@ -234,7 +260,7 @@ variables:
       - cesm_var: Q
 
   huss:
-    table: Amon
+    table: atmos
     units: "1"
     long_name: Near-Surface Specific Humidity
     dims: [time, lat, lon]
@@ -243,14 +269,14 @@ variables:
       - cesm_var: QREFHT
 
   lai:
-    table: Lmon
+    table: land
     units: "1"
     dims: [time, lat, lon]
     sources:
       - cesm_var: TLAI
 
   mlotst:
-    table: Omon
+    table: ocean
     units: "m"
     long_name: "Ocean Mixed Layer Thickness Defined by Sigma T"
     dims: [time, latitude, longitude]
@@ -258,7 +284,7 @@ variables:
       -cesm_var: mlotst
 
   mrfso:
-    table: Lmon
+    table: land
     units: kg m-2
     dims: [time, lat, lon]
     formula: verticalsum(SOILICE, capped_at=5000)
@@ -266,21 +292,21 @@ variables:
       - cesm_var: SOILICE
 
   mrro:
-    table: Lmon
+    table: land
     units: kg m-2 s-1
     dims: [time, lat, lon]
     sources:
       - cesm_var: QRUNOFF
 
   mrros:
-    table: Lmon
+    table: land
     units: kg m-2 s-1
     dims: [time, lat, lon]
     sources:
       - cesm_var: QOVER
 
   mrso:
-    table: Lmon
+    table: land
     units: kg m-2
     dims: [time, lat, lon]
     formula: verticalsum(SOILICE + SOILLIQ, capped_at=5000)
@@ -289,14 +315,14 @@ variables:
       - cesm_var: SOILLIQ
 
   mrsos:
-    table: Lmon
+    table: land
     units: kg m-2
     dims: [time, lat, lon]
     sources:
       - cesm_var: SOILWATER_10CM
 
   nbp:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     formula: NBP/1000.0
@@ -305,7 +331,7 @@ variables:
       - cesm_var: NBP
 
   npp:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     formula: NPP/1000.0
@@ -314,7 +340,7 @@ variables:
       - cesm_var: NPP
 
   pr:
-    table: Amon
+    table: atmos
     units: kg m-2 s-1
     long_name: Precipitation
     standard_name: precipitation_flux
@@ -325,7 +351,7 @@ variables:
       - cesm_var: PRECT
         scale: 1000.0   # convert from m/s to kg m-2 s-1 if needed
   prc:
-    table: Amon
+    table: atmos
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     # PRECC is in m s-1 (water equivalent) → convert to kg m-2 s-1
@@ -334,7 +360,7 @@ variables:
       - cesm_var: PRECC
 
   prsn:
-    table: Amon
+    table: atmos
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     # PRECSC/PRECSL are snowfall rates in m s-1 (water equiv) → convert to kg m-2 s-1
@@ -344,21 +370,21 @@ variables:
       - cesm_var: PRECSL
 
   prveg:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     sources:
       - cesm_var: QINTR
 
   prw:
-    table: Amon
+    table: atmos
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
       - cesm_var: TMQ
 
   psl:
-    table: Amon
+    table: atmos
     units: Pa
     long_name: Sea Level Pressure
     cell_methods: "time: mean"
@@ -367,8 +393,7 @@ variables:
     sources:
       - cesm_var: PSL
 
-  ps:
-    table: Amon
+  atmos.ps.tavg-u-hxy-u:
     units: Pa
     long_name: Surface Air Pressure
     cell_methods: "time: mean"
@@ -378,7 +403,7 @@ variables:
       - cesm_var: PS
 
   ra:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -387,7 +412,7 @@ variables:
       - cesm_var: AR
 
   rh:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -396,7 +421,7 @@ variables:
       - cesm_var: HR
 
   rldscs:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -407,7 +432,7 @@ variables:
       - cesm_var: FLNSC
 
   rlus:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -417,7 +442,7 @@ variables:
       - cesm_var: FLNS
 
   rluscs:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -425,7 +450,7 @@ variables:
       - cesm_var: FLUSC
 
   rlut:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -433,7 +458,7 @@ variables:
       - cesm_var: FLUT
 
   rlutcs:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -441,7 +466,7 @@ variables:
       - cesm_var: FLUTC
 
   rsds:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -449,7 +474,7 @@ variables:
       - cesm_var: FSDS
 
   rsdscs:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -457,7 +482,7 @@ variables:
       - cesm_var: FSDSC
 
   rsdt:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -465,7 +490,7 @@ variables:
       - cesm_var: SOLIN
 
   rsus:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -475,7 +500,7 @@ variables:
       - cesm_var: FSNS
 
   rsuscs:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -485,7 +510,7 @@ variables:
       - cesm_var: FSNSC
 
   rsut:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
@@ -493,7 +518,7 @@ variables:
       - cesm_var: FSUTOA
 
   rsutcs:
-    table: Amon
+    table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
     formula: SOLIN - FSNTOAC
@@ -503,24 +528,24 @@ variables:
       - cesm_var: FSNTOAC
 
   snld:
-    table: Lmon
+    table: land
     units: "m"
     dims: [time, lat, lon]
     sources:
       - cesm_var: SNOW_DEPTH
 
   sos:
-    table: Omon
+    table: ocean
     units: "1e-3"
     dims:
-      - [time, latitude, longitude]   # for curvilinear grids
+      - [time, latitude, longitude]
       - [time, lat, lon]
     regrid_method: conservative
     sources:
       - cesm_var: sos
 
   sos_max:
-    table: Omon
+    table: ocean
     units: "1e-3"
     dims:
       - [time, latitude, longitude]   # for curvilinear grids
@@ -530,7 +555,7 @@ variables:
       - cesm_var: sos_max
 
   sos_min:
-    table: Omon
+    table: ocean
     units: "1e-3"
     dims:
       - [time, latitude, longitude]   # for curvilinear grids
@@ -540,7 +565,7 @@ variables:
       - cesm_var: sos_min
 
   sfcWind:
-    table: Amon
+    table: atmos
     units: "m s-1"
     dims: [time, lat, lon]
     sources:
@@ -555,7 +580,7 @@ variables:
       - cesm_var: LANDFRAC
 
   ta:
-    table: Amon
+    table: atmos
     units: K
     long_name: Air Temperature
     dims: [time, plev, lat, lon]
@@ -567,7 +592,7 @@ variables:
       - cesm_var: T
 
   tas:
-    table: Amon
+    table: atmos
     units: K
     long_name: Near-Surface Air Temperature
     standard_name: air_temperature
@@ -578,21 +603,21 @@ variables:
       - cesm_var: TS
 
   tasmax:
-    table: Amon
+    table: atmos
     units: "K"
     dims: [time, lat, lon]
     sources:
       - cesm_var: TREFHTMX
 
   tasmin:
-    table: Amon
+    table: atmos
     units: "K"
     dims: [time, lat, lon]
     sources:
       - cesm_var: TREFHTMN
 
   tauu:
-    table: Amon
+    table: atmos
     units: "N m-2"
     dims: [time, lat, lon]
     positive: up
@@ -600,15 +625,45 @@ variables:
       - cesm_var: TAUX
 
   tauv:
-    table: Amon
+    table: atmos
     units: "N m-2"
     dims: [time, lat, lon]
     positive: up
     sources:
       - cesm_var: TAUY
 
+  tdps:
+    table: atmos
+    units: "K"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: TD
+
+  tnhus:
+    table: atmos
+    units: "kg kg-1"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: Q
+
+  tnt:
+    table: atmos
+    units: "K s-1"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: T
+
   tos:
-    table: Omon
+    table: ocean
     units: "K"
     dims:
       - [time, latitude, longitude]
@@ -618,7 +673,7 @@ variables:
       - cesm_var: tos
 
   tran:
-    table: Lmon
+    table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     positive: up
@@ -628,21 +683,21 @@ variables:
       - cesm_var: QSOIL
 
   ts:
-    table: Amon
+    table: atmos
     units: "K"
     dims: [time, lat, lon]
     sources:
       - cesm_var: TS
 
   tsl:
-    table: Lmon
+    table: land
     units: "K"
     dims: [time, sdepth, lat, lon]
     sources:
       - cesm_var: TSOI
 
   ua:
-    table: Amon
+    table: atmos
     units: m s-1
     long_name: Zonal Wind
     dims: [time, plev, lat, lon]
@@ -654,14 +709,14 @@ variables:
       - cesm_var: U
 
   uas:
-    table: Amon
+    table: atmos
     units: "m s-1"
     dims: [time, lat, lon]
     sources:
       - cesm_var: U10
 
   va:
-    table: Amon
+    table: atmos
     units: m s-1
     long_name: Meridional Wind
     dims: [time, plev, lat, lon]
@@ -672,21 +727,21 @@ variables:
     sources:
       - cesm_var: V
   vas:
-    table: Amon
+    table: atmos
     units: "m s-1"
     dims: [time, lat, lon]
     sources:
       - cesm_var: VBOT
 
   volcello:
-    table: Omon
+    table: ocean
     units: "m3"
     dims: [time, z_l, latitude, longitude]
     sources:
       - cesm_var: volcello
 
   wap:
-    table: Amon
+    table: atmos
     units: "Pa s-1"
     dims: [time, plev, lat, lon]
     levels:
@@ -696,7 +751,7 @@ variables:
       - cesm_var: OMEGA
 
   zg:
-    table: Amon
+    table: atmos
     units: "m"
     dims: [time, plev, lat, lon]
     levels:
@@ -706,7 +761,7 @@ variables:
       - cesm_var: Z3
 
   zos:
-    table: Omon
+    table: ocean
     units: "m"
     dims: [time, latitude, longitude]
     regrid_method: bilinear
@@ -714,7 +769,7 @@ variables:
       - cesm_var: zos
 
   zossq:
-    table: Omon
+    table: ocean
     units: "m2"
     dims: [time, latitude, longitude]
     regrid_method: bilinear

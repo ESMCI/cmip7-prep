@@ -202,7 +202,7 @@ class Mapping:
     def get_cfg(self, cmip_name: str) -> Dict[str, Any]:
         """Return the normalized config dict for a CMIP variable name."""
         if cmip_name not in self._vars:
-            raise KeyError(f"No mapping for {cmip_name!r} in {self.path}")
+            raise KeyError(f"No mapping for {str(cmip_name)} in {self.path}")
         return self._vars[cmip_name].as_cfg()
 
     def realize(self, ds: xr.Dataset, cmip_name: str) -> xr.DataArray:

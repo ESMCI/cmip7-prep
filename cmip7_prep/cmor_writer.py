@@ -154,7 +154,7 @@ class CmorSession(
             # caller passed a context manager directly
             self._dataset_json_cm = dj
             p = dj.__enter__()  # ← ENTER the CM, get a Path
-
+        logger.info("Using dataset JSON: %s", p)
         with open(p, encoding="utf-8") as f:
             cfg = json.load(f)
         cfg["outpath"] = str(self._outdir)
@@ -172,24 +172,7 @@ class CmorSession(
 
         # long paragraph; split to keep lines < 100
         inst = get_cmor_attr("institution_id") or "NCAR"
-        license_text = (
-            f"CMIP6 model data produced by {inst} is licensed under a Creative Commons "
-            "Attribution 4.0 International License "
-            "(https://creativecommons.org/licenses/by/4.0/). "
-            "Consult https://pcmdi.llnl.gov/CMIP6/TermsOfUse for terms of use "
-            "governing CMIP6 output, including citation requirements and proper "
-            "acknowledgment. Further information about this data, including some "
-            "limitations, can be found via the further_info_url (recorded as a "
-            "global attribute in this file). The data producers and data providers "
-            "make no warranty, either express or implied, including, but not "
-            "limited to, warranties of merchantability and fitness for a "
-            "particular purpose. All liabilities arising from the supply of the "
-            "information (including any liability arising in negligence) are "
-            "excluded to the fullest extent permitted by law."
-        )
-
-        cmor.set_cur_dataset_attribute("license", license_text)
-
+        cmor.set_cur_dataset_attribute("institution_id", inst)
         # Tell CMOR how to build tracking_id; let CMOR generate it
         prefix = get_cmor_attr("tracking_prefix")
         if not (isinstance(prefix, str) and prefix.startswith("hdl:")):
@@ -201,7 +184,13 @@ class CmorSession(
             set_cmor_attr(
                 "tracking_id", ""
             )  # empty lets CMOR regenerate from tracking_prefix
-
+        logger.info("set _controlled_vocabulary_file:")
+        cmor.set_cur_dataset_attribute("_controlled_vocabulary_file", "CMIP7_CV.json")
+        logger.info("set _axis_entry_file:")
+        cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
+        logger.info("set _formula_var_file:")
+        cmor.set_cur_dataset_attribute("_FORMULA_VAR_FILE", "CMIP7_formula_terms.json")
+        logger.info("CMOR session initialized")
         return self
 
     def __exit__(self, exc_type, exc, tb):
@@ -222,7 +211,6 @@ class CmorSession(
             return {}  # already loaded
         table_filename = resolve_table_filename(tables_path, key)
         self.currenttable = key
-        logger.info("Loading CMOR table: %s", table_filename)
         return cmor.load_table(table_filename)
 
     def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
@@ -288,7 +276,7 @@ class CmorSession(
         var_name = getattr(vdef, "name", None)
         if var_name is None or var_name not in ds:
             raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
-        var_da = ds[var_name]
+        var_da = ds[str(var_name)]
         var_dims = list(var_da.dims)
         alev_id = None
         plev_id = None
@@ -372,7 +360,6 @@ class CmorSession(
         self.load_table(self.tables_path, self.primarytable)
         tvals, tbnds, t_units = _get_time_and_bounds(ds)
         if tvals is not None:
-            logger.info("write time axis")
             time_id = cmor.axis(
                 table_entry="time",
                 units=t_units,
@@ -389,6 +376,7 @@ class CmorSession(
             "alev",
         } or "lev" in var_dims:
             # names in the native ds
+            logger.info("*** Define hybrid sigma axis")
             hyam_name = levels.get("hyam", "hyam")  # A mid (dimensionless)
             hybm_name = levels.get("hybm", "hybm")  # B mid (dimensionless)
             hyai_name = levels.get("hyai", "hyai")  # A interfaces (optional)
@@ -405,7 +393,9 @@ class CmorSession(
                 coord_vals=sigma_mid,
                 cell_bounds=sigma_bnds,
             )
-
+            cmor.set_cur_dataset_attribute(
+                "vertical_label", "alevel"
+            )  # or another valid value
             # 2) z-factors: a(lev), b(lev), p0(scalar), ps(time,lat,lon)
 
             cmor.zfactor(
@@ -481,6 +471,8 @@ class CmorSession(
                 # Accept entries like plev19, plev7h, plev27, etc.
                 if key.lower().startswith("plev"):
                     table_entry = key
+            if pb is None:
+                pb = bounds_from_centers_1d(pvals, "plev")
 
             plev_id = cmor.axis(
                 table_entry=table_entry,
@@ -510,6 +502,22 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+        elif "zl" in var_dims:
+            ds[var_name] = ds[var_name].rename({"zl": "olevel"})
+            var_dims = list(ds[var_name].dims)
+            cmor.set_cur_dataset_attribute("vertical_label", "olevel")
+            logger.info("*** Define olevel axis")
+            values = ds["olevel"].values
+            logger.info("write olevel axis")
+            zi = ds["zi"].values
+            bnds = np.column_stack((zi[:-1], zi[1:]))
+            lev_id = cmor.axis(
+                table_entry="depth_coord",
+                units="m",
+                coord_vals=np.asarray(values),
+                cell_bounds=bnds,
+            )
+
         # Map dimension names to axis IDs
         dim_to_axis = {
             "time": time_id,
@@ -517,6 +525,7 @@ class CmorSession(
             "lev": alev_id,  # sometimes used for hybrid
             "sdepth": sdepth_id,
             "z_l": lev_id,
+            "olevel": lev_id,
             "plev": plev_id,
             "lat": lat_id,
             "latitude": lat_id if lat_id is not None else i_id,
@@ -534,6 +543,7 @@ class CmorSession(
                 )
             axes_ids.append(axis_id)
         self.load_table(self.tables_path, self.primarytable)
+
         return axes_ids
 
     def _write_fx_2d(self, ds: xr.Dataset, name: str, units: str) -> None:
@@ -544,7 +554,7 @@ class CmorSession(
         da = ds[name]
         logger.info("FX variable %s dims: %s", name, da.dims)
         if set(da.dims) == {"xh", "yh"}:
-            self.load_table(self.tables_path, "Ofx")
+            self.load_table(self.tables_path, "ocean")
             geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
             ds_geo = xr.open_dataset(geo_path)
             lat = ds_geo["lath"].values
@@ -584,13 +594,17 @@ class CmorSession(
             logger.info("Writing fx variable %s on curvilinear grid", name)
             cmor.set_cur_dataset_attribute("grid", "curvilinear")
             cmor.set_cur_dataset_attribute("grid_label", "gn")
+            if name == "deptho":
+                name = "deptho_ti-u-hxy-sea"
         else:
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
             cmor.set_cur_dataset_attribute("grid_label", "gr")
-            if name in ("areacella", "sftlf"):
-                self.load_table(self.tables_path, "fx")
-            elif name in ("sftof", "deptho", "areacello"):
-                self.load_table(self.tables_path, "Ofx")
+            if name in ("areacella_ti-u-hxy-u", "sftlf_ti-u-hxy-u"):
+                self.load_table(self.tables_path, "land")
+            elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
+                self.load_table(self.tables_path, "ocean")
+                if name == "deptho":
+                    name = "deptho_ti-u-hxy-sea"
             lat = ds["lat"].values
             lon = ds["lon"].values
             lat_b = ds.get("lat_bnds")
@@ -612,14 +626,15 @@ class CmorSession(
                 "longitude", "degrees_east", coord_vals=lon, cell_bounds=lon_b
             )
             data_filled, fillv = filled_for_cmor(da)
-        logger.info("Writing fx variable %s", name)
+        logger.info("Defining fx variable %s", name)
+
         var_id = cmor.variable(name, units, [lat_id, lon_id], missing_value=fillv)
         if cmor.has_variable_attribute(var_id, "outputpath"):
             logger.info(
                 "CMOR variable object has outputpath attribute: %s",
                 cmor.get_variable_attribute(var_id, "outputpath"),
             )
-
+        logger.info("Now writing FX variable %s id: %s", name, var_id)
         cmor.write(var_id, np.asarray(data_filled))
         cmor.close(var_id)
         logger.info("Finished writing fx variable %s", name)
@@ -631,11 +646,11 @@ class CmorSession(
         Returns ds_regr augmented with any missing fx fields.
         """
         need = [
-            ("sftlf", "%"),
-            ("areacella", "m2"),
-            ("sftof", "%"),
+            ("sftlf_ti-u-hxy-u", "%"),
+            ("areacella_ti-u-hxy-u", "m2"),
+            ("sftof_ti-u-hxy-u", "%"),
             ("wet", "%"),
-            ("areacello", "m2"),
+            ("areacello_ti-u-hxy-u", "m2"),
             ("mrsofc", "m3 s-1"),
             ("orog", "m"),
             ("thkcello", "m"),
@@ -651,12 +666,12 @@ class CmorSession(
         ]  # land fraction, ocean cell area, soil moisture fraction
         out = ds_regr
 
-        # Write sftof if present (native grid sea fraction: wet)
-        if "sftof" in ds_regr and "sftof" not in self._fx_written:
-            logger.info("Writing fx variable sftof")
-            self.load_table(self.tables_path, "Ofx")
-            self._write_fx_2d(ds_regr, "sftof", "%")
-            self._fx_written.add("sftof")
+        # Write sftof_ti-u-hxy-u if present (native grid sea fraction: wet)
+        if "sftof_ti-u-hxy-u" in ds_regr and "sftof_ti-u-hxy-u" not in self._fx_written:
+            logger.info("Writing fx variable sftof_ti-u-hxy-u")
+            self.load_table(self.tables_path, "ocean")
+            self._write_fx_2d(ds_regr, "sftof_ti-u-hxy-u", "%")
+            self._fx_written.add("sftof_ti-u-hxy-u")
 
         for name, units in need:
             # 1) Already cached this run?
@@ -670,7 +685,7 @@ class CmorSession(
                 self._fx_cache[name] = out[name]
                 if name not in self._fx_written:
                     # Convert landfrac to % if needed
-                    if name == "sftlf":
+                    if name == "sftlf_ti-u-hxy-u":
                         v = out[name]
                         if (np.nanmax(v.values) <= 1.0) and v.attrs.get(
                             "units", ""
@@ -689,7 +704,10 @@ class CmorSession(
 
             # 3) Not present in ds_regr → try reading existing CMOR fx output
             if self._outdir:
-                fx_da = open_existing_fx(self._outdir, name)
+                try:
+                    fx_da = open_existing_fx(self._outdir, name)
+                except FileNotFoundError:
+                    fx_da = None
                 if fx_da is not None:
                     # Verify grid match (simple equality on lat/lon values)
                     if (
@@ -711,18 +729,23 @@ class CmorSession(
     def write_variable(
         self,
         ds: xr.Dataset,
-        varname: str,
+        cmip_var: object,
         vdef: Any,
     ) -> None:
         """Write one variable from ds to a CMOR-compliant NetCDF file."""
         # Pick CMOR table: prefer vdef.table, else vdef.realm (default Amon)
         self.primarytable = (
-            getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "Amon"
+            getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "atmos"
         )
 
-        logger.info("Using CMOR table key: %s", self.primarytable)  # debug
+        logger.info(
+            "Using CMOR table key: %s %s", self.tables_path, self.primarytable
+        )  # debug
         self.load_table(self.tables_path, self.primarytable)
-        data = ds[vdef.name]
+        varname = getattr(cmip_var, "physical_parameter").name
+        logger.info("Preparing to write variable: %s", varname)  # debug
+        data = ds[str(varname)]
+
         logger.info("Ensure fx variables are written and cached")  # debug
         self.ensure_fx_written_and_cached(ds)
 
@@ -732,25 +755,21 @@ class CmorSession(
         axes_ids = self._define_axes(ds, vdef)
         logger.info("Prepare data for CMOR %s", data.dtype)  # debug
         data_filled, fillv = filled_for_cmor(data)
-
-        # Debug logging for axis mapping
-
-        # Try to get axis table entries for each axis_id
-        try:
-            for i, aid in enumerate(axes_ids):
-                entry = cmor.axis_entry(aid) if hasattr(cmor, "axis_entry") else None
-                logger.info(
-                    "[CMOR DEBUG] axis %d: id=%s, table_entry=%s", i, aid, entry
-                )
-        # pylint: disable=broad-exception-caught
-        except Exception as e:
-            logger.warning("[CMOR DEBUG] Could not retrieve axis table entries: %s", e)
-
-        logger.info("Define variable %s with units %s", varname, units)  # debug
-
+        if "zl" in data_filled.dims:
+            data_filled = data_filled.rename({"zl": "olevel"})
         self.load_table(self.tables_path, self.primarytable)
+
+        var_entry = getattr(cmip_var, "branded_variable_name", varname)
+        if hasattr(var_entry, "name"):
+            var_entry = var_entry.name
+        elif hasattr(var_entry, "value"):
+            var_entry = var_entry.value
+        else:
+            var_entry = str(var_entry)
+
+        logger.info("Define CMOR variable %s", var_entry)  # debug
         var_id = cmor.variable(
-            getattr(vdef, "name", varname),
+            var_entry,
             units,
             axes_ids,
             positive=getattr(vdef, "positive", None),
@@ -768,12 +787,9 @@ class CmorSession(
         if time_da is None:
             time_da = ds.get("time")
         nt = 0
-        logger.info(
-            "Insure fx variables are written and cached: %s", list(ds.variables.keys())
-        )  # debug
 
         # ---- Main variable write ----
-
+        logger.info("Writing CMOR variable %s", var_id)  # debug
         cmor.write(
             var_id,
             np.asarray(data_filled),

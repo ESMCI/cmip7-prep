@@ -29,9 +29,11 @@ from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_wit
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
-from cmip7_prep.dreq_search import find_variables_by_prefix
 from cmip7_prep.mom6_static import load_mom6_grid
 from cmip7_prep.mom6_static import ocean_fx_fields
+from data_request_api.query import data_request as dr
+from data_request_api.content import dump_transformation as dt
+
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
@@ -50,7 +52,7 @@ _DATE_RE = re.compile(
     r"\.nc(?!\S)"  # literal .nc and then end (or whitespace)
 )
 
-TABLES = "/glade/work/cmip7/e3sm_to_cmip/cmip6-cmor-tables/Tables"
+TABLES = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
@@ -89,7 +91,19 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--realm", choices=["atm", "lnd", "ocn"], required=True, help="Realm to process"
+        "--realm",
+        choices=[
+            "atmos",
+            "land",
+            "ocean",
+            "seaIce",
+            "landIce",
+            "aerosol",
+            "atmosChem",
+            "ocnBgchem",
+        ],
+        required=True,
+        help="Realm to process",
     )
     parser.add_argument("--caseroot", type=str, help="Case root directory")
     parser.add_argument("--cimeroot", type=str, help="CIME root directory")
@@ -118,6 +132,12 @@ def parse_args():
         "--skip-timeseries",
         action="store_true",
         help="Skip the timeseries processing step.",
+    )
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        default="piControl",
+        help="Experiment name for data request",
     )
 
     args = parser.parse_args()
@@ -148,18 +168,20 @@ def parse_args():
 
 
 def process_one_var(
-    varname: str,
+    cmip_var,
     mapping,
     inputfile,
     tables_path,
     outdir,
-    realm="atm",
+    realm="atmos",
     mom6_grid=None,
     ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
+    varname = cmip_var.physical_parameter.name
+
     logger.info(f"Starting processing for variable: {varname}")
-    results = [(varname, "started")]
+    results = [(str(varname), "started")]
     try:
         cfg = mapping.get_cfg(varname)
     except Exception as e:
@@ -175,9 +197,9 @@ def process_one_var(
         logger.info(f"Processing {varname} with dims {dims}")
         try:
             open_kwargs = None
-            if realm == "ocn":
+            if realm == "ocean":
                 open_kwargs = {"decode_timedelta": False}
-
+            logger.info("Opening native data for variable %s", varname)
             ds_native, var = open_native_for_cmip_vars(
                 varname,
                 inputfile,
@@ -188,7 +210,7 @@ def process_one_var(
             )
             logger.info("realm is %s", realm)
             # Append ocn_fx_fields to ds_native if available
-            if realm == "ocn" and ocn_fx_fields is not None:
+            if realm == "ocean" and ocn_fx_fields is not None:
                 ds_native = ds_native.merge(ocn_fx_fields)
             logger.info(
                 "ds_native keys: %s for var %s with dims %s",
@@ -204,7 +226,7 @@ def process_one_var(
             if "latitude" in dims and "longitude" in dims:
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
                 ds_cmor = ds_native
-                results.append((varname, "analyzed native mom6 grid"))
+                results.append((str(varname), "analyzed native mom6 grid"))
                 # Attach ocn_fx_fields to ds_cmor for writing
                 if ocn_fx_fields is not None:
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
@@ -227,6 +249,7 @@ def process_one_var(
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
+                logger.info("ds_cmor is not None")
                 # Attach ocn_fx_fields to regridded output for writing
                 if ocn_fx_fields is not None:
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
@@ -249,16 +272,19 @@ def process_one_var(
                 tables_path=tables_path,
                 log_dir=log_dir,
                 log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
-                dataset_attrs={"institution_id": "NCAR"},
+                dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
                 outdir=outdir,
             ) as cm:
+                cmip7name = cmip_var.attributes["branded_variable_name"]
 
+                logger.info(f"Writing CMOR variable {cmip7name.name}")
+                shortname = str(getattr(cmip_var, "physical_parameter").name)
                 vdef = type(
                     "VDef",
                     (),
                     {
-                        "name": varname,
-                        "table": cfg.get("table", "Amon"),
+                        "name": shortname,
+                        "table": cfg.get("table", "atmos"),
                         "units": cfg.get("units", ""),
                         "dims": dims,
                         "positive": cfg.get("positive", None),
@@ -268,17 +294,15 @@ def process_one_var(
                         "levels": cfg.get("levels", None),
                     },
                 )()
-                logger.info(
-                    f"Writing variable {varname} with dims {dims} and type {ds_cmor[varname].dtype}"
-                )
-                cm.write_variable(ds_cmor, varname, vdef)
+                logger.info(f"Writing variable {varname} with dims {dims} ")
+                cm.write_variable(ds_cmor, cmip_var, vdef)
             logger.info(f"Finished processing for {varname} with dims {dims}")
-            results.append((varname, "ok"))
+            results.append((shortname, "ok"))
         except Exception as e:
             logger.error(
                 f"Exception while processing {varname} with dims {dims}: {e!r}"
             )
-            results.append((varname, f"ERROR: {e!r}"))
+            results.append((str(varname), f"ERROR: {e!r}"))
     logger.info(f"Completed all processing for variable: {varname}, results {results}")
     return results
 
@@ -328,18 +352,18 @@ def main():
     mom6_grid = None
     ocn_grid = None
     ocn_fx_fields = None
-    if args.realm == "atm":
+    if args.realm == "atmos":
         include_patterns = ["*cam.h0a*"]
-        var_prefix = "Amon."
+        frequency = "mon"
         subdir = "atm"
-    elif args.realm == "lnd":
+    elif args.realm == "land":
         include_patterns = ["*clm2.h0*"]
-        var_prefix = "Lmon."
+        frequency = "mon"
         subdir = "lnd"
-    elif args.realm == "ocn":
+    elif args.realm == "ocean":
         # we do not want to match static files
-        include_patterns = ["*mom6.h.native.*", "*mom6.h.z.*"]
-        var_prefix = "Omon."
+        include_patterns = ["*mom6.h.native.*"]
+        frequency = "mon"
         subdir = "ocn"
         if args.ocn_grid_file:
             ocn_grid = args.ocn_grid_file
@@ -383,19 +407,19 @@ def main():
                     sys.exit(0)
     else:
         # testing path
-        if args.realm == "atm":
+        if args.realm == "atmos":
             INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
             TSDIR = (
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
             )
-        elif args.realm == "lnd":
+        elif args.realm == "land":
             INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
             TSDIR = (
                 scratch
                 + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
             )
-        elif args.realm == "ocn":
+        elif args.realm == "ocean":
             INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
             TSDIR = (
                 scratch
@@ -407,10 +431,53 @@ def main():
     if not os.path.exists(str(TSDIR)):
         os.makedirs(str(TSDIR))
     # Load MOM6 static grid if needed (ocn realm)
-    if args.realm == "ocn" and ocn_grid:
+    if args.realm == "ocean" and ocn_grid:
         mom6_grid = load_mom6_grid(ocn_grid)
         logger.info(f"Using MOM grid file: {ocn_grid}")
-    # Dask cluster setup
+        # Dask cluster setup
+
+    # Load mapping
+    mapping = Mapping.from_packaged_default()
+    cmip_vars = []
+    # logger.info(f"Finding variables with prefix {var_prefix}")
+
+    # cmip_vars = find_variables_by_prefix(
+    #    None, var_prefix, where={"List of Experiments": "piControl"}
+    # )
+    # cmip_vars = find_variables_by_realm_and_frequency(None, realm, frequency)
+    logger.info("Loading data request content %s", args.realm)
+    content_dic = dt.get_transformed_content()
+    logger.info("Content dic obtained")
+    DR = dr.DataRequest.from_separated_inputs(**content_dic)
+    cmip_vars = DR.find_variables(
+        skip_if_missing=False,
+        operation="all",
+        cmip7_frequency=frequency,
+        modelling_realm=args.realm,
+        experiment=args.experiment,
+    )
+
+    # for variable in DR.get_variables():
+    #    logger.info("variable %s, realm %s, frequency %s", variable.physical_parameter, variable.modelling_realm, variable.cmip7_frequency.name)
+    #    if (
+    #        realm in variable.modelling_realm
+    #        and frequency in str(variable.cmip7_frequency.name)
+    #    ):
+    #        cmip_vars.append(variable)
+    if args.cmip_vars:
+        tmp_cmip_vars = cmip_vars
+        cmip_vars = []
+        for var in tmp_cmip_vars:
+            logger.info(
+                "Checking variable %s in %s",
+                var.physical_parameter.name,
+                args.cmip_vars,
+            )
+            if var.physical_parameter.name in args.cmip_vars:
+                logger.info("Adding variable %s", var.physical_parameter.name)
+                cmip_vars.append(var)
+
+    logger.info(f"CMORIZING {len(cmip_vars)} variables")
     if args.workers == 1:
         client = None
         cluster = None
@@ -421,47 +488,15 @@ def main():
         else:
             ml = "auto"  # Default memory limit if NCPUS is not set
         cluster = LocalCluster(
-            n_workers=args.workers, threads_per_worker=1, memory_limit=ml
+            n_workers=min(args.workers, len(cmip_vars)),
+            threads_per_worker=1,
+            memory_limit=ml,
         )
         client = cluster.get_client()
-    input_head_dir = INPUTDIR
-    output_head_dir = TSDIR
-    if args.skip_timeseries:
-        logger.info("Skipping timeseries processing as per --skip-timeseries flag.")
-    else:
-        cnt = 0
-        for include_pattern in include_patterns:
-            cnt = cnt + len(glob.glob(os.path.join(input_head_dir, include_pattern)))
-        if cnt == 0:
-            logger.warning(
-                f"No input files to process in {input_head_dir} with {include_patterns}"
-            )
-            sys.exit(0)
-        hf_collection = HFCollection(input_head_dir, dask_client=client)
-        for include_pattern in include_patterns:
-            logger.info("Processing files with pattern: %s", include_pattern)
-            hfp_collection = hf_collection.include_patterns([include_pattern])
-            hfp_collection.pull_metadata()
-            ts_collection = TSCollection(
-                hfp_collection, output_head_dir, ts_orders=None, dask_client=client
-            )
-            if args.overwrite:
-                ts_collection = ts_collection.apply_overwrite("*")
-            ts_collection.execute()
-            logger.info("Timeseries processing complete, starting CMORization...")
-
-    # Load mapping
-    mapping = Mapping.from_packaged_default()
-    logger.info(f"Finding variables with prefix {var_prefix}")
-    if args.cmip_vars and len(args.cmip_vars) > 0:
-        cmip_vars = args.cmip_vars
-    else:
-        cmip_vars = find_variables_by_prefix(
-            None, var_prefix, where={"List of Experiments": "piControl"}
-        )
-    logger.info(f"CMORIZING {len(cmip_vars)} variables")
     if args.skip_cmor:
-        logger.info("Skipping CMORization as per --skip-cmor flag. %s", cmip_vars)
+        logger.info("Skipping CMORization as per --skip-cmor flag.")
+        for var in cmip_vars.physical_parameter.name:
+            logger.info(f"Variable {var} would be processed here.")
         sys.exit(0)
     # Load requested variables
     if len(cmip_vars) > 0:
@@ -527,7 +562,7 @@ def main():
                     logger.error("Task error:", e)
                     raise
 
-        for v, status in results:
+        for v, status in set(results):
             logger.info(f"Variable {v} processed with status: {status}")
 
     else:

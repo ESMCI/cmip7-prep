@@ -21,9 +21,12 @@ logger = logging.getLogger(__name__)
 _VAR_TOKEN = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z0-9_]+)(?![A-Za-z0-9_])")
 
 
-def _filename_contains_var(path: Union[str, Path], var: str) -> bool:
+def _filename_contains_var(
+    path: Union[str, Path], var: str, fname_pattern: Optional[str] = None
+) -> bool:
     """
-    True if filename contains the variable as a dot-delimited token: '.var.'.
+    True if filename contains the variable as a dot-delimited token: '.var.'
+    or matches the optional fname_pattern substring.
 
     Example matches: '...cam.h0.TS.0001-01.nc' contains '.TS.' -> True
     >>> _filename_contains_var("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc", "TS")
@@ -32,11 +35,17 @@ def _filename_contains_var(path: Union[str, Path], var: str) -> bool:
     False
     >>> _filename_contains_var(Path("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc"), "TS")
     True
-    >>> _filename_contains_var("wrkflw.mom6.h.native.sos.000101-001012.nc", "sos")
+    >>> _filename_contains_var("wrkflw.mom6.h.native.sos.000101-001012.nc",
+    ...           "sos", fname_pattern=".sfc.")
+    False
+    >>> _filename_contains_var("file.TS.001.nc", "TS", fname_pattern=".001.")
     True
     """
     name = Path(path).name
     needle = f".{var}."
+    if fname_pattern is not None:
+        return fname_pattern in name and needle in name
+
     return needle in name
 
 
@@ -105,11 +114,18 @@ def open_native_for_cmip_vars(
     """
     open_kwargs = dict(open_kwargs or {})
     # Allow cmip_vars to be a single variable (str) or a list
-    if isinstance(cmip_vars, str):
+    if not isinstance(cmip_vars, list):
         cmip_vars = [cmip_vars]
     new_cmip_vars = []
+
     for var in cmip_vars:
+        logger.info("Processing CMIP var collecting cesm vars'%s'", var)
         rvar = _collect_required_cesm_vars(mapping, [var])
+        logger.info(
+            "Looking for native files for CMIP var '%s' needing CESM vars: %s",
+            var,
+            rvar,
+        )
         candidates = glob.glob(str(files_glob))
         selected = sorted(
             {p for p in candidates if any(_filename_contains_var(p, v) for v in rvar)}
@@ -128,7 +144,8 @@ def open_native_for_cmip_vars(
     if not selected:
         logger.warning("no native inputs found for %s", cmip_vars)
         return None, None
-
+    logger.info("Opening native files for CESM vars: %s", required)
+    logger.info("Selected files:\n%s", "\n".join(selected))
     ds = xr.open_mfdataset(
         selected,
         combine="by_coords",
@@ -160,6 +177,7 @@ def _apply_vertical_if_needed(
     """Apply vertical transforms (e.g., plev19) to a single CMIP variable if required."""
     cfg = mapping.get_cfg(cmip_var) or {}
     levels = cfg.get("levels") or {}
+    logger.info("levels for %s: %s", cmip_var, levels)
     if (levels.get("name") or "").lower() != "plev19":
         return ds_var
     if not tables_path:
@@ -167,11 +185,15 @@ def _apply_vertical_if_needed(
 
     need = ["PS", "hyam", "hybm", "P0"]
     base = xr.Dataset({k: ds_native[k] for k in need if k in ds_native})
-    base[cmip_var] = ds_var[cmip_var]
+
+    base[str(cmip_var)] = ds_var[str(cmip_var)]
+    logger.info("Applying plev19 vertical transform for variable: %s", cmip_var)
+
     v_plev = to_plev19(
         base, cmip_var, tables_path
     )  # returns dataset with var on 'plev'
-    return xr.Dataset({cmip_var: v_plev[cmip_var]})
+    logger.info("After vertical transform : %s", cmip_var)
+    return xr.Dataset({str(cmip_var): v_plev[str(cmip_var)]})
 
 
 def _apply_vertical_if_needed_many(
@@ -211,6 +233,7 @@ def realize_regrid_prepare(
     open_kwargs = dict(open_kwargs or {})
     aux = []
     # 1) Get native dataset
+
     if isinstance(ds_or_glob, xr.Dataset):
         ds_native = ds_or_glob
     else:
@@ -241,12 +264,13 @@ def realize_regrid_prepare(
         da = da.chunk({"time": int(time_chunk)})
 
     ds_vars = xr.Dataset({cmip_var: da})
-    for var in ("landfrac", "area", "sftof", "landmask", "wet"):
+    for var in ("landfrac", "area", "landmask", "wet"):
         if var in ds_native and var not in ds_vars:
             ds_vars = ds_vars.assign(**{var: ds_native[var]})
 
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
+    logger.info("Mapping cfg for %s: %s", cmip_var, cfg)
     levels = cfg.get("levels", {}) or {}
     lev_kind = (levels.get("name") or "").lower()
     is_hybrid = lev_kind in {"standard_hybrid_sigma", "alev", "alevel"}
@@ -265,17 +289,20 @@ def realize_regrid_prepare(
         ]
     # 5) Apply vertical transform if needed (plev19, etc.).
     # Single-var helper already takes cfg + tables_path
+    logger.info("Applying vertical handling if needed for variable: %s", cmip_var)
     ds_vert = _apply_vertical_if_needed(
         ds_vars, ds_native, cmip_var, mapping, tables_path=tables_path
     )
-
+    logger.info("After vertical handling, dataset dims: %s", ds_vert.dims)
     # 6) Regrid (include PS if present)
-    names_to_regrid = [cmip_var]
+    names_to_regrid = [str(cmip_var)]
     if is_hybrid and "PS" in ds_vert:
         names_to_regrid.append("PS")
 
     # 7) Rename levgrnd if present to sdepth
-
+    logger.info(
+        "Checking for 'levgrnd' dimension in variables to regrid. %s", names_to_regrid
+    )
     # Check if 'levgrnd' is a dimension of any variable in names_to_regrid
     needs_levgrnd_rename = any(
         (v in ds_vert and "levgrnd" in getattr(ds_vert[v], "dims", []))
@@ -290,11 +317,11 @@ def realize_regrid_prepare(
         ds_vert = ds_vert.rename_dims({"levgrnd": "sdepth"})
         # Ensure the coordinate variable is also copied
         ds_vert = ds_vert.assign_coords(sdepth=ds_native["levgrnd"].values)
-
+    logger.info("Regridding variables: %s", names_to_regrid)
     ds_regr = regrid_to_1deg_ds(
         ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
     )
-
+    logger.info("Regridded dataset dims: %s", ds_regr.dims)
     if aux:
         ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 
