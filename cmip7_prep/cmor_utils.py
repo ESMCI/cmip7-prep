@@ -151,6 +151,11 @@ def bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
             bounds[-1, 1] = 360.0
         # Postprocessing: round bounds to 8 decimals for continuity
         bounds = np.round(bounds, 8)
+    elif kind == "plev":
+        # pressure levels: ensure lower bound < upper bound
+
+        if bounds[-1, 1] < 0:
+            bounds[-1, 1] = 50.0  # set a reasonable upper bound if negative
 
     return bounds
 
