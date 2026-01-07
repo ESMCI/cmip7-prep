@@ -215,6 +215,13 @@ variables:
     positive: down
     sources:
       - cesm_var: GPP
+  hfds:
+    table: ocean
+    units: "W m-2"
+    positive: down
+    dims: [time, latitude, longitude]
+    sources:
+      - cesm_var: hfds
 
   hfls:
     table: atmos
@@ -223,6 +230,15 @@ variables:
     positive: up
     sources:
       - cesm_var: LHFLX
+
+  hfsnthermds:
+    table: ocean
+    units: "W m-2"
+    long_name: "Latent Heat to melt frozen Precipitation"
+    dims: [time, olevel, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: hfsnthermds
 
   hfss:
     table: atmos
@@ -281,7 +297,7 @@ variables:
     long_name: "Ocean Mixed Layer Thickness Defined by Sigma T"
     dims: [time, latitude, longitude]
     sources:
-      -cesm_var: mlotst
+      - cesm_var: mlotst
 
   mrfso:
     table: land
@@ -313,6 +329,15 @@ variables:
     sources:
       - cesm_var: SOILICE
       - cesm_var: SOILLIQ
+
+  mrsol:
+    table: land
+    units: kg m-2
+    dims: [time, sdepth, lat, lon]
+    formula: SOILLIQ + SOILICE
+    sources:
+      - cesm_var: SOILLIQ
+      - cesm_var: SOILICE
 
   mrsos:
     table: land
@@ -534,6 +559,16 @@ variables:
     sources:
       - cesm_var: SNOW_DEPTH
 
+  soga:
+    table: ocean
+    units: "1e-3"
+    dims:
+      - [time, latitude, longitude]
+      - [time, lat, lon]
+    regrid_method: conservative
+    sources:
+      - cesm_var: soga
+
   sos:
     table: ocean
     units: "1e-3"
@@ -624,6 +659,14 @@ variables:
     sources:
       - cesm_var: TAUX
 
+  tauuo:
+    table: ocean
+    units: "N m-2"
+    dims: [time, latitude, longitude]
+    positive: down
+    sources:
+      - cesm_var: tauuo
+
   tauv:
     table: atmos
     units: "N m-2"
@@ -631,6 +674,14 @@ variables:
     positive: up
     sources:
       - cesm_var: TAUY
+
+  tauvo:
+    table: ocean
+    units: "N m-2"
+    dims: [time, latitude, longitude]
+    positive: down
+    sources:
+      - cesm_var: tauvo
 
   tdps:
     table: atmos
@@ -641,6 +692,25 @@ variables:
       units: Pa
     sources:
       - cesm_var: TD
+  thetao:
+    table: ocean
+    units: "K"
+    dims:
+      - [time, z_l, latitude, longitude]
+      - [time, z_l, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: thetao
+
+  thetaoga:
+    table: ocean
+    units: "K"
+    dims:
+      - [time, z_l, latitude, longitude]
+      - [time, z_l, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: thetaoga
 
   tnhus:
     table: atmos
@@ -715,6 +785,13 @@ variables:
     sources:
       - cesm_var: U10
 
+  umo:
+    table: ocean
+    units: "kg s-1"
+    dims: [time, z_l, latitude, longitude]
+    sources:
+      - cesm_var: umo
+
   va:
     table: atmos
     units: m s-1
@@ -732,6 +809,13 @@ variables:
     dims: [time, lat, lon]
     sources:
       - cesm_var: VBOT
+
+  vmo:
+    table: ocean
+    units: "kg s-1"
+    dims: [time, z_l, latitude, longitude]
+    sources:
+      - cesm_var: vmo
 
   volcello:
     table: ocean
