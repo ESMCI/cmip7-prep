@@ -530,6 +530,11 @@ class CmorSession(
                 depth_bnds = ds_bnds["depth_bnds"].values
             # Ensure depth_bnds matches the length of sdepth
             if depth_bnds.shape[0] > values.shape[0]:
+                logger.warning(
+                    "Truncating depth_bnds from %d to %d levels to match sdepth",
+                    depth_bnds.shape[0],
+                    values.shape[0],
+                )
                 depth_bnds = depth_bnds[: values.shape[0], :]
             sdepth_id = cmor.axis(
                 table_entry="sdepth",
