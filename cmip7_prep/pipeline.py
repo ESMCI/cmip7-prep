@@ -138,7 +138,7 @@ def open_native_for_cmip_vars(
     )
 
     if not selected:
-        logger.warning("no native inputs found for %s", required)
+        logger.warning("no native inputs found for requested CMIP variables: %s", cmip_vars)
         return None, None
     logger.info("Opening native files for CESM vars: %s", required)
     logger.info("Selected files:\n%s", "\n".join(selected))
