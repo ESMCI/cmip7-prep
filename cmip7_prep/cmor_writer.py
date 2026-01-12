@@ -285,6 +285,15 @@ class CmorSession(
         lev_id = None
 
         logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
+        has_latlon_dims = "lat" in var_dims and "lon" in var_dims
+        has_latitude_dims = "latitude" in var_dims and "longitude" in var_dims
+        has_mom6_dims = ("xh" in var_dims or "xq" in var_dims) and (
+            "yh" in var_dims or "yq" in var_dims
+        )
+        if has_latitude_dims and not has_mom6_dims:
+            raise ValueError(
+                "Found 'latitude'/'longitude' dims without MOM6 grid; expected 'lat'/'lon'."
+            )
         if ("xh" in var_dims or "xq" in var_dims) and (
             "yh" in var_dims or "yq" in var_dims
         ):
@@ -358,7 +367,7 @@ class CmorSession(
             var_dims = list(var_da.dims)
 
         # --- horizontal axes (use CMOR names) ----
-        elif "lat" in var_dims and "lon" in var_dims:
+        elif has_latlon_dims:
             logger.info("*** Define horizontal axes")
             lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
             lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
@@ -398,6 +407,14 @@ class CmorSession(
             "alevel",
             "alev",
         } or "lev" in var_dims:
+            if (self.primarytable or "").lower() not in {
+                "atmos",
+                "atmoschem",
+                "aerosol",
+            }:
+                raise ValueError(
+                    "Hybrid sigma coordinates are only supported for atmospheric tables."
+                )
             # names in the native ds
             logger.info("*** Define hybrid sigma axis")
             hyam_name = levels.get("hyam", "hyam")  # A mid (dimensionless)
@@ -504,17 +521,21 @@ class CmorSession(
                 cell_bounds=pb if pb is not None else None,
             )
         elif "sdepth" in var_dims:
+            # Read sdepth values from ds as before
             values = ds["sdepth"].values
             logger.info("write sdepth axis")
-            bnds = bounds_from_centers_1d(values, "sdepth")
-            if bnds[0, 0] < 0:
-                bnds[0, 0] = 0.0  # no negative soil depth bounds
-
+            # Read depth_bnds from the NetCDF file in the data directory
+            depth_bnds_path = Path(__file__).parent / "data" / "depth_bnds.nc"
+            with xr.open_dataset(depth_bnds_path) as ds_bnds:
+                depth_bnds = ds_bnds["depth_bnds"].values
+            # Ensure depth_bnds matches the length of sdepth
+            if depth_bnds.shape[0] > values.shape[0]:
+                depth_bnds = depth_bnds[: values.shape[0], :]
             sdepth_id = cmor.axis(
                 table_entry="sdepth",
                 units="m",
                 coord_vals=np.asarray(values),
-                cell_bounds=bnds,
+                cell_bounds=depth_bnds,
             )
         elif "z_l" in var_dims:
             values = ds["z_l"].values

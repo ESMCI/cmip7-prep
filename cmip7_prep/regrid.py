@@ -490,6 +490,7 @@ def regrid_to_1deg(
         elif "lndgrid" in var_da.dims:
             realm = "lnd"
             hdim = "lndgrid"
+            da2 = _normalize_land_field(da2, ds_in)
         else:
             # Fallback: use last dim
             hdim = da2.dims[-1]
