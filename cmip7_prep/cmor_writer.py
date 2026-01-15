@@ -8,14 +8,11 @@ present in the provided dataset. It also supports a packaged default
 """
 
 from pathlib import Path
-import collections.abc
 import json
 import tempfile
-import types
-import warnings
 
 from contextlib import AbstractContextManager
-from typing import Any, Sequence, Optional, Union
+from typing import Any, Optional, Union
 import datetime as dt
 
 import logging
@@ -161,8 +158,10 @@ class CmorSession(
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         json.dump(cfg, tmp)
         tmp.close()
+        if not Path(tmp.name).exists():
+            raise FileNotFoundError(f"Temporary dataset_json not found: {tmp.name}")
         cmor.dataset_json(str(tmp.name))
-
+        logger.info("CMOR dataset_json loaded from: %s", tmp.name)
         try:
             prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
         except Exception:  # pylint: disable=broad-except
@@ -286,7 +285,18 @@ class CmorSession(
         lev_id = None
 
         logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
-        if "xh" in var_dims and "yh" in var_dims:
+        has_latlon_dims = "lat" in var_dims and "lon" in var_dims
+        has_latitude_dims = "latitude" in var_dims and "longitude" in var_dims
+        has_mom6_dims = ("xh" in var_dims or "xq" in var_dims) and (
+            "yh" in var_dims or "yq" in var_dims
+        )
+        if has_latitude_dims and not has_mom6_dims:
+            raise ValueError(
+                "Found 'latitude'/'longitude' dims without MOM6 grid; expected 'lat'/'lon'."
+            )
+        if ("xh" in var_dims or "xq" in var_dims) and (
+            "yh" in var_dims or "yq" in var_dims
+        ):
             # MOM6/curvilinear grid: register xh/yh as generic axes (i/j), not as lat/lon
             # Define the native grid using the coordinate arrays
             logger.debug(
@@ -299,12 +309,22 @@ class CmorSession(
             if not geo_path.exists():
                 raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
             ds_geo = xr.open_dataset(geo_path)
-            lat_vals_1d = ds_geo["lath"].values
-            lon_raw = np.mod(ds_geo["lonh"].values, 360.0)
+            if "xh" in var_dims:
+                lon_raw = np.mod(ds_geo["lonh"].values, 360.0)
+            else:
+                lon_raw = np.mod(ds_geo["lonq"].values, 360.0)
             lon_bnds_raw = bounds_from_centers_1d(lon_raw, "lon")
             lon_vals_1d, lon_bnds, shift = roll_for_monotonic_with_bounds(
                 lon_raw, lon_bnds_raw
             )
+            if "yh" in var_dims:
+                lat_vals_1d = ds_geo["lath"].values
+            elif "yq" in var_dims:
+                lat_vals_1d = ds_geo["latq"].values
+            else:
+                raise KeyError(
+                    "Expected 'yh' or 'yq' dimension for latitude not found."
+                )
             # Fix first and last bounds to wrap correctly
             if lon_bnds.shape[0] > 1:
                 # Ensure bounds are strictly increasing and wrap at dateline
@@ -314,6 +334,7 @@ class CmorSession(
                     lon_bnds[-1, 1] = 360.0
                 # Also correct first upper bound to match the first cell
                 lon_bnds[0, 1] = lon_bnds[1, 0]
+            logger.info("[CMOR axis debug] corrected lon_bnds: %s", lon_bnds)
             # Print lon_bnds for a range (debug)
             i_id = cmor.axis(
                 table_entry="latitude",
@@ -329,13 +350,24 @@ class CmorSession(
                 cell_bounds=lon_bnds,
             )
             axes_ids.extend([j_id, i_id])
-            ds[var_name] = var_da.roll(xh=-shift, roll_coords=True)
-            # rename dims xh and yh to longitude and latitude
-            ds[var_name] = ds[var_name].rename({"xh": "longitude", "yh": "latitude"})
+            for dim in ("xh", "xq", "yh", "yq"):
+                if dim in var_dims:
+                    # rename dims xh and yh to longitude and latitude
+                    logger.info("[CMOR axis debug] renaming dim %s", dim)
+                    if dim in ["xh", "xq"]:
+                        if dim == "xh":
+                            ds[var_name] = var_da.roll(xh=-shift, roll_coords=True)
+                        elif dim == "xq":
+                            ds[var_name] = var_da.roll(xq=-shift, roll_coords=True)
+                        ds[var_name] = ds[var_name].rename({dim: "longitude"})
+                    if dim in ["yh", "yq"]:
+                        ds[var_name] = ds[var_name].rename({dim: "latitude"})
+
             var_da = ds[var_name]
             var_dims = list(var_da.dims)
+
         # --- horizontal axes (use CMOR names) ----
-        elif "lat" in var_dims and "lon" in var_dims:
+        elif has_latlon_dims:
             logger.info("*** Define horizontal axes")
             lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
             lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
@@ -375,6 +407,14 @@ class CmorSession(
             "alevel",
             "alev",
         } or "lev" in var_dims:
+            if (self.primarytable or "").lower() not in {
+                "atmos",
+                "atmoschem",
+                "aerosol",
+            }:
+                raise ValueError(
+                    "Hybrid sigma coordinates are only supported for atmospheric tables."
+                )
             # names in the native ds
             logger.info("*** Define hybrid sigma axis")
             hyam_name = levels.get("hyam", "hyam")  # A mid (dimensionless)
@@ -481,16 +521,26 @@ class CmorSession(
                 cell_bounds=pb if pb is not None else None,
             )
         elif "sdepth" in var_dims:
+            # Read sdepth values from ds as before
             values = ds["sdepth"].values
             logger.info("write sdepth axis")
-            bnds = bounds_from_centers_1d(values, "sdepth")
-            if bnds[0, 0] < 0:
-                bnds[0, 0] = 0.0  # no negative soil depth bounds
+            # Read depth_bnds from the NetCDF file in the data directory
+            depth_bnds_path = Path(__file__).parent / "data" / "depth_bnds.nc"
+            with xr.open_dataset(depth_bnds_path) as ds_bnds:
+                depth_bnds = ds_bnds["depth_bnds"].values
+            # Ensure depth_bnds matches the length of sdepth
+            if depth_bnds.shape[0] > values.shape[0]:
+                logger.warning(
+                    "Truncating depth_bnds from %d to %d levels to match sdepth",
+                    depth_bnds.shape[0],
+                    values.shape[0],
+                )
+                depth_bnds = depth_bnds[: values.shape[0], :]
             sdepth_id = cmor.axis(
                 table_entry="sdepth",
                 units="m",
                 coord_vals=np.asarray(values),
-                cell_bounds=bnds,
+                cell_bounds=depth_bnds,
             )
         elif "z_l" in var_dims:
             values = ds["z_l"].values
@@ -517,7 +567,21 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
-
+        elif "zi" in var_dims:
+            ds[var_name] = ds[var_name].rename({"zi": "olevel"})
+            var_dims = list(ds[var_name].dims)
+            cmor.set_cur_dataset_attribute("vertical_label", "olevel")
+            logger.info("*** Define olevel axis")
+            values = ds["olevel"].values
+            logger.info("write olevel axis")
+            zl = ds["zl"].values
+            bnds = np.column_stack((zl[:-1], zl[1:]))
+            lev_id = cmor.axis(
+                table_entry="depth_coord",
+                units="m",
+                coord_vals=np.asarray(values),
+                cell_bounds=bnds,
+            )
         # Map dimension names to axis IDs
         dim_to_axis = {
             "time": time_id,
@@ -533,10 +597,13 @@ class CmorSession(
             "longitude": lon_id if lon_id is not None else j_id,
             "xh": lon_id,  # MOM6
             "yh": lat_id,  # MOM6
+            "xq": lon_id,  # MOM6
+            "yq": lat_id,  # MOM6
         }
         axes_ids = []
         for d in var_dims:
             axis_id = dim_to_axis.get(d)
+            logger.info("[CMOR axis debug] dim '%s' → axis_id: %s", d, axis_id)
             if axis_id is None:
                 raise KeyError(
                     f"No axis ID found for dimension '{d}' in variable '{var_name}' {var_dims}"
@@ -757,6 +824,8 @@ class CmorSession(
         data_filled, fillv = filled_for_cmor(data)
         if "zl" in data_filled.dims:
             data_filled = data_filled.rename({"zl": "olevel"})
+        elif "zi" in data_filled.dims:
+            data_filled = data_filled.rename({"zi": "olevel"})
         self.load_table(self.tables_path, self.primarytable)
 
         var_entry = getattr(cmip_var, "branded_variable_name", varname)
@@ -795,6 +864,7 @@ class CmorSession(
             np.asarray(data_filled),
             ntimes_passed=nt,
         )
+        logger.info("Finished writing CMOR variable %s", var_id)  # debug
         # ---- Hybrid ps streaming (if present) ----
         if self._pending_ps is not None:
             ps_id, ps_da = self._pending_ps
@@ -816,29 +886,3 @@ class CmorSession(
             self._pending_ps = None
 
         cmor.close(var_id)
-
-    def write_variables(
-        self,
-        ds: xr.Dataset,
-        cmip_vars: Sequence[str],
-        mapping: collections.abc.Mapping,
-    ) -> None:
-        """Write multiple CMIP variables from one dataset."""
-        for v in cmip_vars:
-            cfg = mapping.get_cfg(v) or {}
-            table = cfg.get("table", "Amon")
-            units = cfg.get("units", "")
-            positive = cfg.get("positive") or None
-            vdef = types.SimpleNamespace(
-                name=v,
-                table=table,
-                realm=table,
-                units=units,
-                positive=positive,
-            )
-            # pylint: disable=broad-exception-caught
-            try:
-                self.write_variable(ds, v, vdef)
-            except Exception as e:
-                warnings.warn(f"[cmor] skipping {v} due to error: {e}", RuntimeWarning)
-                # continue to next variable

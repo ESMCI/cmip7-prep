@@ -8,7 +8,6 @@ from typing import Optional, Sequence, Union, Dict, List
 import re
 import logging
 import glob
-import sys
 import xarray as xr
 
 from .mapping_compat import Mapping
@@ -40,12 +39,15 @@ def _filename_contains_var(
     False
     >>> _filename_contains_var("file.TS.001.nc", "TS", fname_pattern=".001.")
     True
+    >>> _filename_contains_var("mom6.h.native.mlotst.000101-001012.nc",
+    ...        "mlotst", fname_pattern=".h.native.")
+    True
     """
     name = Path(path).name
     needle = f".{var}."
     if fname_pattern is not None:
         return fname_pattern in name and needle in name
-
+    logger.debug("Checking if filename '%s' contains variable token '%s'", name, needle)
     return needle in name
 
 
@@ -58,10 +60,7 @@ def _collect_required_cesm_vars(
         try:
             cfg = mapping.get_cfg(var) or {}
         except KeyError:
-            print(
-                f"WARNING: skipping '{var}': no mapping found in {mapping.path}",
-                file=sys.stderr,
-            )
+            logger.warning("Skipping '%s': no mapping found in %s", var, mapping.path)
             continue
         src = cfg.get("source")
         raws = cfg.get("raw_variables") or cfg.get("sources") or []
@@ -80,9 +79,7 @@ def _collect_required_cesm_vars(
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
         for var in ("area", "landmask", "landfrac"):
-            logger.info(
-                "Adding auxiliary variable '%s' for CMIP var '%s'", var, cmip_vars
-            )
+            logger.info("Adding auxiliary variable '%s' ", var)
             needed.add(var)
     return sorted(needed)
 
@@ -132,7 +129,6 @@ def open_native_for_cmip_vars(
         )
         if selected:
             new_cmip_vars.append(var)
-
     required = _collect_required_cesm_vars(mapping, new_cmip_vars)
 
     # keep any file that contains ANY of the required CESM vars as '.var.' in the name
@@ -142,7 +138,9 @@ def open_native_for_cmip_vars(
     )
 
     if not selected:
-        logger.warning("no native inputs found for %s", cmip_vars)
+        logger.warning(
+            "no native inputs found for requested CMIP variables: %s", cmip_vars
+        )
         return None, None
     logger.info("Opening native files for CESM vars: %s", required)
     logger.info("Selected files:\n%s", "\n".join(selected))
@@ -303,21 +301,13 @@ def realize_regrid_prepare(
     logger.info(
         "Checking for 'levgrnd' dimension in variables to regrid. %s", names_to_regrid
     )
-    # Check if 'levgrnd' is a dimension of any variable in names_to_regrid
-    needs_levgrnd_rename = any(
-        (v in ds_vert and "levgrnd" in getattr(ds_vert[v], "dims", []))
-        for v in names_to_regrid
-    )
-    if (
-        needs_levgrnd_rename
-        and "levgrnd" in ds_native.dims
-        and "levgrnd" in ds_native.coords
-    ):
-        logger.info("Renaming 'levgrnd' dimension to 'sdepth'")
-        ds_vert = ds_vert.rename_dims({"levgrnd": "sdepth"})
-        # Ensure the coordinate variable is also copied
-        ds_vert = ds_vert.assign_coords(sdepth=ds_native["levgrnd"].values)
-    logger.info("Regridding variables: %s", names_to_regrid)
+    for lev in ("levgrnd", "levsoi"):
+        if lev in ds_vert.dims:
+            logger.info("Renaming '%s' dimension to 'sdepth'", lev)
+            ds_vert = ds_vert.rename_dims({lev: "sdepth"})
+            # Ensure the coordinate variable is also copied
+            ds_vert = ds_vert.assign_coords(sdepth=ds_native[lev].values)
+
     ds_regr = regrid_to_1deg_ds(
         ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
     )
