@@ -817,6 +817,16 @@ variables:
     sources:
       - cesm_var: vmo
 
+  vo:
+    table: ocean
+    units: "m s-1"
+    dims:
+      - [time, z_l, latitude, longitude]
+      - [time, z_l, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: vo
+
   volcello:
     table: ocean
     units: "m3"
@@ -833,6 +843,14 @@ variables:
       units: Pa
     sources:
       - cesm_var: OMEGA
+
+  wfo:
+    table: ocean
+    units: kg m-2 s-1
+    long_name: "Freshwater Flux into Sea Water"
+    dims: [time, latitude, longitude]
+    sources:
+      - cesm_var: wfo
 
   zg:
     table: atmos

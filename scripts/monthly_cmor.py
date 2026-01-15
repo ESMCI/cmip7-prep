@@ -519,7 +519,6 @@ def main():
                     mom6_grid=mom6_grid,
                     ocn_fx_fields=ocn_fx_fields,
                 )
-                for v in cmip_vars
             ]
 
         else:
@@ -536,6 +535,7 @@ def main():
                 )
                 for var in cmip_vars
             ]
+            logger.info(f"launching {len(futs)} futures")
             futures = client.compute(futs)
             wait(
                 futures, timeout="1200s"
