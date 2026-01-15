@@ -250,10 +250,6 @@ def process_one_var(
 
                 ds_cmor = ds_native
                 results.append((str(varname), "analyzed native mom6 grid"))
-                # Attach ocn_fx_fields to ds_cmor for writing
-                if ocn_fx_fields is not None:
-                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
-
             else:
                 # For lnd/atm or any other dims, use existing logic
                 logger.debug(
