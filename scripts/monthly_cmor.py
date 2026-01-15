@@ -180,19 +180,33 @@ def process_one_var(
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.physical_parameter.name
 
+    # At this point you have a cmip_var (metadata from database query for the target variable)
+    #   queried a cmor database from the clould
+
     logger.info(f"Starting processing for variable: {varname}")
     results = [(str(varname), "started")]
     try:
+        # This is what maps the cesm variable(s) to the cmor variable
+        # This is yaml file - cesm_to_cmip7.yaml in this repo
+        # the variable name in variables: is the output
+        # Jim started with the cmip6 template and then converted it
+        # (cmip6 file used for e3sm -> cmip)
         cfg = mapping.get_cfg(varname)
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
         results.append((varname, f"ERROR: {e}"))
         return results
 
+    # These are the dims on the destination
+    # (interpolated dims if you WILL do interpolation - have not done it yet)
     dims_list = cfg.get("dims")
     # If dims is a single list (atm/lnd), wrap in a list for uniformity
     if dims_list and len(dims_list) > 0 and isinstance(dims_list[0], str):
         dims_list = [dims_list]
+
+    # Loop over dims - in most cases there will only be entry - but some variables (like
+    # ocean sos need to be in on both the native and the interpolated grid - so there
+    # will be two entries - hence the loop below
     for dims in dims_list:
         logger.info(f"Processing {varname} with dims {dims}")
         try:
@@ -200,6 +214,11 @@ def process_one_var(
             if realm == "ocean":
                 open_kwargs = {"decode_timedelta": False}
             logger.info("Opening native data for variable %s", varname)
+
+            # This is where 
+            # ds_native is where you read the CESM time series file
+            # ds_native is an xarray dataset
+            # open_native_for_cmip_vars is in pipeline.py
             ds_native, var = open_native_for_cmip_vars(
                 varname,
                 inputfile,
@@ -210,6 +229,8 @@ def process_one_var(
             )
             logger.info("realm is %s", realm)
             # Append ocn_fx_fields to ds_native if available
+            # fx - grid definition like topography, fraction
+            # ds_native.merge is an xarray command
             if realm == "ocean" and ocn_fx_fields is not None:
                 ds_native = ds_native.merge(ocn_fx_fields)
             logger.info(
@@ -224,7 +245,9 @@ def process_one_var(
                 continue
             # --- OCN: distinguish native vs regridded by dims ---
             if "latitude" in dims and "longitude" in dims:
+                # output ocn on the native grid
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
+
                 ds_cmor = ds_native
                 results.append((varname, "analyzed native mom6 grid"))
                 # Attach ocn_fx_fields to ds_cmor for writing
@@ -236,6 +259,7 @@ def process_one_var(
                 logger.debug(
                     "Processing %s for dims %s (atm/lnd or other)", varname, dims
                 )
+                # Below is where you do the mapping from SE to lat/lon
                 ds_cmor = realize_regrid_prepare(
                     mapping,
                     ds_native,
@@ -253,6 +277,7 @@ def process_one_var(
                 # Attach ocn_fx_fields to regridded output for writing
                 if ocn_fx_fields is not None:
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
+
         except AttributeError:
             results.append((varname, f"ERROR cesm input variable not found"))
             continue
@@ -268,6 +293,8 @@ def process_one_var(
         try:
             # CMORize
             log_dir = outdir + "/logs"
+
+            # Initialize CMOR class
             with CmorSession(
                 tables_path=tables_path,
                 log_dir=log_dir,
@@ -295,7 +322,10 @@ def process_one_var(
                     },
                 )()
                 logger.info(f"Writing variable {varname} with dims {dims} ")
+
+                # Now use CMOR utility to write out netcdf varialbe
                 cm.write_variable(ds_cmor, cmip_var, vdef)
+
             logger.info(f"Finished processing for {varname} with dims {dims}")
             results.append((shortname, "ok"))
         except Exception as e:
@@ -477,14 +507,11 @@ def main():
     # Load mapping
     mapping = Mapping.from_packaged_default()
     cmip_vars = []
+
     # logger.info(f"Finding variables with prefix {var_prefix}")
     if args.cmip_vars and len(args.cmip_vars) > 0:
         cmip_vars = args.cmip_vars
     else:
-        # cmip_vars = find_variables_by_prefix(
-        #    None, var_prefix, where={"List of Experiments": "piControl"}
-        # )
-        # cmip_vars = find_variables_by_realm_and_frequency(None, realm, frequency)
         content_dic = dt.get_transformed_content()
         logger.info("Content dic obtained")
         DR = dr.DataRequest.from_separated_inputs(**content_dic)
@@ -496,14 +523,6 @@ def main():
             experiment=args.experiment,
             priority_level="Core",
         )
-
-        # for variable in DR.get_variables():
-        #    logger.info("variable %s, realm %s, frequency %s", variable.physical_parameter, variable.modelling_realm, variable.cmip7_frequency.name)
-        #    if (
-        #        realm in variable.modelling_realm
-        #        and frequency in str(variable.cmip7_frequency.name)
-        #    ):
-        #        cmip_vars.append(variable)
 
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
     if args.skip_cmor:
