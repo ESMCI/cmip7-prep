@@ -13,6 +13,14 @@ dataset_overrides:
   nominal_resolution: 100 km
 
 variables:
+  agessc:
+    table: ocean
+    long_name: "Ideal Age of Sea Water"
+    units: "yr"
+    dims: [time, olevel, latitude, longitude]
+    sources:
+      - cesm_var: agessc
+
   cl:
     table: atmos
     units: "%"
@@ -134,6 +142,15 @@ variables:
     sources:
       - cesm_var: deptho
 
+  evs:
+    table: ocean
+    units: kg m-2 s-1
+    long_name: Evaporation over ice free ocean
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: evs
+
   evspsbl:
     table: atmos
     units: kg m-2 s-1
@@ -181,6 +198,15 @@ variables:
     sources:
       - cesm_var: WOOD_HARVESTC
 
+  ficeberg:
+    table: ocean
+    units: "kg m-2 s-1"
+    long_name: "Iceberg Freshwater Flux"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: ficeberg
+
   gpp:
     table: land
     units: "kg m-2 s-1"
@@ -189,6 +215,13 @@ variables:
     positive: down
     sources:
       - cesm_var: GPP
+  hfds:
+    table: ocean
+    units: "W m-2"
+    positive: down
+    dims: [time, latitude, longitude]
+    sources:
+      - cesm_var: hfds
 
   hfls:
     table: atmos
@@ -197,6 +230,15 @@ variables:
     positive: up
     sources:
       - cesm_var: LHFLX
+
+  hfsnthermds:
+    table: ocean
+    units: "W m-2"
+    long_name: "Latent Heat to melt frozen Precipitation"
+    dims: [time, olevel, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: hfsnthermds
 
   hfss:
     table: atmos
@@ -250,12 +292,12 @@ variables:
       - cesm_var: TLAI
 
   mlotst:
-    table: Omon
+    table: ocean
     units: "m"
     long_name: "Ocean Mixed Layer Thickness Defined by Sigma T"
     dims: [time, latitude, longitude]
     sources:
-      -cesm_var: mlotst
+      - cesm_var: mlotst
 
   mrfso:
     table: land
@@ -287,6 +329,15 @@ variables:
     sources:
       - cesm_var: SOILICE
       - cesm_var: SOILLIQ
+
+  mrsol:
+    table: land
+    units: kg m-2
+    dims: [time, sdepth, lat, lon]
+    formula: SOILLIQ + SOILICE
+    sources:
+      - cesm_var: SOILLIQ
+      - cesm_var: SOILICE
 
   mrsos:
     table: land
@@ -508,18 +559,28 @@ variables:
     sources:
       - cesm_var: SNOW_DEPTH
 
-  sos:
-    table: Omon
+  soga:
+    table: ocean
     units: "1e-3"
     dims:
-      - [time, latitude, longitude]   # for curvilinear grids
+      - [time, latitude, longitude]
+      - [time, lat, lon]
+    regrid_method: conservative
+    sources:
+      - cesm_var: soga
+
+  sos:
+    table: ocean
+    units: "1e-3"
+    dims:
+      - [time, latitude, longitude]
       - [time, lat, lon]
     regrid_method: conservative
     sources:
       - cesm_var: sos
 
   sos_max:
-    table: Omon
+    table: ocean
     units: "1e-3"
     dims:
       - [time, latitude, longitude]   # for curvilinear grids
@@ -529,7 +590,7 @@ variables:
       - cesm_var: sos_max
 
   sos_min:
-    table: Omon
+    table: ocean
     units: "1e-3"
     dims:
       - [time, latitude, longitude]   # for curvilinear grids
@@ -598,6 +659,14 @@ variables:
     sources:
       - cesm_var: TAUX
 
+  tauuo:
+    table: ocean
+    units: "N m-2"
+    dims: [time, latitude, longitude]
+    positive: down
+    sources:
+      - cesm_var: tauuo
+
   tauv:
     table: atmos
     units: "N m-2"
@@ -606,8 +675,65 @@ variables:
     sources:
       - cesm_var: TAUY
 
+  tauvo:
+    table: ocean
+    units: "N m-2"
+    dims: [time, latitude, longitude]
+    positive: down
+    sources:
+      - cesm_var: tauvo
+
+  tdps:
+    table: atmos
+    units: "K"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: TD
+  thetao:
+    table: ocean
+    units: "K"
+    dims:
+      - [time, z_l, latitude, longitude]
+      - [time, z_l, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: thetao
+
+  thetaoga:
+    table: ocean
+    units: "K"
+    dims:
+      - [time, z_l, latitude, longitude]
+      - [time, z_l, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: thetaoga
+
+  tnhus:
+    table: atmos
+    units: "kg kg-1"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: Q
+
+  tnt:
+    table: atmos
+    units: "K s-1"
+    dims: [time, plev, lat, lon]
+    levels:
+      name: plev19
+      units: Pa
+    sources:
+      - cesm_var: T
+
   tos:
-    table: Omon
+    table: ocean
     units: "K"
     dims:
       - [time, latitude, longitude]
@@ -659,6 +785,13 @@ variables:
     sources:
       - cesm_var: U10
 
+  umo:
+    table: ocean
+    units: "kg s-1"
+    dims: [time, z_l, latitude, longitude]
+    sources:
+      - cesm_var: umo
+
   va:
     table: atmos
     units: m s-1
@@ -677,8 +810,25 @@ variables:
     sources:
       - cesm_var: VBOT
 
+  vmo:
+    table: ocean
+    units: "kg s-1"
+    dims: [time, z_l, latitude, longitude]
+    sources:
+      - cesm_var: vmo
+
+  vo:
+    table: ocean
+    units: "m s-1"
+    dims:
+      - [time, z_l, latitude, longitude]
+      - [time, z_l, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: vo
+
   volcello:
-    table: Omon
+    table: ocean
     units: "m3"
     dims: [time, z_l, latitude, longitude]
     sources:
@@ -694,6 +844,14 @@ variables:
     sources:
       - cesm_var: OMEGA
 
+  wfo:
+    table: ocean
+    units: kg m-2 s-1
+    long_name: "Freshwater Flux into Sea Water"
+    dims: [time, latitude, longitude]
+    sources:
+      - cesm_var: wfo
+
   zg:
     table: atmos
     units: "m"
@@ -705,7 +863,7 @@ variables:
       - cesm_var: Z3
 
   zos:
-    table: Omon
+    table: ocean
     units: "m"
     dims: [time, latitude, longitude]
     regrid_method: bilinear
@@ -713,7 +871,7 @@ variables:
       - cesm_var: zos
 
   zossq:
-    table: Omon
+    table: ocean
     units: "m2"
     dims: [time, latitude, longitude]
     regrid_method: bilinear

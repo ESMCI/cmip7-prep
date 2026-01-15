@@ -249,7 +249,7 @@ def process_one_var(
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
 
                 ds_cmor = ds_native
-                results.append((varname, "analyzed native mom6 grid"))
+                results.append((str(varname), "analyzed native mom6 grid"))
                 # Attach ocn_fx_fields to ds_cmor for writing
                 if ocn_fx_fields is not None:
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
@@ -302,9 +302,9 @@ def process_one_var(
                 dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
                 outdir=outdir,
             ) as cm:
-                varname = cmip_var.attributes["branded_variable_name"]
+                cmip7name = cmip_var.attributes["branded_variable_name"]
 
-                logger.info(f"Writing CMOR variable {varname.name}")
+                logger.info(f"Writing CMOR variable {cmip7name.name}")
                 shortname = str(getattr(cmip_var, "physical_parameter").name)
                 vdef = type(
                     "VDef",
@@ -392,7 +392,7 @@ def main():
         subdir = "lnd"
     elif args.realm == "ocean":
         # we do not want to match static files
-        include_patterns = ["*mom6.h.sfc.*", "*mom6.h.z.*"]
+        include_patterns = ["*mom6.h.native.*"]
         frequency = "mon"
         subdir = "ocn"
         if args.ocn_grid_file:
@@ -464,7 +464,50 @@ def main():
     if args.realm == "ocean" and ocn_grid:
         mom6_grid = load_mom6_grid(ocn_grid)
         logger.info(f"Using MOM grid file: {ocn_grid}")
-    # Dask cluster setup
+        # Dask cluster setup
+
+    # Load mapping
+    mapping = Mapping.from_packaged_default()
+    cmip_vars = []
+    # logger.info(f"Finding variables with prefix {var_prefix}")
+
+    # cmip_vars = find_variables_by_prefix(
+    #    None, var_prefix, where={"List of Experiments": "piControl"}
+    # )
+    # cmip_vars = find_variables_by_realm_and_frequency(None, realm, frequency)
+    logger.info("Loading data request content %s", args.realm)
+    content_dic = dt.get_transformed_content()
+    logger.info("Content dic obtained")
+    DR = dr.DataRequest.from_separated_inputs(**content_dic)
+    cmip_vars = DR.find_variables(
+        skip_if_missing=False,
+        operation="all",
+        cmip7_frequency=frequency,
+        modelling_realm=args.realm,
+        experiment=args.experiment,
+    )
+
+    # for variable in DR.get_variables():
+    #    logger.info("variable %s, realm %s, frequency %s", variable.physical_parameter, variable.modelling_realm, variable.cmip7_frequency.name)
+    #    if (
+    #        realm in variable.modelling_realm
+    #        and frequency in str(variable.cmip7_frequency.name)
+    #    ):
+    #        cmip_vars.append(variable)
+    if args.cmip_vars:
+        tmp_cmip_vars = cmip_vars
+        cmip_vars = []
+        for var in tmp_cmip_vars:
+            logger.info(
+                "Checking variable %s in %s",
+                var.physical_parameter.name,
+                args.cmip_vars,
+            )
+            if var.physical_parameter.name in args.cmip_vars:
+                logger.info("Adding variable %s", var.physical_parameter.name)
+                cmip_vars.append(var)
+
+    logger.info(f"CMORIZING {len(cmip_vars)} variables")
     if args.workers == 1:
         client = None
         cluster = None
@@ -475,56 +518,11 @@ def main():
         else:
             ml = "auto"  # Default memory limit if NCPUS is not set
         cluster = LocalCluster(
-            n_workers=args.workers, threads_per_worker=1, memory_limit=ml
+            n_workers=min(args.workers, len(cmip_vars)),
+            threads_per_worker=1,
+            memory_limit=ml,
         )
         client = cluster.get_client()
-    input_head_dir = INPUTDIR
-    output_head_dir = TSDIR
-    if args.skip_timeseries:
-        logger.info("Skipping timeseries processing as per --skip-timeseries flag.")
-    else:
-        cnt = 0
-        for include_pattern in include_patterns:
-            cnt = cnt + len(glob.glob(os.path.join(input_head_dir, include_pattern)))
-        if cnt == 0:
-            logger.warning(
-                f"No input files to process in {input_head_dir} with {include_patterns}"
-            )
-            sys.exit(0)
-        hf_collection = HFCollection(input_head_dir, dask_client=client)
-        for include_pattern in include_patterns:
-            logger.info("Processing files with pattern: %s", include_pattern)
-            hfp_collection = hf_collection.include_patterns([include_pattern])
-            hfp_collection.pull_metadata()
-            ts_collection = TSCollection(
-                hfp_collection, output_head_dir, ts_orders=None, dask_client=client
-            )
-            if args.overwrite:
-                ts_collection = ts_collection.apply_overwrite("*")
-            ts_collection.execute()
-            logger.info("Timeseries processing complete, starting CMORization...")
-
-    # Load mapping
-    mapping = Mapping.from_packaged_default()
-    cmip_vars = []
-
-    # logger.info(f"Finding variables with prefix {var_prefix}")
-    if args.cmip_vars and len(args.cmip_vars) > 0:
-        cmip_vars = args.cmip_vars
-    else:
-        content_dic = dt.get_transformed_content()
-        logger.info("Content dic obtained")
-        DR = dr.DataRequest.from_separated_inputs(**content_dic)
-        cmip_vars = DR.find_variables(
-            skip_if_missing=False,
-            operation="all",
-            cmip7_frequency=frequency,
-            modelling_realm=args.realm,
-            experiment=args.experiment,
-            priority_level="Core",
-        )
-
-    logger.info(f"CMORIZING {len(cmip_vars)} variables")
     if args.skip_cmor:
         logger.info("Skipping CMORization as per --skip-cmor flag.")
         for var in cmip_vars.physical_parameter.name:
@@ -551,7 +549,6 @@ def main():
                     mom6_grid=mom6_grid,
                     ocn_fx_fields=ocn_fx_fields,
                 )
-                for v in cmip_vars
             ]
 
         else:
@@ -568,6 +565,7 @@ def main():
                 )
                 for var in cmip_vars
             ]
+            logger.info(f"launching {len(futs)} futures")
             futures = client.compute(futs)
             wait(
                 futures, timeout="1200s"
