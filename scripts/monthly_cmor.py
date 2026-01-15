@@ -215,7 +215,7 @@ def process_one_var(
                 open_kwargs = {"decode_timedelta": False}
             logger.info("Opening native data for variable %s", varname)
 
-            # This is where 
+            # This is where
             # ds_native is where you read the CESM time series file
             # ds_native is an xarray dataset
             # open_native_for_cmip_vars is in pipeline.py
