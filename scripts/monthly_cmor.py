@@ -34,8 +34,6 @@ from cmip7_prep.mom6_static import ocean_fx_fields
 from data_request_api.query import data_request as dr
 from data_request_api.content import dump_transformation as dt
 
-from gents.hfcollection import HFCollection
-from gents.timeseries import TSCollection
 from dask.distributed import LocalCluster
 from dask.distributed import wait, as_completed
 from dask import delayed
@@ -124,15 +122,7 @@ def parse_args():
         default=default_outdir,
         help="Output directory for CMORized files (default: $SCRATCH/CMIP7)",
     )
-    # group = parser.add_mutually_exclusive_group()
-    parser.add_argument(
-        "--skip-cmor", action="store_true", help="Skip the CMORization step."
-    )
-    parser.add_argument(
-        "--skip-timeseries",
-        action="store_true",
-        help="Skip the timeseries processing step.",
-    )
+
     parser.add_argument(
         "--experiment",
         type=str,
@@ -178,7 +168,7 @@ def process_one_var(
     ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
-    varname = cmip_var.physical_parameter.name
+    varname = cmip_var.branded_variable_name.name
 
     # At this point you have a cmip_var (metadata from database query for the target variable)
     #   queried a cmor database from the clould
@@ -224,7 +214,7 @@ def process_one_var(
                 inputfile,
                 mapping,
                 use_cftime=True,
-                parallel=True,
+                parallel=False,
                 open_kwargs=open_kwargs,
             )
             logger.info("realm is %s", realm)
@@ -261,10 +251,8 @@ def process_one_var(
                     ds_native,
                     varname,
                     tables_path=tables_path,
-                    time_chunk=12,
                     mom6_grid=mom6_grid,
                     regrid_kwargs={
-                        "output_time_chunk": 12,
                         "dtype": "float32",
                     },
                     open_kwargs={"decode_timedelta": True},
@@ -315,6 +303,7 @@ def process_one_var(
                         "long_name": cfg.get("long_name", None),
                         "standard_name": cfg.get("standard_name", None),
                         "levels": cfg.get("levels", None),
+                        "branded_variable_name": cmip7name,
                     },
                 )()
                 logger.info(f"Writing variable {varname} with dims {dims} ")
@@ -496,11 +485,11 @@ def main():
         for var in tmp_cmip_vars:
             logger.info(
                 "Checking variable %s in %s",
-                var.physical_parameter.name,
+                var.branded_variable_name.name,
                 args.cmip_vars,
             )
-            if var.physical_parameter.name in args.cmip_vars:
-                logger.info("Adding variable %s", var.physical_parameter.name)
+            if var.branded_variable_name.name in args.cmip_vars:
+                logger.info("Adding variable %s", var.branded_variable_name.name)
                 cmip_vars.append(var)
 
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
@@ -519,11 +508,7 @@ def main():
             memory_limit=ml,
         )
         client = cluster.get_client()
-    if args.skip_cmor:
-        logger.info("Skipping CMORization as per --skip-cmor flag.")
-        for var in cmip_vars.physical_parameter.name:
-            logger.info(f"Variable {var} would be processed here.")
-        sys.exit(0)
+
     # Load requested variables
     if len(cmip_vars) > 0:
         if len(include_patterns) == 1:

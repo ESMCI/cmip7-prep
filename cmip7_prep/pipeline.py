@@ -12,7 +12,7 @@ import xarray as xr
 
 from .mapping_compat import Mapping
 from .regrid import regrid_to_1deg_ds
-from .vertical import to_plev19
+from .vertical import to_plev
 
 logger = logging.getLogger(__name__)
 # --------------------------- file discovery ---------------------------
@@ -72,9 +72,9 @@ def _collect_required_cesm_vars(
                 needed.add(raw["cesm_var"])
             elif isinstance(raw, str):
                 needed.add(raw)
-        # vertical dependencies if plev19
+        # vertical dependencies if plev19 or plev39
         levels = cfg.get("levels") or {}
-        if (levels.get("name") or "").lower() == "plev19":
+        if "plev" in (levels.get("name") or "").lower():
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
@@ -176,7 +176,7 @@ def _apply_vertical_if_needed(
     cfg = mapping.get_cfg(cmip_var) or {}
     levels = cfg.get("levels") or {}
     logger.info("levels for %s: %s", cmip_var, levels)
-    if (levels.get("name") or "").lower() != "plev19":
+    if "plev" not in (levels.get("name") or "").lower():
         return ds_var
     if not tables_path:
         raise ValueError("tables_path is required for plev19 vertical interpolation.")
@@ -187,8 +187,8 @@ def _apply_vertical_if_needed(
     base[str(cmip_var)] = ds_var[str(cmip_var)]
     logger.info("Applying plev19 vertical transform for variable: %s", cmip_var)
 
-    v_plev = to_plev19(
-        base, cmip_var, tables_path
+    v_plev = to_plev(
+        ds=base, var=cmip_var, tables_path=tables_path, target=levels.get("name")
     )  # returns dataset with var on 'plev'
     logger.info("After vertical transform : %s", cmip_var)
     return xr.Dataset({str(cmip_var): v_plev[str(cmip_var)]})
