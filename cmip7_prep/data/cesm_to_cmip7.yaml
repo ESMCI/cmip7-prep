@@ -152,7 +152,7 @@ variables:
     sources:
       - cesm_var: evs
 
-  evspsbl_tavg-u-hxy-u_atmos:
+  evspsbl_tavg-u-hxy-u:
     table: atmos
     units: kg m-2 s-1
     long_name: Evaporation
