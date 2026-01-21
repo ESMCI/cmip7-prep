@@ -127,18 +127,20 @@ def _resolve_p0(ds: xr.Dataset, p0_name: str = "P0") -> float:
     return 100000.0  # Pa
 
 
-def to_plev19(
+def to_plev(
     ds: xr.Dataset,
     var: str,
     tables_path: str | os.PathLike,
     *,
+    target: str = "plev19",
     lev_dim: str = "lev",
     ps_name: str = "PS",
     hyam_name: str = "hyam",
     hybm_name: str = "hybm",
     p0_name: str = "P0",
 ) -> xr.Dataset:
-    """Interpolate a hybrid-level variable to CMIP plev19 pressure levels (Pa).
+    """
+    Interpolate a hybrid-level variable to a target CMIP pressure level grid (e.g., plev19, plev39).
 
     Parameters
     ----------
@@ -149,6 +151,8 @@ def to_plev19(
         Name of the variable to be interpolated along the vertical.
     tables_path : str or Path
         Path to CMIPx Tables directory (for coordinate JSON).
+    target : str, default "plev19"
+        Name of the target pressure grid (e.g., 'plev19', 'plev39').
     lev_dim : str, default "lev"
         Name of the hybrid-level dimension in `var`.
     ps_name, hyam_name, hybm_name, p0_name : str
@@ -163,19 +167,16 @@ def to_plev19(
 
     Notes
     -----
-    This function prefers geocat-comp's `interp_hybrid_to_pressure`. If geocat-comp
-    is not importable in the environment, it will raise ImportError with guidance.
+    This function uses geocat-comp's `interp_hybrid_to_pressure` for log-pressure interpolation.
     """
-
     required = [str(var), ps_name, hyam_name, hybm_name]
     missing = [name for name in required if name not in ds]
     if missing:
         raise KeyError(f"Missing required variables in dataset: {missing}")
 
     p0 = _resolve_p0(ds, p0_name=p0_name)
-    new_levels = _read_requested_levels(tables_path, axis_name="plev19")
+    new_levels = _read_requested_levels(tables_path, axis_name=target)
 
-    # geocat-comp performs log-pressure interpolation internally
     out_da = interp_hybrid_to_pressure(
         ds[str(var)],
         ds[ps_name],
@@ -194,11 +195,9 @@ def to_plev19(
         {"units": "Pa", "standard_name": "air_pressure", "positive": "down"}
     )
 
-    # Assemble return dataset
     ds_out = ds.copy()
     ds_out[str(var)] = out_da
 
-    # Optionally drop hybrid coefficients and P0 if present
     drop = [n for n in (hyam_name, hybm_name, p0_name) if n in ds_out.variables]
     if drop:
         ds_out = ds_out.drop_vars(drop)

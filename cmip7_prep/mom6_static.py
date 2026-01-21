@@ -4,7 +4,6 @@ mom6_static.py: Utilities for reading and extracting grid information from MOM6 
 
 import xarray as xr
 import numpy as np
-from cmip7_prep.regrid import _sftof_from_native
 
 
 def ocean_fx_fields(static_path):
@@ -16,10 +15,7 @@ def ocean_fx_fields(static_path):
 
     ds = xr.open_dataset(static_path)
     fx = {}
-    # Extract sftof (sea fraction) using the helper
-    sftof = _sftof_from_native(ds)
-    if sftof is not None:
-        fx["sftof"] = sftof
+
     # Extract deptho if present
     if "deptho" in ds:
         fx["deptho"] = ds["deptho"]
