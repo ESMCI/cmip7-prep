@@ -53,7 +53,21 @@ INTENSIVE_VARS = {
     "psl",
     "ps",
     "huss",
+    "uas",
+    "vas",
+    "sfcWind",
+    "ts",
+    "prsn",
+    "clt",
+    "ta",
+    "ua",
+    "va",
+    "zg",
+    "hus",
     "thetao",
+    "so",
+    "uo",
+    "vo",
 }
 
 
