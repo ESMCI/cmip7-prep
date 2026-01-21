@@ -1,6 +1,6 @@
 # Example usage (in docstring):
 # ds = xr.open_dataset("input.nc")
-# zonal_p39 = zonal_mean_on_p39(ds, "ta", tables_path="cmip7-cmor-tables/tables")
+# zonal_p39 = zonal_mean_on_pressure_grid(ds, "ta", tables_path="cmip7-cmor-tables/tables")
 # cmip7_prep/regrid.py
 """Regridding utilities for CESM -> 1° lat/lon using precomputed ESMF weights."""
 from __future__ import annotations
@@ -137,8 +137,8 @@ def zonal_mean_on_pressure_grid(
         Path to CMIP7 Tables directory (for coordinate JSON).
     target : str, default "plev39"
         Name of the target pressure grid (e.g., 'plev19', 'plev39').
-    lev_dim, lon_dim, lat_dim : str
-        Names for vertical, longitude, and latitude dimensions.
+    lev_dim, lon_dim : str
+        Names for vertical and longitude dimensions.
     ps_name, hyam_name, hybm_name, p0_name : str
         Names for surface pressure, hybrid A/B (midpoint) coefficients, and reference pressure.
     keep_attrs : bool

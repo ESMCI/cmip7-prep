@@ -813,14 +813,20 @@ class CmorSession(
             "Using CMOR table key: %s %s", self.tables_path, self.primarytable
         )  # debug
         self.load_table(self.tables_path, self.primarytable)
-        bvn = getattr(cmip_var, "branded_variable_name", None).name
+        bvn_attr = getattr(cmip_var, "branded_variable_name", None)
+        bvn = bvn_attr.name if bvn_attr is not None else None
+        if bvn is None:
+            # Fall back to vdef.name when no branded variable name is provided
+            bvn = getattr(vdef, "name", None)
+            if bvn is None:
+                raise ValueError(
+                    "Cannot determine branded variable name: both "
+                    "`cmip_var.branded_variable_name` and `vdef.name` are missing."
+                )
         if bvn not in ds:
-            ds.rename({vdef.name: bvn})
+            ds = ds.rename({vdef.name: bvn})
         logger.info("Preparing to write variable: %s", bvn)  # debug
-        if bvn not in ds:
-            data = ds.rename({vdef.name: bvn})[str(bvn)]
-        else:
-            data = ds[str(bvn)]
+        data = ds[str(bvn)]
 
         logger.info("Ensure fx variables are written and cached")  # debug
         self.ensure_fx_written_and_cached(ds)
