@@ -4,7 +4,7 @@
   "activity_id": "CMIP",
   "institution_id": "NCAR",
   "institution": "NSF National Center for Atmospheric Research, Climate and Global Dynamics Laboratory, 1850 Table Mesa Drive, Boulder, CO 80305, USA",
-  "contact": "cmip-support@ucar.edu",
+  "contact": "cesm-cmip@ucar.edu",
   "product": "model-output",
   "_cmip7_option": true,
     "horizontal_label": "hxy",
