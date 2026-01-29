@@ -92,7 +92,7 @@ variables:
     sources:
       - cesm_var: TGCLDLWP
 
-  cProduct:
+  cProduct_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2"
     dims: [time, lat, lon]
@@ -272,7 +272,7 @@ variables:
     sources:
       - cesm_var: RELHUM
 
-  hurs:
+  hurs_tavg-u-hxy-u:
     table: atmos
     units: "%"
     dims: [time, lat, lon]
@@ -301,7 +301,7 @@ variables:
     sources:
       - cesm_var: Q
 
-  huss:
+  huss_tavg-h2m-hxy-u:
     table: atmos
     units: "1"
     long_name: Near-Surface Specific Humidity
@@ -325,7 +325,7 @@ variables:
     sources:
       - cesm_var: mlotst
 
-  mrfso:
+  mrfso_tavg-u-hxy-lnd:
     table: land
     units: kg m-2
     dims: [time, lat, lon]
@@ -518,7 +518,7 @@ variables:
     sources:
       - cesm_var: FLUT
 
-  rlutcs:
+  rlutcs_tavg-u-hxy-u:
     table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
@@ -570,7 +570,7 @@ variables:
       - cesm_var: FSDSC
       - cesm_var: FSNSC
 
-  rsut:
+  rsut_tavg-u-hxy-u:
     table: atmos
     units: "W m-2"
     dims: [time, lat, lon]
@@ -701,7 +701,7 @@ variables:
     sources:
       - cesm_var: TREFHTMN
 
-  tauu:
+  tauu_tavg-u-hxy-u:
     table: atmos
     units: "N m-2"
     dims: [time, lat, lon]
@@ -717,7 +717,7 @@ variables:
     sources:
       - cesm_var: tauuo
 
-  tauv:
+  tauv_tavg-u-hxy-u:
     table: atmos
     units: "N m-2"
     dims: [time, lat, lon]
@@ -742,7 +742,8 @@ variables:
       units: Pa
     sources:
       - cesm_var: TD
-  thetao:
+
+  thetao_tavg-ol-hxy-sea:
     table: ocean
     units: "K"
     dims:
@@ -802,7 +803,7 @@ variables:
       - cesm_var: QVEGT
       - cesm_var: QSOIL
 
-  ts:
+  ts_tavg-u-hxy-u:
     table: atmos
     units: "K"
     dims: [time, lat, lon]
@@ -849,7 +850,7 @@ variables:
     sources:
       - cesm_var: U10
 
-  umo:
+  umo_tavg-ol-hxy-sea:
     table: ocean
     units: "kg s-1"
     dims: [time, z_l, latitude, longitude]
@@ -889,14 +890,14 @@ variables:
     sources:
       - cesm_var: VBOT
 
-  vmo:
+  vmo_tavg-ol-hxy-sea:
     table: ocean
     units: "kg s-1"
     dims: [time, z_l, latitude, longitude]
     sources:
       - cesm_var: vmo
 
-  vo:
+  vo_tavg-ol-hxy-sea:
     table: ocean
     units: "m s-1"
     dims:
@@ -913,7 +914,7 @@ variables:
     sources:
       - cesm_var: volcello
 
-  wap:
+  wap_tavg-p19-hxy-air:
     table: atmos
     units: "Pa s-1"
     dims: [time, plev, lat, lon]
@@ -931,7 +932,7 @@ variables:
     sources:
       - cesm_var: wfo
 
-  zg:
+  zg_tavg-p19-hxy-air:
     table: atmos
     units: "m"
     dims: [time, plev, lat, lon]
@@ -941,7 +942,7 @@ variables:
     sources:
       - cesm_var: Z3
 
-  zos:
+  zos_tavg-u-hxy-sea:
     table: ocean
     units: "m"
     dims: [time, latitude, longitude]

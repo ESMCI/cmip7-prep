@@ -490,7 +490,10 @@ def main():
             )
             if var.branded_variable_name.name in args.cmip_vars:
                 logger.info("Adding variable %s", var.branded_variable_name.name)
-                cmip_vars.append(var)
+                if var.branded_variable_name.name not in [
+                    v.branded_variable_name.name for v in cmip_vars
+                ]:
+                    cmip_vars.append(var)
 
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
     if args.workers == 1:
