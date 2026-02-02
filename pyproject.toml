@@ -12,19 +12,6 @@ include = [
 
 [tool.poetry.dependencies]
 python = ">=3.10.13,<3.14"
-# xarray = "^2024.9.0"
-# netCDF4 = "^1.7.2"
-# cftime = "^1.6.4"
-# numpy = "^2.0.0"
-# pandas = "^2.3.2"
-# esmpy = { git = "https://github.com/esmf-org/esmf.git", tag = "v8.9.0", subdirectory = "src/addon/esmpy" }
-# xesmf = "^0.8.10"
-# typer = { version = "^0.19.1", extras = ["all"] }
-# PyYAML = "^6.0.2"
-# geocat-comp = "^2025.09.0"
-# gents = { git = "https://github.com/AgentOxygen/GenTS", branch = "main" }
-# # CMOR typically comes from conda-forge; if pip isn't viable, install it outside Poetry or via a wheel.
-# # cmor = "^3.8.0"
 
 # Dependency management is now handled by your conda environment.
 # Example setup:

@@ -155,6 +155,9 @@ class Mapping:
     # -----------------
     @staticmethod
     def _load_yaml(path: Path) -> Dict[str, VarConfig]:
+
+        # data holds the contents of the YAML file as ordinary Python
+        # objects that you can work with in your code.
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
@@ -164,8 +167,14 @@ class Mapping:
             and "variables" in data
             and isinstance(data["variables"], dict)
         ):
+            # After this line, data no longer holds the whole
+            # original dictionary—it now holds only the sub‑dictionary
             data = data["variables"]
 
+        # Add a type annotation (Dict[str, VarConfig]) that tells
+        # static type‑checkers that result is expected to be a
+        # dictionary whose keys are strings (str) and whose values are
+        # instances of the class (or type alias) VarConfig.
         result: Dict[str, VarConfig] = {}
 
         if isinstance(data, dict):
@@ -231,6 +240,9 @@ class Mapping:
         return da
 
 
+# -----------------
+# Private routines
+# -----------------
 def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
     """Normalize a raw YAML entry into a VarConfig."""
     table = _normalize_table_name(cfg.get("table") or cfg.get("CMOR_table"))

@@ -33,8 +33,6 @@ from .cmor_utils import (
     roll_for_monotonic_with_bounds,
 )
 
-# from .mom6_static import compute_cell_bounds_from_corners
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -92,8 +90,6 @@ class CmorSession(
         self._fx_cache: dict[str, xr.DataArray] = (
             {}
         )  # regridded fx fields cached in-memory
-
-        # Attach grid mapping attribute to variable if ocean
 
     def __enter__(self) -> "CmorSession":
         # Resolve logfile path if requested

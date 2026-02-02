@@ -20,32 +20,27 @@ from cmip7_prep import vertical
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# try:
-#    import xesmf as xe
-# except ModuleNotFoundError as e:
-#    _HAS_XESMF = False
 try:
     import dask.array as _da  # noqa: F401
-
     _HAS_DASK = True
 except ModuleNotFoundError as e:
     _HAS_DASK = False
 
 # Default weight maps; override via function args.
-INPUTDATA_DIR = Path("/glade/campaign/cesm/cesmdata/inputdata/")
-DEFAULT_CONS_MAP_NE30 = Path(
-    INPUTDATA_DIR / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
-)
+# optional bilinear map
 DEFAULT_BILIN_MAP_NE30 = Path(
-    INPUTDATA_DIR / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
-)  # optional bilinear map
-
-DEFAULT_CONS_MAP_T232 = Path(
-    INPUTDATA_DIR / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc"
+    "/datalake/NS9560K/diagnostics/land_xesmf_diag_data/map_ne30pg3_to_0.5x0.5_nomask_aave_da_c180515.nc"
+)  
+DEFAULT_CONS_MAP_NE30 = Path(
+    "/datalake/NS9560K/diagnostics/land_xesmf_diag_data/map_ne30pg3_to_0.5x0.5_nomask_aave_da_c180515.nc"
+)  
+DEFAULT_BILIN_MAP_NE16 = Path(
+    "/datalake/NS9560K/diagnostics/land_xesmf_diag_data/map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
 )
-DEFAULT_BILIN_MAP_T232 = Path(
-    INPUTDATA_DIR / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc"
-)  # optional bilinear map
+DEFAULT_CONS_MAP_NE16 = Path(
+    "/datalake/NS9560K/diagnostics/land_xesmf_diag_data/map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
+)
+
 INTENSIVE_VARS = {
     "tas",
     "tasmin",
@@ -64,10 +59,6 @@ INTENSIVE_VARS = {
     "va",
     "zg",
     "hus",
-    "thetao",
-    "so",
-    "uo",
-    "vo",
 }
 
 
@@ -185,33 +176,6 @@ def zonal_mean_on_pressure_grid(
 # -------------------------
 # Selection & utilities
 # -------------------------
-def _sftof_from_native(ds: xr.Dataset) -> xr.DataArray | None:
-    """Return sea fraction (sftof) from ocean static grid, using 'wet' mask if present."""
-    # Try common names for ocean fraction
-    for name in ["sftof", "ocnfrac", "wet"]:
-        if name in ds:
-            v = ds[name]
-            # If 'wet', convert 0/1 to percent
-            if name == "wet":
-                vmax = float(np.nanmax(np.asarray(v)))
-                # If 0/1, convert to percent
-                if vmax <= 1.0 + 1e-6:
-                    out = v * 100.0
-                else:
-                    out = v
-            else:
-                out = v
-            out = out.clip(min=0.0, max=100.0)
-            out = out.astype("f8")
-            attrs = dict(out.attrs)
-            attrs["units"] = "%"
-            attrs.setdefault("standard_name", "sea_area_fraction")
-            attrs.setdefault("long_name", "Percentage of sea area")
-            out.attrs = attrs
-            return out
-    return None
-
-
 def _hybrid_support_names(cfg: dict) -> set[str]:
     """Return names needed for hybrid-sigma CMOR axis/z-factors, based on mapping cfg."""
     levels = (cfg or {}).get("levels") or {}
@@ -238,13 +202,11 @@ def _pick_maps(
     realm: Optional[str] = None,
 ) -> MapSpec:
     """Choose which precomputed map file to use for a variable."""
-    if realm == "ocn":
-        cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_T232
-        bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_T232
-    else:
-        cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_NE30
-        bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30
+    cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_NE16
+    bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30
 
+    logger.info(f"Conservative_map is {str(cons)}")
+    
     if force_method:
         if force_method not in {"conservative", "bilinear"}:
             raise ValueError("force_method must be 'conservative' or 'bilinear'")
@@ -277,9 +239,10 @@ def _ensure_ncol_last(da: xr.DataArray) -> Tuple[xr.DataArray, Tuple[str, ...]]:
 # regrid.py
 
 
-def regrid_to_1deg_ds(
+def regrid_to_latlon_ds(
     ds_in: xr.Dataset,
     varnames: str | list[str],
+    resolution: str,
     *,
     time_from: xr.Dataset | None = None,
     method: Optional[str] = None,
@@ -292,12 +255,12 @@ def regrid_to_1deg_ds(
 ) -> xr.Dataset:
     """Regrid var(s) and return a Dataset."""
 
-    names = [varnames] if isinstance(varnames, str) else list(varnames)
     out_vars: dict[str, xr.DataArray] = {}
-
+    names = [varnames] if isinstance(varnames, str) else list(varnames)
     for name in names:
-        out_vars[name] = regrid_to_1deg(
+        out_vars[name] = regrid_to_latlon(
             ds_in,
+            resolution,
             name,
             method=method,
             conservative_map=conservative_map,
@@ -309,15 +272,8 @@ def regrid_to_1deg_ds(
 
     ds_out = xr.Dataset(out_vars)
 
-    # Attach time (and bounds) from the original dataset if requested
-    if time_from is not None:
-        ds_out = _attach_time_and_bounds(ds_out, time_from)
-    if "ncol" in ds_in.dims:
-        realm = "atm"
-    elif "lndgrid" in ds_in.dims:
-        realm = "lnd"
-    else:
-        realm = "ocn"
+    logger.info(f"conservative map is {conservative_map}")
+    logger.info(f"bilinear map is {conservative_map}")
 
     # Pick the mapfile you used for conservative/bilinear selection
     spec = _pick_maps(
@@ -327,6 +283,16 @@ def regrid_to_1deg_ds(
         force_method="conservative",
         realm=realm,
     )  # fx always conservative
+
+    # Attach time (and bounds) from the original dataset if requested
+    if time_from is not None:
+        ds_out = _attach_time_and_bounds(ds_out, time_from)
+    if "ncol" in ds_in.dims:
+        realm = "atm"
+    elif "lndgrid" in ds_in.dims:
+        realm = "lnd"
+
+    # Regrid the data
     logger.info("using fx map: %s", spec.path)
     ds_fx = _regrid_fx_once(spec.path, ds_in, sftlf_path)  # ← uses cache
 
@@ -374,43 +340,6 @@ def _denormalize_land_field(
     logger.debug("sum of regridded landfrac: %s", float(landfrac.sum().values))
 
     out = out_norm / landfrac.where(landfrac > 0)
-    return out
-
-
-def _denormalize_ocn_field(
-    out_norm: xr.DataArray, ds_in: xr.Dataset, mapfile: Path
-) -> xr.DataArray:
-    """Denormalize field by destination sftof (sea fraction)."""
-    logger.info("Denormalizing ocean field by destination sftof (sea fraction)")
-    # Try to find an existing regridded sftof file first
-    sftof_dst = None
-    outdir = Path(mapfile).parent.parent.parent / "Ofx" / "sftof" / "gr"
-    # This path logic may need adjustment for your output structure
-    if outdir.exists():
-        files = list(outdir.glob("sftof_Ofx_*.nc"))
-        if files:
-            try:
-                ds_fx_file = xr.open_dataset(files[0])
-                if "sftof" in ds_fx_file:
-                    sftof_dst = ds_fx_file["sftof"]
-
-            # pylint: disable=broad-exception-caught
-            except Exception as err:
-                logger.warning("Failed to read regridded sftof file: %s", err)
-    if sftof_dst is None:
-        ds_fx = _regrid_fx_once(mapfile, ds_in)
-        if "sftof" in ds_fx:
-            sftof_dst = ds_fx["sftof"]
-        else:
-            logger.warning(
-                "Destination sftof not found; falling back to source sftof if available."
-            )
-    logger.info("sftof_dst dims: %s", sftof_dst.dims if sftof_dst is not None else None)
-    if sftof_dst is not None:
-        frac_dst = sftof_dst / 100.0
-        out = out_norm / frac_dst.where(frac_dst > 0)
-    else:
-        out = out_norm
     return out
 
 
@@ -486,8 +415,9 @@ def _dst_latlon_1d_from_map(mapfile: Path) -> tuple[np.ndarray, np.ndarray]:
     return lat, lon
 
 
-def regrid_to_1deg(
+def regrid_to_latlon(
     ds_in: xr.Dataset,
+    resolution,
     varname: str,
     *,
     method: Optional[str] = None,
@@ -521,18 +451,8 @@ def regrid_to_1deg(
     realm = None
     var_da = ds_in[varname]  # always a DataArray
     if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
-        logger.info("Variable has no 'ncol' or 'lndgrid' dim; assuming ocn variable.")
-        hdim = "tripolar"
-        da2 = var_da  # Use the DataArray, not the whole Dataset
-        non_spatial = [d for d in da2.dims if d not in ("yh", "xh")]
-        realm = "ocn"
-        method = method or "conservative"  # force conservative for ocn
-        # --- OCEAN: Normalize by sftof (sea fraction) if present ---
-        sftof = _sftof_from_native(ds_in)
-        if sftof is not None:
-            logger.info("Normalizing ocean field by source sftof (sea fraction)")
-            frac = sftof / 100.0
-            da2 = da2.fillna(0) * frac
+        logger.error("Variable has no 'ncol' or 'lndgrid' dim")
+        sys.exit(1)
     else:
         da2, non_spatial = _ensure_ncol_last(var_da)
         # For land/atm, set realm and hdim
@@ -543,9 +463,6 @@ def regrid_to_1deg(
             realm = "lnd"
             hdim = "lndgrid"
             da2 = _normalize_land_field(da2, ds_in)
-        else:
-            # Fallback: use last dim
-            hdim = da2.dims[-1]
 
     # cast to save memory
     if dtype is not None and str(da2.dtype) != dtype:
@@ -587,7 +504,6 @@ def regrid_to_1deg(
         da2_2d = da2.rename({"xh": "lon", "yh": "lat"}).transpose(
             *non_spatial, "lat", "lon"
         )
-
         da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
     logger.info(
         "da2_2d range: %f to %f lat, %f to %f lon",
@@ -601,9 +517,6 @@ def regrid_to_1deg(
     logger.info("Regridding complete. out_norms dims: %s", out_norm.dims)
     if realm == "lnd":
         out = _denormalize_land_field(out_norm, ds_in, spec.path)
-    elif realm == "ocn":
-        out = _denormalize_ocn_field(out_norm, ds_in, spec.path)
-        logger.info("Denormalized ocean field. out dims: %s", out.dims)
     else:
         out = out_norm
 
@@ -661,7 +574,6 @@ def regrid_to_1deg(
         out.attrs.update(var_da.attrs)
 
     return out
-
 
 def _attach_time_and_bounds(ds_out: xr.Dataset, time_from: xr.Dataset) -> xr.Dataset:
     """Copy 'time' coord and its bounds from time_from into ds_out, unchanged.
@@ -749,31 +661,6 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
     sftlf = _sftlf_from_native(ds_native)
     if sftlf is not None:
         pieces["sftlf"] = sftlf
-    # Also extract sftof (sea fraction) if present
-    sftof = None
-    for name in ["sftof", "ocnfrac", "wet"]:
-        if name in ds_native:
-            logger.info("Extracting sftof from native variable %s", name)
-            v = ds_native[name]
-            # If 'wet', convert 0/1 to percent
-            if name == "wet":
-                vmax = float(np.nanmax(np.asarray(v)))
-                if vmax <= 1.0 + 1e-6:
-                    sftof = v * 100.0
-                else:
-                    sftof = v
-            else:
-                sftof = v
-            sftof = sftof.clip(min=0.0, max=100.0)
-            sftof = sftof.astype("f8")
-            attrs = dict(sftof.attrs)
-            attrs["units"] = "%"
-            attrs.setdefault("standard_name", "sea_area_fraction")
-            attrs.setdefault("long_name", "Percentage of sea area")
-            sftof.attrs = attrs
-            break
-    if sftof is not None:
-        pieces["sftof"] = sftof
     if not pieces:
         return xr.Dataset()
     ds_fx = xr.Dataset(pieces)
@@ -873,16 +760,6 @@ def _regrid_fx_once(
         "conservative",
     )
 
-    # Add native grid fields to FXCache
-    native_fx = {}
-    for key in ["sftof", "deptho", "areacello"]:
-        if key in ds_fx_native:
-            native_fx[f"{key}_native"] = ds_fx_native[key]
-    # Always cache sftof_native if present
-    if "sftof" in ds_fx_native:
-        native_fx["sftof_native"] = ds_fx_native["sftof"]
-    if native_fx:
-        FXCache.put(mapfile, xr.Dataset(native_fx))
     # Regrid sftlf from source if present
     if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
         da = ds_fx_native["sftlf"].fillna(0)
@@ -901,6 +778,7 @@ def _regrid_fx_once(
         out.name = "sftlf"
         out.attrs.update(da.attrs)
         out_vars["sftlf"] = out
+
     # For regridded grid, set sftof = 1 - sftlf
     if "sftlf" in out_vars:
         logger.info("Computing regridded sftof as 1 - sftlf")
@@ -913,29 +791,6 @@ def _regrid_fx_once(
         sftof.attrs.setdefault("long_name", "Percentage of sea area")
         out_vars["sftof"] = sftof
 
-    # Regrid deptho from source if present
-    if "deptho" in ds_fx_native:
-        logger.info("Regridding deptho from native")
-        da = ds_fx_native["deptho"]
-        da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
-        out = regridder(da2, skipna=True, na_thres=1.0)
-        spatial = [d for d in out.dims if d in ("lat", "lon")]
-        out = out.transpose(*spatial)
-        out.name = "deptho"
-        out.attrs.update(da.attrs)
-        out_vars["deptho"] = out
-
-    # Regrid areacello from source if present
-    if "areacello" in ds_fx_native:
-        logger.info("Regridding areacello from native")
-        da = ds_fx_native["areacello"]
-        da2 = da.rename({"xh": "lon", "yh": "lat"}).transpose(..., "lat", "lon")
-        out = regridder(da2, skipna=True, na_thres=1.0)
-        spatial = [d for d in out.dims if d in ("lat", "lon")]
-        out = out.transpose(*spatial)
-        out.name = "areacello"
-        out.attrs.update(da.attrs)
-        out_vars["areacello"] = out
     # Always compute areacella on the destination grid, not by regridding
     # Use the destination grid from the mapfile
     lat1d, lon1d = _dst_latlon_1d_from_map(mapfile)
