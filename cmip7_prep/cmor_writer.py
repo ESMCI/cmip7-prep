@@ -398,10 +398,10 @@ class CmorSession(
                 coord_vals=tvals,
                 cell_bounds=tbnds if tbnds is not None else None,
             )
-            logger.info("time axis id: %s", time_id)
+            logger.info("time axis id: %s var_dims=%s", time_id, var_dims)
         # --- vertical: standard_hybrid_sigma ---
         levels = getattr(vdef, "levels", {}) or {}
-
+        logger.info("levels dict: %s", levels)
         if (levels.get("name") or "").lower() in {
             "standard_hybrid_sigma",
             "alevel",
@@ -555,6 +555,9 @@ class CmorSession(
         elif "zl" in var_dims:
             ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
+            logger.info(
+                "rename zl to olevel var_name %s var_dims=%s", var_name, var_dims
+            )
             cmor.set_cur_dataset_attribute("vertical_label", "olevel")
             logger.info("*** Define olevel axis")
             values = ds["olevel"].values
@@ -567,9 +570,13 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
-        elif "zi" in var_dims:
-            ds[var_name] = ds[var_name].rename({"zi": "olevel"})
+        elif "zl" in var_dims:
+            logger.info("found zl axis in var_dims for variable %s", var_name)
+            ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
+            logger.info(
+                "rename zl to olevel var_name %s var_dims=%s", var_name, var_dims
+            )
             cmor.set_cur_dataset_attribute("vertical_label", "olevel")
             logger.info("*** Define olevel axis")
             values = ds["olevel"].values

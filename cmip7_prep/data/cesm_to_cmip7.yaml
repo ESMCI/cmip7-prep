@@ -101,6 +101,30 @@ variables:
       - cesm_var: TOTPRODC
       - cesm_var: CWD_P
 
+  cropFracC3_tavg-u-hxy-u:
+    table: land
+    units: "1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: CROP_C3_FRAC
+
+  cropFracC4_tavg-u-hxy-u:
+    table: land
+    units: "1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: CROP_C4_FRAC
+
+  cSoil_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    formula: (SOIL1C + SOIL2C + SOIL3C)/1000.0
+    sources:
+      - cesm_var: SOIL1C
+      - cesm_var: SOIL2C
+      - cesm_var: SOIL3C
+
   cSoilFast:
     table: land
     units: "kg m-2"
@@ -168,7 +192,6 @@ variables:
     units: kg m-2 s-1
     long_name: Water Evaporation from Soil
     dims: [time, lat, lon]
-    positive: up
     sources:
       - cesm_var: QSOIL
 
@@ -177,7 +200,6 @@ variables:
     units: kg m-2 s-1
     long_name: Water Evaporation from Vegetation
     dims: [time, lat, lon]
-    positive: up
     sources:
       - cesm_var: QVEGE
 
@@ -208,12 +230,20 @@ variables:
     sources:
       - cesm_var: ficeberg
 
+  fNVegSoil_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2 s-1"
+    dims: [time, lat, lon]
+    positive: up
+    formula: NVEG_SOIL_CLOSS/1000.0
+    sources:
+      - cesm_var: NVEG_SOIL_CLOSS
+
   gpp_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     formula: GPP/1000.0
-    positive: down
     sources:
       - cesm_var: GPP
 
@@ -326,7 +356,7 @@ variables:
       - cesm_var: mlotst
 
   mrfso_tavg-u-hxy-lnd:
-    table: land
+    table: landIce
     units: kg m-2
     dims: [time, lat, lon]
     formula: verticalsum(SOILICE, capped_at=5000)
@@ -389,6 +419,30 @@ variables:
     positive: down
     sources:
       - cesm_var: NPP
+
+  nVeg_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    formula: (WOOD_C + LEAF_C + ROOT_C)/1000.0
+    sources:
+      - cesm_var: WOOD_C
+      - cesm_var: LEAF_C
+      - cesm_var: ROOT_C
+
+  pastureFracC3_tavg-u-hxy-u:
+    table: land
+    units: "1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: PASTURE_C3_FRAC
+
+  pastureFracC4_tavg-u-hxy-u:
+    table: land
+    units: "1"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: PASTURE_C4_FRAC
 
   pr_tavg-u-hxy-u:
     table: atmos
@@ -528,6 +582,14 @@ variables:
 
   rsds_tavg-u-hxy-u:
     table: atmos
+    units: "W m-2"
+    dims: [time, lat, lon]
+    positive: up
+    sources:
+      - cesm_var: FSDS
+
+  rsds_tavg-u-hxy-lnd:
+    table: land
     units: "W m-2"
     dims: [time, lat, lon]
     positive: up
