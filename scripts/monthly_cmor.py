@@ -103,6 +103,7 @@ def parse_args():
         required=True,
         help="Realm to process",
     )
+    # Move these to a wrapper script
     parser.add_argument("--caseroot", type=str, help="Case root directory")
     parser.add_argument("--cimeroot", type=str, help="CIME root directory")
     parser.add_argument(
