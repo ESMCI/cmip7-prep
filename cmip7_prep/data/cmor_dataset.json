@@ -46,6 +46,6 @@
   "title": "CESM3 piControl on 1x1 degree grid (regridded from ne30np3 se grid)",
   "references": "See CESM3 documentation and CMIP7 references for NCAR/CGD.",
   "outpath": ".",
-    "output_path_template": "<mip_era><activity_id><institution_id><source_id><experiment_id><_member_id><table><variable_id><branding_suffix><grid_label>",
-  "output_file_template": "<branded_variable><table><source_id><experiment_id>[<time_range>]"
+    "output_path_template": "<mip_era><activity_id><institution_id><source_id><experiment_id><variant_label><region><frequency><variable_id><branding_suffix><grid_label>",
+  "output_file_template": "<variable_id><branding_suffix><frequency><region><grid_label><source_id><experiment_id><variant_label>[<time_range>]"
 }
