@@ -1,3 +1,6 @@
+# Example usage (in docstring):
+# ds = xr.open_dataset("input.nc")
+# zonal_p39 = zonal_mean_on_pressure_grid(ds, "ta", tables_path="cmip7-cmor-tables/tables")
 # cmip7_prep/regrid.py
 """Regridding utilities for CESM -> 1° lat/lon using precomputed ESMF weights."""
 from __future__ import annotations
@@ -5,12 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 import logging
+import os
 import xarray as xr
 
 # import warnings
 import numpy as np
 from cmip7_prep.cmor_utils import bounds_from_centers_1d
 from cmip7_prep.cache_tools import FXCache, RegridderCache, read_array, open_nc
+from cmip7_prep import vertical
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,8 +46,6 @@ DEFAULT_CONS_MAP_T232 = Path(
 DEFAULT_BILIN_MAP_T232 = Path(
     INPUTDATA_DIR / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc"
 )  # optional bilinear map
-
-# Variables treated as "intensive" → prefer bilinear when available.
 INTENSIVE_VARS = {
     "tas",
     "tasmin",
@@ -62,9 +65,9 @@ INTENSIVE_VARS = {
     "zg",
     "hus",
     "thetao",
+    "so",
     "uo",
     "vo",
-    "so",
 }
 
 
@@ -74,56 +77,6 @@ class MapSpec:
 
     method_label: str  # "conservative" or "bilinear"
     path: Path
-
-
-# --- OCEAN FRACTION (sftof) extraction ---
-def _sftof_from_native(ds: xr.Dataset) -> xr.DataArray | None:
-    """Return sea fraction (sftof) from ocean static grid, using 'wet' mask if present."""
-    # Try common names for ocean fraction
-    for name in ["sftof", "ocnfrac", "wet"]:
-        if name in ds:
-            v = ds[name]
-            # If 'wet', convert 0/1 to percent
-            if name == "wet":
-                vmax = float(np.nanmax(np.asarray(v)))
-                # If 0/1, convert to percent
-                if vmax <= 1.0 + 1e-6:
-                    out = v * 100.0
-                else:
-                    out = v
-            else:
-                out = v
-            out = out.clip(min=0.0, max=100.0)
-            out = out.astype("f8")
-            attrs = dict(out.attrs)
-            attrs["units"] = "%"
-            attrs.setdefault("standard_name", "sea_area_fraction")
-            attrs.setdefault("long_name", "Percentage of sea area")
-            out.attrs = attrs
-            return out
-    return None
-
-
-def _pick_from_candidates(ds: xr.Dataset, *names: str) -> xr.DataArray | None:
-    """Return the first present variable among candidate names (case-insensitive)."""
-    for nm in names:
-        if nm in ds:
-            return ds[nm]
-    lower = {k.lower(): k for k in ds.variables}
-    for nm in names:
-        k = lower.get(nm.lower())
-        if k:
-            return ds[k]
-    return None
-
-
-def _normalize_land_aux(da: xr.DataArray, hdim: str) -> xr.DataArray:
-    """Reduce extra dims (e.g., pft) and ensure the unstructured dim is present."""
-    if "pft" in da.dims:
-        da = da.sum("pft")
-    if hdim not in da.dims:
-        raise KeyError(f"land aux var missing required dim {hdim!r}: dims={da.dims}")
-    return da
 
 
 def _attach_vertical_metadata(ds_out: xr.Dataset, ds_src: xr.Dataset) -> xr.Dataset:
@@ -155,9 +108,108 @@ def _attach_vertical_metadata(ds_out: xr.Dataset, ds_src: xr.Dataset) -> xr.Data
     return ds_out
 
 
+# Variables treated as "intensive" → prefer bilinear when available.
+def zonal_mean_on_pressure_grid(
+    ds: xr.Dataset,
+    var: str,
+    *,
+    tables_path: str | os.PathLike = "cmip7-cmor-tables/tables",
+    target: str = "plev39",
+    lev_dim: str = "lev",
+    lon_dim: str = "lon",
+    ps_name: str = "PS",
+    hyam_name: str = "hyam",
+    hybm_name: str = "hybm",
+    p0_name: str = "P0",
+    keep_attrs: bool = True,
+) -> xr.DataArray:
+    """
+    Compute zonal mean (average over longitude) and interpolate
+    to a target CMIP pressure grid (e.g., plev19, plev39).
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Input dataset containing the variable and required hybrid inputs.
+    var : str
+        Name of the variable to process.
+    tables_path : str or Path
+        Path to CMIP7 Tables directory (for coordinate JSON).
+    target : str, default "plev39"
+        Name of the target pressure grid (e.g., 'plev19', 'plev39').
+    lev_dim, lon_dim : str
+        Names for vertical and longitude dimensions.
+    ps_name, hyam_name, hybm_name, p0_name : str
+        Names for surface pressure, hybrid A/B (midpoint) coefficients, and reference pressure.
+    keep_attrs : bool
+        Whether to keep variable attributes in the output.
+
+    Returns
+    -------
+    xr.DataArray
+        Zonal mean of the variable, interpolated to the target
+        pressure levels, dims: (plev, lat, [time]).
+    """
+    # 1. Zonal mean (average over longitude)
+    if lon_dim not in ds[var].dims:
+        raise ValueError(
+            f"Longitude dimension '{lon_dim}' not found in variable '{var}'"
+        )
+    zonal = ds[var].mean(dim=lon_dim, keep_attrs=keep_attrs)
+
+    # 2. Build a new dataset for vertical interpolation
+    required = [ps_name, hyam_name, hybm_name]
+    missing = [name for name in required if name not in ds]
+    if missing:
+        raise KeyError(f"Missing required variables in dataset: {missing}")
+
+    ds_zonal = ds.copy()
+    ds_zonal[var] = zonal
+
+    # 3. Interpolate to the requested pressure grid using vertical.to_plev
+    out_ds = vertical.to_plev(
+        ds_zonal,
+        var,
+        tables_path,
+        target=target,
+        lev_dim=lev_dim,
+        ps_name=ps_name,
+        hyam_name=hyam_name,
+        hybm_name=hybm_name,
+        p0_name=p0_name,
+    )
+    # Output dims: (plev, lat, [time])
+    return out_ds[var]
+
+
 # -------------------------
 # Selection & utilities
 # -------------------------
+def _sftof_from_native(ds: xr.Dataset) -> xr.DataArray | None:
+    """Return sea fraction (sftof) from ocean static grid, using 'wet' mask if present."""
+    # Try common names for ocean fraction
+    for name in ["sftof", "ocnfrac", "wet"]:
+        if name in ds:
+            v = ds[name]
+            # If 'wet', convert 0/1 to percent
+            if name == "wet":
+                vmax = float(np.nanmax(np.asarray(v)))
+                # If 0/1, convert to percent
+                if vmax <= 1.0 + 1e-6:
+                    out = v * 100.0
+                else:
+                    out = v
+            else:
+                out = v
+            out = out.clip(min=0.0, max=100.0)
+            out = out.astype("f8")
+            attrs = dict(out.attrs)
+            attrs["units"] = "%"
+            attrs.setdefault("standard_name", "sea_area_fraction")
+            attrs.setdefault("long_name", "Percentage of sea area")
+            out.attrs = attrs
+            return out
+    return None
 
 
 def _hybrid_support_names(cfg: dict) -> set[str]:

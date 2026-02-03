@@ -271,11 +271,15 @@ class CmorSession(
                 vals, bnds, _ = roll_for_monotonic_with_bounds(vals, bnds)
             return vals, bnds, units
 
+        logger.info("Defining CMOR axes for variable: %s", vdef.name)
         axes_ids = []
         var_name = getattr(vdef, "name", None)
         if var_name is None or var_name not in ds:
-            raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
+            var_name = getattr(vdef, "branded_variable_name", None)
+            if var_name is None or var_name not in ds:
+                raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
         var_da = ds[str(var_name)]
+        logger.info("found var_da with name: %s", var_da.name)
         var_dims = list(var_da.dims)
         alev_id = None
         plev_id = None
@@ -398,10 +402,10 @@ class CmorSession(
                 coord_vals=tvals,
                 cell_bounds=tbnds if tbnds is not None else None,
             )
-            logger.info("time axis id: %s", time_id)
+            logger.info("time axis id: %s var_dims=%s", time_id, var_dims)
         # --- vertical: standard_hybrid_sigma ---
         levels = getattr(vdef, "levels", {}) or {}
-
+        logger.info("levels dict: %s", levels)
         if (levels.get("name") or "").lower() in {
             "standard_hybrid_sigma",
             "alevel",
@@ -555,6 +559,9 @@ class CmorSession(
         elif "zl" in var_dims:
             ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
+            logger.info(
+                "rename zl to olevel var_name %s var_dims=%s", var_name, var_dims
+            )
             cmor.set_cur_dataset_attribute("vertical_label", "olevel")
             logger.info("*** Define olevel axis")
             values = ds["olevel"].values
@@ -567,9 +574,13 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
-        elif "zi" in var_dims:
-            ds[var_name] = ds[var_name].rename({"zi": "olevel"})
+        elif "zl" in var_dims:
+            logger.info("found zl axis in var_dims for variable %s", var_name)
+            ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
+            logger.info(
+                "rename zl to olevel var_name %s var_dims=%s", var_name, var_dims
+            )
             cmor.set_cur_dataset_attribute("vertical_label", "olevel")
             logger.info("*** Define olevel axis")
             values = ds["olevel"].values
@@ -809,16 +820,27 @@ class CmorSession(
             "Using CMOR table key: %s %s", self.tables_path, self.primarytable
         )  # debug
         self.load_table(self.tables_path, self.primarytable)
-        varname = getattr(cmip_var, "physical_parameter").name
-        logger.info("Preparing to write variable: %s", varname)  # debug
-        data = ds[str(varname)]
+        bvn_attr = getattr(cmip_var, "branded_variable_name", None)
+        bvn = bvn_attr.name if bvn_attr is not None else None
+        if bvn is None:
+            # Fall back to vdef.name when no branded variable name is provided
+            bvn = getattr(vdef, "name", None)
+            if bvn is None:
+                raise ValueError(
+                    "Cannot determine branded variable name: both "
+                    "`cmip_var.branded_variable_name` and `vdef.name` are missing."
+                )
+        if bvn not in ds:
+            ds = ds.rename({vdef.name: bvn})
+        logger.info("Preparing to write variable: %s", bvn)  # debug
+        data = ds[str(bvn)]
 
         logger.info("Ensure fx variables are written and cached")  # debug
         self.ensure_fx_written_and_cached(ds)
 
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_path, self.primarytable)
-        logger.info("Define CMOR axes for variable %s", vdef.name)  # debug
+        logger.info("Define CMOR axes for variable %s", bvn)  # debug
         axes_ids = self._define_axes(ds, vdef)
         logger.info("Prepare data for CMOR %s", data.dtype)  # debug
         data_filled, fillv = filled_for_cmor(data)
@@ -828,7 +850,7 @@ class CmorSession(
             data_filled = data_filled.rename({"zi": "olevel"})
         self.load_table(self.tables_path, self.primarytable)
 
-        var_entry = getattr(cmip_var, "branded_variable_name", varname)
+        var_entry = getattr(cmip_var, "branded_variable_name", bvn)
         if hasattr(var_entry, "name"):
             var_entry = var_entry.name
         elif hasattr(var_entry, "value"):

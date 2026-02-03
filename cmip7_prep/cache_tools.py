@@ -7,8 +7,6 @@ import xesmf as xe
 import xarray as xr
 import numpy as np
 
-from cmip7_prep.cmor_utils import bounds_from_centers_1d
-
 logger = logging.getLogger(__name__)
 
 
@@ -48,81 +46,42 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
     """Construct minimal ds_in/ds_out satisfying xESMF when reusing weights.
     Adds CF-style bounds for both lat and lon so conservative methods don’t
     trigger cf-xarray’s bounds inference on size-1 dimensions."""
-    with open_nc(mapfile) as m:
-        nlon_in, nlat_in = _get_src_shape(m)
-    lat_out_1d, lon_out_1d = _get_dst_latlon_1d(mapfile=mapfile)
 
-    # --- Dummy INPUT grid (unstructured → represent as 2D with length-1 lat) ---
-    lat_in = np.arange(
-        -90.0, 90.0, 180.0 / nlat_in, dtype="f8"
-    )  # e.g., [0], length can be 1
-    lon_in = np.arange(0.5, 360.5, 360.0 / nlon_in, dtype="f8")
-    ds_in = xr.Dataset(
-        data_vars={
-            "lat_bnds": (
-                ("lat", "nbnds"),
-                bounds_from_centers_1d(lat_in, "lat"),
-            ),
-            "lon_bnds": (
-                ("lon", "nbnds"),
-                bounds_from_centers_1d(lon_in, "lon"),
-            ),
-        },
-        coords={
-            "lat": (
-                "lat",
-                lat_in,
-                {
-                    "units": "degrees_north",
-                    "standard_name": "latitude",
-                    "bounds": "lat_bnds",
-                },
-            ),
-            "lon": (
-                "lon",
-                lon_in,
-                {
-                    "units": "degrees_east",
-                    "standard_name": "longitude",
-                    "bounds": "lon_bnds",
-                },
-            ),
-            "nbnds": ("nbnds", np.array([0, 1], dtype="i4")),
-        },
+    weights = xr.open_dataset(mapfile)
+    in_shape = weights.src_grid_dims.load().data
+
+    # Since xESMF expects 2D vars, we'll insert a dummy dimension of size-1
+    if len(in_shape) == 1:
+        in_shape = [1, in_shape.item()]
+
+    # output variable shape
+    out_shape = weights.dst_grid_dims.load().data.tolist()[::-1]
+
+    # Some prep to get the bounds:
+    # Note that bounds are needed for conservative regridding and not for bilinear
+    lat_b_out = np.zeros(out_shape[0] + 1)
+    lon_b_out = weights.xv_b.data[: out_shape[1] + 1, 0]
+    lat_b_out[:-1] = weights.yv_b.data[np.arange(out_shape[0]) * out_shape[1], 0]
+    lat_b_out[-1] = weights.yv_b.data[-1, -1]
+
+    dummy_in = xr.Dataset(
+        {
+            "lat": ("lat", np.empty((in_shape[0],))),
+            "lon": ("lon", np.empty((in_shape[1],))),
+            "lat_b": ("lat_b", np.empty((in_shape[0] + 1,))),
+            "lon_b": ("lon_b", np.empty((in_shape[1] + 1,))),
+        }
+    )
+    dummy_out = xr.Dataset(
+        {
+            "lat": ("lat", weights.yc_b.data.reshape(out_shape)[:, 0]),
+            "lon": ("lon", weights.xc_b.data.reshape(out_shape)[0, :]),
+            "lat_b": ("lat_b", lat_b_out),
+            "lon_b": ("lon_b", lon_b_out),
+        }
     )
 
-    # --- OUTPUT grid from weights (canonical 1° lat/lon) ---
-    lat_out_bnds = bounds_from_centers_1d(lat_out_1d, "lat")
-    lon_out_bnds = bounds_from_centers_1d(lon_out_1d, "lon")
-
-    ds_out = xr.Dataset(
-        data_vars={
-            "lat_bnds": (("lat", "nbnds"), lat_out_bnds),
-            "lon_bnds": (("lon", "nbnds"), lon_out_bnds),
-        },
-        coords={
-            "lat": (
-                "lat",
-                lat_out_1d,
-                {
-                    "units": "degrees_north",
-                    "standard_name": "latitude",
-                    "bounds": "lat_bnds",
-                },
-            ),
-            "lon": (
-                "lon",
-                lon_out_1d,
-                {
-                    "units": "degrees_east",
-                    "standard_name": "longitude",
-                    "bounds": "lon_bnds",
-                },
-            ),
-            "nbnds": ("nbnds", np.array([0, 1], dtype="i4")),
-        },
-    )
-    return ds_in, ds_out
+    return dummy_in, dummy_out
 
 
 # -------------------------
