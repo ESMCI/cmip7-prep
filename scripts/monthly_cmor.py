@@ -99,6 +99,21 @@ def parse_args():
         type=str,
         help="Time series directory (optional)." 
         "If not specified, will use a preset time series test directory"
+    )    
+    parser.add_argument( # Move to a wrapper script
+        "--caseroot",
+        type=str,
+        help="Case root directory"
+    )
+    parser.add_argument( # Move to a wrapper script
+        "--cimeroot",
+        type=str,
+        help="CIME root directory"
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run in test mode with default paths"
     )
     parser.add_argument(
         "--run-freq",
