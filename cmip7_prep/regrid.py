@@ -28,18 +28,20 @@ except ModuleNotFoundError as e:
 
 # Default weight maps; override via function args.
 # optional bilinear map
-DEFAULT_BILIN_MAP_NE30 = Path(
+DEFAULT_BILIN_MAP_NE30_noresm = Path(
     "/datalake/NS9560K/diagnostics/land_xesmf_diag_data/map_ne30pg3_to_0.5x0.5_nomask_aave_da_c180515.nc"
 )  
-DEFAULT_CONS_MAP_NE30 = Path(
+DEFAULT_CONS_MAP_NE30_noresm = Path(
     "/datalake/NS9560K/diagnostics/land_xesmf_diag_data/map_ne30pg3_to_0.5x0.5_nomask_aave_da_c180515.nc"
 )  
-DEFAULT_BILIN_MAP_NE16 = Path(
+DEFAULT_BILIN_MAP_NE16_noresm= Path(
     "/datalake/NS9560K/diagnostics/land_xesmf_diag_data/map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
 )
-DEFAULT_CONS_MAP_NE16 = Path(
+DEFAULT_CONS_MAP_NE16_noresm = Path(
     "/datalake/NS9560K/diagnostics/land_xesmf_diag_data/map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
 )
+# TODO: add cesm 
+
 
 INTENSIVE_VARS = {
     "tas",
@@ -196,14 +198,26 @@ def _hybrid_support_names(cfg: dict) -> set[str]:
 
 def _pick_maps(
     varname: str,
+    resolution: str,
+    model: str,
     conservative_map: Optional[Path] = None,
     bilinear_map: Optional[Path] = None,
     force_method: Optional[str] = None,
     realm: Optional[str] = None,
 ) -> MapSpec:
     """Choose which precomputed map file to use for a variable."""
-    cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_NE16
-    bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30
+    
+    if model == 'CESM':
+        if resolution == 'ne30':
+            cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_NE30_cesm
+            bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30_cesm
+    else: 
+        if resolution == 'ne30':
+            cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_NE30_noresm
+            bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30_noresm
+        elif resolution == 'ne16':
+            cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_NE16_noresm
+            bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE16_noresm
 
     logger.info(f"Conservative_map is {str(cons)}")
     
@@ -287,10 +301,12 @@ def regrid_to_latlon_ds(
     # Attach time (and bounds) from the original dataset if requested
     if time_from is not None:
         ds_out = _attach_time_and_bounds(ds_out, time_from)
+
+    #TODO: add realm as an input and check that dimension is correct for realm
     if "ncol" in ds_in.dims:
-        realm = "atm"
+        realm = "atmos"
     elif "lndgrid" in ds_in.dims:
-        realm = "lnd"
+        realm = "land"
 
     # Regrid the data
     logger.info("using fx map: %s", spec.path)
