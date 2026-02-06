@@ -175,11 +175,11 @@ class CmorSession(
         # Tell CMOR how to build tracking_id; let CMOR generate it
         prefix = get_cmor_attr("tracking_prefix")
         if not (isinstance(prefix, str) and prefix.startswith("hdl:")):
-            set_cmor_attr("tracking_prefix", "hdl:21.14100/")
+            set_cmor_attr("tracking_prefix", "hdl:21.14107")
 
         # If a non-handle tracking_id snuck in (e.g., bare UUID from JSON), clear it
         tid = get_cmor_attr("tracking_id")
-        if isinstance(tid, str) and not tid.startswith("hdl:21.14100/"):
+        if isinstance(tid, str) and not tid.startswith("hdl:21.14107"):
             set_cmor_attr(
                 "tracking_id", ""
             )  # empty lets CMOR regenerate from tracking_prefix

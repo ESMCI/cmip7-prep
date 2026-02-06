@@ -157,6 +157,13 @@ variables:
     sources:
       - cesm_var: TOTVEGC
 
+  dcw_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: DCW
+
   deptho_ti-u-hxy-sea:
     table: fx
     units: "m"
@@ -166,6 +173,56 @@ variables:
     regrid_method: conservative
     sources:
       - cesm_var: deptho
+
+  dgw_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: DGW
+
+  drivw_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: DRIVW
+
+  dslw_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: DSLW
+
+  dsn_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: DSN
+
+  dsw_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: DSW
+
+  esn_tavg-u-hxy-lnd:
+    table: land
+    units: "kg m-2"
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: ESN
+
+  evspsbl_tavg-u-hxy-lnd:
+    table: land
+    units: kg m-2 s-1
+    long_name: Evaporation over land
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: QVEGT
 
   evspsbl_tavg-u-hxy-ifs:
     table: ocean
@@ -187,6 +244,24 @@ variables:
       - cesm_var: QFLX
         scale: -1.0     # flip sign if CESM positive upward
 
+  evspsblpot_tavg-u-hxy-lnd:
+    table: land
+    units: kg m-2 s-1
+    long_name: Potential Evaporation over Land
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: QVEGT_POT
+
+  evspsblsoi_tavg-u-hxy-u:
+    table: atmos
+    units: kg m-2 s-1
+    long_name: Water Evaporation from Soil
+    dims: [time, lat, lon]
+    regrid_method: conservative
+    sources:
+      - cesm_var: QSOIL
+        scale: -1.0     # flip sign if CESM positive upward
+
   evspsblsoi_tavg-u-hxy-lnd:
     table: land
     units: kg m-2 s-1
@@ -202,6 +277,16 @@ variables:
     dims: [time, lat, lon]
     sources:
       - cesm_var: QVEGE
+
+  evspsblveg_tavg-u-hxy-u:
+    table: atmos
+    units: kg m-2 s-1
+    long_name: Water Evaporation from Vegetation
+    dims: [time, lat, lon]
+    regrid_method: conservative
+    sources:
+      - cesm_var: QVEGE
+        scale: -1.0     # flip sign if CESM positive upward
 
   fFire_tavg-u-hxy-lnd:
     table: land
@@ -246,6 +331,39 @@ variables:
     formula: GPP/1000.0
     sources:
       - cesm_var: GPP
+
+  irrDem_tavg-u-hxy-u:
+    table: atmos
+    units: "kg m-2 s-1"
+    long_name: Irrigation Demand
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: IRR_DEM
+
+  irrGw_tavg-u-hxy-u:
+    table: atmos
+    units: "kg m-2 s-1"
+    long_name: Groundwater Irrigation
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: IRR_GW
+
+  irrLut_tavg-u-hxy-u:
+    table: atmos
+    units: "kg m-2 s-1"
+    long_name: Surface Water Irrigation
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: IRR_LUT
+
+  irrSurf_tavg-u-hxy-u:
+    table: atmos
+    units: "kg m-2 s-1"
+    long_name: Irrigation from Surface Water
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: IRR_SURF
+
 
   hfds_tavg-u-hxy-sea:
     table: ocean
@@ -370,12 +488,33 @@ variables:
     sources:
       - cesm_var: QRUNOFF
 
+  mrrob_tavg-u-hxy-lnd:
+    table: land
+    units: kg m-2 s-1
+    dims: [time, lat, lon]
+    sources:
+      - cesm_var: QBURDRUNOFF
+
   mrros_tavg-u-hxy-lnd:
     table: land
     units: kg m-2 s-1
     dims: [time, lat, lon]
     sources:
       - cesm_var: QOVER
+
+  mrsfl_tavg-sl-hxy-lnd:
+    table: land
+    units: kg m-2
+    dims: [time, sdepth, lat, lon]
+    sources:
+      - cesm_var: SOILMOIST
+
+  mrsll_tavg-sl-hxy-lnd:
+    table: land
+    units: kg m-2
+    dims: [time, sdepth, lat, lon]
+    sources:
+      - cesm_var: SOILLIQ
 
   mrso_tavg-u-hxy-lnd:
     table: land
