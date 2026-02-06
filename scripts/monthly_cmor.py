@@ -39,8 +39,8 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
 logger = logging.getLogger("cmip7_prep.monthly_cmor")
-# Regex for date extraction from filenames
 
+# Regex for date extraction from filenames
 _DATE_RE = re.compile(
     r"[\.\-](?P<year>\d{4})"  # year
     r"(?P<sep>-?)"  # optional hyphen
@@ -48,10 +48,10 @@ _DATE_RE = re.compile(
     r"\.nc(?!\S)"  # literal .nc and then end (or whitespace)
 )
 
-# TODO: add a noresm versus cesm input option
+# Path for cmore tables
+TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
+TABLES_noresm = "/projects/NS9560K/mvertens/cmip7-prep/cmip7-cmor-tables/tables/"
 
-#TABLES = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
-TABLES = "/projects/NS9560K/mvertens/cmip7-prep/cmip7-cmor-tables/tables/"
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 def parse_args():
@@ -204,14 +204,13 @@ def process_one_var(
     varname = cmip_var.branded_variable_name.name
 
     # At this point you have a cmip_var (metadata from database query for the target variable)
-    #   queried a cmor database from the cloud
-
+    # queried a cmor database from the cloud
     logger.info(f"Starting processing for variable: {varname}")
     results = [(str(varname), "started")]
+
     try:
-        # This is what maps the CESM/NorESM variable(s) to the cmor variable
-        # This is yaml file - cesm_to_cmip7.yaml in this repo
-        # the variable name in variables: is the output
+        # This is what maps the CESM/NorESM history variable(s) to the cmor variable
+        # This is obtained from reading cesm_to_cmip7.yaml
         cfg = mapping.get_cfg(varname)
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
@@ -221,6 +220,7 @@ def process_one_var(
     # These are the dims on the destination
     # (interpolated dims if you WILL do interpolation - have not done it yet)
     dims_list = cfg.get("dims")
+
     # If dims is a single list (atm/lnd), wrap in a list for uniformity
     if dims_list and len(dims_list) > 0 and isinstance(dims_list[0], str):
         dims_list = [dims_list]
@@ -254,11 +254,11 @@ def process_one_var(
             )
             logger.info("realm is %s", realm)
 
-            if (arg
-            # Append ocn_fx_fields to ds_native if available
-            # fx - grid definition like topography, fraction
-            if realm == "ocean" and ocn_fx_fields is not None:
-                ds_native = ds_native.merge(ocn_fx_fields)
+            if (model == 'cesm'):
+                # Append ocn_fx_fields to ds_native if available
+                # fx - grid definition like topography, fraction
+                if realm == "ocean" and ocn_fx_fields is not None:
+                    ds_native = ds_native.merge(ocn_fx_fields)
 
             # Output ds_native keys
             logger.info(
@@ -267,13 +267,14 @@ def process_one_var(
                 varname,
                 dims,
             )
+            # TODO: why does this not abort the program?
             if var is None:
                 logger.warning(f"Source variable(s) not found for {varname}")
                 results.append((varname, "ERROR: Source variable(s) not found."))
                 continue
 
             # For ocean realm: distinguish native vs regridded by dims
-            if "latitude" in dims and "longitude" in dims:
+            if model == 'cesm' and "latitude" in dims and "longitude" in dims:
                 # output ocn on the native grid
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
                 ds_cmor = ds_native
@@ -321,6 +322,7 @@ def process_one_var(
         try:
             log_dir = outdir + "/logs"
 
+            # TODO: add NorESM institution_id below
             # Initialize CMOR class
             with CmorSession(
                 tables_path=tables_path,
@@ -408,16 +410,23 @@ def main():
     resolution = args.resolution
     model = args.model
 
+    mom6_grid = None
+    ocn_grid = None
+    ocn_fx_fields = None
+
+    # Determine include patterns and frequency
     if args.realm == "atmos":
         include_patterns = ["*cam.h0a*"]
         frequency = "mon"
-        subdir = "atm"
     elif args.realm == "land":
         include_patterns = ["*clm2.h0*"]
         frequency = "mon"
-        subdir = "lnd"
+    elif args.realm == "ocean":
+        # we do not want to match static files
+        include_patterns = ["*mom6.h.native.*"]
+        frequency = "mon"
 
-    # Setup input directory
+    # Setup input directory for noresm
     if model == 'noresm':
         if args.tsdir:
             TSDIR = Path(args.tsdir)
@@ -431,7 +440,22 @@ def main():
                 TSDIR = "/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
             elif args.realm == "land":
                 TSDIR = "/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
-    else:
+
+    # Setup input directory for cesm
+    if model == 'cesm':
+        if args.realm == "atmos":
+            subdir = "atm"
+        elif args.realm == "land":
+            subdir = "lnd"
+        elif args.realm == "ocean":
+            subdir = "ocn"
+            if args.ocn_grid_file:
+                ocn_grid = args.ocn_grid_file
+            if args.ocn_static_file:
+                ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
+                logger.info(
+                    f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
+                )
         if args.caseroot and args.cimeroot:
             caseroot = args.caseroot
             cimeroot = args.cimeroot
@@ -494,10 +518,7 @@ def main():
         experiment=args.experiment,
     )
     
-    logger.debug(f"list of all cmip variables for realm {args.realm} and experiment {args.experiment}")
-    for var in cmip_vars: 
-        logger.debug(f"cmip_var is {var}")
-
+    # Determine cmip variables that will process
     if args.cmip_vars:
         tmp_cmip_vars = cmip_vars
         cmip_vars = []
@@ -513,8 +534,9 @@ def main():
                     v.branded_variable_name.name for v in cmip_vars
                 ]:
                     cmip_vars.append(var)
-
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
+
+    # Set up dask if appropriate
     if args.workers == 1:
         client = None
         cluster = None
@@ -538,9 +560,16 @@ def main():
         else:
             input_path = Path(str(TSDIR) + f"/*")
 
-        # Load mapping
+        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml)
         mapping = Mapping.from_packaged_default()
 
+        # Determine TABLES directory
+        if model == 'cesm':
+            tables_path = TABLES_cesm
+        else:
+            tables_path = TABLES_noresm
+
+        # Now process the variables
         if args.workers == 1:
             results = [
                 item
@@ -549,21 +578,20 @@ def main():
                     v,
                     mapping,
                     input_path,
-                    TABLES,
+                    tables_path,
                     OUTDIR,
                     resolution,
                     model,
                     realm=args.realm,
                 )
             ]
-
         else:
             futs = [
                 process_one_var_delayed(
                     var,
                     mapping,
                     input_path,
-                    TABLES,
+                    tables_path,
                     OUTDIR,
                     resolution,
                     model,
