@@ -76,16 +76,7 @@ def parse_args():
     )
     parser.add_argument(
         "--realm",
-        choices=[
-            "atmos",
-            "aerosol",
-            "atmosChem",
-            "land",
-            "ocean",
-            "ocnBgchem",
-            "seaIce",
-            "landIce",
-        ],
+        choices=["atmos","aerosol","atmosChem","land","ocean","ocnBgchem","seaIce","landIce"],
         required=True,
         help="Realm to process",
     )
@@ -153,10 +144,7 @@ def parse_args():
     )
     parser.add_argument(
         "--model",
-        choices=[
-            "cesm",
-            "noresm"
-        ]
+        choices=["cesm","noresm"],
         required=True,
         help="Model to use",
     )
@@ -285,8 +273,12 @@ def process_one_var(
                     "Processing %s for dims %s (atm/lnd or other)", varname, dims
                 )
                 # Below is where you do the mapping from SE to lat/lon
+                if model == "noresm":
+                    mom6_grid = None
+
                 ds_cmor = realize_regrid_prepare(
                     resolution,
+                    model,
                     mapping,
                     ds_native,
                     varname,
@@ -487,17 +479,18 @@ def main():
                 TSDIR = (scratch + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist")
 
     # Determine if enough input time series files exist
-    if TSDIR.exists():
-        timeseries = latest_monthly_file(TSDIR)
-        if timeseries is not None:
-            _, tsyr, _ = timeseries
-            _, nyr, _ = native
-            span_months = (nyr - tsyr) * 12
-            if span_months < args.run_months:
-                logger.info(
-                    f"Less than required run frequency ready ({span_months} months, need {args.run_months}), not processing {nyr}, {tsyr}"
-                )
-                sys.exit(0)
+    if (model == 'cesm'):
+        if TSDIR.exists():
+            timeseries = latest_monthly_file(TSDIR)
+            if timeseries is not None:
+                _, tsyr, _ = timeseries
+                _, nyr, _ = native
+                span_months = (nyr - tsyr) * 12
+                if span_months < args.run_months:
+                    logger.info(
+                        f"Less than required run frequency ready ({span_months} months, need {args.run_months}), not processing {nyr}, {tsyr}"
+                    )
+                    sys.exit(0)
 
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)

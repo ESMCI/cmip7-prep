@@ -208,12 +208,14 @@ def _apply_vertical_if_needed_many(
 # ----------------------- single / multi var pipeline -----------------------
 def realize_regrid_prepare(
     resolution: str,
+    model: str,
     mapping: Mapping,
     ds_or_glob: Union[str, Path, xr.Dataset],
     cmip_var: str,
     *,
     tables_path: Optional[Union[str, Path]] = None,
     time_chunk: Optional[int] = 12,
+    mom6_grid: Optional[Dict[str, xr.DataArray]] = None,
     regrid_kwargs: Optional[dict] = None,
     open_kwargs: Optional[dict] = None,
 ) -> xr.Dataset:
@@ -298,7 +300,7 @@ def realize_regrid_prepare(
     # 8) Regrid to lat/lon
     logger.info("Calling regrid_to_latlon_ds")
     ds_regr = regrid_to_latlon_ds(
-        ds_vert, names_to_regrid, resolution, time_from=ds_native, **regrid_kwargs
+        ds_vert, names_to_regrid, resolution, model, time_from=ds_native, **regrid_kwargs
     )
     logger.info("Regridded dataset dims: %s", ds_regr.dims)
     if aux:
