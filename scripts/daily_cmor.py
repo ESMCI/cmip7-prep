@@ -378,8 +378,8 @@ def main():
         subdir = "lnd"
     elif args.realm == "ocean":
         # we do not want to match static files
-        include_patterns = ["*mom6.h.native.*"]
-        frequency = "mon"
+        include_patterns = ["*mom6.h.sfc.*"]
+        frequency = "day"
         subdir = "ocn"
         if args.ocn_grid_file:
             ocn_grid = args.ocn_grid_file

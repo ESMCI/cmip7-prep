@@ -789,6 +789,14 @@ variables:
       - cesm_var: SOLIN
       - cesm_var: FSNTOAC
 
+  sithick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - cesm_var: sithick
+
   snld:
     table: land
     units: "m"
@@ -1132,6 +1140,16 @@ variables:
     dims: [time, latitude, longitude]
     sources:
       - cesm_var: wfo
+
+  wo_tavg-ol-hxy-sea:
+    table: ocean
+    units: "m s-1"
+    dims:
+      - [time, z_l, latitude, longitude]
+      - [time, z_l, lat, lon]
+    regrid_method: bilinear
+    sources:
+      - cesm_var: wo
 
   zg_tavg-p19-hxy-air:
     table: atmos

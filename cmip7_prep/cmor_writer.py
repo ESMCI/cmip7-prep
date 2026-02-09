@@ -210,6 +210,7 @@ class CmorSession(
             return {}  # already loaded
         table_filename = resolve_table_filename(tables_path, key)
         self.currenttable = key
+        logger.info("Loading CMOR table for key '%s': %s", key, table_filename)
         return cmor.load_table(table_filename)
 
     def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
@@ -226,7 +227,7 @@ class CmorSession(
         # ---- helpers ----
 
         def _get_time_and_bounds(dsi: xr.Dataset):
-
+            logger.info("*** Define time axis")
             time_da = (
                 dsi.coords["time"]
                 if "time" in dsi.coords
@@ -234,7 +235,7 @@ class CmorSession(
             )
             if time_da is None:
                 return None, None, None
-
+            logger.info("Found time coordinate: %s", time_da.name)
             units = time_da.attrs.get(
                 "units", time_da.encoding.get("units", "days since 1850-01-01")
             )
@@ -242,7 +243,7 @@ class CmorSession(
             cal = time_da.attrs.get(
                 "calendar", time_da.encoding.get("calendar", "noleap")
             )
-
+            logger.info("time units: %s calendar: %s", units, cal)
             tvals = encode_time_to_num(time_da, units, cal)
 
             bname = time_da.attrs.get("bounds")
@@ -338,7 +339,7 @@ class CmorSession(
                     lon_bnds[-1, 1] = 360.0
                 # Also correct first upper bound to match the first cell
                 lon_bnds[0, 1] = lon_bnds[1, 0]
-            logger.info("[CMOR axis debug] corrected lon_bnds: %s", lon_bnds)
+            logger.info("[CMOR axis debug] corrected lon_bnds")
             # Print lon_bnds for a range (debug)
             i_id = cmor.axis(
                 table_entry="latitude",
@@ -358,16 +359,17 @@ class CmorSession(
                 if dim in var_dims:
                     # rename dims xh and yh to longitude and latitude
                     logger.info("[CMOR axis debug] renaming dim %s", dim)
+
                     if dim in ["xh", "xq"]:
                         if dim == "xh":
-                            ds[var_name] = var_da.roll(xh=-shift, roll_coords=True)
+                            ds[str(var_name)] = var_da.roll(xh=-shift, roll_coords=True)
                         elif dim == "xq":
-                            ds[var_name] = var_da.roll(xq=-shift, roll_coords=True)
-                        ds[var_name] = ds[var_name].rename({dim: "longitude"})
+                            ds[str(var_name)] = var_da.roll(xq=-shift, roll_coords=True)
+                        ds[str(var_name)] = ds[str(var_name)].rename({dim: "longitude"})
                     if dim in ["yh", "yq"]:
-                        ds[var_name] = ds[var_name].rename({dim: "latitude"})
+                        ds[str(var_name)] = ds[str(var_name)].rename({dim: "latitude"})
 
-            var_da = ds[var_name]
+            var_da = ds[str(var_name)]
             var_dims = list(var_da.dims)
 
         # --- horizontal axes (use CMOR names) ----
@@ -394,6 +396,7 @@ class CmorSession(
         # ---- time axis ----
         time_id = None
         self.load_table(self.tables_path, self.primarytable)
+        logger.info("*** Define time axis (if present)")
         tvals, tbnds, t_units = _get_time_and_bounds(ds)
         if tvals is not None:
             time_id = cmor.axis(
@@ -405,7 +408,7 @@ class CmorSession(
             logger.info("time axis id: %s var_dims=%s", time_id, var_dims)
         # --- vertical: standard_hybrid_sigma ---
         levels = getattr(vdef, "levels", {}) or {}
-        logger.info("levels dict: %s", levels)
+
         if (levels.get("name") or "").lower() in {
             "standard_hybrid_sigma",
             "alevel",
