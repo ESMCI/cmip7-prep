@@ -143,7 +143,7 @@ def open_native_for_cmip_vars(
         combine="by_coords",
         use_cftime=use_cftime,
         parallel=parallel,
-        #compat="override",
+        compat="override",
         **open_kwargs,
     )
     # Convert "lev" and "ilev" units from mb to Pa for downstream operations.
@@ -206,6 +206,9 @@ def _apply_vertical_if_needed_many(
 
 
 # ----------------------- single / multi var pipeline -----------------------
+# pylint: disable=unused-argument
+
+
 def realize_regrid_prepare(
     resolution: str,
     model: str,
@@ -240,7 +243,7 @@ def realize_regrid_prepare(
     logger.info("Opened native dataset with dims: %s", ds_native.dims)
     if "lndgrid" not in ds_native.dims and "ncol" not in ds_native.dims:
         logger.error("Variable has no 'lndgrid' or 'ncol' dim")
-        raise ValueError(f"Variable has no 'lndgrid' or 'ncol' dim")
+        raise ValueError("Variable has no 'lndgrid' or 'ncol' dim")
 
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
@@ -300,12 +303,15 @@ def realize_regrid_prepare(
     # 8) Regrid to lat/lon
     logger.info("Calling regrid_to_latlon_ds")
     ds_regr = regrid_to_latlon_ds(
-        ds_vert, names_to_regrid, resolution, model, time_from=ds_native, **regrid_kwargs
+        ds_vert,
+        names_to_regrid,
+        resolution,
+        model,
+        time_from=ds_native,
+        **regrid_kwargs,
     )
     logger.info("Regridded dataset dims: %s", ds_regr.dims)
     if aux:
         ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 
     return ds_regr
-
-
