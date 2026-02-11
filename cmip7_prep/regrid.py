@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Optional, Tuple
 import logging
 import os
-import sys
 import xarray as xr
 
 # import warnings
@@ -193,6 +192,31 @@ def zonal_mean_on_pressure_grid(
 # -------------------------
 # Selection & utilities
 # -------------------------
+def _sftof_from_native(ds: xr.Dataset) -> xr.DataArray | None:
+    """Return sea fraction (sftof) from ocean static grid, using 'wet' mask if present."""
+    # Try common names for ocean fraction
+    for name in ["sftof", "ocnfrac", "wet"]:
+        if name in ds:
+            v = ds[name]
+            # If 'wet', convert 0/1 to percent
+            if name == "wet":
+                vmax = float(np.nanmax(np.asarray(v)))
+                # If 0/1, convert to percent
+                if vmax <= 1.0 + 1e-6:
+                    out = v * 100.0
+                else:
+                    out = v
+            else:
+                out = v
+            out = out.clip(min=0.0, max=100.0)
+            out = out.astype("f8")
+            attrs = dict(out.attrs)
+            attrs["units"] = "%"
+            attrs.setdefault("standard_name", "sea_area_fraction")
+            attrs.setdefault("long_name", "Percentage of sea area")
+            out.attrs = attrs
+            return out
+    return None
 
 
 def _pick_maps(
@@ -414,21 +438,31 @@ def regrid_to_latlon(
 
     var_da = ds_in[varname]  # always a DataArray
     if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
-        logger.error("Variable has no 'ncol' or 'lndgrid' dim")
-        sys.exit(1)
+        logger.info("Variable has no 'ncol' or 'lndgrid' dim; assuming ocn variable.")
+        hdim = "tripolar"
+        da2 = var_da  # Use the DataArray, not the whole Dataset
+        non_spatial = [d for d in da2.dims if d not in ("yh", "xh")]
+        # realm = "ocn"
+        method = method or "conservative"  # force conservative for ocn
+        # --- OCEAN: Normalize by sftof (sea fraction) if present ---
+        sftof = _sftof_from_native(ds_in)
+        if sftof is not None:
+            logger.info("Normalizing ocean field by source sftof (sea fraction)")
+            frac = sftof / 100.0
+            da2 = da2.fillna(0) * frac
+    else:
+        # Move 'ncol' to the last position; return (da, non_spatial_dims)
+        da2, non_spatial = _ensure_ncol_last(var_da)
+        hdim = None
+        # Determine hdim for atmos or land realms
+        if "ncol" in var_da.dims:
+            hdim = "ncol"
+        elif "lndgrid" in var_da.dims:
+            hdim = "lndgrid"
 
-    # Move 'ncol' to the last position; return (da, non_spatial_dims)
-    da2, non_spatial = _ensure_ncol_last(var_da)
-    hdim = None
-    # Determine hdim for atmos or land realms
-    if "ncol" in var_da.dims:
-        hdim = "ncol"
-    elif "lndgrid" in var_da.dims:
-        hdim = "lndgrid"
-
-    # Normalize the land fields by land fraction
-    if hdim == "lndgrid":
-        da2 = _normalize_land_field(da2, ds_in)
+        # Normalize the land fields by land fraction
+        if hdim == "lndgrid":
+            da2 = _normalize_land_field(da2, ds_in)
 
     # Cast to save memory
     if dtype is not None and str(da2.dtype) != dtype:
@@ -467,9 +501,11 @@ def regrid_to_latlon(
             )  # ensure last two dims are ('lat','lon')
         )
     else:
-        da2_2d = da2.rename({"xh": "lon", "yh": "lat"}).transpose(
-            *non_spatial, "lat", "lon"
-        )
+        #        da2_2d = da2.rename({"xh": "lon", "yh": "lat"}).transpose(
+        #            *non_spatial, "lat", "lon"
+        #        )
+        da2_2d = da2.rename({"xh": "lon", "yh": "lat"})
+
         da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
 
     # Regrid the data

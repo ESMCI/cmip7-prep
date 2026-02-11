@@ -352,7 +352,7 @@ def process_one_var(
                 cm.write_variable(ds_cmor, cmip_var, vdef)
 
             logger.info(f"Finished processing for {varname} with dims {dims}")
-            results.append((shortname, "ok"))
+            results.append((cmip7name, "ok"))
         except Exception as e:
             logger.error(
                 f"Exception while processing {varname} with dims {dims}: {e!r}"
