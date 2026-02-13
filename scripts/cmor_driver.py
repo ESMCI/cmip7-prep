@@ -22,6 +22,7 @@ from datetime import datetime, UTC
 import glob
 import numpy as np
 import xarray as xr
+from cmor import set_cur_dataset_attribute
 
 from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds
 from cmip7_prep.mapping_compat import Mapping
@@ -49,11 +50,27 @@ _DATE_RE = re.compile(
     r"\.nc(?!\S)"  # literal .nc and then end (or whitespace)
 )
 
-# Path for cmore tables
+# Path for cmor tables
 TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
 TABLES_noresm = "/projects/NS9560K/mvertens/cmip7-prep/cmip7-cmor-tables/tables/"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+INCLUDE_PATTERN_MAP = {
+    "cesm": {
+        "atmos": {
+            "mon": ["cam.h0"],
+            "day": ["cam.h1"],
+        },
+        "land": {
+            "mon": ["clm2.h0a"],
+        },
+        "ocean": {
+            "mon": ["mom6.h.z", "mom6.h.native."],
+            "day": ["mom6.h.sfc"],
+        },
+    },
+}
 
 
 def parse_args():
@@ -130,10 +147,11 @@ def parse_args():
         "--test", action="store_true", help="Run in test mode with default paths"
     )
     parser.add_argument(
-        "--run-freq",
+        "--frequency",
         type=str,
-        default="10y",
-        help="Request run frequency (e.g. '10y' or '120m'), default 10y",
+        default="mon",
+        choices=["mon", "day", "6hr"],
+        help="Frequency of data to be translated (mon, day, 6hr,)",
     )
     parser.add_argument(
         "--outdir",
@@ -156,30 +174,6 @@ def parse_args():
 
     args = parser.parse_args()
 
-    # Parse run_freq argument
-    run_years = 10
-    run_months = 120
-    run_freq = args.run_freq.strip().lower()
-    if run_freq.endswith("y"):
-        try:
-            run_years = int(run_freq[:-1])
-            run_months = run_years * 12
-        except Exception:
-            logger.error(f"Invalid --run-freq value: {run_freq}")
-            sys.exit(1)
-    elif run_freq.endswith("m"):
-        try:
-            run_months = int(run_freq[:-1])
-            run_years = run_months // 12
-        except Exception:
-            logger.error(f"Invalid --run-freq value: {run_freq}")
-            sys.exit(1)
-    else:
-        logger.error(f"Invalid --run-freq value: {run_freq}")
-        sys.exit(1)
-    args.run_years = run_years
-    args.run_months = run_months
-
     return args
 
 
@@ -192,6 +186,7 @@ def process_one_var(
     resolution,
     model,
     realm="atmos",
+    frequency="mon",
     ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
@@ -330,8 +325,11 @@ def process_one_var(
                 outdir=outdir,
             ) as cm:
                 cmip7name = cmip_var.attributes["branded_variable_name"]
+                set_cur_dataset_attribute("frequency", frequency)
 
-                logger.info(f"Writing CMOR variable {cmip7name.name}")
+                logger.info(
+                    f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
+                )
                 shortname = str(getattr(cmip_var, "physical_parameter").name)
                 vdef = type(
                     "VDef",
@@ -402,28 +400,34 @@ def latest_monthly_file(
     return path, year, month
 
 
+def get_include_patterns(model: str, realm: str, frequency: str) -> list[str]:
+    try:
+        logger.info(
+            "Looking for pattern: %s", INCLUDE_PATTERN_MAP[model][realm][frequency]
+        )
+        return INCLUDE_PATTERN_MAP[model][realm][frequency]
+    except KeyError:
+        raise ValueError(
+            f"No include_patterns defined for model={model}, "
+            f"realm={realm}, frequency={frequency}"
+        )
+
+
 def main():
     args = parse_args()
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
     model = args.model
+    frequency = args.frequency
+    realm = args.realm
 
     mom6_grid = None
     ocn_grid = None
     ocn_fx_fields = None
 
     # Determine include patterns and frequency
-    if args.realm == "atmos":
-        include_patterns = ["*cam.h0a*"]
-        frequency = "mon"
-    elif args.realm == "land":
-        include_patterns = ["*clm2.h0*"]
-        frequency = "mon"
-    elif args.realm == "ocean":
-        # we do not want to match static files
-        include_patterns = ["*mom6.h.native.*"]
-        frequency = "mon"
+    include_patterns = get_include_patterns(model, realm, frequency)
 
     # Setup input directory for noresm
     if model == "noresm":
@@ -435,18 +439,18 @@ def main():
             timeseries = latest_monthly_file(TSDIR)
             logger.info(f"latest monthly time series file is {timeseries}")
         else:
-            if args.realm == "atmos":
+            if realm == "atmos":
                 TSDIR = "/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
-            elif args.realm == "land":
+            elif realm == "land":
                 TSDIR = "/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
 
     # Setup input directory for cesm
     if model == "cesm":
-        if args.realm == "atmos":
+        if realm == "atmos":
             subdir = "atm"
-        elif args.realm == "land":
+        elif realm == "land":
             subdir = "lnd"
-        elif args.realm == "ocean":
+        elif realm == "ocean":
             subdir = "ocn"
             if args.ocn_grid_file:
                 ocn_grid = args.ocn_grid_file
@@ -478,7 +482,7 @@ def main():
         else:
             # testing path
             scratch = os.getenv("SCRATCH")
-            if args.realm == "atmos":
+            if realm == "atmos":
                 TSDIR = (
                     Path(scratch)
                     / "archive"
@@ -487,7 +491,7 @@ def main():
                     / "atm"
                     / "hist"
                 )
-            elif args.realm == "land":
+            elif realm == "land":
                 TSDIR = (
                     Path(scratch)
                     / "archive"
@@ -496,7 +500,7 @@ def main():
                     / "lnd"
                     / "hist"
                 )
-            elif args.realm == "ocean":
+            elif realm == "ocean":
                 TSDIR = (
                     Path(scratch)
                     / "archive"
@@ -506,27 +510,13 @@ def main():
                     / "hist"
                 )
 
-    # Determine if enough input time series files exist
-    #    if (model == 'cesm'):
-    #        if TSDIR.exists():
-    #            timeseries = latest_monthly_file(TSDIR)
-    #            if timeseries is not None:
-    #                _, tsyr, _ = timeseries
-    #                _, nyr, _ = native
-    #                span_months = (nyr - tsyr) * 12
-    #                if span_months < args.run_months:
-    #                    logger.info(
-    #                        f"Less than required run frequency ready ({span_months} months, need {args.run_months}), not processing {nyr}, {ts#yr}"
-    #                    )
-    #                    sys.exit(0)
-
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
 
     # Load all possible cmip vars for this realm and this experiment - create a data request
-    logger.info("Loading data request content %s", args.realm)
+    logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
     logger.info("Content dic obtained")
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
@@ -535,7 +525,7 @@ def main():
         skip_if_missing=False,
         operation="all",
         cmip7_frequency=frequency,
-        modelling_realm=args.realm,
+        modelling_realm=realm,
         experiment=args.experiment,
     )
 
@@ -603,7 +593,8 @@ def main():
                     OUTDIR,
                     resolution,
                     model,
-                    realm=args.realm,
+                    realm=realm,
+                    frequency=args.frequency,
                     ocn_fx_fields=ocn_fx_fields,
                 )
             ]
@@ -617,7 +608,8 @@ def main():
                     OUTDIR,
                     resolution,
                     model,
-                    realm=args.realm,
+                    realm=realm,
+                    frequency=args.frequency,
                     ocn_fx_fields=ocn_fx_fields,
                 )
                 for var in cmip_vars
