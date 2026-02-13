@@ -485,7 +485,7 @@ def regrid_to_latlon(
         "Regridding %s using %s map: %s ", varname, spec.method_label, spec.path
     )
     regridder = RegridderCache.get(spec.path, spec.method_label)
-
+    logger.info("Regridder ready to use")
     # Tell xESMF to produce chunked output
     kwargs = {}
     if "time" in da2.dims and output_time_chunk:
@@ -501,13 +501,22 @@ def regrid_to_latlon(
             )  # ensure last two dims are ('lat','lon')
         )
     else:
-        #        da2_2d = da2.rename({"xh": "lon", "yh": "lat"}).transpose(
-        #            *non_spatial, "lat", "lon"
-        #        )
+        logger.info("Creating da2_2d for ocean grid")
         da2_2d = da2.rename({"xh": "lon", "yh": "lat"})
-
+        da2_2d = da2_2d.transpose(
+            ..., "lat", "lon"
+        )  # ensure last two dims are ('lat','lon')
         da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
 
+    logger.info(
+        "da2d dims %s da2_2d range: %f to %f lat, %f to %f lon",
+        da2_2d.dims,
+        da2_2d["lat"].min().item(),
+        da2_2d["lat"].max().item(),
+        da2_2d["lon"].min().item(),
+        da2_2d["lon"].max().item(),
+    )
+    logger.info("Invoking esmf regridder, da2_2d dims %s", da2_2d.dims)
     # Regrid the data
     out_norm = regridder(da2_2d, skipna=True, na_thres=1.0, **kwargs)
     logger.info("Regridding complete. out_norms dims: %s", out_norm.dims)

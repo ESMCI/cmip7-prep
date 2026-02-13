@@ -1,7 +1,7 @@
 # cmip7_prep/cache_tools.py
 """Tools for caching and reuse in regridding."""
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 import logging
 import xesmf as xe
 import xarray as xr
@@ -49,29 +49,40 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
 
     weights = xr.open_dataset(mapfile)
     in_shape = weights.src_grid_dims.load().data
-
+    dumbdim = False
     # Since xESMF expects 2D vars, we'll insert a dummy dimension of size-1
     if len(in_shape) == 1:
+        dumbdim = True
         in_shape = [1, in_shape.item()]
 
     # output variable shape
     out_shape = weights.dst_grid_dims.load().data.tolist()[::-1]
-
+    logger.info("in_shape  from weights: %s", in_shape)
     # Some prep to get the bounds:
     # Note that bounds are needed for conservative regridding and not for bilinear
     lat_b_out = np.zeros(out_shape[0] + 1)
     lon_b_out = weights.xv_b.data[: out_shape[1] + 1, 0]
     lat_b_out[:-1] = weights.yv_b.data[np.arange(out_shape[0]) * out_shape[1], 0]
     lat_b_out[-1] = weights.yv_b.data[-1, -1]
+    if dumbdim:
+        dummy_in = xr.Dataset(
+            {
+                "lat": ("lat", np.empty((in_shape[0],))),
+                "lon": ("lon", np.empty((in_shape[1],))),
+                "lat_b": ("lat_b", np.empty((in_shape[0] + 1,))),
+                "lon_b": ("lon_b", np.empty((in_shape[1] + 1,))),
+            }
+        )
+    else:
+        dummy_in = xr.Dataset(
+            {
+                "lat": ("lat", np.empty((in_shape[1],))),
+                "lon": ("lon", np.empty((in_shape[0],))),
+                "lat_b": ("lat_b", np.empty((in_shape[1] + 1,))),
+                "lon_b": ("lon_b", np.empty((in_shape[0] + 1,))),
+            }
+        )
 
-    dummy_in = xr.Dataset(
-        {
-            "lat": ("lat", np.empty((in_shape[0],))),
-            "lon": ("lon", np.empty((in_shape[1],))),
-            "lat_b": ("lat_b", np.empty((in_shape[0] + 1,))),
-            "lon_b": ("lon_b", np.empty((in_shape[1] + 1,))),
-        }
-    )
     dummy_out = xr.Dataset(
         {
             "lat": ("lat", weights.yc_b.data.reshape(out_shape)[:, 0]),
@@ -95,6 +106,7 @@ def read_array(m: xr.Dataset, *names: str) -> Optional[xr.DataArray]:
         if n in m:
             return m[n]
     return None
+
 
 # -------------------------
 # Cache

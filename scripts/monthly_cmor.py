@@ -27,6 +27,7 @@ from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_wit
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
+from cmip7_prep.mom6_static import ocean_fx_fields
 
 from data_request_api.query import data_request as dr
 from data_request_api.content import dump_transformation as dt
@@ -191,6 +192,7 @@ def process_one_var(
     resolution,
     model,
     realm="atmos",
+    ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.branded_variable_name.name
@@ -245,11 +247,12 @@ def process_one_var(
                 open_kwargs=open_kwargs,
             )
             logger.info("realm is %s", realm)
-            ocn_fx_fields = None
+
             if model == "cesm":
                 # Append ocn_fx_fields to ds_native if available
                 # fx - grid definition like topography, fraction
                 if realm == "ocean" and ocn_fx_fields is not None:
+                    logger.info("adding ocn_fx_fields to ds_native")
                     ds_native = ds_native.merge(ocn_fx_fields)
 
             # Output ds_native keys
@@ -295,8 +298,8 @@ def process_one_var(
                 logger.info("ds_cmor is not None")
 
                 # Attach ocn_fx_fields to regridded output for writing
-        #                if ocn_fx_fields is not None:
-        #                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
+                if ocn_fx_fields is not None:
+                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
 
         except AttributeError:
             results.append((varname, f"ERROR cesm input variable not found"))
@@ -352,7 +355,7 @@ def process_one_var(
                 cm.write_variable(ds_cmor, cmip_var, vdef)
 
             logger.info(f"Finished processing for {varname} with dims {dims}")
-            results.append((cmip7name, "ok"))
+            results.append((str(cmip7name), "ok"))
         except Exception as e:
             logger.error(
                 f"Exception while processing {varname} with dims {dims}: {e!r}"
@@ -601,6 +604,7 @@ def main():
                     resolution,
                     model,
                     realm=args.realm,
+                    ocn_fx_fields=ocn_fx_fields,
                 )
             ]
         else:
@@ -614,6 +618,7 @@ def main():
                     resolution,
                     model,
                     realm=args.realm,
+                    ocn_fx_fields=ocn_fx_fields,
                 )
                 for var in cmip_vars
             ]
