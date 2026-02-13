@@ -594,7 +594,7 @@ def main():
                     resolution,
                     model,
                     realm=realm,
-                    frequency=args.frequency,
+                    frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                 )
             ]
@@ -609,7 +609,7 @@ def main():
                     resolution,
                     model,
                     realm=realm,
-                    frequency=args.frequency,
+                    frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                 )
                 for var in cmip_vars
