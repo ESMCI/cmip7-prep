@@ -35,9 +35,17 @@ from dask.distributed import LocalCluster
 from dask.distributed import wait, as_completed
 from dask import delayed
 
+formatter = logging.Formatter(
+    fmt="%(asctime)s | %(levelname)-8s | %(module)s.%(funcName)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S")
+# logging.basicConfig(
+#     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+# )
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    level=logging.INFO, format=formatter
 )
+
+
 logger = logging.getLogger("cmip7_prep.monthly_cmor")
 
 # Regex for date extraction from filenames
@@ -50,10 +58,10 @@ _DATE_RE = re.compile(
 
 # Path for cmore tables
 TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
-TABLES_noresm = "/projects/NS9560K/mvertens/cmip7-prep/cmip7-cmor-tables/tables/"
+#TABLES_noresm = "/projects/NS9560K/mvertens/cmip7-prep/cmip7-cmor-tables/tables/"
+TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/tables"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -327,8 +335,6 @@ def process_one_var(
                 outdir=outdir,
             ) as cm:
                 cmip7name = cmip_var.attributes["branded_variable_name"]
-
-                logger.info(f"Writing CMOR variable {cmip7name.name}")
                 shortname = str(getattr(cmip_var, "physical_parameter").name)
                 vdef = type(
                     "VDef",
@@ -346,9 +352,9 @@ def process_one_var(
                         "branded_variable_name": cmip7name,
                     },
                 )()
-                logger.info(f"Writing variable {varname} with dims {dims} ")
 
                 # Now use CMOR utility to write out netcdf varialbe
+                logger.info(f"Writing CMOR variable {varname} with dims {dims} ")
                 cm.write_variable(ds_cmor, cmip_var, vdef)
 
             logger.info(f"Finished processing for {varname} with dims {dims}")

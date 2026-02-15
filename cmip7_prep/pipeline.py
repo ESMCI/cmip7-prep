@@ -143,7 +143,6 @@ def open_native_for_cmip_vars(
         combine="by_coords",
         use_cftime=use_cftime,
         parallel=parallel,
-        compat="override",
         **open_kwargs,
     )
     # Convert "lev" and "ilev" units from mb to Pa for downstream operations.
