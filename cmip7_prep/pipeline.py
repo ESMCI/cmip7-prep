@@ -240,9 +240,6 @@ def realize_regrid_prepare(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
     logger.info("Opened native dataset with dims: %s", ds_native.dims)
-    if "lndgrid" not in ds_native.dims and "ncol" not in ds_native.dims:
-        logger.error("Variable has no 'lndgrid' or 'ncol' dim")
-        raise ValueError("Variable has no 'lndgrid' or 'ncol' dim")
 
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
