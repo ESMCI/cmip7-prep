@@ -88,7 +88,7 @@ def open_native_for_cmip_vars(
     open_kwargs: Optional[Dict] = None,
 ) -> xr.Dataset:
     """
-    Open NorESM timeseries files needed for the requested CMIP variables.
+    Open timeseries files needed for the requested CMIP variables.
 
     Parameters
     ----------
@@ -101,7 +101,7 @@ def open_native_for_cmip_vars(
 
     Returns
     -------
-    xr.Dataset containing only the required NorESM variables.
+    xr.Dataset containing only the required variables.
     """
     open_kwargs = dict(open_kwargs or {})
     # Allow cmip_vars to be a single variable (str) or a list
