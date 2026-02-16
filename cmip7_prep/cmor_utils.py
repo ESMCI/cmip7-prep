@@ -5,12 +5,12 @@ import warnings
 import re
 import datetime as dt
 from importlib.resources import files, as_file
+import logging
 
 import cmor
 import cftime
 import numpy as np
 import xarray as xr
-import logging
 
 
 _FILL_DEFAULT = 1.0e20
@@ -19,6 +19,7 @@ _UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def packaged_dataset_json(filename: str = "cmor_dataset.json"):
     """Context manager yielding a real filesystem path to the packaged mapping file."""
