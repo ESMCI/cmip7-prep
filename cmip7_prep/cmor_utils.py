@@ -5,6 +5,7 @@ import warnings
 import re
 import datetime as dt
 from importlib.resources import files, as_file
+import logging
 
 import cmor
 import cftime
@@ -15,6 +16,9 @@ import xarray as xr
 _FILL_DEFAULT = 1.0e20
 _HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
 _UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def packaged_dataset_json(filename: str = "cmor_dataset.json"):
@@ -142,7 +146,7 @@ def bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
         bounds[:, 1] = np.minimum(bounds[:, 1], 90.0)
     elif kind == "lon":
         # wrap to [0, 360)
-        bounds = bounds % 360.0
+        # bounds = bounds % 360.0
         # ensure continuity: each cell's upper bound matches next cell's lower bound
         for i in range(bounds.shape[0] - 1):
             bounds[i, 1] = bounds[i + 1, 0]

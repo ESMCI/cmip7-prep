@@ -11,7 +11,7 @@ import glob
 import xarray as xr
 
 from .mapping_compat import Mapping
-from .regrid import regrid_to_1deg_ds
+from .regrid import regrid_to_latlon_ds
 from .vertical import to_plev
 
 logger = logging.getLogger(__name__)
@@ -34,13 +34,7 @@ def _filename_contains_var(
     False
     >>> _filename_contains_var(Path("b.e30.fredscomp.cam.h1.TS.ne30pg3.001.nc"), "TS")
     True
-    >>> _filename_contains_var("wrkflw.mom6.h.native.sos.000101-001012.nc",
-    ...           "sos", fname_pattern=".sfc.")
-    False
     >>> _filename_contains_var("file.TS.001.nc", "TS", fname_pattern=".001.")
-    True
-    >>> _filename_contains_var("mom6.h.native.mlotst.000101-001012.nc",
-    ...        "mlotst", fname_pattern=".h.native.")
     True
     """
     name = Path(path).name
@@ -94,7 +88,7 @@ def open_native_for_cmip_vars(
     open_kwargs: Optional[Dict] = None,
 ) -> xr.Dataset:
     """
-    Open CESM timeseries files needed for the requested CMIP variables.
+    Open timeseries files needed for the requested CMIP variables.
 
     Parameters
     ----------
@@ -107,7 +101,7 @@ def open_native_for_cmip_vars(
 
     Returns
     -------
-    xr.Dataset containing only the required CESM variables.
+    xr.Dataset containing only the required variables.
     """
     open_kwargs = dict(open_kwargs or {})
     # Allow cmip_vars to be a single variable (str) or a list
@@ -149,7 +143,6 @@ def open_native_for_cmip_vars(
         combine="by_coords",
         use_cftime=use_cftime,
         parallel=parallel,
-        compat="override",
         **open_kwargs,
     )
     # Convert "lev" and "ilev" units from mb to Pa for downstream operations.
@@ -158,6 +151,7 @@ def open_native_for_cmip_vars(
     if "ilev" in ds:
         ds["ilev"] = ds["ilev"] / 1000
 
+    logger.info("Returning from open_native_for_cmip_vars")
     return ds, new_cmip_vars
 
 
@@ -211,7 +205,12 @@ def _apply_vertical_if_needed_many(
 
 
 # ----------------------- single / multi var pipeline -----------------------
+# pylint: disable=unused-argument
+
+
 def realize_regrid_prepare(
+    resolution: str,
+    model: str,
     mapping: Mapping,
     ds_or_glob: Union[str, Path, xr.Dataset],
     cmip_var: str,
@@ -227,11 +226,12 @@ def realize_regrid_prepare(
     Returns an xr.Dataset with the requested CMIP variable ready for CMOR.
     Ensures hybrid-σ auxiliaries (hyam, hybm, P0, PS, lev/ilev) are present when needed.
     """
+
     regrid_kwargs = dict(regrid_kwargs or {})
     open_kwargs = dict(open_kwargs or {})
     aux = []
-    # 1) Get native dataset
 
+    # 1) Get native dataset
     if isinstance(ds_or_glob, xr.Dataset):
         ds_native = ds_or_glob
     else:
@@ -240,21 +240,7 @@ def realize_regrid_prepare(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
     logger.info("Opened native dataset with dims: %s", ds_native.dims)
-    if "lndgrid" not in ds_native.dims and "ncol" not in ds_native.dims:
-        logger.info("Variable has no 'lndgrid' or 'ncol' dim; assuming ocn variable.")
-        # Add MOM6 grid info if provided
-        if mom6_grid:
-            aux = ["geolat", "geolon", "geolat_c", "geolon_c"]
-            ds_native["geolat"] = xr.DataArray(mom6_grid[0], dims=("yh", "xh"))
-            ds_native["geolon"] = xr.DataArray(mom6_grid[1], dims=("yh", "xh"))
-            ds_native["geolat_c"] = xr.DataArray(mom6_grid[2], dims=("yhp", "xhp"))
-            ds_native["geolon_c"] = xr.DataArray(mom6_grid[3], dims=("yhp", "xhp"))
 
-        else:
-            logger.error("No MOM6 grid info provided; geolat/geolon not added.")
-            raise ValueError(
-                f"MOM6 grid information is required for variable {cmip_var} but was not provided."
-            )
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
@@ -285,13 +271,15 @@ def realize_regrid_prepare(
             for nm in ("hyai", "hybi", "hyam", "hybm", "P0", "ilev", "lev")
             if nm in ds_native
         ]
+
     # 5) Apply vertical transform if needed (plev19, etc.).
-    # Single-var helper already takes cfg + tables_path
+    #    Single-var helper already takes cfg + tables_path
     logger.info("Applying vertical handling if needed for variable: %s", cmip_var)
     ds_vert = _apply_vertical_if_needed(
         ds_vars, ds_native, cmip_var, mapping, tables_path=tables_path
     )
     logger.info("After vertical handling, dataset dims: %s", ds_vert.dims)
+
     # 6) Regrid (include PS if present)
     names_to_regrid = [str(cmip_var)]
     if is_hybrid and "PS" in ds_vert:
@@ -308,105 +296,18 @@ def realize_regrid_prepare(
             # Ensure the coordinate variable is also copied
             ds_vert = ds_vert.assign_coords(sdepth=ds_native[lev].values)
 
-    ds_regr = regrid_to_1deg_ds(
-        ds_vert, names_to_regrid, time_from=ds_native, **regrid_kwargs
+    # 8) Regrid to lat/lon
+    logger.info("Calling regrid_to_latlon_ds")
+    ds_regr = regrid_to_latlon_ds(
+        ds_vert,
+        names_to_regrid,
+        resolution,
+        model,
+        time_from=ds_native,
+        **regrid_kwargs,
     )
     logger.info("Regridded dataset dims: %s", ds_regr.dims)
     if aux:
         ds_regr = ds_regr.merge(ds_native[aux], compat="override")
-
-    return ds_regr
-
-
-def realize_regrid_prepare_many(
-    mapping: Mapping,
-    ds_or_glob: Union[str, Path, xr.Dataset],
-    cmip_vars: Sequence[str],
-    *,
-    tables_path: Optional[Union[str, Path]] = None,
-    time_chunk: Optional[int] = 12,
-    regrid_kwargs: Optional[dict] = None,
-    open_kwargs: Optional[dict] = None,
-) -> xr.Dataset:
-    """
-    Open native (if needed) → realize requested CMIP variables →
-    ensure hybrid-σ support fields are present (PS & coeffs) →
-    apply vertical handling for CMIP vars only → regrid CMIP vars + PS →
-    return 1° dataset that still includes hybrid coeffs (unmodified).
-    """
-    regrid_kwargs = dict(regrid_kwargs or {})
-    open_kwargs = dict(open_kwargs or {})
-
-    # 1) Open native once
-    if isinstance(ds_or_glob, xr.Dataset):
-        ds_native = ds_or_glob
-    else:
-        ds_native = open_native_for_cmip_vars(
-            list(cmip_vars), ds_or_glob, mapping, **open_kwargs
-        )
-
-    # 2) Realize each CMIP var and overlay onto native so we keep auxiliaries
-    realized: dict[str, xr.DataArray] = {}
-    for v in cmip_vars:
-        ds_v = mapping.realize(ds_native, v)
-        da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[v]
-        if time_chunk and "time" in da.dims:
-            da = da.chunk({"time": int(time_chunk)})
-        realized[v] = da
-
-    ds_tmp = ds_native.assign(**realized)
-
-    # Promote vertical axes to coords if present (helps CF/CMOR)
-    for name in ("lev", "ilev"):
-        if name in ds_tmp:
-            ds_tmp = ds_tmp.set_coords(name)
-
-    # 3) Detect if any requested CMIP var uses hybrid-σ and, if so, prepare support
-    regrid_vars = set(cmip_vars)  # variables to actually regrid (lat/lon)
-    carry_along: dict[str, xr.DataArray] = {}  # coeffs kept unchanged (1D)
-
-    for v in cmip_vars:
-        cfg = mapping.get_cfg(v) or {}
-        levels = cfg.get("levels") or {}
-        kind = str(levels.get("name", "")).lower()
-        if kind in {"standard_hybrid_sigma", "alev", "alevel"}:
-            # names as specified in mapping (with robust defaults)
-            ps_name = levels.get("ps", "PS")
-            hyam_name = levels.get("hyam", "hyam")
-            hybm_name = levels.get("hybm", "hybm")
-            p0_name = levels.get("P0", "P0")
-            ilev_name = levels.get("src_axis_bnds", "ilev")
-            lev_name = levels.get("src_axis_name", "lev")
-
-            # PS must be regridded (time,lat,lon); include only if present
-            if ps_name in ds_tmp:
-                regrid_vars.add(ps_name)
-
-            # Hybrid coeffs are 1D; just carry them through unchanged if present
-            for aux in (hyam_name, hybm_name, p0_name, ilev_name, lev_name):
-                if aux in ds_tmp and aux not in carry_along:
-                    carry_along[aux] = ds_tmp[aux]
-
-    # 4) Vertical handling for CMIP vars only (do NOT include PS here)
-    ds_vert = _apply_vertical_if_needed_many(
-        ds_tmp, ds_native, list(cmip_vars), mapping, tables_path=tables_path
-    )
-
-    # Make sure hybrid coeffs (1D) are still present for CMOR writer
-    if carry_along:
-        ds_vert = ds_vert.assign(
-            **{k: v for k, v in carry_along.items() if k not in ds_vert}
-        )
-
-    # 5) Regrid CMIP vars + PS (PS will be present if required & found above)
-    ds_regr = regrid_to_1deg_ds(
-        ds_vert, list(sorted(regrid_vars)), time_from=ds_native, **regrid_kwargs
-    )
-
-    # Reattach coeffs after regridding (they're 1D; no regridding needed)
-    if carry_along:
-        missing = {k: v for k, v in carry_along.items() if k not in ds_regr}
-        if missing:
-            ds_regr = ds_regr.assign(**missing)
 
     return ds_regr

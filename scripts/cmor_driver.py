@@ -3,10 +3,8 @@
 monthly_cmor.py: Combined CMIP7 monthly processing script for ATM and LND realms.
 
 Usage:
-  python monthly_cmor.py --realm atm [--caseroot ... --cimeroot ...]
-  python monthly_cmor.py --realm lnd [--caseroot ... --cimeroot ...]
-  python monthly_cmor.py --realm atm --test
-  python monthly_cmor.py --realm lnd --test
+  python monthly_cmor.py --realm atmos --tsdir
+  python monthly_cmor.py --realm land --tsdir
 
 Preserves all comments and error handling from both atm_monthly.py and lnd_monthly.py.
 """
@@ -24,13 +22,14 @@ from datetime import datetime, UTC
 import glob
 import numpy as np
 import xarray as xr
+from cmor import set_cur_dataset_attribute
 
 from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
-from cmip7_prep.mom6_static import load_mom6_grid
 from cmip7_prep.mom6_static import ocean_fx_fields
+
 from data_request_api.query import data_request as dr
 from data_request_api.content import dump_transformation as dt
 
@@ -41,7 +40,9 @@ from dask import delayed
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
+
 logger = logging.getLogger("cmip7_prep.monthly_cmor")
+
 # Regex for date extraction from filenames
 _DATE_RE = re.compile(
     r"[\.\-](?P<year>\d{4})"  # year
@@ -50,26 +51,41 @@ _DATE_RE = re.compile(
     r"\.nc(?!\S)"  # literal .nc and then end (or whitespace)
 )
 
-TABLES = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
+# Path for cmor tables
+TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
+TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/tables"
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+INCLUDE_PATTERN_MAP = {
+    "cesm": {
+        "atmos": {
+            "mon": ["cam.h0"],
+            "day": ["cam.h1"],
+        },
+        "land": {
+            "mon": ["clm2.h0a"],
+        },
+        "ocean": {
+            "mon": ["mom6.h.z", "mom6.h.native."],
+            "day": ["mom6.h.sfc"],
+        },
+    },
+    "noresm": {
+        "atmos": {
+            "mon": ["cam.h0"],
+            "day": ["cam.h1"],
+        },
+        "land": {
+            "mon": ["clm2.h0a"],
+        },
+    },
+}
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description="CMIP7 monthly processing for atm/lnd realms"
-    )
-
-    parser.add_argument(
-        "--ocn-grid-file",
-        type=str,
-        default="/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc",
-        help="Path to ocean grid description file for MOM (optional)",
-    )
-    parser.add_argument(
-        "--ocn-static-file",
-        type=str,
-        default=None,
-        help="Path to static file for MOM variables (optional)",
     )
     parser.add_argument(
         "--cmip-vars",
@@ -87,74 +103,87 @@ def parse_args():
         action="store_true",
         help="Overwrite existing timeseries outputs (default: False)",
     )
-
     parser.add_argument(
         "--realm",
         choices=[
             "atmos",
-            "land",
-            "ocean",
-            "seaIce",
-            "landIce",
             "aerosol",
             "atmosChem",
+            "land",
+            "ocean",
             "ocnBgchem",
+            "seaIce",
+            "landIce",
         ],
         required=True,
         help="Realm to process",
     )
-    # Move these to a wrapper script
-    parser.add_argument("--caseroot", type=str, help="Case root directory")
-    parser.add_argument("--cimeroot", type=str, help="CIME root directory")
+    parser.add_argument(
+        "--resolution",
+        type=str,
+        choices=[
+            "ne16",
+            "ne30",
+            "tx2_3v2",
+        ],
+        required=True,
+        help="input_grid name (required)",
+    )
+    parser.add_argument(
+        "--ocn-grid-file",
+        type=str,
+        default="/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc",
+        help="Path to ocean grid description file for CESM/MOM (optional)",
+    )
+    parser.add_argument(
+        "--ocn-static-file",
+        type=str,
+        default=None,
+        help="Path to static file for CESM/MOM variables (optional)",
+    )
+    parser.add_argument(
+        "--tsdir",
+        type=str,
+        help="Time series directory (optional)."
+        "If not specified, will use a preset time series test directory",
+    )
+    parser.add_argument(  # Move to a wrapper script
+        "--caseroot", type=str, help="Case root directory"
+    )
+    parser.add_argument(  # Move to a wrapper script
+        "--cimeroot", type=str, help="CIME root directory"
+    )
     parser.add_argument(
         "--test", action="store_true", help="Run in test mode with default paths"
     )
-    scratch = os.getenv("SCRATCH")
-    default_outdir = scratch + "/CMIP7" if scratch else "./CMIP7"
     parser.add_argument(
-        "--run-freq",
+        "--frequency",
         type=str,
-        default="10y",
-        help="Request run frequency (e.g. '10y' or '120m'), default 10y",
+        default="mon",
+        choices=["mon", "day", "6hr"],
+        help="Frequency of data to be translated (mon, day, 6hr,)",
     )
     parser.add_argument(
         "--outdir",
         type=str,
-        default=default_outdir,
-        help="Output directory for CMORized files (default: $SCRATCH/CMIP7)",
+        required=True,
+        help="Output directory for CMORized files",
     )
-
     parser.add_argument(
         "--experiment",
         type=str,
         default="piControl",
         help="Experiment name for data request",
     )
+    parser.add_argument(
+        "--model",
+        choices=["cesm", "noresm"],
+        required=True,
+        help="Model to use",
+    )
 
     args = parser.parse_args()
-    # Parse run_freq argument
-    run_years = 10
-    run_months = 120
-    run_freq = args.run_freq.strip().lower()
-    if run_freq.endswith("y"):
-        try:
-            run_years = int(run_freq[:-1])
-            run_months = run_years * 12
-        except Exception:
-            logger.error(f"Invalid --run-freq value: {run_freq}")
-            sys.exit(1)
-    elif run_freq.endswith("m"):
-        try:
-            run_months = int(run_freq[:-1])
-            run_years = run_months // 12
-        except Exception:
-            logger.error(f"Invalid --run-freq value: {run_freq}")
-            sys.exit(1)
-    else:
-        logger.error(f"Invalid --run-freq value: {run_freq}")
-        sys.exit(1)
-    args.run_years = run_years
-    args.run_months = run_months
+
     return args
 
 
@@ -164,24 +193,23 @@ def process_one_var(
     inputfile,
     tables_path,
     outdir,
+    resolution,
+    model,
     realm="atmos",
-    mom6_grid=None,
+    frequency="mon",
     ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.branded_variable_name.name
 
     # At this point you have a cmip_var (metadata from database query for the target variable)
-    #   queried a cmor database from the clould
-
+    # queried a cmor database from the cloud
     logger.info(f"Starting processing for variable: {varname}")
     results = [(str(varname), "started")]
+
     try:
-        # This is what maps the cesm variable(s) to the cmor variable
-        # This is yaml file - cesm_to_cmip7.yaml in this repo
-        # the variable name in variables: is the output
-        # Jim started with the cmip6 template and then converted it
-        # (cmip6 file used for e3sm -> cmip)
+        # This is what maps the CESM/NorESM history variable(s) to the cmor variable
+        # This is obtained from reading cesm_to_cmip7.yaml
         cfg = mapping.get_cfg(varname)
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
@@ -191,24 +219,29 @@ def process_one_var(
     # These are the dims on the destination
     # (interpolated dims if you WILL do interpolation - have not done it yet)
     dims_list = cfg.get("dims")
+
     # If dims is a single list (atm/lnd), wrap in a list for uniformity
     if dims_list and len(dims_list) > 0 and isinstance(dims_list[0], str):
         dims_list = [dims_list]
 
-    # Loop over dims - in most cases there will only be entry - but some variables (like
-    # ocean sos need to be in on both the native and the interpolated grid - so there
-    # will be two entries - hence the loop below
+    # Loop over dims - in most cases there will only be one entry -
+    # but for some variables (like ocean sos) there needs to be an
+    # entry both the native and the interpolated grid - so there will
+    # be two entries - hence the loop below
+
     for dims in dims_list:
         logger.info(f"Processing {varname} with dims {dims}")
+
+        # ---------------------------------------------
+        # Read in time series and regrid if necessary
+        # ---------------------------------------------
         try:
             open_kwargs = None
             if realm == "ocean":
                 open_kwargs = {"decode_timedelta": False}
             logger.info("Opening native data for variable %s", varname)
 
-            # This is where
-            # ds_native is where you read the CESM time series file
-            # ds_native is an xarray dataset
+            # ds_native is an xarray dataset for the CESM/NorESM time series files
             # open_native_for_cmip_vars is in pipeline.py
             ds_native, var = open_native_for_cmip_vars(
                 varname,
@@ -219,26 +252,31 @@ def process_one_var(
                 open_kwargs=open_kwargs,
             )
             logger.info("realm is %s", realm)
-            # Append ocn_fx_fields to ds_native if available
-            # fx - grid definition like topography, fraction
-            # ds_native.merge is an xarray command
-            if realm == "ocean" and ocn_fx_fields is not None:
-                ds_native = ds_native.merge(ocn_fx_fields)
+
+            if model == "cesm":
+                # Append ocn_fx_fields to ds_native if available
+                # fx - grid definition like topography, fraction
+                if realm == "ocean" and ocn_fx_fields is not None:
+                    logger.info("adding ocn_fx_fields to ds_native")
+                    ds_native = ds_native.merge(ocn_fx_fields)
+
+            # Output ds_native keys
             logger.info(
                 "ds_native keys: %s for var %s with dims %s",
                 list(ds_native.keys()),
                 varname,
                 dims,
             )
+            # TODO: why does this not abort the program?
             if var is None:
                 logger.warning(f"Source variable(s) not found for {varname}")
                 results.append((varname, "ERROR: Source variable(s) not found."))
                 continue
-            # --- OCN: distinguish native vs regridded by dims ---
-            if "latitude" in dims and "longitude" in dims:
+
+            # For ocean realm: distinguish native vs regridded by dims
+            if model == "cesm" and "latitude" in dims and "longitude" in dims:
                 # output ocn on the native grid
                 logger.info(f"Preparing native grid output for mom6 variable {varname}")
-
                 ds_cmor = ds_native
                 results.append((str(varname), "analyzed native mom6 grid"))
             else:
@@ -247,7 +285,11 @@ def process_one_var(
                     "Processing %s for dims %s (atm/lnd or other)", varname, dims
                 )
                 # Below is where you do the mapping from SE to lat/lon
+                mom6_grid = None
+
                 ds_cmor = realize_regrid_prepare(
+                    resolution,
+                    model,
                     mapping,
                     ds_native,
                     varname,
@@ -259,6 +301,7 @@ def process_one_var(
                     open_kwargs={"decode_timedelta": True},
                 )
                 logger.info("ds_cmor is not None")
+
                 # Attach ocn_fx_fields to regridded output for writing
                 if ocn_fx_fields is not None:
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
@@ -275,10 +318,14 @@ def process_one_var(
             )
             results.append((varname, f"ERROR during regridding: {e!r}"))
             continue
-        try:
-            # CMORize
-            log_dir = outdir + "/logs"
 
+        # ---------------------------------------------
+        # CMORize
+        # ---------------------------------------------
+        try:
+            log_dir = outdir / "logs"
+
+            # TODO: add NorESM institution_id below
             # Initialize CMOR class
             with CmorSession(
                 tables_path=tables_path,
@@ -288,8 +335,11 @@ def process_one_var(
                 outdir=outdir,
             ) as cm:
                 cmip7name = cmip_var.attributes["branded_variable_name"]
+                set_cur_dataset_attribute("frequency", frequency)
 
-                logger.info(f"Writing CMOR variable {cmip7name.name}")
+                logger.info(
+                    f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
+                )
                 shortname = str(getattr(cmip_var, "physical_parameter").name)
                 vdef = type(
                     "VDef",
@@ -307,13 +357,13 @@ def process_one_var(
                         "branded_variable_name": cmip7name,
                     },
                 )()
-                logger.info(f"Writing variable {varname} with dims {dims} ")
 
                 # Now use CMOR utility to write out netcdf varialbe
+                logger.info(f"Writing CMOR variable {varname} with dims {dims} ")
                 cm.write_variable(ds_cmor, cmip_var, vdef)
 
             logger.info(f"Finished processing for {varname} with dims {dims}")
-            results.append((shortname, "ok"))
+            results.append((str(cmip7name), "ok"))
         except Exception as e:
             logger.error(
                 f"Exception while processing {varname} with dims {dims}: {e!r}"
@@ -360,126 +410,136 @@ def latest_monthly_file(
     return path, year, month
 
 
+def get_include_patterns(model: str, realm: str, frequency: str) -> list[str]:
+    try:
+        logger.info(
+            "Looking for pattern: %s", INCLUDE_PATTERN_MAP[model][realm][frequency]
+        )
+        return INCLUDE_PATTERN_MAP[model][realm][frequency]
+    except KeyError:
+        raise ValueError(
+            f"No include_patterns defined for model={model}, "
+            f"realm={realm}, frequency={frequency}"
+        )
+
+
 def main():
     args = parse_args()
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
+    resolution = args.resolution
+    model = args.model
+    frequency = args.frequency
+    realm = args.realm
 
     mom6_grid = None
     ocn_grid = None
     ocn_fx_fields = None
-    if args.realm == "atmos":
-        include_patterns = ["*cam.h0a*"]
-        frequency = "mon"
-        subdir = "atm"
-    elif args.realm == "land":
-        include_patterns = ["*clm2.h0*"]
-        frequency = "mon"
-        subdir = "lnd"
-    elif args.realm == "ocean":
-        # we do not want to match static files
-        include_patterns = ["*mom6.h.native.*"]
-        frequency = "mon"
-        subdir = "ocn"
-        if args.ocn_grid_file:
-            ocn_grid = args.ocn_grid_file
-        if args.ocn_static_file:
-            ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
-            logger.info(
-                f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
-            )
-    # Setup input/output directories
-    if args.caseroot and args.cimeroot:
-        caseroot = args.caseroot
-        cimeroot = args.cimeroot
-        sys.path.append(cimeroot)
-        _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
-        sys.path.append(_LIBDIR)
-        try:
-            from CIME.case import Case
-        except ImportError as e:
-            logger.warning(f"Error importing CIME modules: {e}")
-            sys.exit(1)
-        with Case(caseroot, read_only=True) as case:
-            inputroot = case.get_value("DOUT_S_ROOT")
-            casename = case.get_value("CASE")
-        INPUTDIR = os.path.join(inputroot, subdir, "hist")
-        TSDIR = Path(inputroot).parent / "timeseries" / casename / subdir / "hist"
-        native = latest_monthly_file(Path(INPUTDIR))
-        if native is None:
-            print(f"No output files found in {INPUTDIR}")
-            sys.exit(0)
-        if TSDIR.exists():
-            timeseries = latest_monthly_file(TSDIR)
-            if timeseries is not None:
-                _, tsyr, _ = timeseries
-                _, nyr, _ = native
-                # Calculate span in months
-                span_months = (nyr - tsyr) * 12
-                if span_months < args.run_months:
-                    logger.info(
-                        f"Less than required run frequency ready ({span_months} months, need {args.run_months}), not processing {nyr}, {tsyr}"
-                    )
-                    sys.exit(0)
-    else:
-        # testing path
-        if args.realm == "atmos":
-            INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
-            TSDIR = (
-                scratch
-                + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/atm/hist"
-            )
-        elif args.realm == "land":
-            INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
-            TSDIR = (
-                scratch
-                + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/lnd/hist"
-            )
-        elif args.realm == "ocean":
-            INPUTDIR = "/glade/derecho/scratch/cmip7/archive/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
-            TSDIR = (
-                scratch
-                + "/archive/timeseries/b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1/ocn/hist"
-            )
 
+    # Determine include patterns and frequency
+    include_patterns = get_include_patterns(model, realm, frequency)
+
+    # Setup input directory for noresm
+    if model == "noresm":
+        if args.tsdir:
+            TSDIR = Path(args.tsdir)
+            if not TSDIR.exists():
+                logger.info(f"Time series directory {str(TSDIR)} must exist")
+                sys.exit(0)
+            timeseries = latest_monthly_file(TSDIR)
+            logger.info(f"latest monthly time series file is {timeseries}")
+        else:
+            if realm == "atmos":
+                TSDIR = "/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
+            elif realm == "land":
+                TSDIR = "/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
+
+    # Setup input directory for cesm
+    if model == "cesm":
+        if realm == "atmos":
+            subdir = "atm"
+        elif realm == "land":
+            subdir = "lnd"
+        elif realm == "ocean":
+            subdir = "ocn"
+            if args.ocn_grid_file:
+                ocn_grid = args.ocn_grid_file
+            if args.ocn_static_file:
+                ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
+                logger.info(
+                    f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
+                )
+        if args.caseroot and args.cimeroot:
+            caseroot = args.caseroot
+            cimeroot = args.cimeroot
+            sys.path.append(cimeroot)
+            _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
+            sys.path.append(_LIBDIR)
+            try:
+                from CIME.case import Case
+            except ImportError as e:
+                logger.warning(f"Error importing CIME modules: {e}")
+                sys.exit(1)
+            with Case(caseroot, read_only=True) as case:
+                inputroot = case.get_value("DOUT_S_ROOT")
+                casename = case.get_value("CASE")
+            TSDIR = Path(inputroot).parent / "timeseries" / casename / subdir / "hist"
+            INPUTDIR = os.path.join(inputroot, subdir, "hist")
+            native = latest_monthly_file(Path(INPUTDIR))
+            if native is None:
+                print(f"No output files found in {INPUTDIR}")
+                sys.exit(0)
+        else:
+            # testing path
+            scratch = os.getenv("SCRATCH")
+            if realm == "atmos":
+                TSDIR = (
+                    Path(scratch)
+                    / "archive"
+                    / "timeseries"
+                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
+                    / "atm"
+                    / "hist"
+                )
+            elif realm == "land":
+                TSDIR = (
+                    Path(scratch)
+                    / "archive"
+                    / "timeseries"
+                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
+                    / "lnd"
+                    / "hist"
+                )
+            elif realm == "ocean":
+                TSDIR = (
+                    Path(scratch)
+                    / "archive"
+                    / "timeseries"
+                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
+                    / "ocn"
+                    / "hist"
+                )
+
+    # Make output directory if it does not exist
+    OUTDIR = Path(args.outdir)
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
-    if not os.path.exists(str(TSDIR)):
-        os.makedirs(str(TSDIR))
-    # Load MOM6 static grid if needed (ocn realm)
-    if args.realm == "ocean" and ocn_grid:
-        mom6_grid = load_mom6_grid(ocn_grid)
-        logger.info(f"Using MOM grid file: {ocn_grid}")
-        # Dask cluster setup
 
-    # Load mapping
-    mapping = Mapping.from_packaged_default()
-    cmip_vars = []
-    # logger.info(f"Finding variables with prefix {var_prefix}")
-
-    # cmip_vars = find_variables_by_prefix(
-    #    None, var_prefix, where={"List of Experiments": "piControl"}
-    # )
-    # cmip_vars = find_variables_by_realm_and_frequency(None, realm, frequency)
-    logger.info("Loading data request content %s", args.realm)
+    # Load all possible cmip vars for this realm and this experiment - create a data request
+    logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
     logger.info("Content dic obtained")
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
+    cmip_vars = []
     cmip_vars = DR.find_variables(
         skip_if_missing=False,
         operation="all",
         cmip7_frequency=frequency,
-        modelling_realm=args.realm,
+        modelling_realm=realm,
         experiment=args.experiment,
     )
 
-    # for variable in DR.get_variables():
-    #    logger.info("variable %s, realm %s, frequency %s", variable.physical_parameter, variable.modelling_realm, variable.cmip7_frequency.name)
-    #    if (
-    #        realm in variable.modelling_realm
-    #        and frequency in str(variable.cmip7_frequency.name)
-    #    ):
-    #        cmip_vars.append(variable)
+    # Determine cmip variables that will process
     if args.cmip_vars:
         tmp_cmip_vars = cmip_vars
         cmip_vars = []
@@ -495,8 +555,9 @@ def main():
                     v.branded_variable_name.name for v in cmip_vars
                 ]:
                     cmip_vars.append(var)
-
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
+
+    # Set up dask if appropriate
     if args.workers == 1:
         client = None
         cluster = None
@@ -516,10 +577,20 @@ def main():
     # Load requested variables
     if len(cmip_vars) > 0:
         if len(include_patterns) == 1:
-            input_path = Path(str(TSDIR) + f"/*{include_patterns[0]}*")
+            input_path = TSDIR / f"*{include_patterns[0]}*"
         else:
-            input_path = Path(str(TSDIR) + f"/*")
+            input_path = TSDIR / "*"
 
+        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml)
+        mapping = Mapping.from_packaged_default()
+
+        # Determine TABLES directory
+        if model == "cesm":
+            tables_path = TABLES_cesm
+        else:
+            tables_path = TABLES_noresm
+
+        # Now process the variables
         if args.workers == 1:
             results = [
                 item
@@ -528,24 +599,27 @@ def main():
                     v,
                     mapping,
                     input_path,
-                    TABLES,
+                    tables_path,
                     OUTDIR,
-                    realm=args.realm,
-                    mom6_grid=mom6_grid,
+                    resolution,
+                    model,
+                    realm=realm,
+                    frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                 )
             ]
-
         else:
             futs = [
                 process_one_var_delayed(
                     var,
                     mapping,
                     input_path,
-                    TABLES,
+                    tables_path,
                     OUTDIR,
-                    realm=args.realm,
-                    mom6_grid=mom6_grid,
+                    resolution,
+                    model,
+                    realm=realm,
+                    frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                 )
                 for var in cmip_vars
