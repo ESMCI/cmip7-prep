@@ -355,7 +355,7 @@ def regrid_to_latlon_ds(
     # Regrid the fx data
     logger.info("using fx map: %s", spec.path)
     ds_fx = _regrid_fx_once(spec.path, ds_in, sftlf_path)  # ← uses cache
-    if ds_fx:
+    if ds_fx is not None and len(ds_fx.data_vars) > 0:
         # Don’t overwrite if user already computed and passed them in
         for name in (
             "sftlf",
@@ -764,24 +764,6 @@ def _regrid_fx_once(
         sftof.attrs.setdefault("standard_name", "sea_area_fraction")
         sftof.attrs.setdefault("long_name", "Percentage of sea area")
         out_vars["sftof"] = sftof
-
-    # Always compute areacella on the destination grid, not by regridding
-    # Use the destination grid from the mapfile
-    # if realm == 'ocean':
-    #     lat1d, lon1d = _dst_latlon_1d_from_map(mapfile)
-    #     ds_grid = xr.Dataset(
-    #         coords={
-    #             "lat": ("lat", lat1d, {"units": "degrees_north"}),
-    #             "lon": ("lon", lon1d, {"units": "degrees_east"}),
-    #         }
-    #     )
-    #     areacella = compute_areacella_from_bounds(ds_grid)
-    #     out_vars["areacella"] = areacella
-    #     if "sftlf" in out_vars:
-    #         lndarea = (areacella * out_vars["sftlf"] / 100.0).sum(dim=("lat", "lon"))
-    #         logger.info(
-    #             "Total land area on destination grid: %.3e m^2", float(lndarea.values)
-    #         )
 
     ds_fx = xr.Dataset(out_vars)
     FXCache.put(mapfile, ds_fx)
