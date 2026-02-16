@@ -40,6 +40,7 @@ from dask import delayed
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
+
 logger = logging.getLogger("cmip7_prep.monthly_cmor")
 
 # Regex for date extraction from filenames
@@ -52,7 +53,7 @@ _DATE_RE = re.compile(
 
 # Path for cmor tables
 TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
-TABLES_noresm = "/projects/NS9560K/mvertens/cmip7-prep/cmip7-cmor-tables/tables/"
+TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/tables"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -70,7 +71,17 @@ INCLUDE_PATTERN_MAP = {
             "day": ["mom6.h.sfc"],
         },
     },
+    "noresm": {
+        "atmos": {
+            "mon": ["cam.h0"],
+            "day": ["cam.h1"],
+        },
+        "land": {
+            "mon": ["clm2.h0a"],
+        },
+    },
 }
+
 
 
 def parse_args():
@@ -347,9 +358,9 @@ def process_one_var(
                         "branded_variable_name": cmip7name,
                     },
                 )()
-                logger.info(f"Writing variable {varname} with dims {dims} ")
 
                 # Now use CMOR utility to write out netcdf varialbe
+                logger.info(f"Writing CMOR variable {varname} with dims {dims} ")
                 cm.write_variable(ds_cmor, cmip_var, vdef)
 
             logger.info(f"Finished processing for {varname} with dims {dims}")
