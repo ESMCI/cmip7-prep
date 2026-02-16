@@ -83,7 +83,6 @@ INCLUDE_PATTERN_MAP = {
 }
 
 
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description="CMIP7 monthly processing for atm/lnd realms"
