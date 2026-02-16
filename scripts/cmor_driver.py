@@ -37,16 +37,9 @@ from dask.distributed import LocalCluster
 from dask.distributed import wait, as_completed
 from dask import delayed
 
-formatter = logging.Formatter(
-    fmt="%(asctime)s | %(levelname)-8s | %(module)s.%(funcName)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S")
-# logging.basicConfig(
-#     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-# )
 logging.basicConfig(
-    level=logging.INFO, format=formatter
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
-
 
 logger = logging.getLogger("cmip7_prep.monthly_cmor")
 
@@ -60,7 +53,6 @@ _DATE_RE = re.compile(
 
 # Path for cmor tables
 TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
-#TABLES_noresm = "/projects/NS9560K/mvertens/cmip7-prep/cmip7-cmor-tables/tables/"
 TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/tables"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
