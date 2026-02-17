@@ -52,8 +52,9 @@ class CmorSession(
 
     Parameters
     ----------
-    tables_path : str or Path
-        Directory containing CMOR table JSONs (e.g., CMIP6_*.json or CMIP7_*.json).
+    tables_root : str or Path
+        Directory containing CMOR tables and tables-csv directories with JSONs
+           (e.g., CMIP6_*.json or CMIP7_*.json).
     dataset_json : str or Path, optional
         Path to a cmor_dataset.json with the experiment/source metadata.
     dataset_attrs : dict, optional
@@ -63,7 +64,7 @@ class CmorSession(
     def __init__(
         self,
         *,
-        tables_path: Path | str,
+        tables_root: Path | str,
         dataset_attrs: dict[str, str] | None = None,
         dataset_json: Optional[DatasetJsonLike] = None,
         tracking_prefix: str | None = None,
@@ -72,7 +73,7 @@ class CmorSession(
         log_name: str | None = None,
         outdir: Path | str | None = None,
     ) -> None:
-        self.tables_path = Path(tables_path)
+        self.tables_root = tables_root
         self.dataset_attrs = dict(dataset_attrs or {})
         self.dataset_json = dataset_json
         self._dataset_json_cm = None
@@ -108,7 +109,7 @@ class CmorSession(
             if self._log_path is not None:
                 logger.info("CMOR logfile: %s", self._log_path)
                 cmor.setup(
-                    inpath=str(self.tables_path),
+                    inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
                         cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
                     ),
@@ -117,7 +118,7 @@ class CmorSession(
                 )
             else:
                 cmor.setup(
-                    inpath=str(self.tables_path),
+                    inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
                         cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
                     ),
@@ -126,7 +127,7 @@ class CmorSession(
         except TypeError:
             # Older CMOR with no 'logfile' kw
             cmor.setup(
-                inpath=str(self.tables_path),
+                inpath=str(self.tables_root / "tables"),
                 netcdf_file_action=getattr(
                     cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
                 ),
@@ -183,8 +184,11 @@ class CmorSession(
             set_cmor_attr(
                 "tracking_id", ""
             )  # empty lets CMOR regenerate from tracking_prefix
+
         logger.info("set _controlled_vocabulary_file:")
-        cmor.set_cur_dataset_attribute("_controlled_vocabulary_file", "CMIP7_CV.json")
+        cmor.set_cur_dataset_attribute(
+            "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")
+        )
         logger.info("set _axis_entry_file:")
         cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
         logger.info("set _formula_var_file:")
@@ -204,11 +208,11 @@ class CmorSession(
     # -------------------------
     # internal helpers
     # -------------------------
-    def load_table(self, tables_path: Path, key: str) -> dict:
+    def load_table(self, tables_root: Path, key: str) -> dict:
         """Load CMOR table JSON for a given key by searching common patterns."""
         if key == self.currenttable:
             return {}  # already loaded
-        table_filename = resolve_table_filename(tables_path, key)
+        table_filename = resolve_table_filename(tables_root / "tables", key)
         self.currenttable = key
         logger.info("Loading CMOR table for key '%s': %s", key, table_filename)
         return cmor.load_table(table_filename)
@@ -395,7 +399,7 @@ class CmorSession(
 
         # ---- time axis ----
         time_id = None
-        self.load_table(self.tables_path, self.primarytable)
+        self.load_table(self.tables_root, self.primarytable)
         logger.info("*** Define time axis (if present)")
         tvals, tbnds, t_units = _get_time_and_bounds(ds)
         if tvals is not None:
@@ -623,7 +627,7 @@ class CmorSession(
                     f"No axis ID found for dimension '{d}' in variable '{var_name}' {var_dims}"
                 )
             axes_ids.append(axis_id)
-        self.load_table(self.tables_path, self.primarytable)
+        self.load_table(self.tables_root, self.primarytable)
 
         return axes_ids
 
@@ -635,7 +639,7 @@ class CmorSession(
         da = ds[name]
         logger.info("FX variable %s dims: %s", name, da.dims)
         if set(da.dims) == {"xh", "yh"}:
-            self.load_table(self.tables_path, "ocean")
+            self.load_table(self.tables_root, "ocean")
             geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
             ds_geo = xr.open_dataset(geo_path)
             lat = ds_geo["lath"].values
@@ -681,9 +685,9 @@ class CmorSession(
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
             cmor.set_cur_dataset_attribute("grid_label", "gr")
             if name in ("areacella_ti-u-hxy-u", "sftlf_ti-u-hxy-u"):
-                self.load_table(self.tables_path, "land")
+                self.load_table(self.tables_root, "land")
             elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
-                self.load_table(self.tables_path, "ocean")
+                self.load_table(self.tables_root, "ocean")
                 if name == "deptho":
                     name = "deptho_ti-u-hxy-sea"
             lat = ds["lat"].values
@@ -750,7 +754,7 @@ class CmorSession(
         # Write sftof_ti-u-hxy-u if present (native grid sea fraction: wet)
         if "sftof_ti-u-hxy-u" in ds_regr and "sftof_ti-u-hxy-u" not in self._fx_written:
             logger.info("Writing fx variable sftof_ti-u-hxy-u")
-            self.load_table(self.tables_path, "ocean")
+            self.load_table(self.tables_root, "ocean")
             self._write_fx_2d(ds_regr, "sftof_ti-u-hxy-u", "%")
             self._fx_written.add("sftof_ti-u-hxy-u")
 
@@ -820,9 +824,9 @@ class CmorSession(
         )
 
         logger.info(
-            "Using CMOR table key: %s %s", self.tables_path, self.primarytable
+            "Using CMOR table key: %s %s", self.tables_root, self.primarytable
         )  # debug
-        self.load_table(self.tables_path, self.primarytable)
+        self.load_table(self.tables_root, self.primarytable)
         bvn_attr = getattr(cmip_var, "branded_variable_name", None)
         bvn = bvn_attr.name if bvn_attr is not None else None
         if bvn is None:
@@ -842,7 +846,7 @@ class CmorSession(
         self.ensure_fx_written_and_cached(ds)
 
         units = getattr(vdef, "units", "") or ""
-        self.load_table(self.tables_path, self.primarytable)
+        self.load_table(self.tables_root, self.primarytable)
         logger.info("Define CMOR axes for variable %s", bvn)  # debug
         axes_ids = self._define_axes(ds, vdef)
         logger.info("Prepare data for CMOR %s", data.dtype)  # debug
@@ -851,7 +855,7 @@ class CmorSession(
             data_filled = data_filled.rename({"zl": "olevel"})
         elif "zi" in data_filled.dims:
             data_filled = data_filled.rename({"zi": "olevel"})
-        self.load_table(self.tables_path, self.primarytable)
+        self.load_table(self.tables_root, self.primarytable)
 
         var_entry = getattr(cmip_var, "branded_variable_name", bvn)
         if hasattr(var_entry, "name"):

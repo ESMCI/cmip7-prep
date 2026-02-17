@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-monthly_cmor.py: Combined CMIP7 monthly processing script for ATM and LND realms.
+cmor_driver.py: Combined CMIP7 monthly processing script for ATM and LND realms.
 
 Usage:
-  python monthly_cmor.py --realm atmos --tsdir
-  python monthly_cmor.py --realm land --tsdir
+  python cmor_driver.py --realm atmos --tsdir
+  python cmor_driver.py --realm land --tsdir
 
 Preserves all comments and error handling from both atm_monthly.py and lnd_monthly.py.
 """
@@ -41,7 +41,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
 
-logger = logging.getLogger("cmip7_prep.monthly_cmor")
+logger = logging.getLogger("cmip7_prep.cmor_driver")
 
 # Regex for date extraction from filenames
 _DATE_RE = re.compile(
@@ -52,8 +52,8 @@ _DATE_RE = re.compile(
 )
 
 # Path for cmor tables
-TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
-TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/tables"
+TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -191,7 +191,7 @@ def process_one_var(
     cmip_var,
     mapping,
     inputfile,
-    tables_path,
+    tables_root,
     outdir,
     resolution,
     model,
@@ -293,7 +293,7 @@ def process_one_var(
                     mapping,
                     ds_native,
                     varname,
-                    tables_path=tables_path,
+                    tables_path=tables_root / "tables",
                     mom6_grid=mom6_grid,
                     regrid_kwargs={
                         "dtype": "float32",
@@ -328,7 +328,7 @@ def process_one_var(
             # TODO: add NorESM institution_id below
             # Initialize CMOR class
             with CmorSession(
-                tables_path=tables_path,
+                tables_root=tables_root,
                 log_dir=log_dir,
                 log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
                 dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
@@ -586,9 +586,9 @@ def main():
 
         # Determine TABLES directory
         if model == "cesm":
-            tables_path = TABLES_cesm
+            tables_root = Path(TABLES_cesm)
         else:
-            tables_path = TABLES_noresm
+            tables_root = Path(TABLES_noresm)
 
         # Now process the variables
         if args.workers == 1:
@@ -599,7 +599,7 @@ def main():
                     v,
                     mapping,
                     input_path,
-                    tables_path,
+                    tables_root,
                     OUTDIR,
                     resolution,
                     model,
@@ -614,7 +614,7 @@ def main():
                     var,
                     mapping,
                     input_path,
-                    tables_path,
+                    tables_root,
                     OUTDIR,
                     resolution,
                     model,
