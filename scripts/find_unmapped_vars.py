@@ -16,7 +16,7 @@ def parse_cmor_driver_output(file_path: str):
     with open(file_path, "r") as f:
         lines = f.readlines()
 
-    for i, line in enumerate(lines):
+    for line in lines:
         mapping_match = mapping_pattern.search(line)
         if mapping_match:
             no_mapping_vars.append(mapping_match.group(1))
