@@ -10,7 +10,7 @@ def parse_cmor_driver_output(file_path: str):
     # Regex patterns
     mapping_pattern = re.compile(r"No mapping for (.+) in ")
     cesm_pattern = re.compile(
-        r"Variable (.*) processed with status: ERROR cesm input variable not found."
+        r"Variable (.*) processed with status: ERROR \w+ input variable not found\."
     )
 
     with open(file_path, "r") as f:
