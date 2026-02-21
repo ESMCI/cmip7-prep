@@ -9,7 +9,7 @@ no formula, it's treated as a 1:1 mapping; otherwise sources become raw_variable
 from __future__ import annotations
 
 from dataclasses import dataclass
-from importlib.resources import files, as_file
+from importlib.resources import as_file
 from pathlib import Path
 from typing import Any, Dict, List, Mapping as TMapping, Optional
 import warnings
@@ -25,7 +25,8 @@ def packaged_mapping_resource(filename: str = "cesm_to_cmip7.yaml"):
     ...     str(p).endswith("cesm_to_cmip7.yaml")
     True
     """
-    res = files("cmip7_prep").joinpath(f"data/{filename}")
+
+    res = Path(__file__).parent.parent.parent / "data" / filename
     return as_file(res)
 
 

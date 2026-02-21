@@ -8,7 +8,6 @@ import uuid
 import numpy as np
 import pytest
 
-# Import production module at top-level (avoids C0415)
 from cmip7_prep import cmor_writer as cw
 
 

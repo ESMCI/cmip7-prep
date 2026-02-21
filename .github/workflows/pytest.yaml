@@ -65,8 +65,8 @@ jobs:
           ESMFMKFILE: ${{ env.ESMFMKFILE }}
           LD_LIBRARY_PATH: ${{ env.ESMF_INSTALL_PREFIX }}/lib:${{ env.LD_LIBRARY_PATH }}
         run: |
-          #pip uninstall -y cmip7-prep || true
-          #pip install .
+          pip uninstall -y cmip7-prep || true
+          pip install -e .
           pytest -q --doctest-modules --cov=cmip7_prep --cov-report=xml
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
