@@ -1,13 +1,11 @@
 [tool.poetry]
 name = "cmip7-prep"
 version = "0.1.0"
-description = "Prepare CESM outputs for CMIP7 using CMOR, with SE->1deg regridding."
+description = "Prepare CESM and NorESM outputs for CMIP7 using CMOR, with SE->1deg (CESM) and NorESM (SE->1deg and 2deg) regridding."
 authors = ["Jim Edwards <jedwards@example.com>"]
 readme = "README.md"
-packages = [{ include = "cmip7_prep" }]
-# Include non-Python data files in both sdist and wheel
 include = [
-  { path = "cmip7_prep/data/**" }
+  { path = "src/cmip7_prep/data/**" }
 ]
 
 [tool.poetry.dependencies]
