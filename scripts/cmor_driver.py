@@ -209,7 +209,8 @@ def process_one_var(
 
     try:
         # This is what maps the CESM/NorESM history variable(s) to the cmor variable
-        # This is obtained from reading cesm_to_cmip7.yaml
+        # This is obtained from reading cesm_to_cmip7.yaml if cesm
+        # and noresm_to_cmip7.yaml if noresm
         cfg = mapping.get_cfg(varname)
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
@@ -582,7 +583,7 @@ def main():
             input_path = TSDIR / "*"
 
         # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml)
-        mapping = Mapping.from_packaged_default()
+        mapping = Mapping.from_packaged_default(model)
 
         # Determine TABLES directory
         if model == "cesm":

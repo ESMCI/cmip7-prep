@@ -3,8 +3,9 @@ r"""Mapping loader/evaluator compatible with CMIP6-style lists, CMIP7-style dict
 and a dict wrapped under a top-level key 'variables:'.
 
 Also supports a 'sources:' list where each item may be a plain string or a dict
-with 'cesm_var' (e.g., {'cesm_var': 'TS'}). If there's exactly one source and
-no formula, it's treated as a 1:1 mapping; otherwise sources become raw_variables.
+with 'cesm_var' (e.g., {'cesm_var': 'TS'}) for cesm or noresm_var' (e.g., {'noresm_var': 'TS'}). 
+If there's exactly one source and no formula, it's treated as a 1:1
+mapping; otherwise sources become raw_variables.
 """
 from __future__ import annotations
 
@@ -19,10 +20,13 @@ import xarray as xr
 import yaml  # runtime dep
 
 
-def packaged_mapping_resource(filename: str = "cesm_to_cmip7.yaml"):
+def packaged_mapping_resource(filename: str):
     """Context manager yielding a real filesystem path to the packaged mapping file
     >>> with packaged_mapping_resource("cesm_to_cmip7.yaml") as p:
     ...     str(p).endswith("cesm_to_cmip7.yaml")
+    True
+    >>> with packaged_mapping_resource("noresm_to_cmip7.yaml") as p:
+    ...     str(p).endswith("noresm_to_cmip7.yaml")
     True
     """
     res = files("cmip7_prep").joinpath(f"data/{filename}")
@@ -145,8 +149,12 @@ class Mapping:
         self._vars: Dict[str, VarConfig] = self._load_yaml(self.path)
 
     @classmethod
-    def from_packaged_default(cls, filename: str = "cesm_to_cmip7.yaml") -> "Mapping":
+    def from_packaged_default(cls, model) -> "Mapping":
         """Construct a Mapping using the packaged default YAML."""
+        if model == "cesm":
+            filename = "cesm_to_cmip7.yaml"
+        else:
+            filename = "noresm_to_cmip7.yaml"
         with packaged_mapping_resource(filename) as p:
             return cls(p)
 
@@ -254,8 +262,11 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
         for item in cfg["sources"]:
             if isinstance(item, str):
                 raw_from_sources.append(item)
-            elif isinstance(item, dict) and "cesm_var" in item:
-                raw_from_sources.append(str(item["cesm_var"]))
+            elif isinstance(item, dict):
+                if "cesm_var" in item:
+                    raw_from_sources.append(str(item["cesm_var"]))
+                elif "noresm_var" in item:
+                    raw_from_sources.append(str(item["noresm_var"]))
         if not raw_from_sources:
             raw_from_sources = None
 
