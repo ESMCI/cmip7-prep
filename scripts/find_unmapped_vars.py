@@ -10,18 +10,19 @@ def parse_cmor_driver_output(file_path: str):
     # Regex patterns
     mapping_pattern = re.compile(r"No mapping for (.+) in ")
     cesm_pattern = re.compile(
-        r"Variable (.*) processed with status: ERROR cesm input variable not found."
+        r"Variable (.*) processed with status: ERROR \w+ input variable not found\."
     )
 
     with open(file_path, "r") as f:
         lines = f.readlines()
 
-    for i, line in enumerate(lines):
+    for line in lines:
         mapping_match = mapping_pattern.search(line)
         if mapping_match:
             no_mapping_vars.append(mapping_match.group(1))
-        if cesm_pattern.search(line):
-            no_cesm_vars.append(cesm_pattern.search(line).group(1))
+        cesm_match = cesm_pattern.search(line)
+        if cesm_match:
+            no_cesm_vars.append(cesm_match.group(1))
 
     return no_mapping_vars, no_cesm_vars
 
