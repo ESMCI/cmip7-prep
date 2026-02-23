@@ -73,6 +73,9 @@ jobs:
           pip uninstall -y cmip7-prep || true
           pip install -e .
           pytest --doctest-modules --cov=cmip7_prep --cov-report=xml
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
