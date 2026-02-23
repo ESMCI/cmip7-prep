@@ -39,6 +39,7 @@ def test_cmor_session_basic(tmp_path):
 
         name = "tas"
         branded_variable_name = "tas_tmin-h2m-hxy-u"
+        branded_variable = "tas_tmin-h2m-hxy-u"
         units = "K"
         table = "atmos"
         levels = {}
