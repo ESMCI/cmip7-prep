@@ -15,7 +15,7 @@ jobs:
       - name: checkout cmip7-cmor-tables
         uses: actions/checkout@v4
         with:
-          repository: PCMDI/cmip7-cmor-tables
+          repository: WCRP-CMIP/cmip7-cmor-tables
           path: cmip7-cmor-tables
       - name: Set up Python
         uses: actions/setup-python@v5
