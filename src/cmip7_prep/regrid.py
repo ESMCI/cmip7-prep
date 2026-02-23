@@ -156,6 +156,24 @@ def zonal_mean_on_pressure_grid(
     xr.DataArray
         Zonal mean of the variable, interpolated to the target
         pressure levels, dims: (plev, lat, [time]).
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> import xarray as xr
+    >>> from cmip7_prep.regrid import zonal_mean_on_pressure_grid
+    >>> ds = xr.Dataset({
+    ...     'ta': (('time', 'lev', 'lat', 'lon'), np.random.rand(1, 2, 3, 4)),
+    ...     'PS': (('time', 'lat', 'lon'), np.random.rand(1, 3, 4)),
+    ...     'hyam': ('lev', [0.5, 0.3]),
+    ...     'hybm': ('lev', [0.5, 0.7]),
+    ...     'P0': 100000.0,
+    ...     'lat': ('lat', [10, 20, 30]),
+    ...     'lon': ('lon', [0, 90, 180, 270]),
+    ... })
+    >>> # This will fail unless vertical.to_plev is properly mocked or available
+    >>> # zonal_mean_on_pressure_grid(ds, 'ta',
+    >>> #      tables_path='cmip7-cmor-tables/tables', target='plev39')
     """
     # 1. Zonal mean (average over longitude)
     if lon_dim not in ds[var].dims:
