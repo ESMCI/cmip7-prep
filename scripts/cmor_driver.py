@@ -183,6 +183,11 @@ def parse_args():
         required=True,
         help="Model to use",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging output",
+    )
 
     args = parser.parse_args()
 
@@ -427,6 +432,10 @@ def get_include_patterns(model: str, realm: str, frequency: str) -> list[str]:
 
 def main():
     args = parse_args()
+    if getattr(args, "debug", False):
+        logger.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled.")
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
