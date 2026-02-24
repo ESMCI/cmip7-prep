@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-monthly_cmor.py: Combined CMIP7 monthly processing script for ATM and LND realms.
+cmor_driver.py: Combined CMIP7 monthly processing script for ATM and LND realms.
 
 Usage:
-  python monthly_cmor.py --realm atmos --tsdir
-  python monthly_cmor.py --realm land --tsdir
+  python cmor_driver.py --realm atmos --tsdir
+  python cmor_driver.py --realm land --tsdir
 
 Preserves all comments and error handling from both atm_monthly.py and lnd_monthly.py.
 """
@@ -41,7 +41,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
 
-logger = logging.getLogger("cmip7_prep.monthly_cmor")
+logger = logging.getLogger("cmip7_prep.cmor_driver")
 
 # Regex for date extraction from filenames
 _DATE_RE = re.compile(
@@ -52,16 +52,18 @@ _DATE_RE = re.compile(
 )
 
 # Path for cmor tables
-TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/tables"
-TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/tables"
+TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 INCLUDE_PATTERN_MAP = {
     "cesm": {
         "atmos": {
-            "mon": ["cam.h0"],
-            "day": ["cam.h1"],
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h3a"],
         },
         "land": {
             "mon": ["clm2.h0a"],
@@ -160,7 +162,7 @@ def parse_args():
         "--frequency",
         type=str,
         default="mon",
-        choices=["mon", "day", "6hr"],
+        choices=["mon", "day", "6hr", "3hr"],
         help="Frequency of data to be translated (mon, day, 6hr,)",
     )
     parser.add_argument(
@@ -181,6 +183,11 @@ def parse_args():
         required=True,
         help="Model to use",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging output",
+    )
 
     args = parser.parse_args()
 
@@ -191,7 +198,7 @@ def process_one_var(
     cmip_var,
     mapping,
     inputfile,
-    tables_path,
+    tables_root,
     outdir,
     resolution,
     model,
@@ -293,7 +300,7 @@ def process_one_var(
                     mapping,
                     ds_native,
                     varname,
-                    tables_path=tables_path,
+                    tables_path=tables_root / "tables",
                     mom6_grid=mom6_grid,
                     regrid_kwargs={
                         "dtype": "float32",
@@ -307,7 +314,7 @@ def process_one_var(
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
 
         except AttributeError:
-            results.append((varname, f"ERROR cesm input variable not found"))
+            results.append((varname, f"ERROR {model} input variable not found."))
             continue
         except Exception as e:
             logger.warning(
@@ -328,7 +335,7 @@ def process_one_var(
             # TODO: add NorESM institution_id below
             # Initialize CMOR class
             with CmorSession(
-                tables_path=tables_path,
+                tables_root=tables_root,
                 log_dir=log_dir,
                 log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
                 dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
@@ -425,6 +432,10 @@ def get_include_patterns(model: str, realm: str, frequency: str) -> list[str]:
 
 def main():
     args = parse_args()
+    if getattr(args, "debug", False):
+        logger.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled.")
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
@@ -438,30 +449,24 @@ def main():
 
     # Determine include patterns and frequency
     include_patterns = get_include_patterns(model, realm, frequency)
-
+    TSDIR = None
     # Setup input directory for noresm
-    if model == "noresm":
-        if args.tsdir:
-            TSDIR = Path(args.tsdir)
-            if not TSDIR.exists():
-                logger.info(f"Time series directory {str(TSDIR)} must exist")
-                sys.exit(0)
-            timeseries = latest_monthly_file(TSDIR)
-            logger.info(f"latest monthly time series file is {timeseries}")
-        else:
-            if realm == "atmos":
-                TSDIR = "/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
-            elif realm == "land":
-                TSDIR = "/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
+    if args.tsdir:
+        TSDIR = Path(args.tsdir)
+        if not TSDIR.exists():
+            logger.info(f"Time series directory {str(TSDIR)} must exist")
+            sys.exit(0)
+        timeseries = latest_monthly_file(TSDIR)
+        logger.info(f"latest monthly time series file is {timeseries}")
+    elif model == "noresm":
+        if realm == "atmos":
+            TSDIR = "/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
+        elif realm == "land":
+            TSDIR = "/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
 
     # Setup input directory for cesm
     if model == "cesm":
-        if realm == "atmos":
-            subdir = "atm"
-        elif realm == "land":
-            subdir = "lnd"
-        elif realm == "ocean":
-            subdir = "ocn"
+        if realm == "ocean":
             if args.ocn_grid_file:
                 ocn_grid = args.ocn_grid_file
             if args.ocn_static_file:
@@ -489,7 +494,7 @@ def main():
             if native is None:
                 print(f"No output files found in {INPUTDIR}")
                 sys.exit(0)
-        else:
+        elif not TSDIR or not os.path.exists(TSDIR):
             # testing path
             scratch = os.getenv("SCRATCH")
             if realm == "atmos":
@@ -538,19 +543,24 @@ def main():
         modelling_realm=realm,
         experiment=args.experiment,
     )
+    cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
 
     # Determine cmip variables that will process
     if args.cmip_vars:
         tmp_cmip_vars = cmip_vars
         cmip_vars = []
         for var in tmp_cmip_vars:
-            logger.info(
+            logger.debug(
                 "Checking variable %s in %s",
                 var.branded_variable_name.name,
                 args.cmip_vars,
             )
             if var.branded_variable_name.name in args.cmip_vars:
-                logger.info("Adding variable %s", var.branded_variable_name.name)
+                logger.info(
+                    "Adding variable %s with priority %s",
+                    var.branded_variable_name.name,
+                    DR.find_priority_per_variable(variable=var),
+                )
                 if var.branded_variable_name.name not in [
                     v.branded_variable_name.name for v in cmip_vars
                 ]:
@@ -586,9 +596,9 @@ def main():
 
         # Determine TABLES directory
         if model == "cesm":
-            tables_path = TABLES_cesm
+            tables_root = Path(TABLES_cesm)
         else:
-            tables_path = TABLES_noresm
+            tables_root = Path(TABLES_noresm)
 
         # Now process the variables
         if args.workers == 1:
@@ -599,7 +609,7 @@ def main():
                     v,
                     mapping,
                     input_path,
-                    tables_path,
+                    tables_root,
                     OUTDIR,
                     resolution,
                     model,
@@ -614,7 +624,7 @@ def main():
                     var,
                     mapping,
                     input_path,
-                    tables_path,
+                    tables_root,
                     OUTDIR,
                     resolution,
                     model,

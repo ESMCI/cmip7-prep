@@ -374,9 +374,7 @@ def resolve_table_filename(tables_path: Path, key: str) -> str:
     """Return CMOR table filename for a given key by searching common patterns."""
     # key like "Amon" or "coordinate"
     candidates = [
-        tables_path / f"{key}.json",
         tables_path / f"CMIP7_{key}.json",
-        tables_path / f"CMIP6_{key}.json",
         tables_path / f"{key.capitalize()}.json",
     ]
     for c in candidates:

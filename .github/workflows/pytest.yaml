@@ -12,6 +12,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Checkout cmip7-cmor-tables from CESM-Development fork and cesm-dev branch
+        uses: actions/checkout@v4
+        with:
+          repository: CESM-Development/cmip7-cmor-tables
+          ref: cesm-dev
+          path: cmip7-cmor-tables
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -42,14 +48,14 @@ jobs:
             /home/runner/cmor
             /home/runner/cmor3-source
             /home/runner/.cache/pip
-          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}
+          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}-cmor3.14.0
           restore-keys: |
-            cmor-${{ runner.os }}-
+            cmor-${{ runner.os }}-3.14.0
 
       - name: build and install cmor
         run: |
           if [ ! -d "$HOME/cmor" ]; then
-            git clone https://github.com/PCMDI/cmor.git $HOME/cmor3-source
+            git clone https://github.com/PCMDI/cmor.git $HOME/cmor3-source -b 3.14.0
             cd $HOME/cmor3-source
             ./configure --prefix=$HOME/cmor --with-netcdf=/usr/local --with-udunits2=/usr/local
             make
@@ -65,9 +71,18 @@ jobs:
           ESMFMKFILE: ${{ env.ESMFMKFILE }}
           LD_LIBRARY_PATH: ${{ env.ESMF_INSTALL_PREFIX }}/lib:${{ env.LD_LIBRARY_PATH }}
         run: |
-          #pip uninstall -y cmip7-prep || true
-          #pip install .
-          pytest -q --doctest-modules --cov=cmip7_prep --cov-report=xml
+          pip uninstall -y cmip7-prep || true
+          pip install -e .
+          pytest --doctest-modules --cov=cmip7_prep --cov-report=xml --basetemp=./pytest-tmp
+      - name: Upload test log
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cmor_test.log
+          path: ./pytest-tmp/**/cmor_test.log
+      # - name: Setup tmate session
+      #  if: ${{ failure() }}
+      #  uses: mxschmitt/action-tmate@v3
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
