@@ -48,7 +48,7 @@ jobs:
             /home/runner/cmor
             /home/runner/cmor3-source
             /home/runner/.cache/pip
-          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}
+          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}-1
           restore-keys: |
             cmor-${{ runner.os }}-
 
