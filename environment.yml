@@ -228,7 +228,7 @@ dependencies:
       - certifi==2025.11.12
       - cfgv==3.4.0
       - cmip7-data-request-api==1.4
-      - cmor==3.13.2
+      - cmor==3.14.0
       - dask==2024.12.1
       - distlib==0.4.0
       - docutils==0.19
