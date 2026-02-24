@@ -61,6 +61,11 @@ def test_cmor_session_basic(tmp_path):
     with CmorSession(
         tables_root=tables_root,
         dataset_json=dataset_json_path,
+        dataset_attrs={
+            "institution_id": "NCAR",
+            "GLOBAL_IS_CMIP7": True,
+            "branded_variable": "tas_tmin-h2m-hxy-u",
+        },
         log_dir=log_dir,
         log_name=log_name,
     ) as session:
