@@ -64,7 +64,12 @@ def test_cmor_session_basic(tmp_path):
         dataset_attrs={
             "institution_id": "NCAR",
             "GLOBAL_IS_CMIP7": True,
-            "branded_variable": "tas_tmin-h2m-hxy-u",
+            "branded_variable": {
+                "variable_id": "tas",
+                "table_id": "atmos",
+                "plev": 50000,
+                "description": "Vertical velocity at 500 hPa",
+            },
         },
         log_dir=log_dir,
         log_name=log_name,
