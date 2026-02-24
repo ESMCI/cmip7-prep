@@ -55,7 +55,7 @@ jobs:
       - name: build and install cmor
         run: |
           if [ ! -d "$HOME/cmor" ]; then
-            git clone https://github.com/PCMDI/cmor.git $HOME/cmor3-source
+            git clone https://github.com/PCMDI/cmor.git $HOME/cmor3-source -b 3.14.0
             cd $HOME/cmor3-source
             ./configure --prefix=$HOME/cmor --with-netcdf=/usr/local --with-udunits2=/usr/local
             make
