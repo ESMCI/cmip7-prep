@@ -48,9 +48,9 @@ jobs:
             /home/runner/cmor
             /home/runner/cmor3-source
             /home/runner/.cache/pip
-          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}-1
+          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}
           restore-keys: |
-            cmor-${{ runner.os }}-
+            cmor-${{ runner.os }}-3.14.0
 
       - name: build and install cmor
         run: |
