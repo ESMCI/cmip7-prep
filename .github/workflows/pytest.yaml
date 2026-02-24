@@ -12,6 +12,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Checkout cmip7-cmor-tables from CESM-Development fork and cesm-dev branch
+        uses: actions/checkout@v4
+        with:
+          repository: CESM-Development/cmip7-cmor-tables
+          ref: cesm-dev
+          path: cmip7-cmor-tables
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -67,7 +73,10 @@ jobs:
         run: |
           pip uninstall -y cmip7-prep || true
           pip install -e .
-          pytest -q --doctest-modules --cov=cmip7_prep --cov-report=xml
+          pytest --doctest-modules --cov=cmip7_prep --cov-report=xml
+      # - name: Setup tmate session
+      #  if: ${{ failure() }}
+      #  uses: mxschmitt/action-tmate@v3
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
