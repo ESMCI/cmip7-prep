@@ -188,22 +188,6 @@ def _apply_vertical_if_needed(
     return xr.Dataset({str(cmip_var): v_plev[str(cmip_var)]})
 
 
-def _apply_vertical_if_needed_many(
-    ds_vars: xr.Dataset,
-    ds_native: xr.Dataset,
-    cmip_vars: Sequence[str],
-    mapping: Mapping,
-    tables_path: Optional[Union[str, Path]],
-) -> xr.Dataset:
-    """Vectorized wrapper to apply vertical transforms per variable."""
-    out = ds_vars.copy()
-    for v in cmip_vars:
-        out = out.update(
-            _apply_vertical_if_needed(out[[v]], ds_native, v, mapping, tables_path)
-        )
-    return out
-
-
 # ----------------------- single / multi var pipeline -----------------------
 # pylint: disable=unused-argument
 
