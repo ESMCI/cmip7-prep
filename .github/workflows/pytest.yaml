@@ -41,16 +41,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-#      - name: Cache CMOR build
-#        uses: actions/cache@v4
-#        with:
-#          path: |
-#            /home/runner/cmor
-#            /home/runner/cmor3-source
-#            /home/runner/.cache/pip
-#          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}
-#          restore-keys: |
-#            cmor-${{ runner.os }}-
+      - name: Cache CMOR build
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/cmor
+            /home/runner/cmor3-source
+            /home/runner/.cache/pip
+          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}-cmor3.14.0
+          restore-keys: |
+            cmor-${{ runner.os }}-3.14.0
 
       - name: build and install cmor
         run: |
