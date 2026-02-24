@@ -32,6 +32,7 @@ def test_cmor_session_basic(tmp_path):
     ds["time"].attrs["units"] = "days since 2000-01-01"
     ds["time"].attrs["calendar"] = "noleap"
     ds["time"].attrs["bounds"] = "time_bnds"
+    ds.attrs["branded_variable"] = "tas_tmin-h2m-hxy-u"
 
     # pylint: disable=too-few-public-methods
     class VDef:
@@ -39,7 +40,6 @@ def test_cmor_session_basic(tmp_path):
 
         name = "tas"
         branded_variable_name = "tas_tmin-h2m-hxy-u"
-        branded_variable = "tas_tmin-h2m-hxy-u"
         units = "K"
         table = "atmos"
         levels = {}
