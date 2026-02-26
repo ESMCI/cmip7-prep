@@ -603,7 +603,7 @@ def main():
         results = []
         for v in cmip_vars:
             # Find all timeseries files for this variable
-            ts_files = sorted(TSDIR.glob(glob_pattern))
+            ts_files = sorted(Path(TSDIR).glob(glob_pattern))
             logger.info(
                 f"Found {len(ts_files)} timeseries files for variable {v.branded_variable_name.name} with {glob_pattern}"
             )
