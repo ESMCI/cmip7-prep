@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import as_completed
 
+
 import os
 from pathlib import Path
 import logging
@@ -23,6 +24,7 @@ import glob
 import numpy as np
 import xarray as xr
 from cmor import set_cur_dataset_attribute
+import toml
 
 from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds
 from cmip7_prep.mapping_compat import Mapping
@@ -90,6 +92,11 @@ def parse_args():
         description="CMIP7 monthly processing for atm/lnd realms"
     )
     parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Show program version and exit",
+    )
+    parser.add_argument(
         "--cmip-vars",
         nargs="*",
         help="List of CMIP variable names to process directly (bypasses variable search)",
@@ -97,7 +104,7 @@ def parse_args():
     parser.add_argument(
         "--workers",
         type=int,
-        default=128,
+        default=1,
         help="Number of Dask workers (default: 128, set to 1 for serial execution)",
     )
     parser.add_argument(
@@ -117,7 +124,7 @@ def parse_args():
             "seaIce",
             "landIce",
         ],
-        required=True,
+        default="atmos",
         help="Realm to process",
     )
     parser.add_argument(
@@ -128,7 +135,7 @@ def parse_args():
             "ne30",
             "tx2_3v2",
         ],
-        required=True,
+        default="ne30",
         help="input_grid name (required)",
     )
     parser.add_argument(
@@ -168,7 +175,7 @@ def parse_args():
     parser.add_argument(
         "--outdir",
         type=str,
-        required=True,
+        default=".",
         help="Output directory for CMORized files",
     )
     parser.add_argument(
@@ -180,7 +187,7 @@ def parse_args():
     parser.add_argument(
         "--model",
         choices=["cesm", "noresm"],
-        required=True,
+        default="cesm",
         help="Model to use",
     )
     parser.add_argument(
@@ -190,8 +197,14 @@ def parse_args():
     )
 
     args = parser.parse_args()
-
     return args
+
+
+def get_version():
+    # Use dynamic version from cmip7_prep
+    from cmip7_prep import __version__
+
+    return __version__
 
 
 def process_one_var(
@@ -436,6 +449,7 @@ def main():
         logger.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled.")
+        logger.debug(f"Parsed arguments: {args}")
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
@@ -659,4 +673,8 @@ def main():
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    if getattr(args, "version", False):
+        print(f"cmor_driver.py version: {get_version()}")
+        sys.exit(0)
     main()
