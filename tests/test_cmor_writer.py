@@ -75,3 +75,86 @@ def test_cmor_session_basic(tmp_path):
         log_name=log_name,
     ) as session:
         session.write_variable(ds, CMIPVar(), VDef())
+
+
+def test_cmor_session_multiple_timeseries(tmp_path):
+    """Test CmorSession with multiple timeseries files (datasets)."""
+    tables_root = Path(__file__).parent.parent / "cmip7-cmor-tables"
+    tables_root.mkdir(parents=True, exist_ok=True)
+    # Create two timeseries datasets for two months
+    lat = np.linspace(-90, 90, 4)
+    lon = np.linspace(0, 360, 8, endpoint=False)
+    time1 = np.array([15])  # January
+    time2 = np.array([45])  # February
+    time_bnds1 = np.array([[0, 30]])
+    time_bnds2 = np.array([[30, 60]])
+    data1 = np.random.rand(1, 4, 8)
+    data2 = np.random.rand(1, 4, 8)
+    ds1 = xr.Dataset(
+        {
+            "tas_tmin-h2m-hxy-u": (("time", "lat", "lon"), data1),
+            "lat": ("lat", lat),
+            "lon": ("lon", lon),
+            "time": ("time", time1),
+            "time_bnds": (("time", "bnds"), time_bnds1),
+        }
+    )
+    ds2 = xr.Dataset(
+        {
+            "tas_tmin-h2m-hxy-u": (("time", "lat", "lon"), data2),
+            "lat": ("lat", lat),
+            "lon": ("lon", lon),
+            "time": ("time", time2),
+            "time_bnds": (("time", "bnds"), time_bnds2),
+        }
+    )
+    # Concatenate along time
+    ds = xr.concat([ds1, ds2], dim="time")
+    ds["lat"].attrs["units"] = "degrees_north"
+    ds["lon"].attrs["units"] = "degrees_east"
+    ds["time"].attrs["units"] = "days since 2000-01-01"
+    ds["time"].attrs["calendar"] = "noleap"
+    ds["time"].attrs["bounds"] = "time_bnds"
+    ds.attrs["branded_variable"] = "tas_tmin-h2m-hxy-u"
+
+    # pylint: disable=too-few-public-methods
+    class VDef:
+        """Minimal variable definition for testing multiple timeseries."""
+
+        name = "tas"
+        branded_variable_name = "tas_tmin-h2m-hxy-u"
+        units = "K"
+        table = "atmos"
+        levels = {}
+
+    # pylint: disable=too-few-public-methods
+    class CMIPVar:
+        """Minimal CMIP variable wrapper for testing multiple timeseries."""
+
+        class BrandedName:
+            """Branded variable name wrapper for testing multiple timeseries."""
+
+            name = "tas_tmin-h2m-hxy-u"
+
+        branded_variable_name = BrandedName()
+
+    dataset_json_path = Path(__file__).parent.parent / "data" / "cmor_dataset.json"
+    log_dir = tmp_path
+    log_name = "cmor_test_multi.log"
+    with CmorSession(
+        tables_root=tables_root,
+        dataset_json=dataset_json_path,
+        dataset_attrs={
+            "institution_id": "NCAR",
+            "GLOBAL_IS_CMIP7": True,
+            "branded_variable": {
+                "variable_id": "tas",
+                "table_id": "atmos",
+                "plev": 50000,
+                "description": "Vertical velocity at 500 hPa",
+            },
+        },
+        log_dir=log_dir,
+        log_name=log_name,
+    ) as session:
+        session.write_variable(ds, CMIPVar(), VDef())
