@@ -197,7 +197,7 @@ def parse_args():
 def process_one_var(
     cmip_var,
     mapping,
-    inputfile,
+    inputfiles,
     tables_root,
     outdir,
     resolution,
@@ -252,7 +252,7 @@ def process_one_var(
             # open_native_for_cmip_vars is in pipeline.py
             ds_native, var = open_native_for_cmip_vars(
                 varname,
-                inputfile,
+                inputfiles,
                 mapping,
                 use_cftime=True,
                 parallel=False,
@@ -603,51 +603,51 @@ def main():
         results = []
         for v in cmip_vars:
             # Find all timeseries files for this variable
-
             ts_files = sorted(TSDIR.glob(glob_pattern))
             logger.info(
                 f"Found {len(ts_files)} timeseries files for variable {v.branded_variable_name.name} with {glob_pattern}"
             )
-            for ts_file in ts_files:
-                logger.info(
-                    f"Processing file {ts_file} for variable {v.branded_variable_name.name}"
+            if not ts_files:
+                logger.warning(
+                    f"No timeseries files found for variable {v.branded_variable_name.name}"
                 )
-                if args.workers == 1:
-                    res = process_one_var(
-                        v,
-                        mapping,
-                        ts_file,
-                        tables_root,
-                        OUTDIR,
-                        resolution,
-                        model,
-                        realm=realm,
-                        frequency=frequency,
-                        ocn_fx_fields=ocn_fx_fields,
-                    )
-                    results.extend(res)
-                else:
-                    fut = process_one_var_delayed(
-                        v,
-                        mapping,
-                        ts_file,
-                        tables_root,
-                        OUTDIR,
-                        resolution,
-                        model,
-                        realm=realm,
-                        frequency=frequency,
-                        ocn_fx_fields=ocn_fx_fields,
-                    )
-                    futures = client.compute([fut])
-                    wait(futures, timeout="1200s")
-                    for _, result in as_completed(futures, with_results=True):
-                        if isinstance(result, list):
-                            results.extend(result)
-                        elif isinstance(result, tuple) and len(result) == 2:
-                            results.append(result)
-                        else:
-                            results.append((str(result), "unknown"))
+                continue
+            if args.workers == 1:
+                res = process_one_var(
+                    v,
+                    mapping,
+                    ts_files,
+                    tables_root,
+                    OUTDIR,
+                    resolution,
+                    model,
+                    realm=realm,
+                    frequency=frequency,
+                    ocn_fx_fields=ocn_fx_fields,
+                )
+                results.extend(res)
+            else:
+                fut = process_one_var_delayed(
+                    v,
+                    mapping,
+                    ts_files,
+                    tables_root,
+                    OUTDIR,
+                    resolution,
+                    model,
+                    realm=realm,
+                    frequency=frequency,
+                    ocn_fx_fields=ocn_fx_fields,
+                )
+                futures = client.compute([fut])
+                wait(futures, timeout="1200s")
+                for _, result in as_completed(futures, with_results=True):
+                    if isinstance(result, list):
+                        results.extend(result)
+                    elif isinstance(result, tuple) and len(result) == 2:
+                        results.append(result)
+                    else:
+                        results.append((str(result), "unknown"))
         for v, status in set(results):
             logger.info(f"Variable {v} processed with status: {status}")
     else:
