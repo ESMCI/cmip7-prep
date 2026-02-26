@@ -4,7 +4,7 @@ from pathlib import Path
 import warnings
 import re
 import datetime as dt
-from importlib.resources import files, as_file
+from importlib.resources import as_file
 import logging
 
 import cmor
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def packaged_dataset_json(filename: str = "cmor_dataset.json"):
     """Context manager yielding a real filesystem path to the packaged mapping file."""
-    res = files("cmip7_prep").joinpath(f"data/{filename}")
+    res = Path(__file__).parent.parent.parent / "data" / filename
     return as_file(res)
 
 

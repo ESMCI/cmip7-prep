@@ -1,7 +1,7 @@
 # cmip7_prep/cache_tools.py
 """Tools for caching and reuse in regridding."""
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 import logging
 import xesmf as xe
 import xarray as xr
@@ -93,19 +93,6 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
     )
 
     return dummy_in, dummy_out
-
-
-# -------------------------
-# Minimal dummy grids from the weight file (based on your approach)
-# -------------------------
-
-
-def read_array(m: xr.Dataset, *names: str) -> Optional[xr.DataArray]:
-    """helper tool to read array from xarray datasets"""
-    for n in names:
-        if n in m:
-            return m[n]
-    return None
 
 
 # -------------------------

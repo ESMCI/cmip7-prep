@@ -197,7 +197,7 @@ def parse_args():
 def process_one_var(
     cmip_var,
     mapping,
-    inputfile,
+    inputfiles,
     tables_root,
     outdir,
     resolution,
@@ -252,7 +252,7 @@ def process_one_var(
             # open_native_for_cmip_vars is in pipeline.py
             ds_native, var = open_native_for_cmip_vars(
                 varname,
-                inputfile,
+                inputfiles,
                 mapping,
                 use_cftime=True,
                 parallel=False,
@@ -587,9 +587,9 @@ def main():
     # Load requested variables
     if len(cmip_vars) > 0:
         if len(include_patterns) == 1:
-            input_path = TSDIR / f"*{include_patterns[0]}*"
+            glob_pattern = f"*{include_patterns[0]}*.nc"
         else:
-            input_path = TSDIR / "*"
+            glob_pattern = "*.nc"
 
         # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml)
         mapping = Mapping.from_packaged_default()
@@ -600,15 +600,23 @@ def main():
         else:
             tables_root = Path(TABLES_noresm)
 
-        # Now process the variables
-        if args.workers == 1:
-            results = [
-                item
-                for v in cmip_vars
-                for item in process_one_var(
+        results = []
+        for v in cmip_vars:
+            # Find all timeseries files for this variable
+            ts_files = sorted(Path(TSDIR).glob(glob_pattern))
+            logger.info(
+                f"Found {len(ts_files)} timeseries files for variable {v.branded_variable_name.name} with {glob_pattern}"
+            )
+            if not ts_files:
+                logger.warning(
+                    f"No timeseries files found for variable {v.branded_variable_name.name}"
+                )
+                continue
+            if args.workers == 1:
+                res = process_one_var(
                     v,
                     mapping,
-                    input_path,
+                    ts_files,
                     tables_root,
                     OUTDIR,
                     resolution,
@@ -617,13 +625,12 @@ def main():
                     frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                 )
-            ]
-        else:
-            futs = [
-                process_one_var_delayed(
-                    var,
+                results.extend(res)
+            else:
+                fut = process_one_var_delayed(
+                    v,
                     mapping,
-                    input_path,
+                    ts_files,
                     tables_root,
                     OUTDIR,
                     resolution,
@@ -632,38 +639,17 @@ def main():
                     frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                 )
-                for var in cmip_vars
-            ]
-            logger.info(f"launching {len(futs)} futures")
-            futures = client.compute(futs)
-            wait(
-                futures, timeout="1200s"
-            )  # optional soft check; won’t raise, just returns done/pending
-
-            # iterate results; if anything stalls you can call dump_all_stacks(client)
-            results = []
-            for _, result in as_completed(futures, with_results=True):
-                try:
-                    # Handle result types: list of tuples, tuple, or other
+                futures = client.compute([fut])
+                wait(futures, timeout="1200s")
+                for _, result in as_completed(futures, with_results=True):
                     if isinstance(result, list):
-                        # If it's a list, check if it's a list of tuples
-                        if all(isinstance(x, tuple) and len(x) == 2 for x in result):
-                            results.extend(result)
-                        else:
-                            # Not a list of tuples, wrap as unknown
-                            results.append((str(result), "unknown"))
+                        results.extend(result)
                     elif isinstance(result, tuple) and len(result) == 2:
                         results.append(result)
                     else:
-                        # Not a tuple/list, wrap as unknown
                         results.append((str(result), "unknown"))
-                except Exception as e:
-                    logger.error("Task error:", e)
-                    raise
-
         for v, status in set(results):
             logger.info(f"Variable {v} processed with status: {status}")
-
     else:
         logger.info("No results to process.")
     if client:

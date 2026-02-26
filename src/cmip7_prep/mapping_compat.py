@@ -201,14 +201,6 @@ class Mapping:
     # -----------------
     # Public API
     # -----------------
-    def list_variables(self, table: Optional[str] = None) -> List[str]:
-        """Return all CMIP variable names, optionally filtered by table."""
-        if table is None:
-            return sorted(self._vars.keys())
-        t_short = _normalize_table_name(table)
-        out = [k for k, v in self._vars.items() if v.table == t_short]
-        return sorted(out)
-
     def get_cfg(self, cmip_name: str) -> Dict[str, Any]:
         """Return the normalized config dict for a CMIP variable name."""
         if cmip_name not in self._vars:
