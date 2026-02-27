@@ -24,7 +24,7 @@ import glob
 import numpy as np
 import xarray as xr
 from cmor import set_cur_dataset_attribute
-import toml
+#import toml
 
 from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds
 from cmip7_prep.mapping_compat import Mapping
@@ -229,7 +229,7 @@ def process_one_var(
 
     try:
         # This is what maps the CESM/NorESM history variable(s) to the cmor variable
-        # This is obtained from reading cesm_to_cmip7.yaml
+        # This is obtained from reading cesm_to_cmip7.yaml or noresm_to_cmip7.yaml
         cfg = mapping.get_cfg(varname)
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
@@ -605,8 +605,11 @@ def main():
         else:
             glob_pattern = "*.nc"
 
-        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml)
-        mapping = Mapping.from_packaged_default()
+        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml or noresm_to_cmip7.yaml)
+        if model == "noresm":
+            mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
+        else:
+            mapping = Mapping.from_packaged_default()
 
         # Determine TABLES directory
         if model == "cesm":
