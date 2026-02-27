@@ -302,7 +302,7 @@ variables:
     table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
-    formula: FATES_GPP * FATES_FRACTION /1000.0
+    formula: FATES_GPP * FATES_FRACTION
     sources:
       - cesm_var: FATES_GPP
       - cesm_var: FATES_FRACTION
