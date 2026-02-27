@@ -1,5 +1,5 @@
 # cmip7_prep/pipeline.py
-"""Open native CESM timeseries, realize mappings, optional vertical transforms, and regrid."""
+"""Open native MODEL timeseries, realize mappings, optional vertical transforms, and regrid."""
 
 from __future__ import annotations
 
@@ -44,10 +44,10 @@ def _filename_contains_var(
     return needle in name
 
 
-def _collect_required_cesm_vars(
+def _collect_required_model_vars(
     mapping: Mapping, cmip_vars: Sequence[str]
 ) -> List[str]:
-    """Gather all native CESM vars needed to realize the requested CMIP vars."""
+    """Gather all native model vars needed to realize the requested CMIP vars."""
     needed: set[str] = set()
     for var in cmip_vars:
         try:
@@ -60,9 +60,9 @@ def _collect_required_cesm_vars(
         if src:
             needed.add(src)
         for raw in raws:
-            # 'sources' items may be dicts with 'cesm_var'
-            if isinstance(raw, dict) and "cesm_var" in raw:
-                needed.add(raw["cesm_var"])
+            # 'sources' items may be dicts with 'model_var'
+            if isinstance(raw, dict) and "model_var" in raw:
+                needed.add(raw["model_var"])
             elif isinstance(raw, str):
                 needed.add(raw)
         # vertical dependencies if plev19 or plev39
@@ -79,7 +79,7 @@ def _collect_required_cesm_vars(
 
 def open_native_for_cmip_vars(
     cmip_vars: Sequence[str],
-    files: Union[str, Path],
+    files: Sequence[Union[str, Path]],
     mapping: Mapping,
     *,
     use_cftime: bool = True,
@@ -92,8 +92,9 @@ def open_native_for_cmip_vars(
     Parameters
     ----------
     cmip_vars : list of CMIP variable names (e.g., ["tas", "ta"])
-    files : list of native timeseries files
-                 (e.g., "/path/atm/hist_monthly/*cam.h0*")
+    files : list or sequence of native timeseries file paths
+                 (e.g., ["/path/atm/hist_monthly/file1.nc",
+                         "/path/atm/hist_monthly/file2.nc"])
     mapping : Mapping object that knows how to realize CMIP vars
     use_cftime, parallel : forwarded to xarray.open_mfdataset
     open_kwargs : extra kwargs for open_mfdataset
@@ -109,10 +110,10 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
 
     for var in cmip_vars:
-        logger.info("Processing CMIP var collecting cesm vars'%s'", var)
-        rvar = _collect_required_cesm_vars(mapping, [var])
+        logger.info("Processing CMIP var; collecting model vars '%s'", var)
+        rvar = _collect_required_model_vars(mapping, [var])
         logger.info(
-            "Looking for native files for CMIP var '%s' needing CESM vars: %s",
+            "Looking for native files for CMIP var '%s' needing model vars: %s",
             var,
             rvar,
         )
@@ -121,9 +122,9 @@ def open_native_for_cmip_vars(
         )
         if selected:
             new_cmip_vars.append(var)
-    required = _collect_required_cesm_vars(mapping, new_cmip_vars)
+    required = _collect_required_model_vars(mapping, new_cmip_vars)
 
-    # keep any file that contains ANY of the required CESM vars as '.var.' in the name
+    # keep any file that contains ANY of the required model vars as '.var.' in the name
     selected = sorted(
         {str(p) for p in files if any(_filename_contains_var(p, v) for v in required)}
     )

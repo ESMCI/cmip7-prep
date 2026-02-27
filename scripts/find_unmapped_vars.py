@@ -5,11 +5,11 @@ from typing import List
 
 def parse_cmor_driver_output(file_path: str):
     no_mapping_vars: List[str] = []
-    no_cesm_vars: List[str] = []
+    no_model_vars: List[str] = []
 
     # Regex patterns
     mapping_pattern = re.compile(r"No mapping for (.+) in ")
-    cesm_pattern = re.compile(
+    model_pattern = re.compile(
         r"Variable (.*) processed with status: ERROR \w+ input variable not found\."
     )
 
@@ -20,11 +20,11 @@ def parse_cmor_driver_output(file_path: str):
         mapping_match = mapping_pattern.search(line)
         if mapping_match:
             no_mapping_vars.append(mapping_match.group(1))
-        cesm_match = cesm_pattern.search(line)
-        if cesm_match:
-            no_cesm_vars.append(cesm_match.group(1))
+        model_match = model_pattern.search(line)
+        if model_match:
+            no_model_vars.append(model_match.group(1))
 
-    return no_mapping_vars, no_cesm_vars
+    return no_mapping_vars, no_model_vars
 
 
 def main():
@@ -32,13 +32,13 @@ def main():
         print(f"Usage: {sys.argv[0]} <cmor_driver_output.txt>")
         sys.exit(1)
     file_path = sys.argv[1]
-    no_mapping_vars, no_cesm_vars = parse_cmor_driver_output(file_path)
+    no_mapping_vars, no_model_vars = parse_cmor_driver_output(file_path)
 
     print("Variables with no mapping:")
     for var in no_mapping_vars:
         print(var)
-    print("\nVariables with no CESM variable:")
-    for var in no_cesm_vars:
+    print("\nVariables with no MODEL variable:")
+    for var in no_model_vars:
         print(var)
 
 
