@@ -151,7 +151,7 @@ class Mapping:
     @classmethod
     def from_packaged_default(cls, filename: str = "cesm_to_cmip7.yaml") -> "Mapping":
         """Construct a Mapping using the packaged default YAML."""
-        logger.info(f"DEBUG: mapping file is {filename}")
+        logger.info(f"mapping file is %s, filename")
         with packaged_mapping_resource(filename) as p:
             return cls(p)
 
