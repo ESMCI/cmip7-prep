@@ -79,7 +79,7 @@ def _collect_required_model_vars(
 
 def open_native_for_cmip_vars(
     cmip_vars: Sequence[str],
-    files: Union[str, Path],
+    files: Sequence[Union[str, Path]],
     mapping: Mapping,
     *,
     use_cftime: bool = True,
@@ -92,8 +92,9 @@ def open_native_for_cmip_vars(
     Parameters
     ----------
     cmip_vars : list of CMIP variable names (e.g., ["tas", "ta"])
-    files : list of native timeseries files
-                 (e.g., "/path/atm/hist_monthly/*cam.h0*")
+    files : list or sequence of native timeseries file paths
+                 (e.g., ["/path/atm/hist_monthly/file1.nc",
+                         "/path/atm/hist_monthly/file2.nc"])
     mapping : Mapping object that knows how to realize CMIP vars
     use_cftime, parallel : forwarded to xarray.open_mfdataset
     open_kwargs : extra kwargs for open_mfdataset
@@ -109,7 +110,7 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
 
     for var in cmip_vars:
-        logger.info("Processing CMIP var collecting model vars'%s'", var)
+        logger.info("Processing CMIP var; collecting model vars '%s'", var)
         rvar = _collect_required_model_vars(mapping, [var])
         logger.info(
             "Looking for native files for CMIP var '%s' needing model vars: %s",

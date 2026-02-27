@@ -18,12 +18,12 @@ variables:
       - {model_var: TS, scale: 10.0}
     table: CMIP7_atmos
 """
-    with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=True) as tmp:
         tmp.write(yaml_str)
         tmp.flush()
         mapping = Mapping(tmp.name)
         cfg = mapping.get_cfg("tas")
-    print(f"here cfg is {cfg}")
+
     # The Mapping class normalizes sources to raw_variables,
     # and for a single source with no formula, sets source
     assert cfg["source"] == "TS"
