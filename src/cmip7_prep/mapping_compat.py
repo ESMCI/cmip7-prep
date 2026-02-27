@@ -3,7 +3,7 @@ r"""Mapping loader/evaluator compatible with CMIP6-style lists, CMIP7-style dict
 and a dict wrapped under a top-level key 'variables:'.
 
 Also supports a 'sources:' list where each item may be a plain string or a dict
-with 'cesm_var' (e.g., {'cesm_var': 'TS'}). If there's exactly one source and
+with 'model_var' (e.g., {'model_var': 'TS'}). If there's exactly one source and
 no formula, it's treated as a 1:1 mapping; otherwise sources become raw_variables.
 """
 from __future__ import annotations
@@ -252,8 +252,8 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
         for item in cfg["sources"]:
             if isinstance(item, str):
                 raw_from_sources.append(item)
-            elif isinstance(item, dict) and "cesm_var" in item:
-                raw_from_sources.append(str(item["cesm_var"]))
+            elif isinstance(item, dict) and "model_var" in item:
+                raw_from_sources.append(str(item["model_var"]))
         if not raw_from_sources:
             raw_from_sources = None
 

@@ -19,7 +19,7 @@ variables:
     units: "yr"
     dims: [time, olevel, latitude, longitude]
     sources:
-      - cesm_var: agessc
+      - model_var: agessc
 
   cl_tavg-al-hxy-u:
     table: atmos
@@ -35,7 +35,7 @@ variables:
       src_axis_name: lev                 # model midlevel dimension
       src_axis_bnds: ilev                # model interface/bounds dim (if you ever need it)
     sources:
-      - cesm_var: CLOUD
+      - model_var: CLOUD
 
   cli_tavg-al-hxy-u:
     table: atmos
@@ -47,7 +47,7 @@ variables:
       src_axis_name: lev
       src_axis_bnds: ilev
     sources:
-      - cesm_var: CLDICE
+      - model_var: CLDICE
 
   cLitter_tavg-u-hxy-lnd:
     table: land
@@ -55,15 +55,15 @@ variables:
     dims: [time, lat, lon]
     formula: (TOTLITC + CWD_C)/1000.0
     sources:
-      - cesm_var: TOTLITC
-      - cesm_var: CWD_C
+      - model_var: TOTLITC
+      - model_var: CWD_C
 
   clivi_tavg-u-hxy-u:
     table: atmos
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: TGCLDIWP
+      - model_var: TGCLDIWP
 
   clt_tavg-u-hxy-u:
     table: atmos
@@ -71,7 +71,7 @@ variables:
     dims: [time, lat, lon]
     formula: CLDTOT * 100
     sources:
-      - cesm_var: CLDTOT
+      - model_var: CLDTOT
 
   clw_tavg-al-hxy-u:
     table: atmos
@@ -83,14 +83,14 @@ variables:
       src_axis_name: lev
       src_axis_bnds: ilev
     sources:
-      - cesm_var: CLDLIQ
+      - model_var: CLDLIQ
 
   clwvi_tavg-u-hxy-u:
     table: atmos
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: TGCLDLWP
+      - model_var: TGCLDLWP
 
   cProduct_tavg-u-hxy-lnd:
     table: land
@@ -98,22 +98,22 @@ variables:
     dims: [time, lat, lon]
     formula: (TOTPRODC + CWD_P)/1000.0
     sources:
-      - cesm_var: TOTPRODC
-      - cesm_var: CWD_P
+      - model_var: TOTPRODC
+      - model_var: CWD_P
 
   cropFracC3_tavg-u-hxy-u:
     table: land
     units: "1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: CROP_C3_FRAC
+      - model_var: CROP_C3_FRAC
 
   cropFracC4_tavg-u-hxy-u:
     table: land
     units: "1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: CROP_C4_FRAC
+      - model_var: CROP_C4_FRAC
 
   cSoil_tavg-u-hxy-lnd:
     table: land
@@ -121,9 +121,9 @@ variables:
     dims: [time, lat, lon]
     formula: (SOIL1C + SOIL2C + SOIL3C)/1000.0
     sources:
-      - cesm_var: SOIL1C
-      - cesm_var: SOIL2C
-      - cesm_var: SOIL3C
+      - model_var: SOIL1C
+      - model_var: SOIL2C
+      - model_var: SOIL3C
 
   cSoilFast:
     table: land
@@ -131,7 +131,7 @@ variables:
     dims: [time, lat, lon]
     formula: (SOIL1C)/1000.0
     sources:
-      - cesm_var: SOIL1C
+      - model_var: SOIL1C
 
   cSoilMedium:
     table: land
@@ -139,7 +139,7 @@ variables:
     dims: [time, lat, lon]
     formula: (SOIL2C)/1000.0
     sources:
-      - cesm_var: SOIL2C
+      - model_var: SOIL2C
 
   cSoilSlow:
     table: land
@@ -147,7 +147,7 @@ variables:
     dims: [time, lat, lon]
     formula: (SOIL3C)/1000.0
     sources:
-      - cesm_var: SOIL3C
+      - model_var: SOIL3C
 
   cVeg_tavg-u-hxy-lnd:
     table: land
@@ -155,14 +155,14 @@ variables:
     dims: [time, lat, lon]
     formula: (TOTVEGC)/1000.0
     sources:
-      - cesm_var: TOTVEGC
+      - model_var: TOTVEGC
 
   dcw_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: DCW
+      - model_var: DCW
 
   deptho_ti-u-hxy-sea:
     table: fx
@@ -172,49 +172,49 @@ variables:
     dims: [yh, xh]
     regrid_method: conservative
     sources:
-      - cesm_var: deptho
+      - model_var: deptho
 
   dgw_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: DGW
+      - model_var: DGW
 
   drivw_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: DRIVW
+      - model_var: DRIVW
 
   dslw_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: DSLW
+      - model_var: DSLW
 
   dsn_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: DSN
+      - model_var: DSN
 
   dsw_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: DSW
+      - model_var: DSW
 
   esn_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: ESN
+      - model_var: ESN
 
   evspsbl_tavg-u-hxy-lnd:
     table: land
@@ -222,7 +222,7 @@ variables:
     long_name: Evaporation over land
     dims: [time, lat, lon]
     sources:
-      - cesm_var: QVEGT
+      - model_var: QVEGT
 
   evspsbl_tavg-u-hxy-ifs:
     table: ocean
@@ -231,7 +231,7 @@ variables:
     dims: [time, latitude, longitude]
     regrid_method: conservative
     sources:
-      - cesm_var: evs
+      - model_var: evs
 
   evspsbl_tavg-u-hxy-u:
     table: atmos
@@ -241,7 +241,7 @@ variables:
     dims: [time, lat, lon]
     regrid_method: conservative
     sources:
-      - cesm_var: QFLX
+      - model_var: QFLX
         scale: -1.0     # flip sign if CESM positive upward
 
   evspsblpot_tavg-u-hxy-lnd:
@@ -250,7 +250,7 @@ variables:
     long_name: Potential Evaporation over Land
     dims: [time, lat, lon]
     sources:
-      - cesm_var: QVEGT_POT
+      - model_var: QVEGT_POT
 
   evspsblsoi_tavg-u-hxy-u:
     table: atmos
@@ -259,7 +259,7 @@ variables:
     dims: [time, lat, lon]
     regrid_method: conservative
     sources:
-      - cesm_var: QSOIL
+      - model_var: QSOIL
         scale: -1.0     # flip sign if CESM positive upward
 
   evspsblsoi_tavg-u-hxy-lnd:
@@ -268,7 +268,7 @@ variables:
     long_name: Water Evaporation from Soil
     dims: [time, lat, lon]
     sources:
-      - cesm_var: QSOIL
+      - model_var: QSOIL
 
   evspsblveg_tavg-u-hxy-lnd:
     table: land
@@ -276,7 +276,7 @@ variables:
     long_name: Water Evaporation from Vegetation
     dims: [time, lat, lon]
     sources:
-      - cesm_var: QVEGE
+      - model_var: QVEGE
 
   evspsblveg_tavg-u-hxy-u:
     table: atmos
@@ -285,7 +285,7 @@ variables:
     dims: [time, lat, lon]
     regrid_method: conservative
     sources:
-      - cesm_var: QVEGE
+      - model_var: QVEGE
         scale: -1.0     # flip sign if CESM positive upward
 
   fFire_tavg-u-hxy-lnd:
@@ -295,7 +295,7 @@ variables:
     positive: up
     formula: COL_FIRE_CLOSS/1000.0
     sources:
-      - cesm_var: COL_FIRE_CLOSS
+      - model_var: COL_FIRE_CLOSS
 
   fHarvest:
     table: land
@@ -304,7 +304,7 @@ variables:
     positive: up
     formula: WOOD_HARVESTC/1000.0
     sources:
-      - cesm_var: WOOD_HARVESTC
+      - model_var: WOOD_HARVESTC
 
   ficeberg_tavg-u-hxy-sea:
     table: ocean
@@ -313,7 +313,7 @@ variables:
     dims: [time, latitude, longitude]
     regrid_method: conservative
     sources:
-      - cesm_var: ficeberg
+      - model_var: ficeberg
 
   fNVegSoil_tavg-u-hxy-lnd:
     table: land
@@ -322,7 +322,7 @@ variables:
     positive: up
     formula: NVEG_SOIL_CLOSS/1000.0
     sources:
-      - cesm_var: NVEG_SOIL_CLOSS
+      - model_var: NVEG_SOIL_CLOSS
 
   gpp_tavg-u-hxy-lnd:
     table: land
@@ -330,7 +330,7 @@ variables:
     dims: [time, lat, lon]
     formula: GPP/1000.0
     sources:
-      - cesm_var: GPP
+      - model_var: GPP
 
   irrDem_tavg-u-hxy-u:
     table: atmos
@@ -338,7 +338,7 @@ variables:
     long_name: Irrigation Demand
     dims: [time, lat, lon]
     sources:
-      - cesm_var: IRR_DEM
+      - model_var: IRR_DEM
 
   irrGw_tavg-u-hxy-u:
     table: atmos
@@ -346,7 +346,7 @@ variables:
     long_name: Groundwater Irrigation
     dims: [time, lat, lon]
     sources:
-      - cesm_var: IRR_GW
+      - model_var: IRR_GW
 
   irrLut_tavg-u-hxy-u:
     table: atmos
@@ -354,7 +354,7 @@ variables:
     long_name: Surface Water Irrigation
     dims: [time, lat, lon]
     sources:
-      - cesm_var: IRR_LUT
+      - model_var: IRR_LUT
 
   irrSurf_tavg-u-hxy-u:
     table: atmos
@@ -362,7 +362,7 @@ variables:
     long_name: Irrigation from Surface Water
     dims: [time, lat, lon]
     sources:
-      - cesm_var: IRR_SURF
+      - model_var: IRR_SURF
 
 
   hfds_tavg-u-hxy-sea:
@@ -371,7 +371,7 @@ variables:
     positive: down
     dims: [time, latitude, longitude]
     sources:
-      - cesm_var: hfds
+      - model_var: hfds
 
   hfls_tavg-u-hxy-u:
     table: atmos
@@ -379,7 +379,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: LHFLX
+      - model_var: LHFLX
 
   hfsnthermds_tavg-u-hxy-sea:
     table: ocean
@@ -388,7 +388,7 @@ variables:
     dims: [time, olevel, latitude, longitude]
     regrid_method: conservative
     sources:
-      - cesm_var: hfsnthermds
+      - model_var: hfsnthermds
 
   hfss_tavg-u-hxy-u:
     table: atmos
@@ -396,7 +396,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: SHFLX
+      - model_var: SHFLX
 
   hurs_tavg-al-hxy-u:
     table: atmos
@@ -408,7 +408,7 @@ variables:
       src_axis_name: lev
       src_axis_bnds: ilev
     sources:
-      - cesm_var: RELHUM
+      - model_var: RELHUM
 
   hur_tavg-p19-hxy-air:
     table: atmos
@@ -418,14 +418,14 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: RELHUM
+      - model_var: RELHUM
 
   hurs_tavg-u-hxy-u:
     table: atmos
     units: "%"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: RHREFHT
+      - model_var: RHREFHT
 
   hus_tavg-al-hxy-u:
     table: atmos
@@ -437,7 +437,7 @@ variables:
       src_axis_name: lev
       src_axis_bnds: ilev
     sources:
-      - cesm_var: Q
+      - model_var: Q
 
   hus_tavg-p19-hxy-u:
     table: atmos
@@ -447,7 +447,7 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: Q
+      - model_var: Q
 
   huss_tavg-h2m-hxy-u:
     table: atmos
@@ -456,14 +456,14 @@ variables:
     dims: [time, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: QREFHT
+      - model_var: QREFHT
 
   lai_tavg-u-hxy-lnd:
     table: land
     units: "1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: TLAI
+      - model_var: TLAI
 
   mlotst_tavg-u-hxy-sea:
     table: ocean
@@ -471,7 +471,7 @@ variables:
     long_name: "Ocean Mixed Layer Thickness Defined by Sigma T"
     dims: [time, latitude, longitude]
     sources:
-      - cesm_var: mlotst
+      - model_var: mlotst
 
   mrfso_tavg-u-hxy-lnd:
     table: landIce
@@ -479,42 +479,42 @@ variables:
     dims: [time, lat, lon]
     formula: verticalsum(SOILICE, capped_at=5000)
     sources:
-      - cesm_var: SOILICE
+      - model_var: SOILICE
 
   mrro_tavg-u-hxy-lnd:
     table: land
     units: kg m-2 s-1
     dims: [time, lat, lon]
     sources:
-      - cesm_var: QRUNOFF
+      - model_var: QRUNOFF
 
   mrrob_tavg-u-hxy-lnd:
     table: land
     units: kg m-2 s-1
     dims: [time, lat, lon]
     sources:
-      - cesm_var: QBURDRUNOFF
+      - model_var: QBURDRUNOFF
 
   mrros_tavg-u-hxy-lnd:
     table: land
     units: kg m-2 s-1
     dims: [time, lat, lon]
     sources:
-      - cesm_var: QOVER
+      - model_var: QOVER
 
   mrsfl_tavg-sl-hxy-lnd:
     table: land
     units: kg m-2
     dims: [time, sdepth, lat, lon]
     sources:
-      - cesm_var: SOILMOIST
+      - model_var: SOILMOIST
 
   mrsll_tavg-sl-hxy-lnd:
     table: land
     units: kg m-2
     dims: [time, sdepth, lat, lon]
     sources:
-      - cesm_var: SOILLIQ
+      - model_var: SOILLIQ
 
   mrso_tavg-u-hxy-lnd:
     table: land
@@ -522,8 +522,8 @@ variables:
     dims: [time, lat, lon]
     formula: verticalsum(SOILICE + SOILLIQ, capped_at=5000)
     sources:
-      - cesm_var: SOILICE
-      - cesm_var: SOILLIQ
+      - model_var: SOILICE
+      - model_var: SOILLIQ
 
   mrsol_tavg-sl-hxy-lnd:
     table: land
@@ -531,15 +531,15 @@ variables:
     dims: [time, sdepth, lat, lon]
     formula: SOILLIQ + SOILICE
     sources:
-      - cesm_var: SOILLIQ
-      - cesm_var: SOILICE
+      - model_var: SOILLIQ
+      - model_var: SOILICE
 
   mrsol_tavg-d10cm-hxy-lnd:
     table: land
     units: kg m-2
     dims: [time, lat, lon]
     sources:
-      - cesm_var: SOILWATER_10CM
+      - model_var: SOILWATER_10CM
 
   nbp_tavg-u-hxy-lnd:
     table: land
@@ -548,7 +548,7 @@ variables:
     formula: NBP/1000.0
     positive: down
     sources:
-      - cesm_var: NBP
+      - model_var: NBP
 
   npp_tavg-u-hxy-lnd:
     table: land
@@ -557,7 +557,7 @@ variables:
     formula: NPP/1000.0
     positive: down
     sources:
-      - cesm_var: NPP
+      - model_var: NPP
 
   nVeg_tavg-u-hxy-lnd:
     table: land
@@ -565,23 +565,23 @@ variables:
     dims: [time, lat, lon]
     formula: (WOOD_C + LEAF_C + ROOT_C)/1000.0
     sources:
-      - cesm_var: WOOD_C
-      - cesm_var: LEAF_C
-      - cesm_var: ROOT_C
+      - model_var: WOOD_C
+      - model_var: LEAF_C
+      - model_var: ROOT_C
 
   pastureFracC3_tavg-u-hxy-u:
     table: land
     units: "1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: PASTURE_C3_FRAC
+      - model_var: PASTURE_C3_FRAC
 
   pastureFracC4_tavg-u-hxy-u:
     table: land
     units: "1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: PASTURE_C4_FRAC
+      - model_var: PASTURE_C4_FRAC
 
   pr_tavg-u-hxy-u:
     table: atmos
@@ -592,7 +592,7 @@ variables:
     dims: [time, lat, lon]
     regrid_method: conservative
     sources:
-      - cesm_var: PRECT
+      - model_var: PRECT
         scale: 1000.0   # convert from m/s to kg m-2 s-1 if needed
 
   prc_tavg-u-hxy-u:
@@ -602,7 +602,7 @@ variables:
     # PRECC is in m s-1 (water equivalent) → convert to kg m-2 s-1
     formula: PRECC * 1000.0
     sources:
-      - cesm_var: PRECC
+      - model_var: PRECC
 
   prsn_tavg-u-hxy-u:
     table: atmos
@@ -611,22 +611,22 @@ variables:
     # PRECSC/PRECSL are snowfall rates in m s-1 (water equiv) → convert to kg m-2 s-1
     formula: (PRECSC + PRECSL) * 1000.0
     sources:
-      - cesm_var: PRECSC
-      - cesm_var: PRECSL
+      - model_var: PRECSC
+      - model_var: PRECSL
 
   prveg_tavg-u-hxy-lnd:
     table: land
     units: "kg m-2 s-1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: QINTR
+      - model_var: QINTR
 
   prw_tavg-u-hxy-u:
     table: atmos
     units: "kg m-2"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: TMQ
+      - model_var: TMQ
 
   psl_tavg-u-hxy-u:
     table: atmos
@@ -636,7 +636,7 @@ variables:
     dims: [time, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: PSL
+      - model_var: PSL
 
   ps_tavg-u-hxy-u:
     table: atmos
@@ -646,7 +646,7 @@ variables:
     dims: [time, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: PS
+      - model_var: PS
 
   ra_tavg-u-hxy-lnd:
     table: land
@@ -655,7 +655,7 @@ variables:
     positive: up
     formula: AR/1000.0
     sources:
-      - cesm_var: AR
+      - model_var: AR
 
   rh_tavg-u-hxy-lnd:
     table: land
@@ -664,7 +664,7 @@ variables:
     positive: up
     formula: HR/1000.0
     sources:
-      - cesm_var: HR
+      - model_var: HR
 
   rlds_tavg-u-hxy-u:
     table: atmos
@@ -672,7 +672,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: FLDS
+      - model_var: FLDS
 
   rldscs_tavg-u-hxy-u:
     table: atmos
@@ -681,9 +681,9 @@ variables:
     positive: up
     formula: FLDS + FLNS - FLNSC
     sources:
-      - cesm_var: FLDS
-      - cesm_var: FLNS
-      - cesm_var: FLNSC
+      - model_var: FLDS
+      - model_var: FLNS
+      - model_var: FLNSC
 
   rlus_tavg-u-hxy-u:
     table: atmos
@@ -692,8 +692,8 @@ variables:
     positive: up
     formula: FLDS + FLNS
     sources:
-      - cesm_var: FLDS
-      - cesm_var: FLNS
+      - model_var: FLDS
+      - model_var: FLNS
 
   rluscs_tavg-u-hxy-u:
     table: atmos
@@ -701,7 +701,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: FLNSC
+      - model_var: FLNSC
 
   rlut_tavg-u-hxy-u:
     table: atmos
@@ -709,7 +709,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: FLUT
+      - model_var: FLUT
 
   rlutcs_tavg-u-hxy-u:
     table: atmos
@@ -717,7 +717,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: FLUTC
+      - model_var: FLUTC
 
   rsds_tavg-u-hxy-u:
     table: atmos
@@ -725,7 +725,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: FSDS
+      - model_var: FSDS
 
   rsds_tavg-u-hxy-lnd:
     table: land
@@ -733,7 +733,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: FSDS
+      - model_var: FSDS
 
   rsdscs_tavg-u-hxy-u:
     table: atmos
@@ -741,7 +741,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: FSDSC
+      - model_var: FSDSC
 
   rsdt_tavg-u-hxy-u:
     table: atmos
@@ -749,7 +749,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: SOLIN
+      - model_var: SOLIN
 
   rsus_tavg-u-hxy-u:
     table: atmos
@@ -758,8 +758,8 @@ variables:
     positive: up
     formula: FSDS - FSNS
     sources:
-      - cesm_var: FSDS
-      - cesm_var: FSNS
+      - model_var: FSDS
+      - model_var: FSNS
 
   rsuscs_tavg-u-hxy-u:
     table: atmos
@@ -768,8 +768,8 @@ variables:
     positive: up
     formula: FSDSC - FSNSC
     sources:
-      - cesm_var: FSDSC
-      - cesm_var: FSNSC
+      - model_var: FSDSC
+      - model_var: FSNSC
 
   rsut_tavg-u-hxy-u:
     table: atmos
@@ -777,7 +777,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: FLUT
+      - model_var: FLUT
 
   rsutcs_tavg-u-hxy-u:
     table: atmos
@@ -786,8 +786,8 @@ variables:
     formula: SOLIN - FSNTOAC
     positive: up
     sources:
-      - cesm_var: SOLIN
-      - cesm_var: FSNTOAC
+      - model_var: SOLIN
+      - model_var: FSNTOAC
 
   sithick_tavg-u-hxy-si:
     table: seaIce
@@ -795,14 +795,14 @@ variables:
     dims: [time, latitude, longitude]
     regrid_method: conservative
     sources:
-      - cesm_var: sithick
+      - model_var: sithick
 
   snld:
     table: land
     units: "m"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: SNOW_DEPTH
+      - model_var: SNOW_DEPTH
 
   soga:
     table: ocean
@@ -812,7 +812,7 @@ variables:
       - [time, lat, lon]
     regrid_method: conservative
     sources:
-      - cesm_var: soga
+      - model_var: soga
 
   sos_tavg-u-hxy-sea:
     table: ocean
@@ -822,7 +822,7 @@ variables:
       - [time, lat, lon]
     regrid_method: conservative
     sources:
-      - cesm_var: sos
+      - model_var: sos
 
   sos_max:
     table: ocean
@@ -832,7 +832,7 @@ variables:
       - [time, lat, lon]
     regrid_method: conservative
     sources:
-      - cesm_var: sos_max
+      - model_var: sos_max
 
   sos_min:
     table: ocean
@@ -842,14 +842,14 @@ variables:
       - [time, lat, lon]
     regrid_method: conservative
     sources:
-      - cesm_var: sos_min
+      - model_var: sos_min
 
   sfcWind_tavg-h10m-hxy-u:
     table: atmos
     units: "m s-1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: U10
+      - model_var: U10
 
   sftlf:
     table: fx
@@ -857,7 +857,7 @@ variables:
     dims: [lat, lon]
     formula: LANDFRAC * 100.0
     sources:
-      - cesm_var: LANDFRAC
+      - model_var: LANDFRAC
 
   ta_tavg-al-hxy-u:
     table: atmos
@@ -871,7 +871,7 @@ variables:
       src_axis_name: lev
       src_axis_bnds: ilev
     sources:
-      - cesm_var: T
+      - model_var: T
 
   ta_tavg-p19-hxy-air:
     table: atmos
@@ -883,7 +883,7 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: T
+      - model_var: T
 
   tas_tavg-h2m-hxy-u:
     table: atmos
@@ -894,21 +894,21 @@ variables:
     dims: [time, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: TS
+      - model_var: TS
 
   tasmax:
     table: atmos
     units: "K"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: TREFHTMX
+      - model_var: TREFHTMX
 
   tasmin:
     table: atmos
     units: "K"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: TREFHTMN
+      - model_var: TREFHTMN
 
   tauu_tavg-u-hxy-u:
     table: atmos
@@ -916,7 +916,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: TAUX
+      - model_var: TAUX
 
   tauuo_tavg-u-hxy-sea:
     table: ocean
@@ -924,7 +924,7 @@ variables:
     dims: [time, latitude, longitude]
     positive: down
     sources:
-      - cesm_var: tauuo
+      - model_var: tauuo
 
   tauv_tavg-u-hxy-u:
     table: atmos
@@ -932,7 +932,7 @@ variables:
     dims: [time, lat, lon]
     positive: up
     sources:
-      - cesm_var: TAUY
+      - model_var: TAUY
 
   tauvo_tavg-u-hxy-sea:
     table: ocean
@@ -940,7 +940,7 @@ variables:
     dims: [time, latitude, longitude]
     positive: down
     sources:
-      - cesm_var: tauvo
+      - model_var: tauvo
 
   tdps:
     table: atmos
@@ -950,7 +950,7 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: TD
+      - model_var: TD
 
   thetao_tavg-ol-hxy-sea:
     table: ocean
@@ -960,7 +960,7 @@ variables:
       - [time, z_l, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: thetao
+      - model_var: thetao
 
   thetaoga:
     table: ocean
@@ -970,7 +970,7 @@ variables:
       - [time, z_l, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: thetaoga
+      - model_var: thetaoga
 
   tnhus:
     table: atmos
@@ -980,7 +980,7 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: Q
+      - model_var: Q
 
   tnt:
     table: atmos
@@ -990,7 +990,7 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: T
+      - model_var: T
 
   tos_tavg-u-hxy-sea:
     table: ocean
@@ -1000,7 +1000,7 @@ variables:
       - [time, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: tos
+      - model_var: tos
 
   tran_tavg-u-hxy-lnd:
     table: land
@@ -1009,22 +1009,22 @@ variables:
     positive: up
     formula: QSOIL + QVEGT
     sources:
-      - cesm_var: QVEGT
-      - cesm_var: QSOIL
+      - model_var: QVEGT
+      - model_var: QSOIL
 
   ts_tavg-u-hxy-u:
     table: atmos
     units: "K"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: TS
+      - model_var: TS
 
   tsl_tavg-sl-hxy-lnd:
     table: land
     units: "K"
     dims: [time, sdepth, lat, lon]
     sources:
-      - cesm_var: TSOI
+      - model_var: TSOI
 
   ua_tavg-al-hxy-u:
     table: atmos
@@ -1038,7 +1038,7 @@ variables:
       src_axis_name: lev
       src_axis_bnds: ilev
     sources:
-      - cesm_var: U
+      - model_var: U
 
   ua_tavg-p19-hxy-air:
     table: atmos
@@ -1050,21 +1050,21 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: U
+      - model_var: U
 
   uas_tavg-h10m-hxy-u:
     table: atmos
     units: "m s-1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: U10
+      - model_var: U10
 
   umo_tavg-ol-hxy-sea:
     table: ocean
     units: "kg s-1"
     dims: [time, z_l, latitude, longitude]
     sources:
-      - cesm_var: umo
+      - model_var: umo
 
   va_tavg-al-hxy-u:
     table: atmos
@@ -1078,7 +1078,7 @@ variables:
       src_axis_name: lev
       src_axis_bnds: ilev
     sources:
-      - cesm_var: V
+      - model_var: V
 
   va_tavg-p19-hxy-air:
     table: atmos
@@ -1090,21 +1090,21 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: V
+      - model_var: V
 
   vas_tavg-h10m-hxy-u:
     table: atmos
     units: "m s-1"
     dims: [time, lat, lon]
     sources:
-      - cesm_var: VBOT
+      - model_var: VBOT
 
   vmo_tavg-ol-hxy-sea:
     table: ocean
     units: "kg s-1"
     dims: [time, z_l, latitude, longitude]
     sources:
-      - cesm_var: vmo
+      - model_var: vmo
 
   vo_tavg-ol-hxy-sea:
     table: ocean
@@ -1114,14 +1114,14 @@ variables:
       - [time, z_l, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: vo
+      - model_var: vo
 
   volcello:
     table: ocean
     units: "m3"
     dims: [time, z_l, latitude, longitude]
     sources:
-      - cesm_var: volcello
+      - model_var: volcello
 
   wap_tavg-p19-hxy-air:
     table: atmos
@@ -1131,7 +1131,7 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: OMEGA
+      - model_var: OMEGA
 
   wfo:
     table: ocean
@@ -1139,7 +1139,7 @@ variables:
     long_name: "Freshwater Flux into Sea Water"
     dims: [time, latitude, longitude]
     sources:
-      - cesm_var: wfo
+      - model_var: wfo
 
   wo_tavg-ol-hxy-sea:
     table: ocean
@@ -1149,7 +1149,7 @@ variables:
       - [time, z_l, lat, lon]
     regrid_method: bilinear
     sources:
-      - cesm_var: wo
+      - model_var: wo
 
   zg_tavg-p19-hxy-air:
     table: atmos
@@ -1159,7 +1159,7 @@ variables:
       name: plev19
       units: Pa
     sources:
-      - cesm_var: Z3
+      - model_var: Z3
 
   zos_tavg-u-hxy-sea:
     table: ocean
@@ -1167,7 +1167,7 @@ variables:
     dims: [time, latitude, longitude]
     regrid_method: bilinear
     sources:
-      - cesm_var: zos
+      - model_var: zos
 
   zossq:
     table: ocean
@@ -1175,7 +1175,7 @@ variables:
     dims: [time, latitude, longitude]
     regrid_method: bilinear
     sources:
-      - cesm_var: zossq
+      - model_var: zossq
 
 #  areacella:
 #    table: fx
@@ -1184,7 +1184,7 @@ variables:
 #    standard_name: cell_area
 #    dims: [lat, lon]
 #    sources:
-#      - cesm_var: ZBOT
+#      - model_var: ZBOT
 #
 #
 #  sftlf:
@@ -1193,4 +1193,4 @@ variables:
 #    formula: landfrac * 100
 #    dims: [lat, lon]
 #    sources:
-#      - cesm_var: ZBOT
+#      - model_var: ZBOT

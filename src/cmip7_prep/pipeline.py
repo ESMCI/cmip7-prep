@@ -44,7 +44,7 @@ def _filename_contains_var(
     return needle in name
 
 
-def _collect_required_cesm_vars(
+def _collect_required_model_vars(
     mapping: Mapping, cmip_vars: Sequence[str]
 ) -> List[str]:
     """Gather all native CESM vars needed to realize the requested CMIP vars."""
@@ -60,9 +60,9 @@ def _collect_required_cesm_vars(
         if src:
             needed.add(src)
         for raw in raws:
-            # 'sources' items may be dicts with 'cesm_var'
-            if isinstance(raw, dict) and "cesm_var" in raw:
-                needed.add(raw["cesm_var"])
+            # 'sources' items may be dicts with 'model_var'
+            if isinstance(raw, dict) and "model_var" in raw:
+                needed.add(raw["model_var"])
             elif isinstance(raw, str):
                 needed.add(raw)
         # vertical dependencies if plev19 or plev39
@@ -110,7 +110,7 @@ def open_native_for_cmip_vars(
 
     for var in cmip_vars:
         logger.info("Processing CMIP var collecting cesm vars'%s'", var)
-        rvar = _collect_required_cesm_vars(mapping, [var])
+        rvar = _collect_required_model_vars(mapping, [var])
         logger.info(
             "Looking for native files for CMIP var '%s' needing CESM vars: %s",
             var,
@@ -121,7 +121,7 @@ def open_native_for_cmip_vars(
         )
         if selected:
             new_cmip_vars.append(var)
-    required = _collect_required_cesm_vars(mapping, new_cmip_vars)
+    required = _collect_required_model_vars(mapping, new_cmip_vars)
 
     # keep any file that contains ANY of the required CESM vars as '.var.' in the name
     selected = sorted(
