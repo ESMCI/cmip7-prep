@@ -24,7 +24,6 @@ import glob
 import numpy as np
 import xarray as xr
 from cmor import set_cur_dataset_attribute
-import toml
 
 from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds
 from cmip7_prep.mapping_compat import Mapping
@@ -105,7 +104,7 @@ def parse_args():
         "--workers",
         type=int,
         default=1,
-        help="Number of Dask workers (default: 128, set to 1 for serial execution)",
+        help="Number of Dask workers (default: set to 1 for serial execution)",
     )
     parser.add_argument(
         "--overwrite",
@@ -125,7 +124,7 @@ def parse_args():
             "landIce",
         ],
         default="atmos",
-        help="Realm to process",
+        help="Realm to process. (Default: atmos)",
     )
     parser.add_argument(
         "--resolution",
@@ -136,7 +135,7 @@ def parse_args():
             "tx2_3v2",
         ],
         default="ne30",
-        help="input_grid name (required)",
+        help="input_grid name (Default: ne30)",
     )
     parser.add_argument(
         "--ocn-grid-file",
@@ -170,25 +169,25 @@ def parse_args():
         type=str,
         default="mon",
         choices=["mon", "day", "6hr", "3hr"],
-        help="Frequency of data to be translated (mon, day, 6hr,)",
+        help="Frequency of data to be translated (mon, day, 6hr, 3hr), (Default: mon)",
     )
     parser.add_argument(
         "--outdir",
         type=str,
         default=".",
-        help="Output directory for CMORized files",
+        help="Output directory for CMORized files. (Default .)",
     )
     parser.add_argument(
         "--experiment",
         type=str,
         default="piControl",
-        help="Experiment name for data request",
+        help="Experiment name for data request. (Default piControl)",
     )
     parser.add_argument(
         "--model",
         choices=["cesm", "noresm"],
         default="cesm",
-        help="Model to use",
+        help="Model to use, default: cesm",
     )
     parser.add_argument(
         "--debug",
