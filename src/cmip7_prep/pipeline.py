@@ -1,5 +1,5 @@
 # cmip7_prep/pipeline.py
-"""Open native CESM timeseries, realize mappings, optional vertical transforms, and regrid."""
+"""Open native MODEL timeseries, realize mappings, optional vertical transforms, and regrid."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def _filename_contains_var(
 def _collect_required_model_vars(
     mapping: Mapping, cmip_vars: Sequence[str]
 ) -> List[str]:
-    """Gather all native CESM vars needed to realize the requested CMIP vars."""
+    """Gather all native model vars needed to realize the requested CMIP vars."""
     needed: set[str] = set()
     for var in cmip_vars:
         try:
@@ -109,10 +109,10 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
 
     for var in cmip_vars:
-        logger.info("Processing CMIP var collecting cesm vars'%s'", var)
+        logger.info("Processing CMIP var collecting model vars'%s'", var)
         rvar = _collect_required_model_vars(mapping, [var])
         logger.info(
-            "Looking for native files for CMIP var '%s' needing CESM vars: %s",
+            "Looking for native files for CMIP var '%s' needing model vars: %s",
             var,
             rvar,
         )
@@ -123,7 +123,7 @@ def open_native_for_cmip_vars(
             new_cmip_vars.append(var)
     required = _collect_required_model_vars(mapping, new_cmip_vars)
 
-    # keep any file that contains ANY of the required CESM vars as '.var.' in the name
+    # keep any file that contains ANY of the required model vars as '.var.' in the name
     selected = sorted(
         {str(p) for p in files if any(_filename_contains_var(p, v) for v in required)}
     )
