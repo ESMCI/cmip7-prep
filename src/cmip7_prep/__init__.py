@@ -1,22 +1,14 @@
 """CMIP7 preparation toolkit: regridding and CMOR writing for CESM outputs."""
 
-import subprocess
+import importlib.metadata as importlib_metadata
 
 
-def _get_git_version():
+def _get_version() -> str:
+    """Return the installed package version, or 'unknown' if not available."""
     try:
-        version = (
-            subprocess.check_output(
-                ["git", "describe", "--tags", "--abbrev=0"], stderr=subprocess.STDOUT
-            )
-            .decode("utf-8")
-            .strip()
-        )
-        return version
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        return importlib_metadata.version("cmip7-prep")
+    except importlib_metadata.PackageNotFoundError:
         return "unknown"
 
 
-__version__ = _get_git_version()
-
-__all__ = ["regrid", "cmor_writer"]
+__version__ = _get_version()

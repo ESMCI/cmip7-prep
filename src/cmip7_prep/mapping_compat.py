@@ -22,6 +22,7 @@ import yaml  # runtime dep
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def packaged_mapping_resource(filename: str = "cesm_to_cmip7.yaml"):
     """Context manager yielding a real filesystem path to the packaged mapping file
     >>> with packaged_mapping_resource("cesm_to_cmip7.yaml") as p:
@@ -151,7 +152,7 @@ class Mapping:
     @classmethod
     def from_packaged_default(cls, filename: str = "cesm_to_cmip7.yaml") -> "Mapping":
         """Construct a Mapping using the packaged default YAML."""
-        logger.info(f"mapping file is %s, filename")
+        logger.info("mapping file is %s", filename)
         with packaged_mapping_resource(filename) as p:
             return cls(p)
 
