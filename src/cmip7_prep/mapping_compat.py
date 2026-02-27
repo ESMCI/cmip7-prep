@@ -247,6 +247,7 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
 
     # 1) Accept your 'sources:' schema
     raw_from_sources: Optional[List[str]] = None
+    scale_from_sources = None
     if "sources" in cfg and isinstance(cfg["sources"], list):
         raw_from_sources = []
         for item in cfg["sources"]:
@@ -254,6 +255,9 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
                 raw_from_sources.append(item)
             elif isinstance(item, dict) and "model_var" in item:
                 raw_from_sources.append(str(item["model_var"]))
+                # If a scale is present, and not already set, use it
+                if scale_from_sources is None and "scale" in item:
+                    scale_from_sources = item["scale"]
         if not raw_from_sources:
             raw_from_sources = None
 
@@ -269,6 +273,11 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
         source = raw_vars[0]  # 1:1 mapping
         raw_vars = None
 
+    # If unit_conversion is not set, but scale_from_sources is, use it
+    unit_conversion = cfg.get("unit_conversion")
+    if unit_conversion is None and scale_from_sources is not None:
+        unit_conversion = {"scale": scale_from_sources}
+
     vc = VarConfig(
         name=name,
         table=table,
@@ -276,7 +285,7 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
         raw_variables=raw_vars,
         source=source,
         formula=formula,
-        unit_conversion=cfg.get("unit_conversion"),
+        unit_conversion=unit_conversion,
         positive=cfg.get("positive"),
         cell_methods=cfg.get("cell_methods"),
         levels=cfg.get("levels"),
