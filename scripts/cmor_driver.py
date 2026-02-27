@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import as_completed
 
+
 import os
 from pathlib import Path
 import logging
@@ -90,6 +91,11 @@ def parse_args():
         description="CMIP7 monthly processing for atm/lnd realms"
     )
     parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Show program version and exit",
+    )
+    parser.add_argument(
         "--cmip-vars",
         nargs="*",
         help="List of CMIP variable names to process directly (bypasses variable search)",
@@ -97,8 +103,8 @@ def parse_args():
     parser.add_argument(
         "--workers",
         type=int,
-        default=128,
-        help="Number of Dask workers (default: 128, set to 1 for serial execution)",
+        default=1,
+        help="Number of Dask workers (default: set to 1 for serial execution)",
     )
     parser.add_argument(
         "--overwrite",
@@ -117,8 +123,8 @@ def parse_args():
             "seaIce",
             "landIce",
         ],
-        required=True,
-        help="Realm to process",
+        default="atmos",
+        help="Realm to process. (Default: atmos)",
     )
     parser.add_argument(
         "--resolution",
@@ -128,8 +134,8 @@ def parse_args():
             "ne30",
             "tx2_3v2",
         ],
-        required=True,
-        help="input_grid name (required)",
+        default="ne30",
+        help="input_grid name (Default: ne30)",
     )
     parser.add_argument(
         "--ocn-grid-file",
@@ -163,25 +169,25 @@ def parse_args():
         type=str,
         default="mon",
         choices=["mon", "day", "6hr", "3hr"],
-        help="Frequency of data to be translated (mon, day, 6hr,)",
+        help="Frequency of data to be translated (mon, day, 6hr, 3hr), (Default: mon)",
     )
     parser.add_argument(
         "--outdir",
         type=str,
-        required=True,
-        help="Output directory for CMORized files",
+        default=".",
+        help="Output directory for CMORized files. (Default .)",
     )
     parser.add_argument(
         "--experiment",
         type=str,
         default="piControl",
-        help="Experiment name for data request",
+        help="Experiment name for data request. (Default piControl)",
     )
     parser.add_argument(
         "--model",
         choices=["cesm", "noresm"],
-        required=True,
-        help="Model to use",
+        default="cesm",
+        help="Model to use, default: cesm",
     )
     parser.add_argument(
         "--debug",
@@ -190,8 +196,14 @@ def parse_args():
     )
 
     args = parser.parse_args()
-
     return args
+
+
+def get_version():
+    # Use dynamic version from cmip7_prep
+    from cmip7_prep import __version__
+
+    return __version__
 
 
 def process_one_var(
@@ -216,7 +228,7 @@ def process_one_var(
 
     try:
         # This is what maps the CESM/NorESM history variable(s) to the cmor variable
-        # This is obtained from reading cesm_to_cmip7.yaml
+        # This is obtained from reading cesm_to_cmip7.yaml or noresm_to_cmip7.yaml
         cfg = mapping.get_cfg(varname)
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
@@ -436,6 +448,7 @@ def main():
         logger.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug("Debug logging enabled.")
+        logger.debug(f"Parsed arguments: {args}")
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
@@ -591,8 +604,11 @@ def main():
         else:
             glob_pattern = "*.nc"
 
-        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml)
-        mapping = Mapping.from_packaged_default()
+        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml or noresm_to_cmip7.yaml)
+        if model == "noresm":
+            mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
+        else:
+            mapping = Mapping.from_packaged_default()
 
         # Determine TABLES directory
         if model == "cesm":
@@ -659,4 +675,8 @@ def main():
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    if getattr(args, "version", False):
+        print(f"cmor_driver.py version: {get_version()}")
+        sys.exit(0)
     main()

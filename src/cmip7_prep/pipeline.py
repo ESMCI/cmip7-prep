@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Optional, Sequence, Union, Dict, List
 import re
 import logging
-import glob
 import xarray as xr
 
 from .mapping_compat import Mapping
@@ -80,7 +79,7 @@ def _collect_required_cesm_vars(
 
 def open_native_for_cmip_vars(
     cmip_vars: Sequence[str],
-    files_glob: Union[str, Path],
+    files: Union[str, Path],
     mapping: Mapping,
     *,
     use_cftime: bool = True,
@@ -93,7 +92,7 @@ def open_native_for_cmip_vars(
     Parameters
     ----------
     cmip_vars : list of CMIP variable names (e.g., ["tas", "ta"])
-    files_glob : glob pattern pointing at native timeseries files
+    files : list of native timeseries files
                  (e.g., "/path/atm/hist_monthly/*cam.h0*")
     mapping : Mapping object that knows how to realize CMIP vars
     use_cftime, parallel : forwarded to xarray.open_mfdataset
@@ -117,18 +116,16 @@ def open_native_for_cmip_vars(
             var,
             rvar,
         )
-        candidates = glob.glob(str(files_glob))
         selected = sorted(
-            {p for p in candidates if any(_filename_contains_var(p, v) for v in rvar)}
+            {p for p in files if any(_filename_contains_var(p, v) for v in rvar)}
         )
         if selected:
             new_cmip_vars.append(var)
     required = _collect_required_cesm_vars(mapping, new_cmip_vars)
 
     # keep any file that contains ANY of the required CESM vars as '.var.' in the name
-
     selected = sorted(
-        {p for p in candidates if any(_filename_contains_var(p, v) for v in required)}
+        {str(p) for p in files if any(_filename_contains_var(p, v) for v in required)}
     )
 
     if not selected:
@@ -136,13 +133,14 @@ def open_native_for_cmip_vars(
             "no native inputs found for requested CMIP variables: %s", cmip_vars
         )
         return None, None
-    logger.info("Opening native files for CESM vars: %s", required)
-    logger.info("Selected files:\n%s", "\n".join(selected))
+
     ds = xr.open_mfdataset(
         selected,
         combine="by_coords",
         use_cftime=use_cftime,
         parallel=parallel,
+        data_vars="minimal",
+        compat="equals",
         **open_kwargs,
     )
     # Convert "lev" and "ilev" units from mb to Pa for downstream operations.

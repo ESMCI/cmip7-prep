@@ -13,10 +13,14 @@ from importlib.resources import as_file
 from pathlib import Path
 from typing import Any, Dict, List, Mapping as TMapping, Optional
 import warnings
+import logging
 
 import numpy as np
 import xarray as xr
 import yaml  # runtime dep
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def packaged_mapping_resource(filename: str = "cesm_to_cmip7.yaml"):
@@ -148,6 +152,7 @@ class Mapping:
     @classmethod
     def from_packaged_default(cls, filename: str = "cesm_to_cmip7.yaml") -> "Mapping":
         """Construct a Mapping using the packaged default YAML."""
+        logger.info("mapping file is %s", filename)
         with packaged_mapping_resource(filename) as p:
             return cls(p)
 
