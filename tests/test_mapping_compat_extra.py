@@ -63,22 +63,21 @@ class TestMappingListStyle:
   units: kg m-2 s-1
 """
 
-    def _make_mapping(self):
+    def _make_mapping(self, tmp_path):
         """Write the list-style YAML to a temp file and return a Mapping."""
-        with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=False) as f:
-            f.write(self._LIST_YAML)
-            name = f.name
-        return Mapping(name)
+        mapping_path = tmp_path / "mapping_list.yaml"
+        mapping_path.write_text(self._LIST_YAML)
+        return Mapping(str(mapping_path))
 
-    def test_list_style_loads_all_vars(self):
+    def test_list_style_loads_all_vars(self, tmp_path):
         """All variables in the list are accessible via get_cfg."""
-        m = self._make_mapping()
+        m = self._make_mapping(tmp_path)
         assert m.get_cfg("tas")["source"] == "T2"
         assert m.get_cfg("pr")["source"] == "PRECT"
 
-    def test_unknown_var_raises_key_error(self):
+    def test_unknown_var_raises_key_error(self, tmp_path):
         """get_cfg raises KeyError for a variable not present in the mapping."""
-        m = self._make_mapping()
+        m = self._make_mapping(tmp_path)
         with pytest.raises(KeyError, match="No mapping"):
             m.get_cfg("winds")
 
