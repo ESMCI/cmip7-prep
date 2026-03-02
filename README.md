@@ -57,11 +57,6 @@ pip install -e .
 
 Make sure you have generated timeseries files for the run before starting.
 
-**Derecho:**
-```bash
-qcmd -- bash scripts/fullamon.sh
-```
-
 **General usage via `cmor_driver.py`:**
 ```bash
 # Atmosphere variables
@@ -71,31 +66,55 @@ python scripts/cmor_driver.py --realm atmos --tsdir /path/to/timeseries/
 python scripts/cmor_driver.py --realm land --tsdir /path/to/timeseries/
 ```
 
+**Derecho:**
+```bash
+qcmd -- python scripts/cmor_driver.py --realm atmos --tsdir /path/to/timeseries/
+```
+
 ## Variable mapping files
 
-The mapping YAML files live in `data/`. Each entry describes how a native model variable maps to a CMIP variable:
+The mapping YAML files live in `data/`. Each entry describes how a native model variable maps to a CMIP variable.
+Keys use the form `<cmip_name>_<frequency>-<level>-<grid>-<realm>`:
 
 ```yaml
-# Simple rename with unit conversion
-tas:
-  table: Amon
-  units: K
-  source: TREFHT
+# Simple source mapping with unit scaling
+pr_tavg-u-hxy-u:
+  table: atmos
+  units: kg m-2 s-1
+  sources:
+    - model_var: PRECT
+      scale: 1000.0   # m/s -> kg m-2 s-1
 
 # Formula combining multiple variables
-pr:
-  table: Amon
-  units: kg m-2 s-1
-  raw_variables: [PRECC, PRECL]
-  formula: "PRECC + PRECL"
+clt_tavg-u-hxy-u:
+  table: atmos
+  units: "%"
+  formula: CLDTOT * 100
+  sources:
+    - model_var: CLDTOT
 
 # Pressure-level variable
-ta:
-  table: Amon
+ta_tavg-p19-hxy-air:
+  table: atmos
   units: K
-  source: T
+  dims: [time, plev, lat, lon]
   levels:
     name: plev19
+    units: Pa
+  sources:
+    - model_var: T
+
+# Hybrid-sigma level variable
+cl_tavg-al-hxy-u:
+  table: atmos
+  units: "%"
+  formula: CLOUD * 100
+  dims: [time, lev, lat, lon]
+  levels:
+    name: standard_hybrid_sigma
+    src_axis_name: lev
+  sources:
+    - model_var: CLOUD
 ```
 
 Both CESM (`cesm_to_cmip7.yaml`) and NorESM (`noresm_to_cmip7.yaml`) mappings are included.
