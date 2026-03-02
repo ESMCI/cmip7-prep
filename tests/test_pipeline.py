@@ -125,6 +125,14 @@ class TestCollectRequiredModelVars:
         with caplog.at_level(logging.WARNING, logger="cmip7_prep.pipeline"):
             needed = _collect_required_model_vars(m, ["nonexistent_var"])
         assert isinstance(needed, list)
+        # Verify that a WARNING from cmip7_prep.pipeline was logged with the expected message.
+        assert any(
+            record.levelno == logging.WARNING
+            and record.name == "cmip7_prep.pipeline"
+            and "Skipping" in record.getMessage()
+            and "no mapping found" in record.getMessage()
+            for record in caplog.records
+        )
 
     def test_result_is_sorted(self):
         """Returned list of model variables is sorted alphabetically."""
