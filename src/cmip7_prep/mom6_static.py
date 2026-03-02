@@ -32,6 +32,14 @@ def compute_cell_bounds_from_corners(corner_array):
     Given a 2D array of cell corners (shape [ny+1, nx+1]),
     compute bounds for each cell as [min, max].
     Returns a (ny*nx, 2) array for CMOR.
+
+    >>> import numpy as np
+    >>> corners = np.array([[0., 1., 2.], [3., 4., 5.], [6., 7., 8.]])
+    >>> bounds = compute_cell_bounds_from_corners(corners)
+    >>> bounds.shape
+    (4, 2)
+    >>> bounds.tolist()
+    [[0.0, 4.0], [1.0, 5.0], [3.0, 7.0], [4.0, 8.0]]
     """
     # For each cell, get the 4 corners and compute min/max
     ny, nx = corner_array.shape[0] - 1, corner_array.shape[1] - 1

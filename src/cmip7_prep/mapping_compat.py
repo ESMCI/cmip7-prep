@@ -242,7 +242,18 @@ class Mapping:
 # Private routines
 # -----------------
 def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
-    """Normalize a raw YAML entry into a VarConfig."""
+    """Normalize a raw YAML entry into a VarConfig.
+
+    >>> vc = _to_varconfig("tas", {"table": "Amon", "units": "K", "source": "TREFHT"})
+    >>> vc.name, vc.table, vc.source
+    ('tas', 'Amon', 'TREFHT')
+    >>> vc2 = _to_varconfig("pr", {"raw_variables": ["PRECC", "PRECL"], "formula": "PRECC + PRECL"})
+    >>> vc2.raw_variables
+    ['PRECC', 'PRECL']
+    >>> vc3 = _to_varconfig("tas", {"sources": [{"model_var": "T2m", "scale": 1.0}]})
+    >>> vc3.source
+    'T2m'
+    """
     table = _normalize_table_name(cfg.get("table") or cfg.get("CMOR_table"))
 
     # 1) Accept your 'sources:' schema
@@ -300,6 +311,17 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
 def _require_vars(
     ds: xr.Dataset, names: List[str], context: str
 ) -> Dict[str, xr.DataArray]:
+    """Return a dict of DataArrays for the requested names, raising KeyError if any are missing.
+
+    >>> import xarray as xr
+    >>> ds = xr.Dataset({"a": xr.DataArray([1]), "b": xr.DataArray([2])})
+    >>> sorted(_require_vars(ds, ["a", "b"], "ctx").keys())
+    ['a', 'b']
+    >>> _require_vars(ds, ["c"], "ctx")
+    Traceback (most recent call last):
+        ...
+    KeyError: "ctx: missing variables ['c']"
+    """
     missing = [n for n in names if n not in ds]
     if missing:
         raise KeyError(f"{context}: missing variables {missing}")
@@ -347,7 +369,17 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
 
 
 def _apply_unit_conversion(da: xr.DataArray, rule: Any) -> xr.DataArray:
-    """Apply a unit conversion rule to a DataArray."""
+    """Apply a unit conversion rule to a DataArray.
+
+    >>> import xarray as xr
+    >>> da = xr.DataArray([1.0, 2.0, 3.0])
+    >>> _apply_unit_conversion(da, {"scale": 2.0}).values.tolist()
+    [2.0, 4.0, 6.0]
+    >>> _apply_unit_conversion(da, {"offset": 10.0}).values.tolist()
+    [11.0, 12.0, 13.0]
+    >>> _apply_unit_conversion(da, "x * 2").values.tolist()
+    [2.0, 4.0, 6.0]
+    """
     if isinstance(rule, str):
         try:
             out = _safe_eval(rule, {"x": da})
