@@ -789,13 +789,40 @@ variables:
       - model_var: SOLIN
       - model_var: FSNTOAC
 
+  siconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: aice
+        scale: 100.0          # CICE aice is fraction 0-1; CMIP siconc is %
+
+  sisnthick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: hs
+
+  sitemptop_tavg-u-hxy-si:
+    table: seaIce
+    units: "K"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    unit_conversion:
+      offset: 273.15          # CICE Tsurf is in °C
+    sources:
+      - model_var: Tsurf
+
   sithick_tavg-u-hxy-si:
     table: seaIce
     units: "m"
-    dims: [time, latitude, longitude]
+    dims: [time, nj, ni]
     regrid_method: conservative
     sources:
-      - model_var: sithick
+      - model_var: hi
 
   snld:
     table: land

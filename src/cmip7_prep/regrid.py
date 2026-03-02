@@ -459,7 +459,13 @@ def regrid_to_latlon(
         logger.info("Variable has no 'ncol' or 'lndgrid' dim; assuming ocn variable.")
         hdim = "tripolar"
         da2 = var_da  # Use the DataArray, not the whole Dataset
-        non_spatial = [d for d in da2.dims if d not in ("yh", "xh")]
+        if "xh" in var_da.dims and "yh" in var_da.dims:
+            hdim_x, hdim_y = "xh", "yh"
+        elif "ni" in var_da.dims and "nj" in var_da.dims:
+            hdim_x, hdim_y = "ni", "nj"
+        else:
+            hdim_x, hdim_y = "xh", "yh"  # fallback (will error if neither present)
+        non_spatial = [d for d in da2.dims if d not in (hdim_x, hdim_y)]
         # realm = "ocn"
         method = method or "conservative"  # force conservative for ocn
         # --- OCEAN: Normalize by sftof (sea fraction) if present ---
@@ -520,7 +526,7 @@ def regrid_to_latlon(
         )
     else:
         logger.info("Creating da2_2d for ocean grid")
-        da2_2d = da2.rename({"xh": "lon", "yh": "lat"})
+        da2_2d = da2.rename({hdim_x: "lon", hdim_y: "lat"})
         da2_2d = da2_2d.transpose(
             ..., "lat", "lon"
         )  # ensure last two dims are ('lat','lon')

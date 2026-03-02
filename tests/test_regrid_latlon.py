@@ -168,6 +168,37 @@ def test_attrs_propagated(monkeypatch):
     assert out.attrs.get("long_name") == "Near-surface air temperature"
 
 
+def test_regrid_cice_ni_nj_dims(monkeypatch):
+    """regrid_to_latlon handles CICE variables with nj/ni dims."""
+    monkeypatch.setattr(
+        regrid.RegridderCache,
+        "get",
+        staticmethod(lambda path, method: _FakeRegridder(4, 8)),
+    )
+    monkeypatch.setattr(regrid.xr, "open_dataset", lambda _: _fake_weights(4, 8))
+
+    # Synthetic CICE-style dataset: (time, nj, ni) — small dims for testing
+    time_len, nj, ni = 2, 6, 8
+    ds_in = xr.Dataset(
+        {"hi": (("time", "nj", "ni"), np.ones((time_len, nj, ni), dtype=np.float32))},
+        coords={"time": np.arange(time_len)},
+    )
+
+    out = regrid.regrid_to_latlon(
+        ds_in,
+        varname="hi",
+        resolution="tx2_3v2",
+        model="cesm",
+        method="conservative",
+        conservative_map=Path("dummy.nc"),
+        output_time_chunk=1,
+        dtype="float32",
+    )
+
+    assert list(out.dims)[-2:] == ["lat", "lon"]
+    assert out.sizes["lat"] == 4 and out.sizes["lon"] == 8
+
+
 def test_pick_maps_noresm_ne16_defaults():
     """noresm/ne16 map defaults and method preference work."""
     cons = regrid._pick_maps(  # pylint: disable=protected-access

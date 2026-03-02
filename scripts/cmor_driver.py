@@ -73,6 +73,9 @@ INCLUDE_PATTERN_MAP = {
             "mon": ["mom6.h.z", "mom6.h.native."],
             "day": ["mom6.h.sfc"],
         },
+        "seaIce": {
+            "mon": ["cice.h."],
+        },
     },
     "noresm": {
         "atmos": {
@@ -256,7 +259,7 @@ def process_one_var(
         # ---------------------------------------------
         try:
             open_kwargs = None
-            if realm == "ocean":
+            if realm in ("ocean", "seaIce"):
                 open_kwargs = {"decode_timedelta": False}
             logger.info("Opening native data for variable %s", varname)
 
