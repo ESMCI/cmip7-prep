@@ -150,5 +150,5 @@ The `data/` directory contains:
 | `noresm_to_cmip7.yaml` | NorESM → CMIP7 variable mapping |
 | `cmor_dataset.json` | Default CMOR dataset attributes |
 | `piControl.json` | CMOR experiment metadata for piControl |
-| `depth_bnds.nc` | Ocean depth bounds for olevel axis |
+| `depth_bnds.nc` | Soil level depth bounds for sdepth axis |
 | `ocean_geometry.nc` | MOM6 ocean grid geometry |
