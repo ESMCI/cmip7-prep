@@ -799,7 +799,7 @@ variables:
 
   sicompstren_tavg-u-hxy-si:
     table: seaIce
-    units: "N m-2"
+    units: "N m-1"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
@@ -879,7 +879,7 @@ variables:
 
   sifb_tavg-u-hxy-si:
     table: seaIce
-    units: "kg m-2 s-1"
+    units: "m"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
@@ -890,6 +890,7 @@ variables:
     units: "W m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: siflcondbot
 
@@ -898,6 +899,7 @@ variables:
     units: "W m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: siflcondtop
 
@@ -906,6 +908,7 @@ variables:
     units: "degrees_north"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: sifllattop
 
@@ -914,6 +917,7 @@ variables:
     units: "degrees_north"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: siflsensbot
 
@@ -922,6 +926,7 @@ variables:
     units: "m"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: siflsenstop
 
@@ -1071,7 +1076,7 @@ variables:
 
   sisali_tavg-u-hxy-si:
     table: seaIce
-    units: "kg m-2"
+    units: "1e-3"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
@@ -1079,7 +1084,7 @@ variables:
 
   sisaltmass_tavg-u-hxy-si:
     table: seaIce
-    units: "kg m-2 s-1"
+    units: "kg m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
@@ -1138,6 +1143,7 @@ variables:
     units: "m"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: sistrxdtop
 
@@ -1146,22 +1152,25 @@ variables:
     units: "m"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: sistrxubot
 
   sistrydtop_tavg-u-hxy-si:
     table: seaIce
-    units: "m"
+    units: "N m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: sistrydtop
 
   sistryubot_tavg-u-hxy-si:
     table: seaIce
-    units: "m"
+    units: "N m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
+    positive: down
     sources:
       - model_var: sistryubot
 
