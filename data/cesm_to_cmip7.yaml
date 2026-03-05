@@ -789,6 +789,23 @@ variables:
       - model_var: SOLIN
       - model_var: FSNTOAC
 
+  sialgc_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sialgc
+
+  siareaacrossline_tavg-u-ht-u:
+    table: ocean
+    units: "m"
+    long_name: "Sea Ice Area Across Line"
+    dims: [time, latitude]
+    regrid_method: conservative
+    sources:
+      - model_var: siareaacrossline
+
   siage_tavg-u-hxy-si:
     table: seaIce
     units: "yr"
@@ -796,6 +813,14 @@ variables:
     regrid_method: conservative
     sources:
       - model_var: siage
+
+  sichl_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sichl
 
   sicompstren_tavg-u-hxy-si:
     table: seaIce
@@ -805,6 +830,14 @@ variables:
     sources:
       - model_var: sicompstren
 
+  siconc_tavg-u-hxy-u:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siconc
+
   siconc_tavg-u-hxy-si:
     table: seaIce
     units: "%"
@@ -812,6 +845,32 @@ variables:
     regrid_method: conservative
     sources:
       - model_var: siconc
+
+  siconca_tavg-u-hxy-u:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siconca
+
+  sidconcdyn_tavg-u-hxy-sea:
+    table: seaIce
+    units: "s-1"
+    long_name: "Dynamic Sea Ice Concentration Change"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidconcdyn
+
+  sidconcth_tavg-u-hxy-sea:
+    table: seaIce
+    units: "s-1"
+    long_name: "Sea Ice Concentration Change due to Thickness Changes"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidconcth
 
   sidconcth_tavg-u-hxy-si:
     table: seaIce
@@ -828,6 +887,14 @@ variables:
     regrid_method: conservative
     sources:
       - model_var: sidmassdyn
+
+  sidmassgrowthbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassgrowthbot
 
   sidmassgrowthsi_tavg-u-hxy-si:
     table: seaIce
@@ -853,6 +920,22 @@ variables:
     sources:
       - model_var: sidmassmeltbot
 
+  sidmassmeltlat_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassmeltlat
+
+  sidmassmelttop_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassmelttop
+
   sidmassth_tavg-u-hxy-si:
     table: seaIce
     units: "kg m-2 s-1"
@@ -861,21 +944,69 @@ variables:
     sources:
       - model_var: sidmassth
 
-  sidmasstranx_tavg-u-hxy-si:
+  sidmasstranx_tavg-u-hxy-u:
     table: seaIce
-    units: "kg m-2 s-1"
+    units: "kg s-1"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
       - model_var: sidmasstranx
 
-  sidmasstrany_tavg-u-hxy-si:
+  sidmasstranx_tavg-u-hxy-si:
     table: seaIce
-    units: "kg m-2 s-1"
+    units: "kg s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmasstranx
+
+  sidmasstrany_tavg-u-hxy-u:
+    table: seaIce
+    units: "kg s-1"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
       - model_var: sidmasstrany
+
+  sidmasstrany_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmasstrany
+
+  sidivvel_tpt-u-hxy-si:
+    table: seaIce
+    units: "s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidivvel
+
+  sidragbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidragbot
+
+  sidragtop_tavg-u-hxy-si:
+    table: seaIce
+    units: "1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidragtop
+
+  sieqthick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sieqthick
 
   sifb_tavg-u-hxy-si:
     table: seaIce
@@ -903,9 +1034,42 @@ variables:
     sources:
       - model_var: siflcondtop
 
+  siflfwbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siflfwbot
+
+  siflfwbot_tavg-u-hxy-sea:
+    table: ocean
+    units: "kg m-2 s-1"
+    long_name: "Freshwater Flux from Sea Ice to Ocean"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - model_var: siflfwbot
+
+  siflfwdrain_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siflfwdrain
+
+  siflswdbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "W m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siflswdbot
+
   sifllattop_tavg-u-hxy-si:
     table: seaIce
-    units: "degrees_north"
+    units: "W m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
     positive: down
@@ -914,7 +1078,7 @@ variables:
 
   siflsensbot_tavg-u-hxy-si:
     table: seaIce
-    units: "degrees_north"
+    units: "W m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
     positive: down
@@ -923,7 +1087,7 @@ variables:
 
   siflsenstop_tavg-u-hxy-si:
     table: seaIce
-    units: "m"
+    units: "W m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
     positive: down
@@ -932,7 +1096,7 @@ variables:
 
   siflswdtop_tavg-u-hxy-si:
     table: seaIce
-    units: "m"
+    units: "W m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
@@ -1002,6 +1166,31 @@ variables:
     sources:
       - model_var: sigl
 
+  sigpp_tavg-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sigpp
+
+  sihc_tavg-u-hxy-sea:
+    table: ocean
+    units: "kg m-2 s-1"
+    long_name: "Sea Ice Surface Freshwater Flux to Ocean"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - model_var: sihc
+
+  siitdconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitdconc
+
   siitdsnthick_tavg-u-hxy-si:
     table: seaIce
     units: "m"
@@ -1026,6 +1215,23 @@ variables:
     sources:
       - model_var: simass
 
+  simassacrossline_tavg-u-ht-u:
+    table: seaIce
+    units: "kg m-2"
+    long_name: "Sea Ice Mass Across Line"
+    dims: [time, latitude]
+    regrid_method: conservative
+    sources:
+      - model_var: simassacrossline
+
+  simpconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simpconc
+
   simpeffconc_tavg-u-hxy-si:
     table: seaIce
     units: "%"
@@ -1033,6 +1239,14 @@ variables:
     regrid_method: conservative
     sources:
       - model_var: simpeffconc
+
+  simprefrozen_tavg-u-hxy-simp:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simprefrozen
 
   simprefrozen_tavg-u-hxy-si:
     table: seaIce
@@ -1049,6 +1263,14 @@ variables:
     regrid_method: conservative
     sources:
       - model_var: simpthick
+
+  sino3_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sino3
 
   sirdgconc_tavg-u-hxy-si:
     table: seaIce
@@ -1090,6 +1312,39 @@ variables:
     sources:
       - model_var: sisaltmass
 
+  sishearvel_tpt-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sishearvel
+
+  sisi_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisi
+
+  sisnmassacrossline_tavg-u-ht-u :
+    table: seaIce
+    units: "kg m-2 s-1"
+    long_name: "Sea Ice Mass Across Line"
+    dims: [time, latitude]
+    regrid_method: conservative
+    sources:
+      - model_var: sisnmassacrossline
+
+  sisndmassdyn_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisndmassdyn
+
   sisndmasssnf_tavg-u-hxy-si:
     table: seaIce
     units: "kg m-2 s-1"
@@ -1130,6 +1385,15 @@ variables:
     sources:
       - model_var: sisndmasswind
 
+  sisnhc_tavg-u-hxy-si:
+    table: seaIce
+    units: "J m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: sisnhc
+
   sisnthick_tavg-u-hxy-si:
     table: seaIce
     units: "m"
@@ -1138,9 +1402,33 @@ variables:
     sources:
       - model_var: sisnthick
 
+  sispeed_tavg-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sispeed
+
+  sistressave_tpt-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sistressave
+
+  sistressmax_tpt-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sistressmax
+
   sistrxdtop_tavg-u-hxy-si:
     table: seaIce
-    units: "m"
+    units: "N m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
     positive: down
@@ -1149,7 +1437,7 @@ variables:
 
   sistrxubot_tavg-u-hxy-si:
     table: seaIce
-    units: "m"
+    units: "N m-2"
     dims: [time, nj, ni]
     regrid_method: conservative
     positive: down
@@ -1174,6 +1462,14 @@ variables:
     sources:
       - model_var: sistryubot
 
+  sitempbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "K"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitempbot
+
   sitempsnic_tavg-u-hxy-si:
     table: seaIce
     units: "K"
@@ -1190,6 +1486,14 @@ variables:
     sources:
       - model_var: sitemptop
 
+  sithick_tavg-u-hxy-sir:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sithick
+
   sithick_tavg-u-hxy-si:
     table: seaIce
     units: "m"
@@ -1198,8 +1502,32 @@ variables:
     sources:
       - model_var: sithick
 
+  sitimefrac_tavg-u-hxy-sea:
+    table: seaIce
+    units: "1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitimefrac
+
+  siu_tavg-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siu
+
+  siv_tavg-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siv
+
   siv_tavg-u-hxy-ifs:
-    table: ocean
+    table: seaIce
     units: "m s-1"
     dims: [time, latitude, longitude]
     regrid_method: conservative

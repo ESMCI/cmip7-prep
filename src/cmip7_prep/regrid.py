@@ -456,7 +456,9 @@ def regrid_to_latlon(
 
     var_da = ds_in[varname]  # always a DataArray
     if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
-        logger.info("Variable has no 'ncol' or 'lndgrid' dim; assuming ocn variable.")
+        logger.info(
+            "Variable has no 'ncol' or 'lndgrid' dim; assuming ocean or seaIce variable."
+        )
         hdim = "tripolar"
         da2 = var_da  # Use the DataArray, not the whole Dataset
         if "xh" in var_da.dims and "yh" in var_da.dims:
