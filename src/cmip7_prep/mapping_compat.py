@@ -147,7 +147,7 @@ class Mapping:
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
-        self._vars: Dict[str, VarConfig] = self._load_yaml(self.path)
+        self._vars, self._raw = self._load_yaml(self.path)
 
     @classmethod
     def from_packaged_default(cls, filename: str = "cesm_to_cmip7.yaml") -> "Mapping":
@@ -160,10 +160,8 @@ class Mapping:
     # Loading
     # -----------------
     @staticmethod
-    def _load_yaml(path: Path) -> Dict[str, VarConfig]:
-
-        # data holds the contents of the YAML file as ordinary Python
-        # objects that you can work with in your code.
+    def _load_yaml(path: Path):
+        """Load YAML and return (vars_dict, raw_dict)."""
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
@@ -173,21 +171,17 @@ class Mapping:
             and "variables" in data
             and isinstance(data["variables"], dict)
         ):
-            # After this line, data no longer holds the whole
-            # original dictionary—it now holds only the sub‑dictionary
             data = data["variables"]
 
-        # Add a type annotation (Dict[str, VarConfig]) that tells
-        # static type‑checkers that result is expected to be a
-        # dictionary whose keys are strings (str) and whose values are
-        # instances of the class (or type alias) VarConfig.
         result: Dict[str, VarConfig] = {}
+        raw: Dict[str, Any] = {}
 
         if isinstance(data, dict):
             # CMIP7-style (or wrapped): keys are CMIP names
             for name, cfg in data.items():
                 if not isinstance(cfg, dict):
                     continue
+                raw[name] = cfg
                 result[name] = _to_varconfig(name, cfg)
         elif isinstance(data, list):
             # CMIP6-style: list with 'name' field
@@ -195,24 +189,42 @@ class Mapping:
                 if not isinstance(item, dict) or "name" not in item:
                     continue
                 name = str(item["name"])
+                raw[name] = item
                 result[name] = _to_varconfig(name, item)
         else:
             raise TypeError(
                 "Unsupported YAML structure: expected dict or list at top level."
             )
 
-        return result
+        return result, raw
 
     # -----------------
     # Public API
     # -----------------
-    def get_cfg(self, cmip_name: str) -> Dict[str, Any]:
-        """Return the normalized config dict for a CMIP variable name."""
+    def get_cfg(self, cmip_name: str, freq: Optional[str] = None) -> Dict[str, Any]:
+        """Return the normalized config dict for a CMIP variable name.
+
+        Parameters
+        ----------
+        cmip_name:
+            Key into the mapping (e.g. ``"siu_tavg-u-hxy-si"``).
+        freq:
+            Output frequency token (e.g. ``"mon"``, ``"day"``).  When
+            provided, source entries tagged with a matching ``freq:`` field
+            are preferred over untagged ones.
+        """
         if cmip_name not in self._vars:
             raise KeyError(f"No mapping for {str(cmip_name)} in {self.path}")
+        if freq is None:
+            return self._vars[cmip_name].as_cfg()
+        raw = self._raw.get(cmip_name)
+        if raw is not None:
+            return _to_varconfig(cmip_name, raw, freq=freq).as_cfg()
         return self._vars[cmip_name].as_cfg()
 
-    def realize(self, ds: xr.Dataset, cmip_name: str) -> xr.DataArray:
+    def realize(
+        self, ds: xr.Dataset, cmip_name: str, freq: Optional[str] = None
+    ) -> xr.DataArray:
         """Construct a CMIP variable as an xarray.DataArray from a native dataset."""
         if cmip_name not in self._vars:
             warnings.warn(
@@ -221,7 +233,10 @@ class Mapping:
                 stacklevel=1,
             )
             return None
-        vc = self._vars[cmip_name]
+        if freq is not None and (raw := self._raw.get(cmip_name)) is not None:
+            vc = _to_varconfig(cmip_name, raw, freq=freq)
+        else:
+            vc = self._vars[cmip_name]
 
         da = _realize_core(ds, vc)
 
@@ -241,7 +256,37 @@ class Mapping:
 # -----------------
 # Private routines
 # -----------------
-def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
+def _filter_sources(sources: List[Any], freq: Optional[str]) -> List[Any]:
+    """Return the subset of source entries that match *freq*.
+
+    If no entry carries a ``freq`` tag, all sources are returned unchanged.
+    When a freq is requested but no entry matches, untagged entries are used
+    as a fallback; if there are none either, the full list is returned.
+
+    >>> srcs = [{"model_var": "siu_d", "freq": "day"}, {"model_var": "siu", "freq": "mon"}]
+    >>> [s["model_var"] for s in _filter_sources(srcs, "mon")]
+    ['siu']
+    >>> [s["model_var"] for s in _filter_sources(srcs, "day")]
+    ['siu_d']
+    >>> srcs2 = [{"model_var": "T2m"}]
+    >>> _filter_sources(srcs2, "mon")
+    [{'model_var': 'T2m'}]
+    """
+    if not sources:
+        return sources
+    has_tags = any(isinstance(s, dict) and "freq" in s for s in sources)
+    if not has_tags or freq is None:
+        return sources
+    matched = [s for s in sources if isinstance(s, dict) and s.get("freq") == freq]
+    if matched:
+        return matched
+    untagged = [s for s in sources if isinstance(s, dict) and "freq" not in s]
+    return untagged if untagged else sources
+
+
+def _to_varconfig(
+    name: str, cfg: TMapping[str, Any], freq: Optional[str] = None
+) -> VarConfig:
     """Normalize a raw YAML entry into a VarConfig.
 
     >>> vc = _to_varconfig("tas", {"table": "Amon", "units": "K", "source": "TREFHT"})
@@ -253,6 +298,11 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
     >>> vc3 = _to_varconfig("tas", {"sources": [{"model_var": "T2m", "scale": 1.0}]})
     >>> vc3.source
     'T2m'
+    >>> srcs = [{"model_var": "siu_d", "freq": "day"}, {"model_var": "siu", "freq": "mon"}]
+    >>> _to_varconfig("siu", {"sources": srcs}, freq="day").source
+    'siu_d'
+    >>> _to_varconfig("siu", {"sources": srcs}, freq="mon").source
+    'siu'
     """
     table = _normalize_table_name(cfg.get("table") or cfg.get("CMOR_table"))
 
@@ -260,8 +310,9 @@ def _to_varconfig(name: str, cfg: TMapping[str, Any]) -> VarConfig:
     raw_from_sources: Optional[List[str]] = None
     scale_from_sources = None
     if "sources" in cfg and isinstance(cfg["sources"], list):
+        active = _filter_sources(cfg["sources"], freq)
         raw_from_sources = []
-        for item in cfg["sources"]:
+        for item in active:
             if isinstance(item, str):
                 raw_from_sources.append(item)
             elif isinstance(item, dict) and "model_var" in item:
