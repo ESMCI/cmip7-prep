@@ -233,7 +233,7 @@ def process_one_var(
     try:
         # This is what maps the CESM/NorESM history variable(s) to the cmor variable
         # This is obtained from reading cesm_to_cmip7.yaml or noresm_to_cmip7.yaml
-        cfg = mapping.get_cfg(varname, freq=frequency)
+        cfg = mapping.get_cfg(varname)
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
         results.append((varname, f"ERROR: {e}"))
@@ -270,7 +270,6 @@ def process_one_var(
                 varname,
                 inputfiles,
                 mapping,
-                freq=frequency,
                 use_cftime=True,
                 parallel=False,
                 open_kwargs=open_kwargs,
@@ -614,6 +613,7 @@ def main():
             mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
         else:
             mapping = Mapping.from_packaged_default()
+        mapping.default_freq = frequency
 
         # Determine TABLES directory
         if model == "cesm":

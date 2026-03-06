@@ -147,6 +147,7 @@ class Mapping:
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
+        self.default_freq: Optional[str] = None
         self._vars, self._raw = self._load_yaml(self.path)
 
     @classmethod
@@ -215,11 +216,12 @@ class Mapping:
         """
         if cmip_name not in self._vars:
             raise KeyError(f"No mapping for {str(cmip_name)} in {self.path}")
-        if freq is None:
+        effective_freq = freq if freq is not None else self.default_freq
+        if effective_freq is None:
             return self._vars[cmip_name].as_cfg()
         raw = self._raw.get(cmip_name)
         if raw is not None:
-            return _to_varconfig(cmip_name, raw, freq=freq).as_cfg()
+            return _to_varconfig(cmip_name, raw, freq=effective_freq).as_cfg()
         return self._vars[cmip_name].as_cfg()
 
     def realize(
@@ -233,8 +235,9 @@ class Mapping:
                 stacklevel=1,
             )
             return None
-        if freq is not None and (raw := self._raw.get(cmip_name)) is not None:
-            vc = _to_varconfig(cmip_name, raw, freq=freq)
+        effective_freq = freq if freq is not None else self.default_freq
+        if effective_freq is not None and (raw := self._raw.get(cmip_name)) is not None:
+            vc = _to_varconfig(cmip_name, raw, freq=effective_freq)
         else:
             vc = self._vars[cmip_name]
 
