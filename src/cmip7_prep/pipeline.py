@@ -45,13 +45,13 @@ def _filename_contains_var(
 
 
 def _collect_required_model_vars(
-    mapping: Mapping, cmip_vars: Sequence[str]
+    mapping: Mapping, cmip_vars: Sequence[str], freq: Optional[str] = None
 ) -> List[str]:
     """Gather all native model vars needed to realize the requested CMIP vars."""
     needed: set[str] = set()
     for var in cmip_vars:
         try:
-            cfg = mapping.get_cfg(var) or {}
+            cfg = mapping.get_cfg(var, freq=freq) or {}
         except KeyError:
             logger.warning("Skipping '%s': no mapping found in %s", var, mapping.path)
             continue
@@ -82,6 +82,7 @@ def open_native_for_cmip_vars(
     files: Sequence[Union[str, Path]],
     mapping: Mapping,
     *,
+    freq: Optional[str] = None,
     use_cftime: bool = True,
     parallel: bool = False,
     open_kwargs: Optional[Dict] = None,
@@ -111,7 +112,7 @@ def open_native_for_cmip_vars(
 
     for var in cmip_vars:
         logger.info("Processing CMIP var; collecting model vars '%s'", var)
-        rvar = _collect_required_model_vars(mapping, [var])
+        rvar = _collect_required_model_vars(mapping, [var], freq=freq)
         logger.info(
             "Looking for native files for CMIP var '%s' needing model vars: %s",
             var,
@@ -122,7 +123,7 @@ def open_native_for_cmip_vars(
         )
         if selected:
             new_cmip_vars.append(var)
-    required = _collect_required_model_vars(mapping, new_cmip_vars)
+    required = _collect_required_model_vars(mapping, new_cmip_vars, freq=freq)
 
     # keep any file that contains ANY of the required model vars as '.var.' in the name
     selected = sorted(

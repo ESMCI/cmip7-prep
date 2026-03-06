@@ -270,6 +270,7 @@ def process_one_var(
                 varname,
                 inputfiles,
                 mapping,
+                freq=frequency,
                 use_cftime=True,
                 parallel=False,
                 open_kwargs=open_kwargs,
