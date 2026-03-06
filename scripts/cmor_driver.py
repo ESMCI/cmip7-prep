@@ -75,6 +75,7 @@ INCLUDE_PATTERN_MAP = {
         },
         "seaIce": {
             "mon": ["cice.h."],
+            "day": ["cice.h1."],
         },
     },
     "noresm": {

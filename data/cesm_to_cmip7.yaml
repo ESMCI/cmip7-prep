@@ -1191,6 +1191,14 @@ variables:
     sources:
       - model_var: sitdconc
 
+  siitdsnconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitdsnconc
+
   siitdsnthick_tavg-u-hxy-si:
     table: seaIce
     units: "m"
@@ -1250,11 +1258,19 @@ variables:
 
   simprefrozen_tavg-u-hxy-si:
     table: seaIce
-    units: "kg m-2 s-1"
+    units: "m"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
       - model_var: simprefrozen
+
+  simpthick_tavg-u-hxy-simp:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simpthick
 
   simpthick_tavg-u-hxy-si:
     table: seaIce
