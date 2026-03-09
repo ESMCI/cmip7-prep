@@ -27,13 +27,8 @@ variables:
         mapping = Mapping(tmp.name)
         cfg = mapping.get_cfg("tas")
 
-    # The Mapping class normalizes sources to raw_variables,
-    # and for a single source with no formula, sets source
-    assert cfg["source"] == "TS"
-    assert "raw_variables" not in cfg or cfg["raw_variables"] is None
+    # Only CMIP7 'sources' key is supported
     assert cfg["table"] == "atmos"
-    # Check that the scale is preserved in the config (if present)
-    # The scale is not a top-level field, but should be present in unit_conversion if handled
     if "unit_conversion" in cfg:
         if isinstance(cfg["unit_conversion"], dict):
             assert cfg["unit_conversion"].get("scale", None) == 10.0

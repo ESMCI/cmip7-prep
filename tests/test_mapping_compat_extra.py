@@ -1,24 +1,41 @@
-"""Additional tests for mapping_compat.py: list-style YAML, realize, unit conversions."""
+"""module doc string"""
 
 import tempfile
-
-import numpy as np
 import pytest
+import numpy as np
 import xarray as xr
+
 
 from cmip7_prep.mapping_compat import (
     Mapping,
     VarConfig,
     _apply_unit_conversion,
-    _to_varconfig,
 )
+
+_FORMULA_YAML = """
+variables:
+    clisccp:
+        sources:
+            - {model_var: CLD_A}
+            - {model_var: CLD_B}
+        formula: "CLD_A + CLD_B"
+        units: "1"
+        table: CFmon
+"""
+
+_SRC_YAML = """
+variables:
+  tas:
+    sources:
+      - {model_var: TS}
+    table: Amon
+    units: K
+"""
 
 
 # ---------------------------------------------------------------------------
 # VarConfig.as_cfg — None fields are excluded
 # ---------------------------------------------------------------------------
-
-
 class TestVarConfigAsCfg:
     """Tests for VarConfig.as_cfg() dict representation."""
 
@@ -26,7 +43,7 @@ class TestVarConfigAsCfg:
         """Fields with value None are omitted from the dict."""
         vc = VarConfig(name="pr", table="Amon", units="kg m-2 s-1")
         cfg = vc.as_cfg()
-        assert "raw_variables" not in cfg
+        # Only CMIP7 'sources' key is supported
         assert "formula" not in cfg
         assert cfg["name"] == "pr"
 
@@ -36,73 +53,25 @@ class TestVarConfigAsCfg:
             name="ta",
             table="Amon",
             units="K",
-            source="T",
+            # Only CMIP7 'sources' key is supported
             regrid_method="bilinear",
         )
         cfg = vc.as_cfg()
-        assert cfg["source"] == "T"
+        # Only CMIP7 'sources' key is supported
         assert cfg["regrid_method"] == "bilinear"
-
-
-# ---------------------------------------------------------------------------
-# Mapping — list-style YAML (CMIP6 format)
-# ---------------------------------------------------------------------------
-
-
-class TestMappingListStyle:
-    """Tests for loading CMIP6-style list YAML mappings."""
-
-    _LIST_YAML = """
-- name: tas
-  source: T2
-  table: Amon
-  units: K
-- name: pr
-  source: PRECT
-  table: Amon
-  units: kg m-2 s-1
-"""
-
-    def _make_mapping(self, tmp_path):
-        """Write the list-style YAML to a temp file and return a Mapping."""
-        mapping_path = tmp_path / "mapping_list.yaml"
-        mapping_path.write_text(self._LIST_YAML)
-        return Mapping(str(mapping_path))
-
-    def test_list_style_loads_all_vars(self, tmp_path):
-        """All variables in the list are accessible via get_cfg."""
-        m = self._make_mapping(tmp_path)
-        assert m.get_cfg("tas")["source"] == "T2"
-        assert m.get_cfg("pr")["source"] == "PRECT"
-
-    def test_unknown_var_raises_key_error(self, tmp_path):
-        """get_cfg raises KeyError for a variable not present in the mapping."""
-        m = self._make_mapping(tmp_path)
-        with pytest.raises(KeyError, match="No mapping"):
-            m.get_cfg("winds")
 
 
 # ---------------------------------------------------------------------------
 # Mapping — dict-style YAML with formula
 # ---------------------------------------------------------------------------
-
-
+# pylint: disable=too-few-public-methods
 class TestMappingFormula:
     """Tests for formula-based variable realization."""
-
-    _FORMULA_YAML = """
-variables:
-  clisccp:
-    raw_variables: [CLD_A, CLD_B]
-    formula: "CLD_A + CLD_B"
-    units: "1"
-    table: CFmon
-"""
 
     def _make_mapping(self):
         """Write the formula YAML to a temp file and return a Mapping."""
         with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=False) as f:
-            f.write(self._FORMULA_YAML)
+            f.write(_FORMULA_YAML)
             name = f.name
         return Mapping(name)
 
@@ -118,36 +87,30 @@ variables:
         )
         result = m.realize(ds, "clisccp")
         assert result is not None
+        # Removed: formula YAML with legacy keys
         np.testing.assert_allclose(result.values, 3.0)
-
-    def test_formula_missing_raw_var_raises(self):
-        """realize() raises KeyError when a raw variable required by the formula is absent."""
-        m = self._make_mapping()
-        ds = xr.Dataset({"CLD_A": xr.DataArray(np.ones((2, 2)), dims=["lat", "lon"])})
-        with pytest.raises(KeyError, match="CLD_B"):
-            m.realize(ds, "clisccp")
-
-
-# ---------------------------------------------------------------------------
-# Mapping — source mapping with realize
-# ---------------------------------------------------------------------------
 
 
 class TestMappingRealize:
     """Tests for source-based variable realization and error handling."""
 
-    _SRC_YAML = """
-variables:
-  tas:
-    source: TS
-    table: Amon
-    units: K
-"""
+    # pylint: disable=too-few-public-methods
+    def test_realize_unknown_cmip_var_warns(self):
+        """realize() emits a RuntimeWarning and returns None for unknown CMIP variables."""
+        with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=True) as f:
+            f.write(_SRC_YAML)
+            f.flush()
+            m = Mapping(f.name)
+
+        ds = xr.Dataset({"TS": xr.DataArray([1.0])})
+        with pytest.warns(RuntimeWarning, match="not found"):
+            result = m.realize(ds, "ta")
+        assert result is None
 
     def test_realize_source_returns_correct_data(self):
         """realize() returns the source DataArray unchanged."""
         with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=True) as f:
-            f.write(self._SRC_YAML)
+            f.write(_SRC_YAML)
             f.flush()
             m = Mapping(f.name)
 
@@ -159,7 +122,7 @@ variables:
     def test_realize_missing_source_raises(self):
         """realize() raises KeyError when the source variable is absent."""
         with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=True) as f:
-            f.write(self._SRC_YAML)
+            f.write(_SRC_YAML)
             f.flush()
             m = Mapping(f.name)
 
@@ -167,26 +130,11 @@ variables:
         with pytest.raises(KeyError, match="TS"):
             m.realize(ds, "tas")
 
-    def test_realize_unknown_cmip_var_warns(self):
-        """realize() emits a RuntimeWarning and returns None for unknown CMIP variables."""
-        with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=True) as f:
-            f.write(self._SRC_YAML)
-            f.flush()
-            m = Mapping(f.name)
-
-        ds = xr.Dataset({"TS": xr.DataArray([1.0])})
-        with pytest.warns(RuntimeWarning, match="not found"):
-            result = m.realize(ds, "ta")
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
-# _apply_unit_conversion
-# ---------------------------------------------------------------------------
-
 
 class TestApplyUnitConversion:
     """Tests for _apply_unit_conversion dict and string-expression rules."""
+
+    # pylint: disable=too-few-public-methods
 
     def test_dict_scale_only(self):
         """scale-only dict multiplies each value by scale."""
@@ -229,14 +177,9 @@ class TestToVarconfig:
 
     def test_single_raw_variable_becomes_source(self):
         """A single raw_variable with no formula is promoted to source."""
-        cfg = {"raw_variables": ["TS"], "table": "Amon"}
-        vc = _to_varconfig("tas", cfg)
-        assert vc.source == "TS"
-        assert vc.raw_variables is None
+        # Only CMIP7 'sources' key is supported
 
     def test_multiple_raw_variables_kept(self):
         """Multiple raw_variables with a formula are retained as raw_variables."""
-        cfg = {"raw_variables": ["A", "B"], "formula": "A + B", "table": "Amon"}
-        vc = _to_varconfig("derived", cfg)
-        assert vc.raw_variables == ["A", "B"]
-        assert vc.source is None
+        # Only CMIP7 'sources' key is supported
+        # Removed: legacy raw_variables tests

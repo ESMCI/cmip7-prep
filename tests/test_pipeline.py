@@ -53,31 +53,36 @@ class TestFilenameContainsVar:
 
 _SIMPLE_YAML = """
 variables:
-  tas:
-    source: TS
-    table: Amon
-    units: K
-  pr:
-    source: PRECT
-    table: Amon
-    units: kg m-2 s-1
-  ta:
-    raw_variables: [T]
-    formula: "T"
-    table: Amon
-    units: K
-    levels:
-      name: plev19
+    tas:
+        sources:
+            - {model_var: TS}
+        table: Amon
+        units: K
+    pr:
+        sources:
+            - {model_var: PRECT}
+        table: Amon
+        units: kg m-2 s-1
+    ta:
+        sources:
+            - {model_var: T}
+        raw_variables: [T]
+        formula: "T"
+        table: Amon
+        units: K
+        levels:
+            name: plev19
 """
 
 _SIGMA_YAML = """
 variables:
-  ua:
-    source: U
-    table: Amon
-    units: m s-1
-    levels:
-      name: standard_hybrid_sigma
+    ua:
+        sources:
+            - {model_var: U}
+        table: Amon
+        units: m s-1
+        levels:
+            name: standard_hybrid_sigma
 """
 
 
