@@ -73,6 +73,10 @@ INCLUDE_PATTERN_MAP = {
             "mon": ["mom6.h.z", "mom6.h.native."],
             "day": ["mom6.h.sfc"],
         },
+        "seaIce": {
+            "mon": ["cice.h."],
+            "day": ["cice.h1."],
+        },
     },
     "noresm": {
         "atmos": {
@@ -256,7 +260,7 @@ def process_one_var(
         # ---------------------------------------------
         try:
             open_kwargs = None
-            if realm == "ocean":
+            if realm in ("ocean", "seaIce"):
                 open_kwargs = {"decode_timedelta": False}
             logger.info("Opening native data for variable %s", varname)
 
@@ -609,6 +613,7 @@ def main():
             mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
         else:
             mapping = Mapping.from_packaged_default()
+        mapping.default_freq = frequency
 
         # Determine TABLES directory
         if model == "cesm":

@@ -789,13 +789,1056 @@ variables:
       - model_var: SOLIN
       - model_var: FSNTOAC
 
-  sithick_tavg-u-hxy-si:
+  sialgc_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sialgc_d
+        freq: day
+      - model_var: sialgc
+        freq: mon
+
+  siareaacrossline_tavg-u-ht-u:
+    table: ocean
+    units: "m"
+    long_name: "Sea Ice Area Across Line"
+    dims: [time, latitude]
+    regrid_method: conservative
+    sources:
+      - model_var: siareaacrossline_d
+        freq: day
+      - model_var: siareaacrossline
+        freq: mon
+
+  siage_tavg-u-hxy-si:
+    table: seaIce
+    units: "yr"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siage_d
+        freq: day
+      - model_var: siage
+        freq: mon
+
+  sichl_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sichl_d
+        freq: day
+      - model_var: sichl
+        freq: mon
+
+  sicompstren_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sicompstren_d
+        freq: day
+      - model_var: sicompstren
+        freq: mon
+
+  siconc_tavg-u-hxy-u:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siconc_d
+        freq: day
+      - model_var: siconc
+        freq: mon
+
+  siconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siconc_d
+        freq: day
+      - model_var: siconc
+        freq: mon
+
+  siconca_tavg-u-hxy-u:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siconca_d
+        freq: day
+      - model_var: siconca
+        freq: mon
+
+  sidconcdyn_tavg-u-hxy-sea:
+    table: seaIce
+    units: "s-1"
+    long_name: "Dynamic Sea Ice Concentration Change"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidconcdyn_d
+        freq: day
+      - model_var: sidconcdyn
+        freq: mon
+
+  sidconcth_tavg-u-hxy-sea:
+    table: seaIce
+    units: "s-1"
+    long_name: "Sea Ice Concentration Change due to Thickness Changes"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidconcth_d
+        freq: day
+      - model_var: sidconcth
+        freq: mon
+
+  sidconcth_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidconcth_d
+        freq: day
+      - model_var: sidconcth
+        freq: mon
+
+  sidmassdyn_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassdyn_d
+        freq: day
+      - model_var: sidmassdyn
+        freq: mon
+
+  sidmassgrowthbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassgrowthbot_d
+        freq: day
+      - model_var: sidmassgrowthbot
+        freq: mon
+
+  sidmassgrowthsi_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassgrowthsi_d
+        freq: day
+      - model_var: sidmassgrowthsi
+        freq: mon
+
+  sidmassgrowthwat_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassgrowthwat_d
+        freq: day
+      - model_var: sidmassgrowthwat
+        freq: mon
+
+  sidmassmeltbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassmeltbot_d
+        freq: day
+      - model_var: sidmassmeltbot
+        freq: mon
+
+  sidmassmeltlat_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassmeltlat_d
+        freq: day
+      - model_var: sidmassmeltlat
+        freq: mon
+
+  sidmassmelttop_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassmelttop_d
+        freq: day
+      - model_var: sidmassmelttop
+        freq: mon
+
+  sidmassth_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmassth_d
+        freq: day
+      - model_var: sidmassth
+        freq: mon
+
+  sidmasstranx_tavg-u-hxy-u:
+    table: seaIce
+    units: "kg s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmasstranx_d
+        freq: day
+      - model_var: sidmasstranx
+        freq: mon
+
+  sidmasstranx_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmasstranx_d
+        freq: day
+      - model_var: sidmasstranx
+        freq: mon
+
+  sidmasstrany_tavg-u-hxy-u:
+    table: seaIce
+    units: "kg s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmasstrany_d
+        freq: day
+      - model_var: sidmasstrany
+        freq: mon
+
+  sidmasstrany_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidmasstrany_d
+        freq: day
+      - model_var: sidmasstrany
+        freq: mon
+
+  sidivvel_tpt-u-hxy-si:
+    table: seaIce
+    units: "s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidivvel_d
+        freq: day
+      - model_var: sidivvel
+        freq: mon
+
+  sidragbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidragbot_d
+        freq: day
+      - model_var: sidragbot
+        freq: mon
+
+  sidragtop_tavg-u-hxy-si:
+    table: seaIce
+    units: "1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sidragtop_d
+        freq: day
+      - model_var: sidragtop
+        freq: mon
+
+  sieqthick_tavg-u-hxy-si:
     table: seaIce
     units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sieqthick_d
+        freq: day
+      - model_var: sieqthick
+        freq: mon
+
+  sifb_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sifb_d
+        freq: day
+      - model_var: sifb
+        freq: mon
+
+  siflcondbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "W m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: siflcondbot_d
+        freq: day
+      - model_var: siflcondbot
+        freq: mon
+
+  siflcondtop_tavg-u-hxy-si:
+    table: seaIce
+    units: "W m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: siflcondtop_d
+        freq: day
+      - model_var: siflcondtop
+        freq: mon
+
+  siflfwbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siflfwbot_d
+        freq: day
+      - model_var: siflfwbot
+        freq: mon
+
+  siflfwbot_tavg-u-hxy-sea:
+    table: ocean
+    units: "kg m-2 s-1"
+    long_name: "Freshwater Flux from Sea Ice to Ocean"
     dims: [time, latitude, longitude]
     regrid_method: conservative
     sources:
+      - model_var: siflfwbot_d
+        freq: day
+      - model_var: siflfwbot
+        freq: mon
+
+  siflfwdrain_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siflfwdrain_d
+        freq: day
+      - model_var: siflfwdrain
+        freq: mon
+
+  siflswdbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "W m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siflswdbot_d
+        freq: day
+      - model_var: siflswdbot
+        freq: mon
+
+  sifllattop_tavg-u-hxy-si:
+    table: seaIce
+    units: "W m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: sifllattop_d
+        freq: day
+      - model_var: sifllattop
+        freq: mon
+
+  siflsensbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "W m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: siflsensbot_d
+        freq: day
+      - model_var: siflsensbot
+        freq: mon
+
+  siflsenstop_tavg-u-hxy-si:
+    table: seaIce
+    units: "W m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: siflsenstop_d
+        freq: day
+      - model_var: siflsenstop
+        freq: mon
+
+  siflswdtop_tavg-u-hxy-si:
+    table: seaIce
+    units: "W m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siflswdtop_d
+        freq: day
+      - model_var: siflswdtop
+        freq: mon
+
+  siflswutop_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siflswutop_d
+        freq: day
+      - model_var: siflswutop
+        freq: mon
+
+  siforcecoriolx_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siforcecoriolx_d
+        freq: day
+      - model_var: siforcecoriolx
+        freq: mon
+
+  siforcecorioly_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siforcecorioly_d
+        freq: day
+      - model_var: siforcecorioly
+        freq: mon
+
+  siforceintstrx_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siforceintstrx_d
+        freq: day
+      - model_var: siforceintstrx
+        freq: mon
+
+  siforceintstry_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siforceintstry_d
+        freq: day
+      - model_var: siforceintstry
+        freq: mon
+
+  siforcetiltx_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siforcetiltx_d
+        freq: day
+      - model_var: siforcetiltx
+        freq: mon
+
+  siforcetilty_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siforcetilty_d
+        freq: day
+      - model_var: siforcetilty
+        freq: mon
+
+  sig1_tavg-u-hxy-sea:
+    table: ocean
+    units: "m s-1"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - model_var: sigl_d
+        freq: day
+      - model_var: sigl
+        freq: mon
+
+  sigpp_tavg-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sigpp_d
+        freq: day
+      - model_var: sigpp
+        freq: mon
+
+  sihc_tavg-u-hxy-sea:
+    table: ocean
+    units: "kg m-2 s-1"
+    long_name: "Sea Ice Surface Freshwater Flux to Ocean"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - model_var: sihc_d
+        freq: day
+      - model_var: sihc
+        freq: mon
+
+  siitdconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitdconc_d
+        freq: day
+      - model_var: sitdconc
+        freq: mon
+
+  siitdsnconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitdsnconc_d
+        freq: day
+      - model_var: sitdsnconc
+        freq: mon
+
+  siitdsnthick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siitdsnthick_d
+        freq: day
+      - model_var: siitdsnthick
+        freq: mon
+
+  siitdthick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siitdthick_d
+        freq: day
+      - model_var: siitdthick
+        freq: mon
+
+  simass_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simass_d
+        freq: day
+      - model_var: simass
+        freq: mon
+
+  simassacrossline_tavg-u-ht-u:
+    table: seaIce
+    units: "kg m-2"
+    long_name: "Sea Ice Mass Across Line"
+    dims: [time, latitude]
+    regrid_method: conservative
+    sources:
+      - model_var: simassacrossline_d
+        freq: day
+      - model_var: simassacrossline
+        freq: mon
+
+  simpconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simpconc_d
+        freq: day
+      - model_var: simpconc
+        freq: mon
+
+  simpeffconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simpeffconc_d
+        freq: day
+      - model_var: simpeffconc
+        freq: mon
+
+  simprefrozen_tavg-u-hxy-simp:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simprefrozen_d
+        freq: day
+      - model_var: simprefrozen
+        freq: mon
+
+  simprefrozen_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simprefrozen_d
+        freq: day
+      - model_var: simprefrozen
+        freq: mon
+
+  simpthick_tavg-u-hxy-simp:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simpthick_d
+        freq: day
+      - model_var: simpthick
+        freq: mon
+
+  simpthick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: simpthick_d
+        freq: day
+      - model_var: simpthick
+        freq: mon
+
+  sino3_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sino3_d
+        freq: day
+      - model_var: sino3
+        freq: mon
+
+  sirdgconc_tavg-u-hxy-si:
+    table: seaIce
+    units: "%"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sirdgconc_d
+        freq: day
+      - model_var: sirdgconc
+        freq: mon
+
+  sirdgthick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sirdgthick_d
+        freq: day
+      - model_var: sirdgthick
+        freq: mon
+
+  sipr_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sipr_d
+        freq: day
+      - model_var: sipr
+        freq: mon
+
+  sisali_tavg-u-hxy-si:
+    table: seaIce
+    units: "1e-3"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisali_d
+        freq: day
+      - model_var: sisali
+        freq: mon
+
+  sisaltmass_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisaltmass_d
+        freq: day
+      - model_var: sisaltmass
+        freq: mon
+
+  sishearvel_tpt-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sishearvel_d
+        freq: day
+      - model_var: sishearvel
+        freq: mon
+
+  sisi_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisi_d
+        freq: day
+      - model_var: sisi
+        freq: mon
+
+  sisnmassacrossline_tavg-u-ht-u :
+    table: seaIce
+    units: "kg m-2 s-1"
+    long_name: "Sea Ice Mass Across Line"
+    dims: [time, latitude]
+    regrid_method: conservative
+    sources:
+      - model_var: sisnmassacrossline_d
+        freq: day
+      - model_var: sisnmassacrossline
+        freq: mon
+
+  sisndmassdyn_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisndmassdyn_d
+        freq: day
+      - model_var: sisndmassdyn
+        freq: mon
+
+  sisndmasssnf_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisndmasssnf_d
+        freq: day
+      - model_var: sisndmasssnf
+        freq: mon
+
+  sisndmassmelt_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisndmassmelt_d
+        freq: day
+      - model_var: sisndmassmelt
+        freq: mon
+
+  sisndmasssi_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisndmasssi_d
+        freq: day
+      - model_var: sisndmasssi
+        freq: mon
+
+  sisndmasssubl_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisndmasssubl_d
+        freq: day
+      - model_var: sisndmasssubl
+        freq: mon
+
+  sisndmasswind_tavg-u-hxy-si:
+    table: seaIce
+    units: "kg m-2 s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisndmasswind_d
+        freq: day
+      - model_var: sisndmasswind
+        freq: mon
+
+  sisnhc_tavg-u-hxy-si:
+    table: seaIce
+    units: "J m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: sisnhc_d
+        freq: day
+      - model_var: sisnhc
+        freq: mon
+
+  sisnthick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sisnthick_d
+        freq: day
+      - model_var: sisnthick
+        freq: mon
+
+  sispeed_tavg-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sispeed_d
+        freq: day
+      - model_var: sispeed
+        freq: mon
+
+  sistressave_tpt-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sistressave_d
+        freq: day
+      - model_var: sistressave
+        freq: mon
+
+  sistressmax_tpt-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sistressmax_d
+        freq: day
+      - model_var: sistressmax
+        freq: mon
+
+  sistrxdtop_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: sistrxdtop_d
+        freq: day
+      - model_var: sistrxdtop
+        freq: mon
+
+  sistrxubot_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: sistrxubot_d
+        freq: day
+      - model_var: sistrxubot
+        freq: mon
+
+  sistrydtop_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: sistrydtop_d
+        freq: day
+      - model_var: sistrydtop
+        freq: mon
+
+  sistryubot_tavg-u-hxy-si:
+    table: seaIce
+    units: "N m-2"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    positive: down
+    sources:
+      - model_var: sistryubot_d
+        freq: day
+      - model_var: sistryubot
+        freq: mon
+
+  sitempbot_tavg-u-hxy-si:
+    table: seaIce
+    units: "K"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitempbot_d
+        freq: day
+      - model_var: sitempbot
+        freq: mon
+
+  sitempsnic_tavg-u-hxy-si:
+    table: seaIce
+    units: "K"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitempsnic_d
+        freq: day
+      - model_var: sitempsnic
+        freq: mon
+
+  sitemptop_tavg-u-hxy-si:
+    table: seaIce
+    units: "K"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitemptop_d
+        freq: day
+      - model_var: sitemptop
+        freq: mon
+
+  sithick_tavg-u-hxy-sir:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sithick_d
+        freq: day
       - model_var: sithick
+        freq: mon
+
+  sithick_tavg-u-hxy-si:
+    table: seaIce
+    units: "m"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sithick_d
+        freq: day
+      - model_var: sithick
+        freq: mon
+
+  sitimefrac_tavg-u-hxy-sea:
+    table: seaIce
+    units: "1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sitimefrac_d
+        freq: day
+      - model_var: sitimefrac
+        freq: mon
+
+  siu_tavg-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siu_d
+        freq: day
+      - model_var: siu
+        freq: mon
+
+  siv_tavg-u-hxy-si:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: siv_d
+        freq: day
+      - model_var: siv
+        freq: mon
+
+  siv_tavg-u-hxy-ifs:
+    table: seaIce
+    units: "m s-1"
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources:
+      - model_var: siv_d
+        freq: day
+      - model_var: siv
+        freq: mon
+
+  sivol_tavg-u-hxy-si:
+    table: seaIce
+    units: "m3 m-3"
+    dims: [time, nj, ni]
+    regrid_method: conservative
+    sources:
+      - model_var: sivol_d
+        freq: day
+      - model_var: sivol
+        freq: mon
 
   snld:
     table: land
