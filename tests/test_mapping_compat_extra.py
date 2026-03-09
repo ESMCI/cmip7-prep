@@ -1,4 +1,4 @@
-"""module doc string"""
+"""Additional tests for mapping_compat.py: list-style YAML, realize, unit conversions."""
 
 import tempfile
 import pytest
@@ -165,21 +165,3 @@ class TestApplyUnitConversion:
         da = xr.DataArray([1.0])
         with pytest.raises(ValueError, match="unit_conversion"):
             _apply_unit_conversion(da, "undefined_func(x)")
-
-
-# ---------------------------------------------------------------------------
-# _to_varconfig — edge cases
-# ---------------------------------------------------------------------------
-
-
-class TestToVarconfig:
-    """Tests for _to_varconfig normalization of raw YAML entries."""
-
-    def test_single_raw_variable_becomes_source(self):
-        """A single raw_variable with no formula is promoted to source."""
-        # Only CMIP7 'sources' key is supported
-
-    def test_multiple_raw_variables_kept(self):
-        """Multiple raw_variables with a formula are retained as raw_variables."""
-        # Only CMIP7 'sources' key is supported
-        # Removed: legacy raw_variables tests

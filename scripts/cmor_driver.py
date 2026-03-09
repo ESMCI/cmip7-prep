@@ -608,7 +608,7 @@ def main():
         else:
             glob_pattern = "*.nc"
 
-        # Load and evaluate the CMIPy mapping YAML file (cesm_to_cmip7.yaml or noresm_to_cmip7.yaml)
+        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml or noresm_to_cmip7.yaml)
         if model == "noresm":
             mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
         else:
