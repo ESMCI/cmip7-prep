@@ -312,7 +312,7 @@ class CmorSession(
                 "[CMOR axis debug] Defining unstructured grid for variable %s.",
                 var_name,
             )
-            logger.info("[CMOR axis debug] write geolon axes")
+            logger.debug("[CMOR axis debug] write geolon axes")
 
             geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
             if not geo_path.exists():
@@ -343,7 +343,7 @@ class CmorSession(
                     lon_bnds[-1, 1] = 360.0
                 # Also correct first upper bound to match the first cell
                 lon_bnds[0, 1] = lon_bnds[1, 0]
-            logger.info("[CMOR axis debug] corrected lon_bnds")
+            logger.debug("[CMOR axis debug] corrected lon_bnds")
             # Print lon_bnds for a range (debug)
             i_id = cmor.axis(
                 table_entry="latitude",
@@ -351,7 +351,7 @@ class CmorSession(
                 coord_vals=lat_vals_1d,
                 cell_bounds=bounds_from_centers_1d(lat_vals_1d, "lat"),
             )
-            logger.info("[CMOR axis debug] write geolat axes")
+            logger.debug("[CMOR axis debug] write geolat axes")
             j_id = cmor.axis(
                 table_entry="longitude",
                 units="degrees_east",
@@ -362,7 +362,7 @@ class CmorSession(
             for dim in ("xh", "xq", "yh", "yq"):
                 if dim in var_dims:
                     # rename dims xh and yh to longitude and latitude
-                    logger.info("[CMOR axis debug] renaming dim %s", dim)
+                    logger.debug("[CMOR axis debug] renaming dim %s", dim)
 
                     if dim in ["xh", "xq"]:
                         if dim == "xh":
@@ -621,7 +621,7 @@ class CmorSession(
         axes_ids = []
         for d in var_dims:
             axis_id = dim_to_axis.get(d)
-            logger.info("[CMOR axis debug] dim '%s' → axis_id: %s", d, axis_id)
+            logger.debug("[CMOR axis debug] dim '%s' → axis_id: %s", d, axis_id)
             if axis_id is None:
                 raise KeyError(
                     f"No axis ID found for dimension '{d}' in variable '{var_name}' {var_dims}"
@@ -839,17 +839,17 @@ class CmorSession(
                 )
         if bvn not in ds:
             ds = ds.rename({vdef.name: bvn})
-        logger.info("Preparing to write variable: %s", bvn)  # debug
+        logger.debug("Preparing to write variable: %s", bvn)  # debug
         data = ds[str(bvn)]
 
-        logger.info("Ensure fx variables are written and cached")  # debug
+        logger.debug("Ensure fx variables are written and cached")  # debug
         self.ensure_fx_written_and_cached(ds)
 
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_root, self.primarytable)
-        logger.info("Define CMOR axes for variable %s", bvn)  # debug
+        logger.debug("Define CMOR axes for variable %s", bvn)  # debug
         axes_ids = self._define_axes(ds, vdef)
-        logger.info("Prepare data for CMOR %s", data.dtype)  # debug
+        logger.debug("Prepare data for CMOR %s", data.dtype)  # debug
         data_filled, fillv = filled_for_cmor(data)
         if "zl" in data_filled.dims:
             data_filled = data_filled.rename({"zl": "olevel"})
