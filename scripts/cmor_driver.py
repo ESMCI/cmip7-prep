@@ -54,7 +54,8 @@ _DATE_RE = re.compile(
 
 # Path for cmor tables
 TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
-TABLES_noresm = "/nird/home/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
+#TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
+TABLES_noresm = "/nird/home/masan/cmip7-cmor-tables/"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -350,7 +351,7 @@ def process_one_var(
                 tables_root=tables_root,
                 log_dir=log_dir,
                 log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
-                dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
+                dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
                 outdir=outdir,
             ) as cm:
                 cmip7name = cmip_var.attributes["branded_variable_name"]
