@@ -275,7 +275,8 @@ def process_one_var(
                 open_kwargs=open_kwargs,
             )
             logger.info("realm is %s", realm)
-
+            if "TLAT" in ds_native:
+                logger.info("TLAT is present")
             if model == "cesm":
                 # Append ocn_fx_fields to ds_native if available
                 # fx - grid definition like topography, fraction
@@ -286,11 +287,14 @@ def process_one_var(
             # Output ds_native keys
             logger.info(
                 "ds_native keys: %s for var %s with dims %s",
-                list(ds_native.keys()),
+                list(ds_native.variables.keys()),
                 varname,
                 dims,
             )
             # TODO: why does this not abort the program?
+            # JPE: because I don't want to abort the whole program
+            # if one variable is missing - I want to log the error and
+            # move on to the next variable
             if var is None:
                 logger.warning(f"Source variable(s) not found for {varname}")
                 results.append((varname, "ERROR: Source variable(s) not found."))
@@ -560,7 +564,7 @@ def main():
         modelling_realm=realm,
         experiment=args.experiment,
     )
-    cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
+    # cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
 
     # Determine cmip variables that will process
     if args.cmip_vars:

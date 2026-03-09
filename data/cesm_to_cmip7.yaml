@@ -812,6 +812,19 @@ variables:
       - model_var: siareaacrossline
         freq: mon
 
+  siarea_tavg-u-hm-u:
+    table: seaIce
+    units: "m2"
+    long_name: "Sea Ice Area"
+    dims: [time]
+    formula: (siconc.where(TLAT > 0) * area.where(TLAT > 0)).sum(dim=['nj', 'ni'])
+    sources:
+      - model_var: siconc_d
+        freq: day
+      - model_var: siconc
+        freq: mon
+
+
   siage_tavg-u-hxy-si:
     table: seaIce
     units: "yr"

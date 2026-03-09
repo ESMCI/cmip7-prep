@@ -240,9 +240,9 @@ class Mapping:
             vc = _to_varconfig(cmip_name, raw, freq=effective_freq)
         else:
             vc = self._vars[cmip_name]
-
+        logger.info("Realizing variable '%s' with config: %s", cmip_name, vc.as_cfg())
         da = _realize_core(ds, vc)
-
+        logger.info("Realized variable '%s' with dims: %s", cmip_name, da.dims)
         if da is not None:
             if vc.unit_conversion is not None:
                 da = _apply_unit_conversion(da, vc.unit_conversion)
