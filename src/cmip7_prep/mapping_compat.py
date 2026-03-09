@@ -363,26 +363,26 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
         return ds[vc.source]
 
     if vc.name == "sftlf":
-        raw_vars = ["landfrac"]
+        model_vars = ["landfrac"]
     elif vc.name == "areacella":
-        raw_vars = ["area"]
+        model_vars = ["area"]
     else:
-        raw_vars = vc.raw_variables
+        model_vars = vc.raw_variables
 
     # Identity mapping from a single raw variable
-    if raw_vars and vc.formula in (None, "", "null") and len(raw_vars) == 1:
-        var = raw_vars[0]
+    if model_vars and vc.formula in (None, "", "null") and len(model_vars) == 1:
+        var = model_vars[0]
         if var not in ds:
             raise KeyError(f"raw variable {var!r} not found in dataset")
         return ds[var]
 
     # Identity mapping from a formula
     if vc.formula:
-        if not raw_vars:
+        if not model_vars:
             raise ValueError(f"formula given for {vc.name} but no raw_variables listed")
-        env = _require_vars(ds, raw_vars, f"realize({vc.name})")
+        da_dict = _require_vars(ds, model_vars, f"realize({vc.name})")
         try:
-            result = _safe_eval(vc.formula, env)
+            result = _safe_eval(vc.formula, da_dict)
         except Exception as exc:
             raise ValueError(f"Error evaluating formula for {vc.name}: {exc}") from exc
         if not isinstance(result, xr.DataArray):
