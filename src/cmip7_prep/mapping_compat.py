@@ -357,6 +357,7 @@ def _require_vars(
 
 def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
     """Create a DataArray according to a VarConfig (without unit conversion)."""
+    logger.info("Realizing variable '%s' with config: %s", vc.name, vc.as_cfg())
     if vc.source:
         if vc.source not in ds:
             raise KeyError(f"source variable {vc.source!r} not found in dataset")
@@ -382,11 +383,17 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
             raise ValueError(f"formula given for {vc.name} but no raw_variables listed")
         da_dict = _require_vars(ds, model_vars, f"realize({vc.name})")
         try:
+            logger.info("ds contains vars %s", list(ds.data_vars))
             result = _safe_eval(vc.formula, da_dict)
         except Exception as exc:
             raise ValueError(f"Error evaluating formula for {vc.name}: {exc}") from exc
         if not isinstance(result, xr.DataArray):
             raise ValueError(f"Formula for {vc.name} did not produce a DataArray")
+        logger.info(
+            "Successfully evaluated formula for %s, result dims: %s",
+            vc.name,
+            result.dims,
+        )
         return result
 
     raise ValueError(

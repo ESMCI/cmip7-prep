@@ -817,7 +817,8 @@ variables:
     units: "m2"
     long_name: "Sea Ice Area"
     dims: [time]
-    formula: (siconc.where(TLAT > 0) * area.where(TLAT > 0)).sum(dim=['nj', 'ni'])
+    #formula: (siconc.where(siconc.coords['TLAT'] > 0) * areacello.where(siconc.coords['TLAT'] > 0)).sum(dim=['nj', 'ni'])
+    formula: (siconc.where(siconc.coords['TLAT'] > 0)).sum(dim=['nj', 'ni'])
     sources:
       - model_var: siconc_d
         freq: day

@@ -304,10 +304,41 @@ def process_one_var(
 
             # For ocean realm: distinguish native vs regridded by dims
             if model == "cesm" and "latitude" in dims and "longitude" in dims:
-                # output ocn on the native grid
-                logger.info(f"Preparing native grid output for mom6 variable {varname}")
-                ds_cmor = ds_native
-                results.append((str(varname), "analyzed native mom6 grid"))
+                # output ocn on the native grid, but apply realize for formulas/mapping
+                logger.info(
+                    f"Preparing native grid output for mom6 variable {varname}, applying realize"
+                )
+                realized = mapping.realize(ds_native, varname)
+                ds_cmor = (
+                    realized
+                    if isinstance(realized, xr.Dataset)
+                    else xr.Dataset({varname: realized})
+                )
+                # Ensure time_bounds is included if present
+                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+                results.append(
+                    (str(varname), "analyzed native mom6 grid (realize applied)")
+                )
+            elif model == "cesm" and realm == "seaIce" and len(dims) == 1:
+                logger.info(
+                    f"Preparing globally averaged seaIce field, applying realize"
+                )
+                realized = mapping.realize(ds_native, varname)
+                ds_cmor = (
+                    realized
+                    if isinstance(realized, xr.Dataset)
+                    else xr.Dataset({varname: realized})
+                )
+                # Ensure time_bounds is included if present
+                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+                results.append(
+                    (
+                        str(varname),
+                        "globaly or hemispherically averaged seaIce field (realize applied)",
+                    )
+                )
             else:
                 # For lnd/atm or any other dims, use existing logic
                 logger.debug(
@@ -487,7 +518,7 @@ def main():
 
     # Setup input directory for cesm
     if model == "cesm":
-        if realm == "ocean":
+        if realm in ["ocean", "seaIce"]:
             if args.ocn_grid_file:
                 ocn_grid = args.ocn_grid_file
             if args.ocn_static_file:
