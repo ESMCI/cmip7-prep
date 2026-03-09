@@ -336,6 +336,7 @@ def sigma_mid_and_bounds(ds: xr.Dataset, levels: dict) -> tuple[np.ndarray, np.n
     # 1) midpoints: prefer B mid (dimensionless 0..1); fallback to lev if already 0..1
     if hybm_name in ds:
         mid = np.asarray(ds[hybm_name].values, dtype="f8")
+        mid = make_strictly_monotonic(mid)
     elif lev_name in ds:
         mid_candidate = np.asarray(ds[lev_name].values, dtype="f8")
         if np.nanmin(mid_candidate) >= 0.0 and np.nanmax(mid_candidate) <= 1.0:

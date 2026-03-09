@@ -203,7 +203,6 @@ def realize_regrid_prepare(
     *,
     tables_path: Optional[Union[str, Path]] = None,
     time_chunk: Optional[int] = 12,
-    mom6_grid: Optional[Dict[str, xr.DataArray]] = None,
     regrid_kwargs: Optional[dict] = None,
     open_kwargs: Optional[dict] = None,
 ) -> xr.Dataset:

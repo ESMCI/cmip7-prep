@@ -1431,7 +1431,7 @@ variables:
 
   simprefrozen_tavg-u-hxy-simp:
     table: seaIce
-    units: "kg m-2 s-1"
+    units: "m"
     dims: [time, nj, ni]
     regrid_method: conservative
     sources:
