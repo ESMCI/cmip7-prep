@@ -1,11 +1,8 @@
-# noresm_to_cmip7.yaml — CMIP-keyed schema with CMIP6 compatibility
+# noresm_to_cmip7.yaml — CMIP7-keyed schema
 #
 # Top-level keys are CMIP variable names.
 # Each variable can be defined either with:
 #   - new-style 'sources' (preferred for complex/multi-source),
-#   - or CMIP6-style 'raw_variables' + 'formula' (+ 'unit_conversion', 'levels', etc.).
-#
-# This allows direct reuse of CMIP6 tables while supporting newer expressive mappings.
 
 dataset_overrides:
   institution_id: NCAR

@@ -1,5 +1,5 @@
 # cmip7_prep/mapping_compat.py
-r"""Mapping loader/evaluator compatible with CMIP6-style lists, CMIP7-style dicts,
+r"""Mapping loader/evaluator compatible with CMIP7-style dicts
 and a dict wrapped under a top-level key 'variables:'.
 
 Also supports a 'sources:' list where each item may be a plain string or a dict
@@ -79,27 +79,6 @@ class VarConfig:
         return {k: v for k, v in d.items() if v is not None}
 
 
-def _normalize_table_name(value: Optional[str]) -> Optional[str]:
-    """Return a short CMOR table name like 'Amon' from common inputs.
-    >>> _normalize_table_name("CMIP6_Amon.json")
-    'Amon'
-    >>> _normalize_table_name("Amon")
-    'Amon'
-    >>> print(_normalize_table_name(None))
-    None
-    """
-    if not value:
-        return None
-    s = str(value)
-    if s.lower().endswith(".json"):
-        s = s[:-5]
-    if "_" in s:
-        head, tail = s.split("_", 1)
-        if head.upper().startswith("CMIP"):
-            s = tail
-    return s
-
-
 def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     """Evaluate a small arithmetic/xarray expression in a restricted environment.
     >>> _safe_eval("x + 2", {"x": 3})
@@ -141,7 +120,7 @@ class Mapping:
 
     Notes
     -----
-    The loader accepts both dict- and list-based YAML styles. All table names
+    The loader accepts only a dict-based YAML style. All table names
     are normalized to a short form (e.g., 'Amon').
     """
 
@@ -166,36 +145,28 @@ class Mapping:
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        # Accept top-level "variables:" wrapper
-        if (
-            isinstance(data, dict)
-            and "variables" in data
-            and isinstance(data["variables"], dict)
-        ):
-            data = data["variables"]
-
-        result: Dict[str, VarConfig] = {}
-        raw: Dict[str, Any] = {}
-
-        if isinstance(data, dict):
-            # CMIP7-style (or wrapped): keys are CMIP names
-            for name, cfg in data.items():
-                if not isinstance(cfg, dict):
-                    continue
-                raw[name] = cfg
-                result[name] = _to_varconfig(name, cfg)
-        elif isinstance(data, list):
-            # CMIP6-style: list with 'name' field
-            for item in data:
-                if not isinstance(item, dict) or "name" not in item:
-                    continue
-                name = str(item["name"])
-                raw[name] = item
-                result[name] = _to_varconfig(name, item)
-        else:
+        if not isinstance(data, dict):
             raise TypeError(
                 "Unsupported YAML structure: expected dict or list at top level."
             )
+        if not "variables" in data and not isinstance(data["variables"], dict):
+            raise TypeError(
+                "Unsupported YAML structure: expected dict for variables."
+            )
+
+        # Top-level "variables:" wrapper
+        data = data["variables"]
+
+        # CMIP7-style (or wrapped): keys are CMIP names
+        result: Dict[str, VarConfig] = {}
+        raw: Dict[str, Any] = {}
+        for name, cfg in data.items():
+            if not isinstance(cfg, dict):
+                raise TypeError(
+                    "Each entry in the yaml file must be a dictionary."
+                )
+            raw[name] = cfg
+            result[name] = _to_varconfig(name, cfg)
 
         return result, raw
 
@@ -224,6 +195,7 @@ class Mapping:
             return _to_varconfig(cmip_name, raw, freq=effective_freq).as_cfg()
         return self._vars[cmip_name].as_cfg()
 
+
     def realize(
         self, ds: xr.Dataset, cmip_name: str, freq: Optional[str] = None
     ) -> xr.DataArray:
@@ -241,11 +213,12 @@ class Mapping:
         else:
             vc = self._vars[cmip_name]
 
+        # realize the entry (apply the formula and unit conversions if appropriate)
+        # da is an DataArray that is returned
         da = _realize_core(ds, vc)
 
+        # TODO: Should error you not error if da is None?
         if da is not None:
-            if vc.unit_conversion is not None:
-                da = _apply_unit_conversion(da, vc.unit_conversion)
             if vc.units:
                 da.attrs["units"] = vc.units
             if vc.long_name:
@@ -295,7 +268,7 @@ def _to_varconfig(
     >>> vc = _to_varconfig("tas", {"table": "Amon", "units": "K", "source": "TREFHT"})
     >>> vc.name, vc.table, vc.source
     ('tas', 'Amon', 'TREFHT')
-    >>> vc2 = _to_varconfig("pr", {"raw_variables": ["PRECC", "PRECL"], "formula": "PRECC + PRECL"})
+    >>> vc2 = _to_varconfig("pr", {"sources": ["PRECC", "PRECL"], "formula": "PRECC + PRECL"})
     >>> vc2.raw_variables
     ['PRECC', 'PRECL']
     >>> vc3 = _to_varconfig("tas", {"sources": [{"model_var": "T2m", "scale": 1.0}]})
@@ -307,47 +280,42 @@ def _to_varconfig(
     >>> _to_varconfig("siu", {"sources": srcs}, freq="mon").source
     'siu'
     """
-    table = _normalize_table_name(cfg.get("table") or cfg.get("CMOR_table"))
+    # Determine table
+    table = cfg.get("table")
 
-    # 1) Accept your 'sources:' schema
+    # Accept your 'sources:' schema
+    # active is the subset of source entries that match *freq*.
+    # if no entry carries a ``freq`` tag, all sources are returned unchanged.
     raw_from_sources: Optional[List[str]] = None
     scale_from_sources = None
-    if "sources" in cfg and isinstance(cfg["sources"], list):
-        active = _filter_sources(cfg["sources"], freq)
-        raw_from_sources = []
-        for item in active:
-            if isinstance(item, str):
-                raw_from_sources.append(item)
-            elif isinstance(item, dict) and "model_var" in item:
-                raw_from_sources.append(str(item["model_var"]))
-                # If a scale is present, and not already set, use it
-                if scale_from_sources is None and "scale" in item:
-                    scale_from_sources = item["scale"]
-        if not raw_from_sources:
-            raw_from_sources = None
+    active = _filter_sources(cfg["sources"], freq)
+    raw_from_sources = []
+    for item in active:
+        if "model_var" in item:
+            raw_from_sources.append(str(item["model_var"]))
+            # If a scale is present, and not already set, use it
+            if scale_from_sources is None and "scale" in item:
+                scale_from_sources = item["scale"]
+    if not raw_from_sources:
+        raise ValueError("raw_from_sources does not contain any values")
 
-    # 2) Also accept traditional fields
-    raw_vars = cfg.get("raw_variables") or cfg.get("raw_vars") or raw_from_sources
-    if isinstance(raw_vars, str):
-        raw_vars = [raw_vars]
-
-    # Decide source vs raw_variables
-    source = cfg.get("source")
+    # Decide source (scalar) versus raw_from_sources (list)
+    source = None
     formula = cfg.get("formula")
-    if source is None and raw_vars and len(raw_vars) == 1 and not formula:
-        source = raw_vars[0]  # 1:1 mapping
-        raw_vars = None
+    if raw_from_sources and len(raw_from_sources) == 1 and not formula:
+        source = raw_from_sources[0]  # 1:1 mapping
+        raw_from_sources = None
 
     # If unit_conversion is not set, but scale_from_sources is, use it
     unit_conversion = cfg.get("unit_conversion")
-    if unit_conversion is None and scale_from_sources is not None:
+    if scale_from_sources is not None:
         unit_conversion = {"scale": scale_from_sources}
 
     vc = VarConfig(
         name=name,
         table=table,
         units=cfg.get("units"),
-        raw_variables=raw_vars,
+        raw_variables=raw_from_sources,
         source=source,
         formula=formula,
         unit_conversion=unit_conversion,
@@ -394,7 +362,7 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
     elif vc.name == "areacella":
         vc.raw_variables = "area"
 
-    # 2) identity mapping from a single raw variable
+    # Identity mapping from a single raw variable
     if (
         vc.raw_variables
         and vc.formula in (None, "", "null")
@@ -405,6 +373,7 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
             raise KeyError(f"raw variable {var!r} not found in dataset")
         return ds[var]
 
+    # Identity mapping from a formula
     if vc.formula:
         if not vc.raw_variables:
             raise ValueError(f"formula given for {vc.name} but no raw_variables listed")
@@ -418,7 +387,7 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
         return result
 
     raise ValueError(
-        f"Mapping for {vc.name} is incomplete: set 'source', or 'raw_variables', or 'formula'."
+        f"Mapping for {vc.name} is incomplete: set 'source' or 'raw_variables' or 'formula'."
     )
 
 
