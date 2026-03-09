@@ -140,11 +140,12 @@ class TestSigmaMidAndBounds:
         with pytest.raises(ValueError, match="sigma"):
             sigma_mid_and_bounds(ds, {"hybm": "hybm"})
 
-    def test_raises_on_nonmonotonic(self):
-        """Non-monotonic hybm values raise ValueError."""
+    def test_monotonic_on_nonmonotonic_input(self):
+        """Non-monotonic hybm values are made strictly monotonic."""
         ds = xr.Dataset({"hybm": ("mid", [0.1, 0.3, 0.2, 0.9])})
-        with pytest.raises(ValueError):
-            sigma_mid_and_bounds(ds, {"hybm": "hybm"})
+        mid, _ = sigma_mid_and_bounds(ds, {"hybm": "hybm"})
+        # Check that mid is strictly monotonic
+        assert np.all(np.diff(mid) > 0)
 
 
 # ---------------------------------------------------------------------------
