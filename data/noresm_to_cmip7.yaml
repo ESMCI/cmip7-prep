@@ -5,8 +5,8 @@
 #   - new-style 'sources' (preferred for complex/multi-source),
 
 dataset_overrides:
-  institution_id: NCAR
-  source_id: CESM3
+  institution_id: NCC
+  source_id: NorESM3
   nominal_resolution: 100 km
 
 variables:
