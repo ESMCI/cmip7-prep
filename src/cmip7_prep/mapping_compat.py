@@ -367,6 +367,8 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
         model_vars = ["landfrac"]
     elif vc.name == "areacella":
         model_vars = ["area"]
+    elif "siarea" in vc.name:
+        model_vars = ["siconc", "tarea"]
     else:
         model_vars = vc.raw_variables
 
@@ -383,7 +385,12 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
             raise ValueError(f"formula given for {vc.name} but no raw_variables listed")
         da_dict = _require_vars(ds, model_vars, f"realize({vc.name})")
         try:
-            logger.info("ds contains vars %s", list(ds.data_vars))
+            logger.info(
+                "Applying formula: %s for name %s with model_vars %s",
+                vc.formula,
+                vc.name,
+                model_vars,
+            )
             result = _safe_eval(vc.formula, da_dict)
         except Exception as exc:
             raise ValueError(f"Error evaluating formula for {vc.name}: {exc}") from exc
