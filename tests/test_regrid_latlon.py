@@ -85,6 +85,7 @@ def test_lat_lon_named_and_sized_correctly(monkeypatch, model, resolution):
 
     # Dims & coordinate ranges
     assert list(out.dims)[-2:] == ["lat", "lon"]
+    print(f"out sizes are {out.sizes}")
     assert out.sizes["lat"] == 4 and out.sizes["lon"] == 8
     assert np.isclose(float(out["lat"].min()), -67.5) and np.isclose(
         float(out["lat"].max()), 67.5
@@ -166,6 +167,38 @@ def test_attrs_propagated(monkeypatch):
     )
     assert out.attrs.get("units") == "K"
     assert out.attrs.get("long_name") == "Near-surface air temperature"
+
+
+def test_regrid_cice_ni_nj_dims(monkeypatch):
+    """regrid_to_latlon handles CICE variables with nj/ni dims."""
+    monkeypatch.setattr(
+        regrid.RegridderCache,
+        "get",
+        staticmethod(lambda path, method: _FakeRegridder(4, 8)),
+    )
+    monkeypatch.setattr(regrid.xr, "open_dataset", lambda _: _fake_weights(4, 8))
+
+    # Synthetic CICE-style dataset: (time, nj, ni) — small dims for testing
+    time_len, nj, ni = 2, 6, 8
+    ds_in = xr.Dataset(
+        {"hi": (("time", "nj", "ni"), np.ones((time_len, nj, ni), dtype=np.float32))},
+        coords={"time": np.arange(time_len)},
+    )
+
+    out = regrid.regrid_to_latlon(
+        ds_in,
+        varname="hi",
+        resolution="tx2_3v2",
+        model="cesm",
+        method="conservative",
+        conservative_map=Path("dummy.nc"),
+        output_time_chunk=1,
+        dtype="float32",
+    )
+
+    # Key check: ni/nj dims were handled and output has lat/lon
+    assert "lat" in out.dims and "lon" in out.dims
+    assert "ni" not in out.dims and "nj" not in out.dims
 
 
 def test_pick_maps_noresm_ne16_defaults():

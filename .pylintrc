@@ -1,7 +1,7 @@
 [MASTER]
 ignore-paths=build,dist,.venv,.eggs,scripts
 extension-pkg-allow-list=cmor
-init-hook='import sys, os; sys.path.append(os.getcwd())'
+init-hook='import sys, os; src = os.path.join(os.getcwd(), "src"); sys.path.insert(0, src) if src not in sys.path else None'
 
 [MESSAGES CONTROL]
 disable=

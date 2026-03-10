@@ -119,6 +119,14 @@ def bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
     - For 'lat': clamps to [-90, 90]
     - For 'lon': treats as periodic [0, 360)
     - Works with non-uniform spacing (uses midpoints between neighbors)
+
+    >>> import numpy as np
+    >>> bounds_from_centers_1d(np.array([-60., 0., 60.]), kind="lat")
+    array([[-90., -30.],
+           [-30.,  30.],
+           [ 30.,  90.]])
+    >>> bounds_from_centers_1d(np.array([1.0]), kind="lat")
+    array([[0.5, 1.5]])
     """
     v = np.asarray(vals, dtype="f8").reshape(-1)
     n = v.size
@@ -165,7 +173,22 @@ def bounds_from_centers_1d(vals: np.ndarray, kind: str) -> np.ndarray:
 
 
 def roll_for_monotonic_with_bounds(lon, lon_bnds):
-    """Roll lon and lon_bnds together so both are strictly increasing and aligned."""
+    """Roll lon and lon_bnds together so both are strictly increasing and aligned.
+
+    >>> import numpy as np
+    >>> lon = np.array([180., 270., 0., 90.])
+    >>> lon_bnds = np.array([[135., 225.], [225., 315.], [315., 45.], [45., 135.]])
+    >>> lon, lon_bnds, shift = roll_for_monotonic_with_bounds(lon, lon_bnds)
+    >>> lon
+    array([  0.,  90., 180., 270.])
+    >>> shift
+    np.int64(-2)
+    >>> lon2 = np.array([0., 90., 180., 270.])
+    >>> lon2_bnds = np.array([[-45., 45.], [45., 135.], [135., 225.], [225., 315.]])
+    >>> _, _, shift2 = roll_for_monotonic_with_bounds(lon2, lon2_bnds)
+    >>> shift2
+    0
+    """
     d = np.diff(lon)
     k = np.where(d < 0)[0]
     if k.size:
@@ -384,6 +407,13 @@ def resolve_table_filename(tables_path: Path, key: str) -> str:
 
 
 def _fx_glob_pattern(name: str) -> str:
+    """Return a glob pattern for finding fx files for a given variable name.
+
+    >>> _fx_glob_pattern("sftlf")
+    '**/*_sftlf_fx_*.nc'
+    >>> _fx_glob_pattern("areacella")
+    '**/*_areacella_fx_*.nc'
+    """
     # CMOR filenames vary; this finds most fx files for this var
     # e.g., *_sftlf_fx_*.nc  or sftlf_fx_*.nc
     return f"**/*_{name}_fx_*.nc"

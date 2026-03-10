@@ -100,7 +100,21 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
 # -------------------------
 class FXCache:
     """Cache of regridded FX fields (sftlf, areacella,
-    areacello, sftof, deptho) keyed by mapfile."""
+    areacello, sftof, deptho) keyed by mapfile.
+
+    >>> from pathlib import Path
+    >>> import xarray as xr
+    >>> FXCache.clear()
+    >>> FXCache.get(Path("test_key")) is None
+    True
+    >>> ds = xr.Dataset({"sftlf": xr.DataArray([1.0])})
+    >>> FXCache.put(Path("test_key"), ds)
+    >>> FXCache.get(Path("test_key")) is ds
+    True
+    >>> FXCache.clear()
+    >>> FXCache.get(Path("test_key")) is None
+    True
+    """
 
     _cache: Dict[Path, xr.Dataset] = {}
 

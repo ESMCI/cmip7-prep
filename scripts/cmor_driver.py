@@ -74,11 +74,17 @@ INCLUDE_PATTERN_MAP = {
             "mon": ["mom6.h.z", "mom6.h.native."],
             "day": ["mom6.h.sfc"],
         },
+        "seaIce": {
+            "mon": ["cice.h."],
+            "day": ["cice.h1."],
+        },
     },
     "noresm": {
         "atmos": {
             "mon": ["cam.h0"],
             "day": ["cam.h1"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h3a"],
         },
         "land": {
             "mon": ["clm2.h0a"],
@@ -253,11 +259,11 @@ def process_one_var(
         logger.info(f"Processing {varname} with dims {dims}")
 
         # ---------------------------------------------
-        # Read in time series and regrid if necessary
+        # Read in time series, do the mapping and then regrid if necessary
         # ---------------------------------------------
         try:
             open_kwargs = None
-            if realm == "ocean":
+            if realm in ("ocean", "seaIce"):
                 open_kwargs = {"decode_timedelta": False}
             logger.info("Opening native data for variable %s", varname)
 
@@ -290,7 +296,7 @@ def process_one_var(
             # TODO: why does this not abort the program?
             if var is None:
                 logger.warning(f"Source variable(s) not found for {varname}")
-                results.append((varname, "ERROR: Source variable(s) not found."))
+                results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
 
             # For ocean realm: distinguish native vs regridded by dims
@@ -304,9 +310,8 @@ def process_one_var(
                 logger.debug(
                     "Processing %s for dims %s (atm/lnd or other)", varname, dims
                 )
-                # Below is where you do the mapping from SE to lat/lon
-                mom6_grid = None
-
+                # Obtain an xr.Dataset (ds_cmor) with the requested CMIP variable ready for CMOR.
+                # (this will include mapping from SE to lat/lon)
                 ds_cmor = realize_regrid_prepare(
                     resolution,
                     model,
@@ -314,7 +319,6 @@ def process_one_var(
                     ds_native,
                     varname,
                     tables_path=tables_root / "tables",
-                    mom6_grid=mom6_grid,
                     regrid_kwargs={
                         "dtype": "float32",
                     },
@@ -610,6 +614,7 @@ def main():
             mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
         else:
             mapping = Mapping.from_packaged_default()
+        mapping.default_freq = frequency
 
         # Determine TABLES directory
         if model == "cesm":
