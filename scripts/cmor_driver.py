@@ -25,7 +25,7 @@ import numpy as np
 import xarray as xr
 from cmor import set_cur_dataset_attribute
 
-from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds
+from cmip7_prep.cmor_utils import bounds_from_centers_1d, roll_for_monotonic_with_bounds, packaged_dataset_json
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
 from cmip7_prep.cmor_writer import CmorSession
@@ -351,10 +351,15 @@ def process_one_var(
 
             # TODO: add NorESM institution_id below
             # Initialize CMOR class
+            metadata_json = None
+            if model == "noresm":
+                metadata_json = packaged_dataset_json("cmor_dataset_noresm.json")
+
             with CmorSession(
                 tables_root=tables_root,
                 log_dir=log_dir,
                 log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
+                dataset_json = metadata_json,
                 dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
                 outdir=outdir,
             ) as cm:
