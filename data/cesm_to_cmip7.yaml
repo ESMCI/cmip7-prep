@@ -815,14 +815,21 @@ variables:
   siarea_tavg-u-hm-u:
     table: seaIce
     units: "m2"
-    long_name: "Sea Ice Area"
     dims: [time]
-    formula: (siconc * tarea / 100.).where(siconc.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
     sources:
       - model_var: siconc_d
         freq: day
+        alias: siconc
       - model_var: siconc
         freq: mon
+      - model_var: tarea
+    variants:
+      - long_name: "Sea Ice Area (Northern Hemisphere)"
+        region: nh
+        formula: "(siconc * tarea / 100.).where(siconc.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])"
+      - long_name: "Sea Ice Area (Southern Hemisphere)"
+        region: sh
+        formula: "(siconc * tarea / 100.).where(siconc.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])"
 
 
   siage_tavg-u-hxy-si:

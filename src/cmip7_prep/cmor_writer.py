@@ -185,6 +185,9 @@ class CmorSession(
                 "tracking_id", ""
             )  # empty lets CMOR regenerate from tracking_prefix
 
+        # Default region to "glb"; overridden per-variable in cmor_driver.py for NH/SH variants
+        cmor.set_cur_dataset_attribute("region", "glb")
+
         logger.info("set _controlled_vocabulary_file:")
         cmor.set_cur_dataset_attribute(
             "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")

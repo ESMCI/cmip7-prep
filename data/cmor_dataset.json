@@ -15,7 +15,6 @@
   "source": "CESM3 (2025): atmosphere: CAM; ocean: MOM; sea ice: CICE6; land: CTSM; aerosol: MAM4; coupler: CMEPS.",
   "source_type": "AOGCM",
   "nominal_resolution": "100 km",
-    "region": "glb",
     "branding_suffix": "tavg-l-hxy-u",
   "experiment_id": "piControl",
   "experiment": "Pre-industrial control simulation with prescribed carbon dioxide concentrations (for prescribed carbon dioxide emissions, see `esm-piControl`). Used to characterise natural variability and unforced behaviour.",
