@@ -1434,9 +1434,9 @@ variables:
       - model_var: simassacrossline
         freq: mon
 
-  sisnmass_tavg-u-hm-u:
+  sisnmass_tavg-u-hm-si:
     table: seaIce
-    units: "kg m-2"
+    units: "kg"
     dims: [time]
     sources:
       - model_var: sisnmass_d
