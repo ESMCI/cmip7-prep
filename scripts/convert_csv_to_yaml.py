@@ -306,7 +306,7 @@ def read_csv(filepath, config):
     key_col = config["key_column"]
     column_map = config["column_map"]
 
-    with open(filepath, "r") as f:
+    with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
         for row in reader:
