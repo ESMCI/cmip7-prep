@@ -13,6 +13,7 @@ The script is intentionally simple: it does a best-effort translation and flags 
 variables that could not be represented cleanly so the user can review them.
 """
 
+import json
 import yaml
 import csv
 import argparse
@@ -25,9 +26,17 @@ CESM_COLUMNS = [
     "Standard Name",
     "Units",
     "Dimensions",
-    "CESM Variable Name",
+    "CESM Variable Name",  # human-readable expression; used by convert_csv as skip filter
+    "Formula",  # the formula string, present only when original had one
+    "Sources JSON",  # full sources list (model_var + scale/freq/alias) as JSON
     "Cell Methods",
     "Regrid Method",
+    "Region",
+    "Positive",
+    "Levels Name",
+    "Levels Units",
+    "Levels Src Axis Name",
+    "Levels Src Axis Bnds",
 ]
 
 
@@ -70,71 +79,111 @@ def sources_to_expr(sources: list) -> str:
     return " + ".join(parts)
 
 
-def variable_to_row(name: str, var: dict) -> dict:
-    """Convert one YAML variable entry to a CSV row dict.
+def variable_to_rows(name: str, var: dict) -> list:
+    """Convert one YAML variable entry to a list of CSV row dicts.
 
-    Variables with a top-level ``variants`` key (region-specific sub-formulas)
-    cannot be fully represented in a flat CSV.  They are included using their
-    first variant formula and flagged with a ``#VARIANTS`` suffix in the
-    ``CESM Variable Name`` cell so the user knows to review them.
+    Variables without ``variants`` produce a single row.  Variables with
+    ``variants`` produce one row per variant, each carrying the variant's
+    ``formula``, ``long_name``, and ``region``.  The full ``sources`` list
+    (including ``scale``, ``freq``, and ``alias`` sub-fields) is serialised as
+    JSON in the ``Sources JSON`` column so the round-trip is lossless.
 
-    >>> row = variable_to_row("tas", {"table": "atmos", "units": "K", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "TREFHT"}]})
-    >>> row["CMIP Variable Name"]
+    >>> rows = variable_to_rows("tas", {"table": "atmos", "units": "K", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "TREFHT"}]})
+    >>> len(rows)
+    1
+    >>> rows[0]["CMIP Variable Name"]
     'tas'
-    >>> row["CESM Variable Name"]
+    >>> rows[0]["CESM Variable Name"]
     'TREFHT'
-    >>> row["Dimensions"]
-    'time, lat, lon'
+    >>> rows[0]["Formula"]
+    ''
+    >>> rows[0]["Sources JSON"]
+    '[{"model_var": "TREFHT"}]'
+    >>> rows[0]["Dimensions"]
+    '["time", "lat", "lon"]'
+    >>> rows[0]["Region"]
+    ''
 
-    >>> row2 = variable_to_row("pr", {"table": "atmos", "units": "kg m-2 s-1", "dims": ["time", "lat", "lon"], "formula": "PRECC + PRECL", "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}]})
-    >>> row2["CESM Variable Name"]
+    >>> rows2 = variable_to_rows("pr", {"table": "atmos", "units": "kg m-2 s-1", "dims": ["time", "lat", "lon"], "formula": "PRECC + PRECL", "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}]})
+    >>> rows2[0]["Formula"]
     'PRECC + PRECL'
+    >>> rows2[0]["CESM Variable Name"]
+    'PRECC + PRECL'
+
+    >>> var_with_scale = {"table": "atmos", "units": "kg m-2 s-1", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "QFLX", "scale": -1.0}]}
+    >>> rows_scale = variable_to_rows("evspsbl", var_with_scale)
+    >>> rows_scale[0]["Formula"]
+    ''
+    >>> import json; json.loads(rows_scale[0]["Sources JSON"])
+    [{'model_var': 'QFLX', 'scale': -1.0}]
+
+    >>> var_with_variants = {"table": "seaIce", "units": "m2", "dims": ["time"], "sources": [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}], "variants": [{"long_name": "NH", "region": "nh", "formula": "siconc.where(lat>0)"}, {"long_name": "SH", "region": "sh", "formula": "siconc.where(lat<0)"}]}
+    >>> rows3 = variable_to_rows("siarea_tavg-u-hm-u", var_with_variants)
+    >>> len(rows3)
+    2
+    >>> rows3[0]["Region"]
+    'nh'
+    >>> rows3[0]["Long Name"]
+    'NH'
+    >>> rows3[0]["Formula"]
+    'siconc.where(lat>0)'
+    >>> rows3[0]["CESM Variable Name"]
+    'siconc.where(lat>0)'
+    >>> rows3[1]["Region"]
+    'sh'
+    >>> import json; json.loads(rows3[0]["Sources JSON"]) == [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}]
+    True
     """
-    # ── CESM Variable Name ──────────────────────────────────────────────────
     formula = var.get("formula")
     sources = var.get("sources", [])
     variants = var.get("variants")
+    levels = var.get("levels", {})
 
-    if variants:
-        # Variants take precedence: use the first variant formula when available
-        first_variant = variants[0] if isinstance(variants, list) and variants else {}
-        variant_formula = first_variant.get("formula") if isinstance(first_variant, dict) else None
-
-        if variant_formula:
-            base_expr = variant_formula
-        else:
-            # Fallback to existing logic if variant formula is not provided
-            if formula:
-                base_expr = formula
-            elif sources:
-                base_expr = sources_to_expr(sources)
-            else:
-                base_expr = ""
-
-        cesm_var = f"{base_expr}  #VARIANTS" if base_expr else "#VARIANTS"
-    else:
-        if formula:
-            cesm_var = formula
-        elif sources:
-            cesm_var = sources_to_expr(sources)
-        else:
-            cesm_var = ""
-
-    # ── dims ────────────────────────────────────────────────────────────────
     dims = var.get("dims", [])
-    dims_str = ", ".join(str(d) for d in dims)
+    # Use JSON so that list-of-lists dims round-trip correctly.
+    dims_str = json.dumps(dims)
 
-    return {
+    base = {
         "CMIP Variable Name": name,
         "Table": var.get("table", ""),
-        "Long Name": var.get("long_name", ""),
         "Standard Name": var.get("standard_name", ""),
         "Units": var.get("units", ""),
         "Dimensions": dims_str,
-        "CESM Variable Name": cesm_var,
         "Cell Methods": var.get("cell_methods", ""),
         "Regrid Method": var.get("regrid_method", ""),
+        "Positive": var.get("positive", ""),
+        "Sources JSON": json.dumps(sources) if sources else "",
+        "Levels Name": levels.get("name", ""),
+        "Levels Units": levels.get("units", ""),
+        "Levels Src Axis Name": levels.get("src_axis_name", ""),
+        "Levels Src Axis Bnds": levels.get("src_axis_bnds", ""),
     }
+
+    if variants and isinstance(variants, list) and variants:
+        rows = []
+        for v in variants:
+            row = dict(base)
+            row["Long Name"] = v.get("long_name", var.get("long_name", ""))
+            row["CESM Variable Name"] = v.get("formula", "")
+            row["Formula"] = v.get("formula", "")
+            row["Region"] = v.get("region", "")
+            rows.append(row)
+        return rows
+
+    # No variants — single row
+    if formula:
+        cesm_var = formula
+    elif sources:
+        cesm_var = sources_to_expr(sources)
+    else:
+        cesm_var = ""
+
+    row = dict(base)
+    row["Long Name"] = var.get("long_name", "")
+    row["CESM Variable Name"] = cesm_var
+    row["Formula"] = formula or ""
+    row["Region"] = ""
+    return [row]
 
 
 def yaml_to_csv(yaml_path: str, csv_path: str) -> int:
@@ -155,7 +204,9 @@ def yaml_to_csv(yaml_path: str, csv_path: str) -> int:
         data = yaml.safe_load(f)
 
     variables = data.get("variables", {})
-    rows = [variable_to_row(name, var) for name, var in variables.items()]
+    rows = [
+        row for name, var in variables.items() for row in variable_to_rows(name, var)
+    ]
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CESM_COLUMNS)

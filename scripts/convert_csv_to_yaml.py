@@ -1,4 +1,5 @@
 import csv
+import json
 import yaml
 import re
 import argparse
@@ -21,6 +22,7 @@ MODEL_CONFIGS = {
     "noresm": {
         "default_input": "data.csv",
         "default_output": "data.yaml",
+        "normalize_dim_names": True,
         "dataset_overrides": {
             "institution_id": "NCC",
             "source_id": "NorESM3",
@@ -50,6 +52,7 @@ MODEL_CONFIGS = {
     "cesm": {
         "default_input": "cesm_data.csv",
         "default_output": "cesm_data.yaml",
+        "normalize_dim_names": False,
         "dataset_overrides": {
             "institution_id": "NCAR",
             "source_id": "CESM3",
@@ -62,9 +65,19 @@ MODEL_CONFIGS = {
             "Standard Name": "standard_name",
             "Units": "units",
             "Dimensions": "dims",
-            "CESM Variable Name": "_source_expr",
+            # "CESM Variable Name" is intentionally absent from column_map:
+            # it is used only as source_column (skip filter) and not parsed for
+            # formula/sources.  Formula and sources come from the dedicated columns below.
+            "Formula": "_formula",
+            "Sources JSON": "_sources_json",
             "Cell Methods": "cell_methods",
             "Regrid Method": "regrid_method",
+            "Region": "region",
+            "Positive": "positive",
+            "Levels Name": "_levels_name",
+            "Levels Units": "_levels_units",
+            "Levels Src Axis Name": "_levels_src_axis_name",
+            "Levels Src Axis Bnds": "_levels_src_axis_bnds",
         },
         "realm_column": "Table",
         "keep_realms": None,  # keep all realms
@@ -76,6 +89,7 @@ MODEL_CONFIGS = {
 
 class InlineListDumper(yaml.Dumper):
     """YAML dumper that can render lists in inline (flow) style."""
+
     pass
 
 
@@ -257,13 +271,21 @@ def fix_number_norwegian_format(value):
     return value
 
 
-def clean_string(value):
-    """Clean a string by stripping whitespace and normalising dimension names.
+def clean_string(value, normalize_dim_names=False):
+    """Clean a string by stripping whitespace and optionally normalising dimension names.
 
-    >>> clean_string("longitude")
+    Dimension name normalisation (longitude→lon, latitude→lat) is only applied
+    when normalize_dim_names=True (NorESM), not for CESM where the original
+    names such as "latitude"/"longitude" must be preserved.
+
+    >>> clean_string("longitude", normalize_dim_names=True)
     'lon'
-    >>> clean_string("latitude")
+    >>> clean_string("latitude", normalize_dim_names=True)
     'lat'
+    >>> clean_string("longitude", normalize_dim_names=False)
+    'longitude'
+    >>> clean_string("latitude", normalize_dim_names=False)
+    'latitude'
     >>> clean_string("  lev  ")
     'lev'
     >>> clean_string("'time'")
@@ -272,23 +294,102 @@ def clean_string(value):
     if isinstance(value, str):
         value = value.replace("'", "").replace('"', "")  # remove quotes
         value = value.strip()
-    if value == "longitude":
-        value = "lon"
-    elif value == "latitude":
-        value = "lat"
+    if normalize_dim_names:
+        if value == "longitude":
+            value = "lon"
+        elif value == "latitude":
+            value = "lat"
     return value
 
 
-def clean_strings(values):
+def clean_strings(values, normalize_dim_names=False):
     """Clean a list of strings."""
     if isinstance(values, list):
-        return [clean_string(v) for v in values]
+        return [clean_string(v, normalize_dim_names) for v in values]
     elif isinstance(values, str):
-        return clean_string(values)
+        return clean_string(values, normalize_dim_names)
     return values
 
 
 # ── read csv ──────────────────────────────────────────────────────────────────
+def _build_entry(row, config):
+    """Build a single variable entry dict from one CSV row."""
+    column_map = config["column_map"]
+    entry = {}
+
+    for csv_col, yaml_key in column_map.items():
+        if csv_col not in row:
+            continue  # skip columns absent from this CSV
+        value = row[csv_col].strip()
+        if not value:
+            continue  # skip blank cells
+
+        if yaml_key == "dims":
+            normalize = config.get("normalize_dim_names", False)
+            if value.startswith("["):
+                # JSON-encoded dims from yaml_to_csv (handles flat and nested lists).
+                try:
+                    dims = json.loads(value)
+                except json.JSONDecodeError:
+                    dims = clean_strings(value.split(","), normalize)
+            else:
+                dims = clean_strings(value.split(","), normalize)
+            entry["dims"] = dims
+        elif yaml_key == "units":
+            entry["units"] = fix_number_norwegian_format(value)
+        elif yaml_key == "_source_expr":
+            result = analyse_expression(value)
+            if result["is_math"]:
+                entry["formula"] = value
+                entry["sources"] = result["variables"]
+            else:
+                entry["sources"] = result["variables"]
+        elif yaml_key == "_formula":
+            entry["formula"] = value
+        elif yaml_key == "_sources_json":
+            try:
+                entry["sources"] = json.loads(value)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        else:
+            # Includes: table, long_name, standard_name, cell_methods,
+            # regrid_method, region, positive, _levels_name, _levels_units,
+            # _levels_src_axis_name, _levels_src_axis_bnds
+            entry[yaml_key] = value
+
+    # Build levels dict from explicit columns (if present) or fall back to
+    # auto-generating from "lev" in dims (needed for NorESM which has no
+    # dedicated levels columns).
+    levels_name = entry.pop("_levels_name", None)
+    levels_units = entry.pop("_levels_units", None)
+    levels_src_axis_name = entry.pop("_levels_src_axis_name", None)
+    levels_src_axis_bnds = entry.pop("_levels_src_axis_bnds", None)
+
+    if levels_name:
+        levels = {"name": levels_name}
+        if levels_units:
+            levels["units"] = levels_units
+        if levels_src_axis_name:
+            levels["src_axis_name"] = levels_src_axis_name
+        if levels_src_axis_bnds:
+            levels["src_axis_bnds"] = levels_src_axis_bnds
+        entry["levels"] = levels
+    elif "dims" in entry and "lev" in entry["dims"]:
+        # Fallback for models without explicit levels columns (e.g., NorESM).
+        entry["levels"] = {
+            "name": "standard_hybrid_sigma",
+            "units": "1",
+            "src_axis_name": "lev",
+            "src_axis_bnds": "ilev",
+        }
+
+    return entry
+
+
+# Fields that belong to each variant, not to the base variable entry.
+_VARIANT_FIELDS = ("long_name", "formula", "region")
+
+
 def read_csv(filepath, config):
     """Read CSV and return a data dict ready for YAML output.
 
@@ -301,52 +402,45 @@ def read_csv(filepath, config):
                 ...
             }
         }
-    """
-    data = {}
-    key_col = config["key_column"]
-    column_map = config["column_map"]
 
+    Variables with multiple CSV rows (same CMIP Variable Name, different Region)
+    are reconstructed into a ``variants`` list.
+    """
+    key_col = config["key_column"]
+
+    # First pass: collect all (name, entry) pairs, preserving order.
+    all_entries = []
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-
         for row in reader:
-
             if not should_keep(row, config):
                 continue
-
-            entry = {}
-            for csv_col, yaml_key in column_map.items():
-                if csv_col not in row:
-                    continue  # skip columns absent from this CSV
-                value = row[csv_col].strip()
-                if not value:
-                    continue  # skip blank cells
-
-                if yaml_key == "dims":
-                    dims = clean_strings(value.split(","))
-                    entry["dims"] = dims
-                    if "lev" in dims:
-                        entry["levels"] = {
-                            "name": "standard_hybrid_sigma",
-                            "units": "1",
-                            "src_axis_name": "lev",
-                            "src_axis_bnds": "ilev",
-                        }
-                elif yaml_key == "units":
-                    entry["units"] = fix_number_norwegian_format(value)
-                elif yaml_key == "_source_expr":
-                    result = analyse_expression(value)
-                    if result["is_math"]:
-                        entry["formula"] = value
-                        entry["sources"] = result["variables"]
-                    else:
-                        entry["sources"] = result["variables"]
-                else:
-                    entry[yaml_key] = value
-
             name = row[key_col].strip()
-            if name:
-                data[name] = entry
+            if not name:
+                continue
+            entry = _build_entry(row, config)
+            all_entries.append((name, entry))
+
+    # Second pass: group by name and reconstruct variants where multiple rows
+    # share the same CMIP Variable Name.
+    grouped = {}
+    for name, entry in all_entries:
+        grouped.setdefault(name, []).append(entry)
+
+    data = {}
+    for name, entries in grouped.items():
+        if len(entries) == 1:
+            data[name] = entries[0]
+        else:
+            # Multiple rows → variants variable.
+            # Base fields come from the first row (they are identical across rows).
+            base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
+            variants = []
+            for e in entries:
+                variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
+                variants.append(variant)
+            base["variants"] = variants
+            data[name] = base
 
     return {
         "dataset_overrides": config["dataset_overrides"],
@@ -364,7 +458,9 @@ def write_yaml(data, filepath):
     modified_lines = []
     for line in lines:
         if "{model_var:" in line:
-            line = line.replace("{model_var:", "model_var: ").replace("}", "")
+            # Only reformat single-key source dicts: {model_var: VAR} → model_var: VAR
+            # Leave multi-key dicts (e.g. {model_var: VAR, scale: -1.0}) untouched.
+            line = re.sub(r"\{model_var: (\w+)\}", r"model_var: \1", line)
         modified_lines.append(line)
         if "units:" in line or "source_id:" in line:
             modified_lines.append("\n")
