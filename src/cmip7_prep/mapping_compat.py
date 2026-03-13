@@ -389,7 +389,7 @@ def _to_varconfig(
             raw_from_sources.append(item)
             aliases[item] = item
     if not raw_from_sources:
-        raise ValueError(f"raw_from_sources does not contain any values for {str}")
+        raise ValueError(f"raw_from_sources does not contain any values for {name}")
     if raw_from_sources and len(raw_from_sources) == 1 and not formula:
         source = raw_from_sources[0]
         raw_from_sources = None
