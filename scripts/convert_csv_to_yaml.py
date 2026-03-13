@@ -239,7 +239,7 @@ def strip_quotes(obj):
 
 
 def fix_number_norwegian_format(value):
-    """Convert a string with Norwegian number format to a float.
+    """Normalize a value using Norwegian number formatting to a standard numeric string.
 
     >>> fix_number_norwegian_format("1,5")
     '1.5'
