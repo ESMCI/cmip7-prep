@@ -75,11 +75,20 @@ MODEL_CONFIGS = {
 
 
 class InlineListDumper(yaml.Dumper):
+    """YAML dumper that can render lists in inline (flow) style."""
     pass
 
 
 def inline_list_representer(dumper, data):
+    """Represent a Python list as an inline YAML sequence (flow style)."""
     return dumper.represent_sequence("tag:yaml.org,2002:seq", data, flow_style=True)
+
+
+# Register the inline list representer for both the custom dumper and the
+# default PyYAML dumper so that yaml.dump() picks it up even when no
+# explicit Dumper is provided.
+yaml.add_representer(list, inline_list_representer, Dumper=InlineListDumper)
+yaml.add_representer(list, inline_list_representer, Dumper=yaml.Dumper)
 
 
 def should_keep(row, config):
