@@ -260,9 +260,9 @@ class Mapping:
         """
         if cmip_name not in self._vars:
             warnings.warn(
-                f"[mapping] source variable {cmip_name} not found in dataset — skipping",
+                f"[mapping] no mapping found for CMIP variable {cmip_name} — skipping",
                 RuntimeWarning,
-                stacklevel=1,
+                stacklevel=2,
             )
             return []
         effective_freq = freq if freq is not None else self.default_freq
