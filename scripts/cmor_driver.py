@@ -265,6 +265,8 @@ def process_one_var(
         # ---------------------------------------------
         # Read in time series, do the mapping and then regrid if necessary
         # ---------------------------------------------
+        # cmor_items is a list of (ds_cmor, write_cfg) — one per variant
+        cmor_items = []
         try:
             open_kwargs = None
             if realm in ("ocean", "seaIce"):
@@ -282,7 +284,8 @@ def process_one_var(
                 open_kwargs=open_kwargs,
             )
             logger.info("realm is %s", realm)
-
+            if "TLAT" in ds_native:
+                logger.info("TLAT is present")
             if model == "cesm":
                 # Append ocn_fx_fields to ds_native if available
                 # fx - grid definition like topography, fraction
@@ -293,11 +296,14 @@ def process_one_var(
             # Output ds_native keys
             logger.info(
                 "ds_native keys: %s for var %s with dims %s",
-                list(ds_native.keys()),
+                list(ds_native.variables.keys()),
                 varname,
                 dims,
             )
             # TODO: why does this not abort the program?
+            # JPE: because I don't want to abort the whole program
+            # if one variable is missing - I want to log the error and
+            # move on to the next variable
             if var is None:
                 logger.warning(f"Source variable(s) not found for {varname}")
                 results.append((varname, "WARNING: Source variable(s) not found."))
@@ -305,10 +311,42 @@ def process_one_var(
 
             # For ocean realm: distinguish native vs regridded by dims
             if model == "cesm" and "latitude" in dims and "longitude" in dims:
-                # output ocn on the native grid
-                logger.info(f"Preparing native grid output for mom6 variable {varname}")
-                ds_cmor = ds_native
-                results.append((str(varname), "analyzed native mom6 grid"))
+                # output ocn on the native grid, but apply realize for formulas/mapping
+                logger.info(
+                    f"Preparing native grid output for mom6 variable {varname}, applying realize"
+                )
+                realized = mapping.realize(ds_native, varname)
+                ds_c = (
+                    realized
+                    if isinstance(realized, xr.Dataset)
+                    else xr.Dataset({varname: realized})
+                )
+                # Ensure time_bounds is included if present
+                if "time_bounds" in ds_native and "time_bounds" not in ds_c:
+                    ds_c = ds_c.assign(time_bounds=ds_native["time_bounds"])
+                cmor_items = [(ds_c, cfg)]
+                results.append(
+                    (str(varname), "analyzed native mom6 grid (realize applied)")
+                )
+            elif model == "cesm" and realm == "seaIce" and len(dims) == 1:
+                logger.info(
+                    f"Preparing seaIce field variants via realize_all for {varname}"
+                )
+                for da, variant_cfg in mapping.realize_all(
+                    ds_native, varname, freq=frequency
+                ):
+                    ds_v = (
+                        da if isinstance(da, xr.Dataset) else xr.Dataset({varname: da})
+                    )
+                    if "time_bounds" in ds_native and "time_bounds" not in ds_v:
+                        ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
+                    cmor_items.append((ds_v, variant_cfg))
+                results.append(
+                    (
+                        str(varname),
+                        f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
+                    )
+                )
             else:
                 # For lnd/atm or any other dims, use existing logic
                 logger.debug(
@@ -333,6 +371,7 @@ def process_one_var(
                 # Attach ocn_fx_fields to regridded output for writing
                 if ocn_fx_fields is not None:
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
+                cmor_items = [(ds_cmor, cfg)]
 
         except AttributeError:
             results.append((varname, f"ERROR {model} input variable not found."))
@@ -348,60 +387,64 @@ def process_one_var(
             continue
 
         # ---------------------------------------------
-        # CMORize
+        # CMORize — loop over variants (usually just one)
         # ---------------------------------------------
-        try:
-            log_dir = outdir / "logs"
+        shortname = str(getattr(cmip_var, "physical_parameter").name)
+        cmip7name = cmip_var.attributes["branded_variable_name"]
+        for ds_cmor_write, write_cfg in cmor_items:
+            try:
+                log_dir = outdir / "logs"
 
-            # TODO: add NorESM institution_id below
-            # Initialize CMOR class
-            metadata_json = None
-            if model == "noresm":
-                metadata_json = packaged_dataset_json("cmor_dataset_noresm.json")
+                # TODO: add NorESM institution_id below
+                # Initialize CMOR class
+                metadata_json = None
+                if model == "noresm":
+                    metadata_json = packaged_dataset_json("cmor_dataset_noresm.json")
 
-            with CmorSession(
-                tables_root=tables_root,
-                log_dir=log_dir,
-                log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
-                dataset_json=metadata_json,
-                dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
-                outdir=outdir,
-            ) as cm:
-                cmip7name = cmip_var.attributes["branded_variable_name"]
-                set_cur_dataset_attribute("frequency", frequency)
+                with CmorSession(
+                    tables_root=tables_root,
+                    log_dir=log_dir,
+                    log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
+                    dataset_json=metadata_json,
+                    dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
+                    outdir=outdir,
+                ) as cm:
+                    set_cur_dataset_attribute("frequency", frequency)
+                    region = write_cfg.get("region", "glb")
+                    logger.info("Setting region: %s", region)
+                    set_cur_dataset_attribute("region", region)
 
-                logger.info(
-                    f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
+                    logger.info(
+                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
+                    )
+                    vdef = type(
+                        "VDef",
+                        (),
+                        {
+                            "name": shortname,
+                            "table": write_cfg.get("table", "atmos"),
+                            "units": write_cfg.get("units", ""),
+                            "dims": dims,
+                            "positive": write_cfg.get("positive", None),
+                            "cell_methods": write_cfg.get("cell_methods", None),
+                            "long_name": write_cfg.get("long_name", None),
+                            "standard_name": write_cfg.get("standard_name", None),
+                            "levels": write_cfg.get("levels", None),
+                            "branded_variable_name": cmip7name,
+                        },
+                    )()
+
+                    # Now use CMOR utility to write out netcdf variable
+                    logger.info(f"Writing CMOR variable {varname} with dims {dims} ")
+                    cm.write_variable(ds_cmor_write, cmip_var, vdef)
+
+                logger.info(f"Finished processing for {varname} with dims {dims}")
+                results.append((str(cmip7name), "ok"))
+            except Exception as e:
+                logger.error(
+                    f"Exception while processing {varname} with dims {dims}: {e!r}"
                 )
-                shortname = str(getattr(cmip_var, "physical_parameter").name)
-                vdef = type(
-                    "VDef",
-                    (),
-                    {
-                        "name": shortname,
-                        "table": cfg.get("table", "atmos"),
-                        "units": cfg.get("units", ""),
-                        "dims": dims,
-                        "positive": cfg.get("positive", None),
-                        "cell_methods": cfg.get("cell_methods", None),
-                        "long_name": cfg.get("long_name", None),
-                        "standard_name": cfg.get("standard_name", None),
-                        "levels": cfg.get("levels", None),
-                        "branded_variable_name": cmip7name,
-                    },
-                )()
-
-                # Now use CMOR utility to write out netcdf varialbe
-                logger.info(f"Writing CMOR variable {varname} with dims {dims} ")
-                cm.write_variable(ds_cmor, cmip_var, vdef)
-
-            logger.info(f"Finished processing for {varname} with dims {dims}")
-            results.append((str(cmip7name), "ok"))
-        except Exception as e:
-            logger.error(
-                f"Exception while processing {varname} with dims {dims}: {e!r}"
-            )
-            results.append((str(varname), f"ERROR: {e!r}"))
+                results.append((str(varname), f"ERROR: {e!r}"))
     logger.info(f"Completed all processing for variable: {varname}, results {results}")
     return results
 
@@ -493,7 +536,7 @@ def main():
 
     # Setup input directory for cesm
     if model == "cesm":
-        if realm == "ocean":
+        if realm in ["ocean", "seaIce"]:
             if args.ocn_grid_file:
                 ocn_grid = args.ocn_grid_file
             if args.ocn_static_file:
@@ -570,7 +613,7 @@ def main():
         modelling_realm=realm,
         experiment=args.experiment,
     )
-    cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
+    # cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
 
     # Determine cmip variables that will process
     if args.cmip_vars:

@@ -71,9 +71,10 @@ def _collect_required_model_vars(
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
-        for var in ("area", "landmask", "landfrac"):
+        for var in ("area", "landmask", "landfrac", "TLAT"):
             logger.info("Adding auxiliary variable '%s' ", var)
             needed.add(var)
+
     return sorted(needed)
 
 
@@ -142,8 +143,10 @@ def open_native_for_cmip_vars(
         parallel=parallel,
         data_vars="minimal",
         compat="equals",
+        coords="all",
         **open_kwargs,
     )
+
     # Convert "lev" and "ilev" units from mb to Pa for downstream operations.
     if "lev" in ds:
         ds["lev"] = ds["lev"] / 1000
@@ -225,13 +228,15 @@ def realize_regrid_prepare(
 
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
+    logger.info("Realized variable '%s' with dims: %s", cmip_var, ds_v.dims)
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
     if time_chunk and "time" in da.dims:
         da = da.chunk({"time": int(time_chunk)})
-
+    logger.info("Realized variable '%s' with dims: %s", cmip_var, da.dims)
     ds_vars = xr.Dataset({cmip_var: da})
-    for var in ("landfrac", "area", "landmask", "wet"):
+    for var in ("landfrac", "area", "landmask", "wet", "TLAT"):
         if var in ds_native and var not in ds_vars:
+            logger.info("Adding auxiliary variable '%s' to dataset for regridding", var)
             ds_vars = ds_vars.assign(**{var: ds_native[var]})
 
     # 3) Check whether hybrid-σ is required

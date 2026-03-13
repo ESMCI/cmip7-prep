@@ -185,6 +185,9 @@ class CmorSession(
                 "tracking_id", ""
             )  # empty lets CMOR regenerate from tracking_prefix
 
+        # Default region to "glb"; overridden per-variable in cmor_driver.py for NH/SH variants
+        cmor.set_cur_dataset_attribute("region", "glb")
+
         logger.info("set _controlled_vocabulary_file:")
         cmor.set_cur_dataset_attribute(
             "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")
@@ -303,6 +306,8 @@ class CmorSession(
             raise ValueError(
                 "Found 'latitude'/'longitude' dims without MOM6 grid; expected 'lat'/'lon'."
             )
+        i_id = None
+        j_id = None
         if ("xh" in var_dims or "xq" in var_dims) and (
             "yh" in var_dims or "yq" in var_dims
         ):
@@ -838,6 +843,11 @@ class CmorSession(
                     "`cmip_var.branded_variable_name` and `vdef.name` are missing."
                 )
         if bvn not in ds:
+            logger.warning(
+                "Variable '%s' not found in dataset; available variables: %s",
+                bvn,
+                list(ds.data_vars),
+            )
             ds = ds.rename({vdef.name: bvn})
         logger.debug("Preparing to write variable: %s", bvn)  # debug
         data = ds[str(bvn)]

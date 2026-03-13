@@ -52,6 +52,8 @@ class VarConfig:
     long_name: Optional[str] = None
     standard_name: Optional[str] = None
     dims: Optional[List[str]] = None
+    source_aliases: Optional[Dict[str, str]] = None  # alias → model_var
+    region: Optional[str] = None
 
     def as_cfg(self) -> Dict[str, Any]:
         """Return a plain dict view for convenience in other modules.
@@ -75,6 +77,8 @@ class VarConfig:
             "long_name": self.long_name,
             "standard_name": self.standard_name,
             "dims": self.dims,
+            "source_aliases": self.source_aliases,
+            "region": self.region,
         }
         return {k: v for k, v in d.items() if v is not None}
 
@@ -128,7 +132,7 @@ class Mapping:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.default_freq: Optional[str] = None
-        self._vars, self._raw = self._load_yaml(self.path)
+        self._vars, self._raw, self._variant_keys = self._load_yaml(self.path)
 
     @classmethod
     def from_packaged_default(cls, filename: str = "cesm_to_cmip7.yaml") -> "Mapping":
@@ -142,7 +146,7 @@ class Mapping:
     # -----------------
     @staticmethod
     def _load_yaml(path: Path):
-        """Load CMIP7 YAML and return (vars_dict, raw_dict)."""
+        """Load CMIP7 YAML and return (vars_dict, raw_dict, variant_keys)."""
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
@@ -158,12 +162,30 @@ class Mapping:
         data = data["variables"]
         result: Dict[str, VarConfig] = {}
         raw: Dict[str, Any] = {}
+        variant_keys: Dict[str, List[str]] = {}
         for name, cfg in data.items():
             if not isinstance(cfg, dict):
                 raise TypeError("Each entry in the yaml file must be a dictionary.")
-            raw[name] = cfg
-            result[name] = _to_varconfig(name, cfg)
-        return result, raw
+            variants = cfg.get("variants")
+            if variants:
+                # Expand into N internal entries keyed as "<name>:0", "<name>:1", etc.
+                base_cfg = {k: v for k, v in cfg.items() if k != "variants"}
+                internal_keys = []
+                for i, variant in enumerate(variants):
+                    internal_key = f"{name}:{i}"
+                    variant_cfg = {**base_cfg, **variant}
+                    raw[internal_key] = variant_cfg
+                    result[internal_key] = _to_varconfig(name, variant_cfg)
+                    internal_keys.append(internal_key)
+                variant_keys[name] = internal_keys
+                # Point base name to first variant for backward compat
+                result[name] = result[f"{name}:0"]
+                raw[name] = raw[f"{name}:0"]
+            else:
+                raw[name] = cfg
+                result[name] = _to_varconfig(name, cfg)
+                variant_keys[name] = [name]
+        return result, raw, variant_keys
 
     # -----------------
     # Public API
@@ -205,9 +227,9 @@ class Mapping:
             vc = _to_varconfig(cmip_name, raw, freq=effective_freq)
         else:
             vc = self._vars[cmip_name]
-
+        logger.info("Realizing variable '%s' with config: %s", cmip_name, vc.as_cfg())
         da = _realize_core(ds, vc)
-
+        logger.info("Realized variable '%s' with dims: %s", cmip_name, da.dims)
         if da is not None:
             if vc.units:
                 da.attrs["units"] = vc.units
@@ -217,6 +239,55 @@ class Mapping:
                 da.attrs.setdefault("standard_name", vc.standard_name)
 
         return da
+
+    def realize_all(
+        self, ds: xr.Dataset, cmip_name: str, freq: Optional[str] = None
+    ) -> List[tuple]:
+        """Realize all variants of a CMIP variable.
+
+        For non-variant entries returns a single-element list.
+        For entries with a ``variants:`` key in the YAML, returns one
+        ``(DataArray, cfg_dict)`` tuple per variant.
+
+        Parameters
+        ----------
+        ds:
+            Native model dataset.
+        cmip_name:
+            Branded variable name (top-level YAML key).
+        freq:
+            Output frequency token (e.g. 'mon', 'day').
+        """
+        if cmip_name not in self._vars:
+            warnings.warn(
+                f"[mapping] no mapping found for CMIP variable {cmip_name} — skipping",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return []
+        effective_freq = freq if freq is not None else self.default_freq
+        results = []
+        for internal_key in self._variant_keys.get(cmip_name, [cmip_name]):
+            raw_entry = self._raw.get(internal_key)
+            if effective_freq is not None and raw_entry is not None:
+                vc = _to_varconfig(cmip_name, raw_entry, freq=effective_freq)
+            else:
+                vc = self._vars.get(internal_key, self._vars[cmip_name])
+            logger.info(
+                "realize_all: realizing variant '%s' with config: %s",
+                internal_key,
+                vc.as_cfg(),
+            )
+            da = _realize_core(ds, vc)
+            if da is not None:
+                if vc.units:
+                    da.attrs["units"] = vc.units
+                if vc.long_name:
+                    da.attrs.setdefault("long_name", vc.long_name)
+                if vc.standard_name:
+                    da.attrs.setdefault("standard_name", vc.standard_name)
+                results.append((da, vc.as_cfg()))
+        return results
 
     # No public access to _vars or _raw outside this file.
 
@@ -228,6 +299,8 @@ def _filter_sources(sources: List[Any], freq: Optional[str]) -> List[Any]:
     """Return the subset of source entries that match *freq*.
 
     If no entry carries a ``freq`` tag, all sources are returned unchanged.
+    When a freq is requested and entries match, matched entries are returned
+    together with any untagged entries (which are always included).
     When a freq is requested but no entry matches, untagged entries are used
     as a fallback; if there are none either, the full list is returned.
 
@@ -240,6 +313,10 @@ def _filter_sources(sources: List[Any], freq: Optional[str]) -> List[Any]:
         >>> srcs2 = [{'model_var': 'T2m'}]
         >>> _filter_sources(srcs2, 'mon')
         [{'model_var': 'T2m'}]
+        >>> srcs3 = [{'model_var': 'v_d', 'freq': 'day'}, {'model_var': 'v', 'freq': 'mon'},
+        ...          {'model_var': 'area'}]
+        >>> [s['model_var'] for s in _filter_sources(srcs3, 'day')]
+        ['v_d', 'area']
     """
     if not sources:
         return sources
@@ -247,9 +324,9 @@ def _filter_sources(sources: List[Any], freq: Optional[str]) -> List[Any]:
     if not has_tags or freq is None:
         return sources
     matched = [s for s in sources if isinstance(s, dict) and s.get("freq") == freq]
-    if matched:
-        return matched
     untagged = [s for s in sources if isinstance(s, dict) and "freq" not in s]
+    if matched:
+        return matched + untagged
     return untagged if untagged else sources
 
 
@@ -299,18 +376,24 @@ def _to_varconfig(
         raise ValueError("CMIP7 mapping entry must have a 'sources' key.")
     active = _filter_sources(cfg["sources"], freq)
     raw_from_sources = []
+    aliases: Dict[str, str] = {}
     for item in active:
         if isinstance(item, dict) and "model_var" in item:
-            raw_from_sources.append(str(item["model_var"]))
+            mv = str(item["model_var"])
+            raw_from_sources.append(mv)
+            alias = str(item.get("alias", mv))
+            aliases[alias] = mv
             if scale_from_sources is None and "scale" in item:
                 scale_from_sources = item["scale"]
         elif isinstance(item, str):
             raw_from_sources.append(item)
+            aliases[item] = item
     if not raw_from_sources:
-        raise ValueError(f"raw_from_sources does not contain any values for {str}")
+        raise ValueError(f"raw_from_sources does not contain any values for {name}")
     if raw_from_sources and len(raw_from_sources) == 1 and not formula:
         source = raw_from_sources[0]
         raw_from_sources = None
+        aliases = {}
 
     unit_conversion = cfg.get("unit_conversion")
     if scale_from_sources is not None:
@@ -331,6 +414,8 @@ def _to_varconfig(
         long_name=cfg.get("long_name"),
         standard_name=cfg.get("standard_name"),
         dims=cfg.get("dims"),
+        source_aliases=aliases if aliases else None,
+        region=cfg.get("region"),
     )
     return vc
 
@@ -357,6 +442,7 @@ def _require_vars(
 
 def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
     """Create a DataArray according to a VarConfig (without unit conversion)."""
+    logger.info("Realizing variable '%s' with config: %s", vc.name, vc.as_cfg())
     if vc.source:
         if vc.source not in ds:
             raise KeyError(f"source variable {vc.source!r} not found in dataset")
@@ -378,15 +464,33 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
 
     # Identity mapping from a formula
     if vc.formula:
-        if not model_vars:
+        if vc.source_aliases:
+            # Build da_dict using alias → model_var mapping
+            missing = [mv for mv in vc.source_aliases.values() if mv not in ds]
+            if missing:
+                raise KeyError(f"realize({vc.name}): missing variables {missing}")
+            da_dict = {alias: ds[mv] for alias, mv in vc.source_aliases.items()}
+        elif model_vars:
+            da_dict = _require_vars(ds, model_vars, f"realize({vc.name})")
+        else:
             raise ValueError(f"formula given for {vc.name} but no raw_variables listed")
-        da_dict = _require_vars(ds, model_vars, f"realize({vc.name})")
         try:
+            logger.info(
+                "Applying formula: %s for name %s with model_vars %s",
+                vc.formula,
+                vc.name,
+                model_vars,
+            )
             result = _safe_eval(vc.formula, da_dict)
         except Exception as exc:
             raise ValueError(f"Error evaluating formula for {vc.name}: {exc}") from exc
         if not isinstance(result, xr.DataArray):
             raise ValueError(f"Formula for {vc.name} did not produce a DataArray")
+        logger.info(
+            "Successfully evaluated formula for %s, result dims: %s",
+            vc.name,
+            result.dims,
+        )
         return result
 
     raise ValueError(
