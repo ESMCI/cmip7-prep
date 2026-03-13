@@ -1109,6 +1109,26 @@ variables:
       - model_var: sieqthick
         freq: mon
 
+  siextent_tavg-u-hm-u:
+    table: seaIce
+    units: "m2"
+    dims: [time]
+    sources:
+      - model_var: siconc_d
+        freq: day
+        alias: siconc
+      - model_var: siconc
+        freq: mon
+      - model_var: tarea
+    variants:
+      - long_name: "Sea Ice Extent (Northern Hemisphere)"
+        region: nh
+        formula: "(tarea.where(siconc > 15., 0.0)).where(siconc.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])"
+      - long_name: "Sea Ice Extent (Southern Hemisphere)"
+        region: sh
+        formula: "(tarea.where(siconc > 15., 0.0)).where(siconc.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])"
+
+
   sifb_tavg-u-hxy-si:
     table: seaIce
     units: "m"
@@ -1413,6 +1433,25 @@ variables:
         freq: day
       - model_var: simassacrossline
         freq: mon
+
+  sisnmass_tavg-u-hm-u:
+    table: seaIce
+    units: "kg m-2"
+    dims: [time]
+    sources:
+      - model_var: sisnmass_d
+        freq: day
+        alias: sisnmass
+      - model_var: sisnmass
+        freq: mon
+      - model_var: tarea
+    variants:
+      - long_name: "Sea Ice Snow Mass (Northern Hemisphere)"
+        region: nh
+        formula: "(sisnmass * tarea).where(sisnmass.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])"
+      - long_name: "Sea Ice Snow Mass (Southern Hemisphere)"
+        region: sh
+        formula: "(sisnmass * tarea).where(sisnmass.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])"
 
   simpconc_tavg-u-hxy-si:
     table: seaIce
@@ -1859,6 +1898,26 @@ variables:
         freq: day
       - model_var: sivol
         freq: mon
+
+  sivol_tavg-u-hm-u:
+    table: seaIce
+    units: "1e3 km^3"
+    dims: [time]
+    sources:
+      - model_var: sivol_d
+        freq: day
+        alias: sivol
+      - model_var: sivol
+        freq: mon
+      - model_var: tarea
+    variants:
+      - long_name: "Sea Ice Volume (Northern Hemisphere)"
+        region: nh
+        formula: "(sivol * tarea).where(sivol.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])"
+      - long_name: "Sea Ice Volume (Southern Hemisphere)"
+        region: sh
+        formula: "(sivol * tarea).where(sivol.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])"
+
 
   snld:
     table: land
