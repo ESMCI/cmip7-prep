@@ -151,13 +151,13 @@ def yaml_to_csv(yaml_path: str, csv_path: str) -> int:
     1
     >>> os.unlink(ypath); os.unlink(cpath)
     """
-    with open(yaml_path, "r") as f:
+    with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     variables = data.get("variables", {})
     rows = [variable_to_row(name, var) for name, var in variables.items()]
 
-    with open(csv_path, "w", newline="") as f:
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CESM_COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
