@@ -14,7 +14,7 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
-from yaml_to_csv import CESM_COLUMNS, sources_to_expr, variable_to_row, yaml_to_csv
+from yaml_to_csv import CESM_COLUMNS, sources_to_expr, variable_to_rows, yaml_to_csv
 
 
 # ── sources_to_expr ───────────────────────────────────────────────────────────
@@ -71,15 +71,15 @@ class TestSourcesToExpr:
         assert "day" not in expr
 
 
-# ── variable_to_row ───────────────────────────────────────────────────────────
+# ── variable_to_rows ──────────────────────────────────────────────────────────
 
 
 class TestVariableToRow:
-    """Tests for variable_to_row()."""
+    """Tests for variable_to_rows()."""
 
     def test_basic_fields(self):
         """Core fields are mapped to the correct CSV columns."""
-        row = variable_to_row(
+        row = variable_to_rows(
             "tas",
             {
                 "table": "atmos",
@@ -88,17 +88,17 @@ class TestVariableToRow:
                 "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "TREFHT"}],
             },
-        )
+        )[0]
         assert row["CMIP Variable Name"] == "tas"
         assert row["Table"] == "atmos"
         assert row["Long Name"] == "Near-Surface Air Temperature"
         assert row["Units"] == "K"
-        assert row["Dimensions"] == "time, lat, lon"
+        assert row["Dimensions"] == '["time", "lat", "lon"]'
         assert row["CESM Variable Name"] == "TREFHT"
 
     def test_formula_takes_precedence_over_sources(self):
         """When formula is present, it is used instead of sources."""
-        row = variable_to_row(
+        row = variable_to_rows(
             "cl",
             {
                 "table": "atmos",
@@ -107,12 +107,12 @@ class TestVariableToRow:
                 "formula": "CLOUD * 100",
                 "sources": [{"model_var": "CLOUD"}],
             },
-        )
+        )[0]
         assert row["CESM Variable Name"] == "CLOUD * 100"
 
     def test_no_formula_uses_sources(self):
         """Without a formula, sources are joined into an expression."""
-        row = variable_to_row(
+        row = variable_to_rows(
             "pr",
             {
                 "table": "atmos",
@@ -120,12 +120,12 @@ class TestVariableToRow:
                 "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}],
             },
-        )
+        )[0]
         assert row["CESM Variable Name"] == "PRECC + PRECL"
 
     def test_scale_in_sources_represented(self):
         """A scale factor in a source is included in the expression."""
-        row = variable_to_row(
+        row = variable_to_rows(
             "evspsbl",
             {
                 "table": "atmos",
@@ -133,12 +133,12 @@ class TestVariableToRow:
                 "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "QFLX", "scale": -1.0}],
             },
-        )
+        )[0]
         assert row["CESM Variable Name"] == "QFLX * -1.0"
 
     def test_optional_fields_empty_when_absent(self):
         """Optional columns are empty strings when not present in the variable dict."""
-        row = variable_to_row(
+        row = variable_to_rows(
             "tas",
             {
                 "table": "atmos",
@@ -146,14 +146,14 @@ class TestVariableToRow:
                 "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "TREFHT"}],
             },
-        )
+        )[0]
         assert row["Standard Name"] == ""
         assert row["Cell Methods"] == ""
         assert row["Regrid Method"] == ""
 
     def test_optional_fields_populated(self):
         """Optional columns are populated when present in the variable dict."""
-        row = variable_to_row(
+        row = variable_to_rows(
             "pr",
             {
                 "table": "atmos",
@@ -164,14 +164,14 @@ class TestVariableToRow:
                 "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "PRECT"}],
             },
-        )
+        )[0]
         assert row["Standard Name"] == "precipitation_flux"
         assert row["Cell Methods"] == "time: mean"
         assert row["Regrid Method"] == "conservative"
 
-    def test_dims_joined_comma_space(self):
-        """Dims list is joined with ', ' in the output row."""
-        row = variable_to_row(
+    def test_dims_as_json(self):
+        """Dims list is serialised as JSON in the output row."""
+        row = variable_to_rows(
             "ta",
             {
                 "table": "atmos",
@@ -179,24 +179,24 @@ class TestVariableToRow:
                 "dims": ["time", "lev", "lat", "lon"],
                 "sources": [{"model_var": "T"}],
             },
-        )
-        assert row["Dimensions"] == "time, lev, lat, lon"
+        )[0]
+        assert row["Dimensions"] == '["time", "lev", "lat", "lon"]'
 
     def test_empty_dims(self):
-        """Missing dims key results in an empty Dimensions field."""
-        row = variable_to_row(
+        """Missing dims key results in an empty JSON list in Dimensions field."""
+        row = variable_to_rows(
             "tas",
             {
                 "table": "atmos",
                 "units": "K",
                 "sources": [{"model_var": "TREFHT"}],
             },
-        )
-        assert row["Dimensions"] == ""
+        )[0]
+        assert row["Dimensions"] == "[]"
 
-    def test_variants_flagged(self):
-        """A variable with variants gets a #VARIANTS marker in CESM Variable Name."""
-        row = variable_to_row(
+    def test_variants_produce_one_row_each(self):
+        """A variable with variants returns one row per variant."""
+        rows = variable_to_rows(
             "siarea",
             {
                 "table": "seaIce",
@@ -208,16 +208,18 @@ class TestVariableToRow:
                 ],
             },
         )
-        assert "#VARIANTS" in row["CESM Variable Name"]
+        assert len(rows) == 2
+        assert rows[0]["CESM Variable Name"] == "formula_nh"
+        assert rows[1]["CESM Variable Name"] == "formula_sh"
 
     def test_no_sources_or_formula_gives_empty(self):
         """A variable with neither sources nor formula gets an empty expression."""
-        row = variable_to_row("mystery", {"table": "atmos", "units": "1"})
+        row = variable_to_rows("mystery", {"table": "atmos", "units": "1"})[0]
         assert row["CESM Variable Name"] == ""
 
     def test_all_columns_present(self):
         """All CESM_COLUMNS are present in the returned row."""
-        row = variable_to_row(
+        row = variable_to_rows(
             "tas",
             {
                 "table": "atmos",
@@ -225,7 +227,7 @@ class TestVariableToRow:
                 "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "TREFHT"}],
             },
-        )
+        )[0]
         assert set(row.keys()) == set(CESM_COLUMNS)
 
 
@@ -315,7 +317,7 @@ class TestYamlToCsv:
         assert r["Table"] == "atmos"
         assert r["Long Name"] == "Near-Surface Air Temperature"
         assert r["Units"] == "K"
-        assert r["Dimensions"] == "time, lat, lon"
+        assert r["Dimensions"] == '["time", "lat", "lon"]'
         assert r["CESM Variable Name"] == "TREFHT"
 
     def test_formula_in_cesm_variable_name(self, tmp_path):

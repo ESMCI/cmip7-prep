@@ -65,9 +65,8 @@ MODEL_CONFIGS = {
             "Standard Name": "standard_name",
             "Units": "units",
             "Dimensions": "dims",
-            # "CESM Variable Name" is intentionally absent from column_map:
-            # it is used only as source_column (skip filter) and not parsed for
-            # formula/sources.  Formula and sources come from the dedicated columns below.
+            "CESM Variable Name": "_source_expr",
+            # "Formula" and "Sources JSON" override _source_expr when present (round-trip format).
             "Formula": "_formula",
             "Sources JSON": "_sources_json",
             "Cell Methods": "cell_methods",
@@ -275,8 +274,7 @@ def clean_string(value, normalize_dim_names=False):
     """Clean a string by stripping whitespace and optionally normalising dimension names.
 
     Dimension name normalisation (longitude→lon, latitude→lat) is only applied
-    when normalize_dim_names=True (NorESM), not for CESM where the original
-    names such as "latitude"/"longitude" must be preserved.
+    when normalize_dim_names=True (NorESM); for CESM the original names are preserved.
 
     >>> clean_string("longitude", normalize_dim_names=True)
     'lon'
@@ -321,6 +319,15 @@ def _build_entry(row, config):
         if csv_col not in row:
             continue  # skip columns absent from this CSV
         value = row[csv_col].strip()
+        if yaml_key == "_formula":
+            # An explicit (possibly empty) Formula column is authoritative: clear
+            # any formula that _source_expr may have set from the human-readable
+            # CESM Variable Name column (round-trip case).
+            if value:
+                entry["formula"] = value
+            else:
+                entry.pop("formula", None)
+            continue
         if not value:
             continue  # skip blank cells
 

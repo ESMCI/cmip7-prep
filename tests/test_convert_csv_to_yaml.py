@@ -286,12 +286,12 @@ class TestCleanString:
     """Tests for clean_string()."""
 
     def test_longitude(self):
-        """'longitude' is normalised to 'lon'."""
-        assert clean_string("longitude") == "lon"
+        """'longitude' is normalised to 'lon' when normalize_dim_names=True."""
+        assert clean_string("longitude", normalize_dim_names=True) == "lon"
 
     def test_latitude(self):
-        """'latitude' is normalised to 'lat'."""
-        assert clean_string("latitude") == "lat"
+        """'latitude' is normalised to 'lat' when normalize_dim_names=True."""
+        assert clean_string("latitude", normalize_dim_names=True) == "lat"
 
     def test_strip_whitespace(self):
         """Leading/trailing whitespace is stripped."""
@@ -319,12 +319,14 @@ class TestCleanStrings:
 
     def test_list_of_dims(self):
         """Each element in a list is cleaned."""
-        result = clean_strings(["time", "longitude", "latitude"])
+        result = clean_strings(
+            ["time", "longitude", "latitude"], normalize_dim_names=True
+        )
         assert result == ["time", "lon", "lat"]
 
     def test_single_string(self):
         """A plain string is cleaned as a single value."""
-        assert clean_strings("longitude") == "lon"
+        assert clean_strings("longitude", normalize_dim_names=True) == "lon"
 
     def test_passthrough_non_string(self):
         """Non-string values pass through unchanged."""
