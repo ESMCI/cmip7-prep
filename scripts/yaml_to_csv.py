@@ -95,19 +95,30 @@ def variable_to_row(name: str, var: dict) -> dict:
     sources = var.get("sources", [])
     variants = var.get("variants")
 
-    if formula:
-        cesm_var = formula
-    elif sources:
-        cesm_var = sources_to_expr(sources)
-    elif variants:
-        # Use the first variant formula and mark for review
-        cesm_var = variants[0].get("formula", "") + "  #VARIANTS"
-    else:
-        cesm_var = ""
+    if variants:
+        # Variants take precedence: use the first variant formula when available
+        first_variant = variants[0] if isinstance(variants, list) and variants else {}
+        variant_formula = first_variant.get("formula") if isinstance(first_variant, dict) else None
 
-    if variants and not (formula or (not sources)):
-        # sources present but variants also present — append flag
-        cesm_var = cesm_var + "  #VARIANTS"
+        if variant_formula:
+            base_expr = variant_formula
+        else:
+            # Fallback to existing logic if variant formula is not provided
+            if formula:
+                base_expr = formula
+            elif sources:
+                base_expr = sources_to_expr(sources)
+            else:
+                base_expr = ""
+
+        cesm_var = f"{base_expr}  #VARIANTS" if base_expr else "#VARIANTS"
+    else:
+        if formula:
+            cesm_var = formula
+        elif sources:
+            cesm_var = sources_to_expr(sources)
+        else:
+            cesm_var = ""
 
     # ── dims ────────────────────────────────────────────────────────────────
     dims = var.get("dims", [])
