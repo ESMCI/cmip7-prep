@@ -27,7 +27,7 @@ MODEL_CONFIGS = {
             "institution_id": "NCC",
             "source_id": "NorESM3",
             "nominal_resolution": "200 km",
-            "yaml_coax_dummy": [0,1,2]
+            "yaml_coax_dummy": [0, 1, 2],
         },
         "key_column": "Branded Variable Name",
         "column_map": {
@@ -165,6 +165,8 @@ def is_math_expression(expr: str) -> bool:
     #     return True
     if re.search(r"\w+\s+\w+", expr):
         return True
+    if re.search("FATES", expr):
+        return True
 
     return False
 
@@ -217,6 +219,8 @@ def extract_variables(expr: str) -> list:
         if word not in ignore:
             word_dict["model_var"] = word
             variables.append(word_dict)
+    if "FATES" in expr and "FATES_FRAC" not in expr:
+        variables.append({"model_var": "FATES_FRAC"})
     return variables
 
 
@@ -300,6 +304,8 @@ def clean_string(value, normalize_dim_names=False):
             value = "lon"
         elif value == "latitude":
             value = "lat"
+        elif value == "alevel":
+            value = "lev"
     return value
 
 
@@ -310,6 +316,15 @@ def clean_strings(values, normalize_dim_names=False):
     elif isinstance(values, str):
         return clean_string(values, normalize_dim_names)
     return values
+
+
+def include_fates_frac(expr):
+    """If the expression contains "FATES" but not "FATES_FRAC", include "FATES_FRAC" as an additional source variable."""
+    if "FATES" not in expr:
+        return expr
+    if "FATES_FRAC" in expr:
+        return expr
+    return f"({expr})*FATES_FRAC"
 
 
 # ── read csv ──────────────────────────────────────────────────────────────────
@@ -341,10 +356,11 @@ def _build_entry(row, config):
         elif yaml_key == "_source_expr":
             result = analyse_expression(value)
             if result["is_math"]:
-                entry["formula"] = value
+                entry["formula"] = include_fates_frac(value)
                 entry["sources"] = result["variables"]
             else:
                 entry["sources"] = result["variables"]
+
         elif yaml_key == "_formula":
             entry["formula"] = value
         elif yaml_key == "_sources_json":
@@ -352,6 +368,7 @@ def _build_entry(row, config):
                 entry["sources"] = json.loads(value)
             except (json.JSONDecodeError, ValueError):
                 pass
+
         else:
             # Includes: table, long_name, standard_name, cell_methods,
             # regrid_method, region, positive, _levels_name, _levels_units,
@@ -464,8 +481,19 @@ def write_yaml(data, filepath):
             line = re.sub(r"\{model_var: (\w+)\}", r"model_var: \1", line)
         if "yaml_coax_dummy" in line:
             continue
-        time_signifiers = ["_tavg-", "_tpt-", "_tclmdc-", "_ti-", "_tmin-", "_tminavg-", "_tmax-", "_tmaxavg-"]
-        add_newline = any(sig in line for sig in time_signifiers) or "variables:" in line
+        time_signifiers = [
+            "_tavg-",
+            "_tpt-",
+            "_tclmdc-",
+            "_ti-",
+            "_tmin-",
+            "_tminavg-",
+            "_tmax-",
+            "_tmaxavg-",
+        ]
+        add_newline = (
+            any(sig in line for sig in time_signifiers) or "variables:" in line
+        )
         if add_newline:
             modified_lines.append("\n")
         modified_lines.append(line)
