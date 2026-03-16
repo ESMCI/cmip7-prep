@@ -27,6 +27,7 @@ MODEL_CONFIGS = {
             "institution_id": "NCC",
             "source_id": "NorESM3",
             "nominal_resolution": "200 km",
+            "yaml_coax_dummy": [0,1,2]
         },
         "key_column": "Branded Variable Name",
         "column_map": {
@@ -461,9 +462,13 @@ def write_yaml(data, filepath):
             # Only reformat single-key source dicts: {model_var: VAR} → model_var: VAR
             # Leave multi-key dicts (e.g. {model_var: VAR, scale: -1.0}) untouched.
             line = re.sub(r"\{model_var: (\w+)\}", r"model_var: \1", line)
-        modified_lines.append(line)
-        if "units:" in line or "source_id:" in line:
+        if "yaml_coax_dummy" in line:
+            continue
+        time_signifiers = ["_tavg-", "_tpt-", "_tclmdc-", "_ti-", "_tmin-", "_tminavg-", "_tmax-", "_tmaxavg-"]
+        add_newline = any(sig in line for sig in time_signifiers) or "variables:" in line
+        if add_newline:
             modified_lines.append("\n")
+        modified_lines.append(line)
     with open(filepath, "w") as f:
         f.writelines(modified_lines)
 
