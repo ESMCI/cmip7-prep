@@ -189,7 +189,7 @@ class TestShouldKeepNorESM:
 
     def _row(self, realm, source):
         return {
-            "Modelling Realm-Primary": realm,
+            "Modelling Realm - Primary": realm,
             "NorESM3 name (dependency)": source,
         }
 
@@ -287,11 +287,11 @@ class TestCleanString:
 
     def test_longitude(self):
         """'longitude' is normalised to 'lon'."""
-        assert clean_string("longitude") == "lon"
+        assert clean_string("longitude", normalize_dim_names=True) == "lon"
 
     def test_latitude(self):
         """'latitude' is normalised to 'lat'."""
-        assert clean_string("latitude") == "lat"
+        assert clean_string("latitude", normalize_dim_names=True) == "lat"
 
     def test_strip_whitespace(self):
         """Leading/trailing whitespace is stripped."""
@@ -308,6 +308,10 @@ class TestCleanString:
     def test_passthrough_lev(self):
         """'lev' passes through unchanged."""
         assert clean_string("lev") == "lev"
+    
+    def test_alevel_to_lev(self):
+        """'lev' passes through unchanged."""
+        assert clean_string("alevel", normalize_dim_names=True) == "lev"
 
     def test_passthrough_time(self):
         """'time' passes through unchanged."""
@@ -319,16 +323,21 @@ class TestCleanStrings:
 
     def test_list_of_dims(self):
         """Each element in a list is cleaned."""
-        result = clean_strings(["time", "longitude", "latitude"])
+        result = clean_strings(["time", "longitude", "latitude"], normalize_dim_names=True)
         assert result == ["time", "lon", "lat"]
+    
+    def test_list_of_dims(self):
+        """Each element in a list is cleaned."""
+        result = clean_strings(["time", "longitude", "latitude"])
+        assert result == ["time", "longitude", "latitude"]
 
     def test_single_string(self):
         """A plain string is cleaned as a single value."""
-        assert clean_strings("longitude") == "lon"
+        assert clean_strings("longitude", normalize_dim_names=True) == "lon"
 
     def test_passthrough_non_string(self):
         """Non-string values pass through unchanged."""
-        assert clean_strings(42) == 42
+        assert clean_strings(42, normalize_dim_names=True) == 42
 
 
 # ── fix_number_norwegian_format ───────────────────────────────────────────────
@@ -388,7 +397,7 @@ class TestReadCsvNorESM:
 
     FIELDNAMES = [
         "Branded Variable Name",
-        "Modelling Realm-Primary",
+        "Modelling Realm - Primary",
         "CMIP6 Compound Name",
         "Description",
         "Units (from Physical Parameter)",
@@ -403,7 +412,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tas",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "CMIP6 Compound Name": "Near-Surface Air Temperature",
                 "Description": "Temperature at 2m",
                 "Units (from Physical Parameter)": "K",
@@ -427,7 +436,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "pr",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "Units (from Physical Parameter)": "kg m-2 s-1",
                 "Dimensions": "time, lat, lon",
                 "NorESM3 name (dependency)": "PRECC + PRECL",
@@ -447,7 +456,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "ta",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "Units (from Physical Parameter)": "K",
                 "Dimensions": "time, lev, lat, lon",
                 "NorESM3 name (dependency)": "T",
@@ -468,7 +477,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tos",
-                "Modelling Realm-Primary": "atmos",  # contrived, just testing dim logic
+                "Modelling Realm - Primary": "atmos",  # contrived, just testing dim logic
                 "Dimensions": "time, olevel, lat, lon",
                 "NorESM3 name (dependency)": "SST",
                 "CMIP6 Compound Name": "",
@@ -485,7 +494,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tas",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "Dimensions": "time, lat, lon",
                 "NorESM3 name (dependency)": "TREFHT",
                 "CMIP6 Compound Name": "",
@@ -502,7 +511,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tos",
-                "Modelling Realm-Primary": "ocean",
+                "Modelling Realm - Primary": "ocean",
                 "NorESM3 name (dependency)": "SST",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -519,7 +528,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "v1",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "n/a",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -529,7 +538,7 @@ class TestReadCsvNorESM:
             },
             {
                 "Branded Variable Name": "v2",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "derived",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -539,7 +548,7 @@ class TestReadCsvNorESM:
             },
             {
                 "Branded Variable Name": "v3",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "TREFHT",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -556,7 +565,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tas",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "TREFHT",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -574,7 +583,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tas",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "TREFHT",
                 "Dimensions": "time, longitude, latitude",
                 "CMIP6 Compound Name": "",
@@ -769,6 +778,7 @@ class TestReadCsvCESM:
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
         var = data["variables"]["clt"]
+        print(var)
         assert var["formula"] == "CLDTOT * 100"
         assert [v["model_var"] for v in var["sources"]] == ["CLDTOT"]
 
@@ -813,24 +823,24 @@ class TestWriteYaml:
         # Should NOT contain the raw flow-style dict notation
         assert "{model_var:" not in content
 
-    def test_blank_line_after_units(self, tmp_path):
+    def test_blank_line_after_before_new_var(self, tmp_path):
         """A blank line is inserted after each 'units:' key."""
         data = {
             "dataset_overrides": {"source_id": "NorESM3"},
             "variables": {
                 "tas": {"units": "K", "sources": [{"model_var": "TREFHT"}]},
-                "pr": {"units": "kg m-2 s-1", "sources": [{"model_var": "PRECT"}]},
+                "gpp_tavg-u-hxy-lnd": {"units": "kg C", "sources": [{"model_var": "FATES_GPP"}]},
             },
         }
         out = str(tmp_path / "out.yaml")
         write_yaml(data, out)
         with open(out, encoding="utf-8") as f:
             lines = f.readlines()
-        units_indices = [i for i, l in enumerate(lines) if "units:" in l]
-        for idx in units_indices:
+        pre_break_index = [i for i, l in enumerate(lines) if "tavg" in l]
+        for idx in pre_break_index:
             assert (
-                lines[idx + 1].strip() == ""
-            ), f"Expected blank line after 'units:' at line {idx + 1}"
+                lines[idx - 1].strip() == ""
+            ), f"Expected blank line before 'new CMIP named variable' at line {idx - 1}"
 
     def test_blank_line_after_source_id(self, tmp_path):
         """A blank line is inserted after 'source_id:'."""
