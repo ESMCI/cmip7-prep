@@ -1,3 +1,4 @@
+import sys
 import csv
 import json
 import yaml
@@ -31,7 +32,7 @@ MODEL_CONFIGS = {
         },
         "key_column": "Branded Variable Name",
         "column_map": {
-            "Modelling Realm-Primary": "table",
+            "Modelling Realm - Primary": "table",
             "CMIP6 Compound Name": "long_name",
             "Description": "description",
             "Units (from Physical Parameter)": "units",
@@ -39,7 +40,7 @@ MODEL_CONFIGS = {
             "NorESM3 name (dependency)": "_source_expr",
             "CMIP7 Freq.": "freq",
         },
-        "realm_column": "Modelling Realm-Primary",
+        "realm_column": "Modelling Realm - Primary",
         "keep_realms": ["atmos", "land"],
         "source_column": "NorESM3 name (dependency)",
         "source_skip_phrases": [
@@ -112,13 +113,13 @@ def should_keep(row, config):
     Filters on realm and source-column content using the model config.
 
     >>> cfg = MODEL_CONFIGS["noresm"]
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": "T2M"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": "T2M"}, cfg)
     True
-    >>> should_keep({"Modelling Realm-Primary": "ocean", "NorESM3 name (dependency)": "SST"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "ocean", "NorESM3 name (dependency)": "SST"}, cfg)
     False
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": ""}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": ""}, cfg)
     False
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": "n/a"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": "n/a"}, cfg)
     False
     """
     realm_col = config["realm_column"]
@@ -431,12 +432,14 @@ def read_csv(filepath, config):
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
+
             if not should_keep(row, config):
                 continue
             name = row[key_col].strip()
             if not name:
                 continue
             entry = _build_entry(row, config)
+
             all_entries.append((name, entry))
 
     # Second pass: group by name and reconstruct variants where multiple rows
@@ -454,9 +457,11 @@ def read_csv(filepath, config):
             # Base fields come from the first row (they are identical across rows).
             base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
             variants = []
+            # print(base)
             for e in entries:
                 variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
                 variants.append(variant)
+            # print(variants)
             base["variants"] = variants
             data[name] = base
 
@@ -479,6 +484,8 @@ def write_yaml(data, filepath):
             # Only reformat single-key source dicts: {model_var: VAR} → model_var: VAR
             # Leave multi-key dicts (e.g. {model_var: VAR, scale: -1.0}) untouched.
             line = re.sub(r"\{model_var: (\w+)\}", r"model_var: \1", line)
+        if "FATES_FRAC" in line:
+            line = line.replace("FATES_FRAC", "FATES_FRACTION")
         if "yaml_coax_dummy" in line:
             continue
         time_signifiers = [
