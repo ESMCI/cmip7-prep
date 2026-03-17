@@ -286,11 +286,11 @@ class TestCleanString:
     """Tests for clean_string()."""
 
     def test_longitude(self):
-        """'longitude' is normalised to 'lon'."""
+        """'longitude' is normalised to 'lon' when normalize_dim_names=True."""
         assert clean_string("longitude", normalize_dim_names=True) == "lon"
 
     def test_latitude(self):
-        """'latitude' is normalised to 'lat'."""
+        """'latitude' is normalised to 'lat' when normalize_dim_names=True."""
         assert clean_string("latitude", normalize_dim_names=True) == "lat"
 
     def test_strip_whitespace(self):
@@ -308,7 +308,7 @@ class TestCleanString:
     def test_passthrough_lev(self):
         """'lev' passes through unchanged."""
         assert clean_string("lev") == "lev"
-    
+
     def test_alevel_to_lev(self):
         """'lev' passes through unchanged."""
         assert clean_string("alevel", normalize_dim_names=True) == "lev"
@@ -323,9 +323,11 @@ class TestCleanStrings:
 
     def test_list_of_dims(self):
         """Each element in a list is cleaned."""
-        result = clean_strings(["time", "longitude", "latitude"], normalize_dim_names=True)
+        result = clean_strings(
+            ["time", "longitude", "latitude"], normalize_dim_names=True
+        )
         assert result == ["time", "lon", "lat"]
-    
+
     def test_list_of_dims(self):
         """Each element in a list is cleaned."""
         result = clean_strings(["time", "longitude", "latitude"])
@@ -829,7 +831,10 @@ class TestWriteYaml:
             "dataset_overrides": {"source_id": "NorESM3"},
             "variables": {
                 "tas": {"units": "K", "sources": [{"model_var": "TREFHT"}]},
-                "gpp_tavg-u-hxy-lnd": {"units": "kg C", "sources": [{"model_var": "FATES_GPP"}]},
+                "gpp_tavg-u-hxy-lnd": {
+                    "units": "kg C",
+                    "sources": [{"model_var": "FATES_GPP"}],
+                },
             },
         }
         out = str(tmp_path / "out.yaml")
