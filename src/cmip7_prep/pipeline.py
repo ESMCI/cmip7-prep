@@ -279,8 +279,7 @@ def realize_regrid_prepare(
     for lev in ("levgrnd", "levsoi"):
         if lev in ds_vert.dims:
             logger.info("Renaming '%s' dimension to 'sdepth'", lev)
-            ds_vert = ds_vert.rename_dims({lev: "sdepth"})
-            # Ensure the coordinate variable is also copied
+            ds_vert = ds_vert.rename({lev: "sdepth"})
             ds_vert = ds_vert.assign_coords(sdepth=ds_native[lev].values)
 
     # 8) Regrid to lat/lon

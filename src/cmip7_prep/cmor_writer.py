@@ -319,7 +319,7 @@ class CmorSession(
             )
             logger.debug("[CMOR axis debug] write geolon axes")
 
-            geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
+            geo_path = Path(__file__).parent.parent.parent / "data" / "ocean_geometry.nc"
             if not geo_path.exists():
                 raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
             ds_geo = xr.open_dataset(geo_path)
@@ -541,7 +541,9 @@ class CmorSession(
             values = ds["sdepth"].values
             logger.info("write sdepth axis")
             # Read depth_bnds from the NetCDF file in the data directory
-            depth_bnds_path = Path(__file__).parent / "data" / "depth_bnds.nc"
+            depth_bnds_path = Path(__file__).parent.parent.parent / "data" / "depth_bnds.nc"
+            if not depth_bnds_path.exists():
+                raise FileNotFoundError(f"Expected depth_bnds file not found: {depth_bnds__path}")
             with xr.open_dataset(depth_bnds_path) as ds_bnds:
                 depth_bnds = ds_bnds["depth_bnds"].values
             # Ensure depth_bnds matches the length of sdepth
