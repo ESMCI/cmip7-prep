@@ -286,6 +286,10 @@ def process_one_var(
                 parallel=False,
                 open_kwargs=open_kwargs,
             )
+            if ds_native is None:
+                logger.warning(f"Source variable(s) not found for {varname}, skipping")
+                results.append((varname, "WARNING: Source variable(s) not found."))
+                continue
             logger.info("realm is %s", realm)
             if "TLAT" in ds_native:
                 logger.info("TLAT is present")
