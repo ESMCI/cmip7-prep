@@ -686,7 +686,7 @@ def main():
             # Find all timeseries files for this variable
             ts_files = sorted(Path(TSDIR).glob(glob_pattern))
             logger.info(
-                f"Found {len(ts_files)} timeseries files for variable {v.branded_variable_name.name} with {glob_pattern}"
+                f"Found {len(ts_files)} candidate timeseries files matching '{glob_pattern}' (searching for {v.branded_variable_name.name})"
             )
             if not ts_files:
                 logger.warning(

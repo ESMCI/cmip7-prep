@@ -111,6 +111,7 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
 
     for var in cmip_vars:
+        logger.info("=" * 60)
         logger.info("Processing CMIP var; collecting model vars '%s'", var)
         rvar = _collect_required_model_vars(mapping, [var])
         logger.info(
