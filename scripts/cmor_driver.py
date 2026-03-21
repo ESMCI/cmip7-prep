@@ -698,13 +698,15 @@ def main():
             ts_files = sorted(
                 {p for p in all_ts_files if any(_filename_contains_var(p, mv) for mv in model_vars)}
             )
-            logger.info(
-                f"Found {len(ts_files)} timeseries files for variable {varname} "
-                f"(model vars: {model_vars})"
-            )
+            logger.info("=" * 60)
             if not ts_files:
                 logger.warning(f"No timeseries files found for variable {varname}")
                 continue
+            else:
+                logger.info(
+                    f"Found {len(ts_files)} timeseries files for variable {varname} "
+                    f"(model vars: {model_vars})"
+                )
             if args.workers == 1:
                 res = process_one_var(
                     v,

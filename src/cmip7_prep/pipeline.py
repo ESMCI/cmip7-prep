@@ -71,9 +71,8 @@ def _collect_required_model_vars(
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
-        for var in ("area", "landmask", "landfrac", "TLAT"):
-            logger.info("Adding auxiliary variable '%s' ", var)
-            needed.add(var)
+        for varconst in ("area", "landmask", "landfrac", "TLAT"):
+            needed.add(varconst)
 
     return sorted(needed)
 
@@ -111,7 +110,6 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
 
     for var in cmip_vars:
-        logger.info("=" * 60)
         logger.info("Processing CMIP var; collecting model vars '%s'", var)
         # Get the source variables explicitly listed in the YAML 'sources' entry
         # and check they all have matching time series files before doing anything else
