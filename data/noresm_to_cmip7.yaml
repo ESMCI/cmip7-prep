@@ -65,8 +65,8 @@ variables:
   c3PftFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by C3 PFTs (including
       grass, crops, and trees).
-    dims: [lon, lat, time, typec3pft]
-    formula: (FATES_AREA_PLANTS-FATES_CROWNAREA_PF(14))*FATES_FRACTION
+    dims: [lon, lat, time]
+    formula: (FATES_AREA_PLANTS- sumoverpft(FATES_CROWNAREA_PF,[14],"fates_levpft"))*FATES_FRACTION
     long_name: Lmon.c3PftFrac
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -75,8 +75,8 @@ variables:
   c4PftFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by C4 PFTs (including
       grass and crops).
-    dims: [lon, lat, time, typec4pft]
-    formula: FATES_CROWNAREA_PF(14)*FATES_FRACTION
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[1,2,3,4],"fates_levpft")*FATES_FRACTION
     long_name: Lmon.c4PftFrac
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -234,7 +234,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (FATES_VEGC_PF(12:14))*FATES_FRACTION
+    formula: sumoverpft(FATES_VEGC_PF, [12,13,14], "fates_levpft) * FATES_FRACTION
     long_name: Emon.cVegGrass
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
@@ -245,7 +245,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (FATES_VEGC_PF(7:11))*FATES_FRACTION
+    formula: sumovertpft(FATES_VEGC_PF, [7,8,9,10,11], "fates_levpft)*FATES_FRACTION
     long_name: Emon.cVegShrub
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
@@ -256,7 +256,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (FATES_VEGC_PF(1:6))*FATES_FRACTION
+    formula: (sumoverpft(FATES_VEGC_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION
     long_name: Emon.cVegTree
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
@@ -1042,8 +1042,8 @@ variables:
 
   grassFracC3_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C3 natural grass.
-    dims: [lon, lat, time, typec3natg]
-    formula: (FATES_CROWNAREA_PF(12+13))*FATES_FRACTION
+    dims: [lon, lat, time]
+    formula: (sumoverpft(FATES_CROWNAREA_PF,[12,13],"fates_levpft"))*FATES_FRACTION
     long_name: Emon.grassFracC3
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -1051,8 +1051,8 @@ variables:
 
   grassFracC4_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C4 natural grass.
-    dims: [lon, lat, time, typec4natg]
-    formula: (FATES_CROWNAREA_PF(14))*FATES_FRACTION
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[14],"fates_levpft")*FATES_FRACTION
     long_name: Emon.grassFracC4
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -1060,12 +1060,12 @@ variables:
 
   grassFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell that is covered by natural grass.
-    dims: [lon, lat, time, typenatgr]
+    dims: [lon, lat, time]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: 'FATES_CROWNAREA_PF(12:14) *FATES_FRACTION', long_name: Eyr.grassFrac},
-      {formula: 'FATES_CROWNAREA_PF(12:14)*FATES_FRACTION', long_name: Lmon.grassFrac}]
+    variants: [{formula: 'sumoverpft(FATES_CROWNAREA_PF,[12,13,14],"fates_levpft")*FATES_FRACTION', long_name: Eyr.grassFrac},
+               {formula: 'sumoverpft(FATES_CROWNAREA_PF,[12,13,14],"fates_levpft")*FATES_FRACTION', long_name: Lmon.grassFrac}]
 
   hfdsl_tavg-u-hxy-lnd:
     description: Ground heat flux at 3hr
@@ -2551,12 +2551,12 @@ variables:
 
   shrubFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by shrub.
-    dims: [lon, lat, time, typeshrub]
+    dims: [lon, lat, time]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: 'FATES_CROWNAREA_PF(7:11) *FATES_FRACTION', long_name: Eyr.shrubFrac},
-      {formula: 'FATES_CROWNAREA_PF(7:11) *FATES_FRACTION', long_name: Lmon.shrubFrac}]
+    variants: [{formula: 'sumoverpft(FATES_CROWNAREA_PF,[7,8,9,10,11],"fates_levpft")*FATES_FRACTION', long_name: Eyr.shrubFrac},
+               {formula: 'sumoverpft(FATES_CROWNAREA_PF,[7,8,9,10,11],"fates_levpft")*FATES_FRACTION', long_name: Lmon.shrubFrac}]
 
   slthick_ti-sl-hxy-lnd:
     description: Thickness of Soil Layers
@@ -2817,8 +2817,8 @@ variables:
   treeFracBdlDcd_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf deciduous trees.
-    dims: [lon, lat, time, typetreebd]
-    formula: (FATES_CROWNAREA_PF(5:6)*FATES_FRACTION
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[5,6],"fates_levpft")*FATES_FRACTION
     long_name: Emon.treeFracBdlDcd
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -2827,8 +2827,8 @@ variables:
   treeFracBdlEvg_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf evergreen trees.
-    dims: [lon, lat, time, typetreebe]
-    formula: (FATES_CROWNAREA_PF(1,4))*FATES_FRACTION
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[1,2,3,4],"fates_levpft")*FATES_FRACTION
     long_name: Emon.treeFracBdlEvg
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -2837,8 +2837,8 @@ variables:
   treeFracNdlDcd_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf deciduous trees.
-    dims: [lon, lat, time, typetreend]
-    formula: (FATES_CROWNAREA_PF(3))*FATES_FRACTION
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[3],"fates_levpft")*FATES_FRACTION
     long_name: Emon.treeFracNdlDcd
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -2847,8 +2847,8 @@ variables:
   treeFracNdlEvg_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf evergreen trees.
-    dims: [lon, lat, time, typetreene]
-    formula: (FATES_CROWNAREA_PF(2))*FATES_FRACTION
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[2],"fates_levpft")*FATES_FRACTION
     long_name: Emon.treeFracNdlEvg
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -2856,12 +2856,12 @@ variables:
 
   treeFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by trees.
-    dims: [lon, lat, time, typetree]
+    dims: [lon, lat, time]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: 'FATES_CROWNAREA_PF(1:6) *FATES_FRACTION', long_name: Eyr.treeFrac},
-      {formula: 'FATES_CROWNAREA_PF(1:6) *FATES_FRACTION', long_name: Lmon.treeFrac}]
+    variants: [{formula: 'sumoverpft(FATES_CROWNAREA_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION', long_name: Eyr.treeFrac},
+               {formula: 'sumoverpft(FATES_CROWNAREA_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION', long_name: Lmon.treeFrac}]
 
   tsLut_tavg-u-hxy-multi:
     description: Surface temperature (i.e. temperature at which long-wave radiation
@@ -3050,12 +3050,12 @@ variables:
   vegFrac_tavg-u-hxy-u:
     description: Percentage of grid cell that is covered by vegetation.This SHOULD
       be the sum of tree, grass (natural and pasture), crop and shrub fractions.
-    dims: [lon, lat, time, typeveg]
+    dims: [lon, lat, time]
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: (FATES_AREA_PLANTS)*FATES_FRACTION, long_name: Emon.vegFrac},
-      {formula: (sum(FATES_CROWNAREA_PF))*FATES_FRACTION, long_name: Eyr.vegFrac}]
+    variants: [{formula: 'FATES_AREA_PLANTS*FATES_FRACTION', long_name: Emon.vegFrac},
+               {formula: 'FATES_AREA_PLANTS*FATES_FRACTION', long_name: Eyr.vegFrac}]
 
   vegHeight_tavg-u-hxy-ng:
     description: Vegetation height averaged over the grass fraction of a grid cell.

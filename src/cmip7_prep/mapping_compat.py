@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping as TMapping, Optional
 import warnings
 import logging
+import sys
 
 import numpy as np
 import xarray as xr
@@ -105,14 +106,42 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             summed = xr.where(summed > capped_at, capped_at, summed)
         return summed
 
-    locals_safe = {
+
+    def sumoverpft(arr: xr.DataArray, pftlist: list, dimname: str) -> xr.DataArray:
+        """
+        Sum a DataArray over a subset of PFT indices along a named dimension.
+
+        Parameters
+        ----------
+        arr     : xr.DataArray with a PFT dimension
+        pftlist : list of integer PFT indices to sum over
+        dimname : name of the PFT dimension to select/squeeze
+        """
+        if not isinstance(arr, xr.DataArray):
+            raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
+        if dimname not in arr.dims:
+            raise ValueError(f"Dimension '{dimname}' not found in array dimensions {list(arr.dims)}")
+        if not pftlist:
+            raise ValueError("pftlist must not be empty")
+
+        logger.info(f" i am here")
+
+        # Account for zero-based indexing
+        pftlist = [x-1 for x in pftlist]
+
+        # Select only the specified PFT indices before summing —
+        # this ensures indices not in pftlist are excluded from the sum entirely.
+        return arr.isel({dimname: pftlist}).sum(dim=dimname)
+
+    safe_locals = local_names.copy()
+    safe_locals.update({
         "np": np,
         "xr": xr,
         "verticalsum": verticalsum,
-    }
-    locals_safe.update(local_names)
+        "sumoverpft": sumoverpft,
+    })
     # pylint: disable=eval-used
-    return eval(expr, safe_globals, locals_safe)
+    return eval(expr, safe_globals, safe_locals)
 
 
 class Mapping:
@@ -454,6 +483,7 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
         model_vars = ["area"]
     else:
         model_vars = vc.raw_variables
+    logger.info("Required model vars to realize are %s", model_vars)
 
     # Identity mapping from a single raw variable
     if model_vars and vc.formula in (None, "", "null") and len(model_vars) == 1:
@@ -464,6 +494,10 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
 
     # Identity mapping from a formula
     if vc.formula:
+        logger.debug("formula is %s", vc.formula)
+        logger.debug("source aliases are %s",vc.source_aliases.items())
+
+        # Determine da_dict for formula
         if vc.source_aliases:
             # Build da_dict using alias → model_var mapping
             missing = [mv for mv in vc.source_aliases.values() if mv not in ds]
@@ -471,9 +505,12 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
                 raise KeyError(f"realize({vc.name}): missing variables {missing}")
             da_dict = {alias: ds[mv] for alias, mv in vc.source_aliases.items()}
         elif model_vars:
+            # Obtain a dictionary of DataArrays for the requested names
             da_dict = _require_vars(ds, model_vars, f"realize({vc.name})")
         else:
             raise ValueError(f"formula given for {vc.name} but no raw_variables listed")
+
+        # Apply formula
         try:
             logger.info(
                 "Applying formula: %s for name %s with model_vars %s",
@@ -482,6 +519,7 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
                 model_vars,
             )
             result = _safe_eval(vc.formula, da_dict)
+
         except Exception as exc:
             raise ValueError(f"Error evaluating formula for {vc.name}: {exc}") from exc
         if not isinstance(result, xr.DataArray):

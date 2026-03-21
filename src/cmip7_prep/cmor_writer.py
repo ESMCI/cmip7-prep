@@ -287,8 +287,8 @@ class CmorSession(
             if var_name is None or var_name not in ds:
                 raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
         var_da = ds[str(var_name)]
-        logger.info("found var_da with name: %s", var_da.name)
         var_dims = list(var_da.dims)
+        logger.info("found var_da with name: %s and dims: %s", var_da.name, var_dims)
         alev_id = None
         plev_id = None
         lat_id = None
@@ -381,7 +381,9 @@ class CmorSession(
             var_da = ds[str(var_name)]
             var_dims = list(var_da.dims)
 
+        #-------------------------
         # --- horizontal axes (use CMOR names) ----
+        #-------------------------
         elif has_latlon_dims:
             logger.info("*** Define horizontal axes")
             lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
@@ -402,7 +404,9 @@ class CmorSession(
                 cell_bounds=lon_bnds,
             )
 
+        #-------------------------
         # ---- time axis ----
+        #-------------------------
         time_id = None
         self.load_table(self.tables_root, self.primarytable)
         logger.info("*** Define time axis (if present)")
@@ -415,9 +419,11 @@ class CmorSession(
                 cell_bounds=tbnds if tbnds is not None else None,
             )
             logger.info("time axis id: %s var_dims=%s", time_id, var_dims)
-        # --- vertical: standard_hybrid_sigma ---
-        levels = getattr(vdef, "levels", {}) or {}
 
+        #-------------------------
+        # --- vertical: standard_hybrid_sigma
+        #-------------------------
+        levels = getattr(vdef, "levels", {}) or {}
         if (levels.get("name") or "").lower() in {
             "standard_hybrid_sigma",
             "alevel",
@@ -490,6 +496,9 @@ class CmorSession(
             # stash to write before main variable
             self._pending_ps = (ps_zvar_id, ps_da)
 
+        #-------------------------
+        # --- vertical: pressure
+        #-------------------------
         elif "plev" in var_dims:
             # Pressure levels expected in data
             plev = ds["plev"]
@@ -536,6 +545,10 @@ class CmorSession(
                 coord_vals=pvals,
                 cell_bounds=pb if pb is not None else None,
             )
+
+        #-------------------------
+        # --- vertical: sdepth
+        #-------------------------
         elif "sdepth" in var_dims:
             # Read sdepth values from ds as before
             values = ds["sdepth"].values
@@ -560,6 +573,10 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=depth_bnds,
             )
+
+        #-------------------------
+        # --- vertical: z_l
+        #-------------------------
         elif "z_l" in var_dims:
             values = ds["z_l"].values
             logger.info("write z_l axis")
@@ -570,6 +587,10 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+
+        #-------------------------
+        # --- vertical: zl
+        #-------------------------
         elif "zl" in var_dims:
             ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
@@ -588,6 +609,10 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+
+        #-------------------------
+        # --- vertical: zl
+        #-------------------------
         elif "zl" in var_dims:
             logger.info("found zl axis in var_dims for variable %s", var_name)
             ds[var_name] = ds[var_name].rename({"zl": "olevel"})
@@ -607,7 +632,10 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+
+        #-------------------------
         # Map dimension names to axis IDs
+        #-------------------------
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
