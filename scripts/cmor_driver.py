@@ -684,7 +684,8 @@ def main():
         all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
         logger.info(f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'")
         if not all_ts_files:
-            logger.warning(f"No timeseries files found in {TSDIR} matching '{glob_pattern}'")
+            logger.error(f"No timeseries files found in {TSDIR} matching '{glob_pattern}'")
+            sys.exit(1)
 
         results = []
         for v in cmip_vars:
