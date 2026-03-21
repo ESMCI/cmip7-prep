@@ -31,7 +31,7 @@ from cmip7_prep.cmor_utils import (
     packaged_dataset_json,
 )
 from cmip7_prep.mapping_compat import Mapping
-from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
+from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars, _collect_required_model_vars, _filename_contains_var
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 
@@ -681,17 +681,28 @@ def main():
         else:
             tables_root = Path(TABLES_noresm)
 
+        all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
+        logger.info(f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'")
+        if not all_ts_files:
+            logger.warning(f"No timeseries files found in {TSDIR} matching '{glob_pattern}'")
+
         results = []
         for v in cmip_vars:
-            # Find all timeseries files for this variable
-            ts_files = sorted(Path(TSDIR).glob(glob_pattern))
+            varname = v.branded_variable_name.name
+            # Filter to only files containing the native model vars needed for this variable
+            try:
+                model_vars = _collect_required_model_vars(mapping, [varname])
+            except Exception:
+                model_vars = []
+            ts_files = sorted(
+                {p for p in all_ts_files if any(_filename_contains_var(p, mv) for mv in model_vars)}
+            )
             logger.info(
-                f"Found {len(ts_files)} candidate timeseries files matching '{glob_pattern}' (searching for {v.branded_variable_name.name})"
+                f"Found {len(ts_files)} timeseries files for variable {varname} "
+                f"(model vars: {model_vars})"
             )
             if not ts_files:
-                logger.warning(
-                    f"No timeseries files found for variable {v.branded_variable_name.name}"
-                )
+                logger.warning(f"No timeseries files found for variable {varname}")
                 continue
             if args.workers == 1:
                 res = process_one_var(
