@@ -296,7 +296,6 @@ def process_one_var(
                 logger.warning(f"Source variable(s) not found for {varname}, skipping")
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
-            logger.info("realm is %s", realm)
             if "TLAT" in ds_native:
                 logger.info("TLAT is present")
             if model == "cesm":
@@ -307,11 +306,9 @@ def process_one_var(
                     ds_native = ds_native.merge(ocn_fx_fields)
 
             # Output ds_native keys
-            logger.info(
+            logger.debug(
                 "ds_native keys: %s for var %s with dims %s",
-                list(ds_native.variables.keys()),
-                varname,
-                dims,
+                list(ds_native.variables.keys()), varname, dims,
             )
             # TODO: why does this not abort the program?
             # JPE: because I don't want to abort the whole program
@@ -379,7 +376,7 @@ def process_one_var(
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
-                logger.info("ds_cmor is not None")
+                logger.debug("ds_cmor is not None")
 
                 # Attach ocn_fx_fields to regridded output for writing
                 if ocn_fx_fields is not None:
@@ -525,6 +522,7 @@ def main():
     model = args.model
     frequency = args.frequency
     realm = args.realm
+    logger.debug("Realm is %s", realm)
 
     mom6_grid = None
     ocn_grid = None
@@ -537,7 +535,7 @@ def main():
     if args.tsdir:
         TSDIR = Path(args.tsdir)
         if not TSDIR.exists():
-            logger.info(f"Time series directory {str(TSDIR)} must exist")
+            logger.info(f"Time series directory {str(TSDIR)} does not exist")
             sys.exit(0)
         timeseries = latest_monthly_file(TSDIR)
         logger.info(f"latest monthly time series file is {timeseries}")
@@ -616,7 +614,7 @@ def main():
     # Load all possible cmip vars for this realm and this experiment - create a data request
     logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
-    logger.info("Content dic obtained")
+    logger.info("Content dictionary obtained")
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = []
     cmip_vars = DR.find_variables(

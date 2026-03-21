@@ -133,11 +133,7 @@ def open_native_for_cmip_vars(
             continue
 
         rvar = _collect_required_model_vars(mapping, [var])
-        logger.info(
-            "Looking for native files for CMIP var '%s' needing model vars: %s",
-            var,
-            rvar,
-        )
+        logger.debug("Looking for native files for CMIP var '%s' needing model vars: %s", var, rvar)
         selected = sorted(
             {p for p in files if any(_filename_contains_var(p, v) for v in rvar)}
         )
@@ -180,7 +176,7 @@ def open_native_for_cmip_vars(
     if "ilev" in ds:
         ds["ilev"] = ds["ilev"] / 1000
 
-    logger.info("Returning from open_native_for_cmip_vars")
+    logger.debug("Returning from open_native_for_cmip_vars")
     return ds, new_cmip_vars
 
 
@@ -198,7 +194,7 @@ def _apply_vertical_if_needed(
     """Apply vertical transforms (e.g., plev19) to a single CMIP variable if required."""
     cfg = mapping.get_cfg(cmip_var) or {}
     levels = cfg.get("levels") or {}
-    logger.info("levels for %s: %s", cmip_var, levels)
+    logger.debug("levels for %s: %s", cmip_var, levels)
     if "plev" not in (levels.get("name") or "").lower():
         return ds_var
     if not tables_path:
@@ -251,7 +247,7 @@ def realize_regrid_prepare(
         ds_native = open_native_for_cmip_vars(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
-    logger.info("Opened native dataset with dims: %s", ds_native.dims)
+    logger.debug("Opened native dataset with dims: %s", ds_native.dims)
 
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
@@ -267,7 +263,7 @@ def realize_regrid_prepare(
 
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
-    logger.info("Mapping cfg for %s: %s", cmip_var, cfg)
+    logger.debug("Obtaining mapping cfg for %s: %s", cmip_var, cfg)
     levels = cfg.get("levels", {}) or {}
     lev_kind = (levels.get("name") or "").lower()
     is_hybrid = lev_kind in {"standard_hybrid_sigma", "alev", "alevel"}
