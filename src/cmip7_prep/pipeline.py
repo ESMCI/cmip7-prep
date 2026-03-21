@@ -119,6 +119,27 @@ def open_native_for_cmip_vars(
             var,
             rvar,
         )
+        # Get the source variables explicitly listed in the YAML 'sources' entry
+        try:
+            cfg = mapping.get_cfg(var) or {}
+        except KeyError:
+            cfg = {}
+        source_vars = []
+        if cfg.get("source"):
+            source_vars = [cfg["source"]]
+        elif cfg.get("raw_variables"):
+            source_vars = list(cfg["raw_variables"])
+
+        # Check every source var has at least one matching time series file
+        missing = [v for v in source_vars if not any(_filename_contains_var(p, v) for p in files)]
+        if missing:
+            logger.warning(
+                "Skipping '%s': no time series files found for source vars %s",
+                var,
+                missing,
+            )
+            continue
+
         selected = sorted(
             {p for p in files if any(_filename_contains_var(p, v) for v in rvar)}
         )
