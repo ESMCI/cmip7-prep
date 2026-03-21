@@ -110,7 +110,7 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
 
     for var in cmip_vars:
-        logger.info("Processing CMIP var; collecting model vars '%s'", var)
+        logger.debug("Processing CMIP var; collecting model vars '%s'", var)
         # Get the source variables explicitly listed in the YAML 'sources' entry
         # and check they all have matching time series files before doing anything else
         try:
@@ -259,11 +259,10 @@ def realize_regrid_prepare(
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
     if time_chunk and "time" in da.dims:
         da = da.chunk({"time": int(time_chunk)})
-    logger.info("Realized variable '%s' with dims: %s", cmip_var, da.dims)
     ds_vars = xr.Dataset({cmip_var: da})
     for var in ("landfrac", "area", "landmask", "wet", "TLAT"):
         if var in ds_native and var not in ds_vars:
-            logger.info("Adding auxiliary variable '%s' to dataset for regridding", var)
+            logger.debug("Adding auxiliary variable '%s' to dataset for regridding", var)
             ds_vars = ds_vars.assign(**{var: ds_native[var]})
 
     # 3) Check whether hybrid-σ is required
@@ -288,11 +287,11 @@ def realize_regrid_prepare(
 
     # 5) Apply vertical transform if needed (plev19, etc.).
     #    Single-var helper already takes cfg + tables_path
-    logger.info("Applying vertical handling if needed for variable: %s", cmip_var)
+    logger.debug("Applying vertical handling if needed for variable: %s", cmip_var)
     ds_vert = _apply_vertical_if_needed(
         ds_vars, ds_native, cmip_var, mapping, tables_path=tables_path
     )
-    logger.info("After vertical handling, dataset dims: %s", ds_vert.dims)
+    logger.debug("After vertical handling, dataset dims: %s", ds_vert.dims)
 
     # 6) Regrid (include PS if present)
     names_to_regrid = [str(cmip_var)]
@@ -300,17 +299,17 @@ def realize_regrid_prepare(
         names_to_regrid.append("PS")
 
     # 7) Rename levgrnd if present to sdepth
-    logger.info(
+    logger.debug(
         "Checking for 'levgrnd' dimension in variables to regrid. %s", names_to_regrid
     )
     for lev in ("levgrnd", "levsoi"):
         if lev in ds_vert.dims:
-            logger.info("Renaming '%s' dimension to 'sdepth'", lev)
+            logger.debug("Renaming '%s' dimension to 'sdepth'", lev)
             ds_vert = ds_vert.rename({lev: "sdepth"})
             ds_vert = ds_vert.assign_coords(sdepth=ds_native[lev].values)
 
     # 8) Regrid to lat/lon
-    logger.info("Calling regrid_to_latlon_ds")
+    logger.debug("Calling regrid_to_latlon_ds")
     ds_regr = regrid_to_latlon_ds(
         ds_vert,
         names_to_regrid,
@@ -319,7 +318,7 @@ def realize_regrid_prepare(
         time_from=ds_native,
         **regrid_kwargs,
     )
-    logger.info("Regridded dataset dims: %s", ds_regr.dims)
+    logger.debug("Regridded dataset dims: %s", ds_regr.dims)
     if aux:
         ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 
