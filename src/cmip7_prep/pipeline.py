@@ -123,6 +123,13 @@ def open_native_for_cmip_vars(
         )
         if selected:
             new_cmip_vars.append(var)
+        else:
+            logger.warning(
+                "Skipping '%s': found in mapping but no time series files match "
+                "required model vars %s",
+                var,
+                rvar,
+            )
     required = _collect_required_model_vars(mapping, new_cmip_vars)
 
     # keep any file that contains ANY of the required model vars as '.var.' in the name

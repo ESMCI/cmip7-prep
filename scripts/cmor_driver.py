@@ -240,6 +240,10 @@ def process_one_var(
         # This is what maps the CESM/NorESM history variable(s) to the cmor variable
         # This is obtained from reading cesm_to_cmip7.yaml or noresm_to_cmip7.yaml
         cfg = mapping.get_cfg(varname)
+    except KeyError:
+        logger.warning(f"Skipping '{varname}': no entry found in mapping YAML")
+        results.append((varname, "WARNING: no mapping in YAML"))
+        return results
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
         results.append((varname, f"ERROR: {e}"))
