@@ -204,6 +204,12 @@ def parse_args():
         action="store_true",
         help="Enable debug logging output",
     )
+    parser.add_argument(
+        "--log-level",
+        default='INFO',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+        help="log output level",
+    )
 
     args = parser.parse_args()
     return args
@@ -508,11 +514,11 @@ def get_include_patterns(model: str, realm: str, frequency: str) -> list[str]:
 
 def main():
     args = parse_args()
-    if getattr(args, "debug", False):
-        logger.setLevel(logging.DEBUG)
-        logging.getLogger().setLevel(logging.DEBUG)
-        logger.debug("Debug logging enabled.")
-        logger.debug(f"Parsed arguments: {args}")
+
+    # Set logging level
+    logger.setLevel(getattr(logging, args.log_level))
+    logger.debug(f"Parsed arguments: {args}")
+
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
