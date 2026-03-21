@@ -113,13 +113,8 @@ def open_native_for_cmip_vars(
     for var in cmip_vars:
         logger.info("=" * 60)
         logger.info("Processing CMIP var; collecting model vars '%s'", var)
-        rvar = _collect_required_model_vars(mapping, [var])
-        logger.info(
-            "Looking for native files for CMIP var '%s' needing model vars: %s",
-            var,
-            rvar,
-        )
         # Get the source variables explicitly listed in the YAML 'sources' entry
+        # and check they all have matching time series files before doing anything else
         try:
             cfg = mapping.get_cfg(var) or {}
         except KeyError:
@@ -130,7 +125,6 @@ def open_native_for_cmip_vars(
         elif cfg.get("raw_variables"):
             source_vars = list(cfg["raw_variables"])
 
-        # Check every source var has at least one matching time series file
         missing = [v for v in source_vars if not any(_filename_contains_var(p, v) for p in files)]
         if missing:
             logger.warning(
@@ -140,6 +134,12 @@ def open_native_for_cmip_vars(
             )
             continue
 
+        rvar = _collect_required_model_vars(mapping, [var])
+        logger.info(
+            "Looking for native files for CMIP var '%s' needing model vars: %s",
+            var,
+            rvar,
+        )
         selected = sorted(
             {p for p in files if any(_filename_contains_var(p, v) for v in rvar)}
         )
