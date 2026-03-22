@@ -326,8 +326,8 @@ class TestCleanStrings:
         result = clean_strings(["time", "longitude", "latitude"], normalize_dim_names=True)
         assert result == ["time", "lon", "lat"]
 
-    def test_list_of_dims(self):
-        """Each element in a list is cleaned."""
+    def test_list_of_dims_no_normalize(self):
+        """Each element in a list is cleaned without dim name normalization."""
         result = clean_strings(["time", "longitude", "latitude"])
         assert result == ["time", "longitude", "latitude"]
 

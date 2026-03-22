@@ -51,7 +51,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping as TMapping, Optional
 import warnings
 import logging
-import sys
 
 import numpy as np
 import xarray as xr
@@ -234,7 +233,9 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
         if not isinstance(arr, xr.DataArray):
             raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
         if dimname not in arr.dims:
-            raise ValueError(f"Dimension '{dimname}' not found in array dimensions {list(arr.dims)}")
+            raise ValueError(
+                f"Dimension '{dimname}' not found in array dimensions {list(arr.dims)}"
+            )
         if not pftlist:
             raise ValueError("pftlist must not be empty")
 

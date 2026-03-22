@@ -189,7 +189,9 @@ class CmorSession(
         cmor.set_cur_dataset_attribute("region", "glb")
 
         logger.debug("set _controlled_vocabulary_file:")
-        cmor.set_cur_dataset_attribute("_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json"))
+        cmor.set_cur_dataset_attribute(
+            "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")
+        )
         logger.debug("set _axis_entry_file:")
         cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
         logger.debug("set _formula_var_file:")
