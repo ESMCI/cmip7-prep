@@ -555,7 +555,7 @@ class CmorSession(
             # Read depth_bnds from the NetCDF file in the data directory
             depth_bnds_path = Path(__file__).parent.parent.parent / "data" / "depth_bnds.nc"
             if not depth_bnds_path.exists():
-                raise FileNotFoundError(f"Expected depth_bnds file not found: {depth_bnds__path}")
+                raise FileNotFoundError(f"Expected depth_bnds file not found: {depth_bnds_path}")
             with xr.open_dataset(depth_bnds_path) as ds_bnds:
                 depth_bnds = ds_bnds["depth_bnds"].values
             # Ensure depth_bnds matches the length of sdepth

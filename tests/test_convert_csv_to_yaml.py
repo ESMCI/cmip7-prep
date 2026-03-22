@@ -321,11 +321,9 @@ class TestCleanString:
 class TestCleanStrings:
     """Tests for clean_strings()."""
 
-    def test_list_of_dims(self):
+    def test_list_of_dims_normalize(self):
         """Each element in a list is cleaned."""
-        result = clean_strings(
-            ["time", "longitude", "latitude"], normalize_dim_names=True
-        )
+        result = clean_strings(["time", "longitude", "latitude"], normalize_dim_names=True)
         assert result == ["time", "lon", "lat"]
 
     def test_list_of_dims(self):
