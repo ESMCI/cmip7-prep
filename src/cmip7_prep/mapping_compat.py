@@ -238,8 +238,6 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
         if not pftlist:
             raise ValueError("pftlist must not be empty")
 
-        logger.info(f" i am here")
-
         # Account for zero-based indexing
         pftlist = [x-1 for x in pftlist]
 

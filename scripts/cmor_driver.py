@@ -611,7 +611,10 @@ def main():
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
 
-    # Load all possible cmip vars for this realm and this experiment - create a data request
+    # Load all possible cmip vars for this realm and this experiment
+    # The data_request_api is a CMIP7-specific Python package that is
+    # separate from CMOR itself but closely related to it.
+    # It produce lists of variables requested for each CMIP7 experiment
     logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
     logger.info("Content dictionary obtained")
@@ -624,15 +627,17 @@ def main():
         modelling_realm=realm,
         experiment=args.experiment,
     )
-    # cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
+    #cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
 
     # Determine cmip variables that will process
     if args.cmip_vars:
+        # Make a copy of the cmip_vars from the data request
         tmp_cmip_vars = cmip_vars
+        # Now process the cmip_vars from the input argument, if any
         cmip_vars = []
         for var in tmp_cmip_vars:
             logger.debug(
-                "Checking variable %s in %s",
+                "Checking variable %s in %s relative to the data request",
                 var.branded_variable_name.name,
                 args.cmip_vars,
             )
