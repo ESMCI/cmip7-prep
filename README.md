@@ -125,7 +125,7 @@ Both CESM (`cesm_to_cmip7.yaml`) and NorESM (`noresm_to_cmip7.yaml`) mappings ar
 |--------|---------|
 | `cmip7_prep.mapping_compat` | Load and evaluate YAML mapping files; `Mapping`, `VarConfig` |
 | `cmip7_prep.pipeline` | File discovery, dataset opening, vertical transform dispatch |
-| `cmip7_prep.regrid` | Regrid to 1° lat/lon via precomputed ESMF weight files |
+| `cmip7_prep.regrid` | Regrid to 1° lat/lon for CESM/NorESM or 2° lat/lon for NorESM via precomputed ESMF weight files |
 | `cmip7_prep.vertical` | Hybrid-sigma → pressure-level interpolation (geocat-comp) |
 | `cmip7_prep.cmor_writer` | Write CMOR-compliant output (`CmorSession`) |
 | `cmip7_prep.cmor_utils` | Fill values, time encoding, bounds, monotonicity utilities |
