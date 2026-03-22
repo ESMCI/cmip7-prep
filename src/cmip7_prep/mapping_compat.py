@@ -1,8 +1,47 @@
 # cmip7_prep/mapping_compat.py
 """
-Mapping loader/evaluator for CMIP7-style YAML files.
-Supports only CMIP7 YAML format (top-level 'variables:' dict).
-All mapping access is via config structure (cfg/VarConfig).
+Mapping loader and evaluator for CMIP7-style YAML variable mapping files.
+
+Overview
+--------
+This module translates between native model variable names (e.g. CESM output)
+and CMIP7-standard variable names by loading a YAML mapping file.  The main
+entry points are:
+
+* :class:`Mapping` – loads a mapping YAML and provides ``realize`` /
+  ``realize_all`` methods that construct xarray DataArrays for a requested
+  CMIP variable from a native model dataset.
+* :class:`VarConfig` – immutable dataclass holding the normalized
+  configuration for a single CMIP variable entry.
+* :func:`_to_varconfig` – converts a raw YAML dict for one variable into a
+  ``VarConfig``.
+
+YAML format
+-----------
+The mapping file must have a top-level ``variables:`` dict.  Each entry
+describes one CMIP variable::
+
+    variables:
+      tas:
+        table: Amon
+        units: K
+        sources:
+          - model_var: T2m
+      pr:
+        table: Amon
+        units: kg m-2 s-1
+        sources:
+          - model_var: PRECC
+          - model_var: PRECL
+        formula: "PRECC + PRECL"
+
+Optional per-source ``freq`` tags allow different source variables to be
+selected at different output frequencies.  Optional ``variants:`` lists allow
+one logical CMIP name to map to several distinct realizations (e.g. different
+pressure levels).
+
+All mapping access is via the :class:`VarConfig` / ``cfg`` dict structure;
+the raw YAML dicts are not exposed publicly.
 """
 from __future__ import annotations
 
@@ -37,7 +76,57 @@ def packaged_mapping_resource(filename: str = "cesm_to_cmip7.yaml"):
 # pylint: disable=too-many-instance-attributes
 @dataclass(frozen=True)
 class VarConfig:
-    """Normalized mapping entry for a single CMIP variable."""
+    """Immutable, normalized configuration for a single CMIP variable mapping.
+
+    Populated by :func:`_to_varconfig` from a raw YAML entry.  Exactly one of
+    ``source`` (single direct variable) or ``raw_variables`` + optional
+    ``formula`` (multi-variable or derived) will be set for any given entry.
+
+    Attributes
+    ----------
+    name:
+        CMIP variable name (e.g. ``"tas"``).
+    table:
+        MIP table short name (e.g. ``"Amon"``).  ``"CMIP7_"`` prefixes are
+        stripped on load.
+    units:
+        Target CMIP units string (e.g. ``"K"``).
+    raw_variables:
+        List of native model variable names required when a formula is used or
+        when more than one source variable contributes.  ``None`` when
+        ``source`` is set instead.
+    source:
+        Single native variable name used for a direct (no-formula) mapping.
+        ``None`` when ``raw_variables`` is set instead.
+    formula:
+        Python/xarray expression string evaluated by :func:`_safe_eval`.
+        Variable names in the expression correspond to keys in
+        ``source_aliases`` (or directly to ``raw_variables`` if no aliases
+        are defined).
+    unit_conversion:
+        Either a string expression ``"x * factor"`` or a dict with optional
+        ``scale`` and/or ``offset`` keys applied after variable realization.
+    positive:
+        CF ``positive`` attribute (``"up"`` or ``"down"``), if applicable.
+    cell_methods:
+        CF ``cell_methods`` string (e.g. ``"time: mean"``).
+    levels:
+        Vertical level specification dict (e.g. ``{name: plev19, units: Pa}``).
+    regrid_method:
+        Regridding method hint (e.g. ``"bilinear"``).
+    long_name:
+        Human-readable variable description.
+    standard_name:
+        CF standard name.
+    dims:
+        Expected output dimension list (e.g. ``["time", "lat", "lon"]``).
+    source_aliases:
+        Mapping of formula token → native model variable name.  Allows the
+        formula to use short alias names that differ from the actual variable
+        names in the dataset.
+    region:
+        Optional region selector string (e.g. ``"global"``).
+    """
 
     name: str
     table: Optional[str] = None
@@ -45,7 +134,7 @@ class VarConfig:
     raw_variables: Optional[List[str]] = None
     source: Optional[str] = None
     formula: Optional[str] = None
-    unit_conversion: Optional[Any] = None  # str expr or {scale, offset}
+    unit_conversion: Optional[Any] = None
     positive: Optional[str] = None
     cell_methods: Optional[str] = None
     levels: Optional[Dict[str, Any]] = None
@@ -85,7 +174,32 @@ class VarConfig:
 
 
 def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
-    """Evaluate a small arithmetic/xarray expression in a restricted environment.
+    """Evaluate a formula string in a restricted namespace.
+
+    Built-in Python names are blocked (``__builtins__`` is empty).  The
+    following names are always available in addition to whatever is passed via
+    ``local_names``:
+
+    * ``np`` – NumPy
+    * ``xr`` – xarray
+    * ``verticalsum(arr, capped_at=None, dim="levsoi")`` – sum a DataArray
+      along a soil/vertical dimension, optionally capping the result.
+    * ``sumoverpft(arr, pftlist, dimname)`` – sum a DataArray over a subset
+      of PFT indices along a named dimension.
+
+    Parameters
+    ----------
+    expr:
+        Arithmetic or xarray expression string (e.g. ``"PRECC + PRECL"``).
+    local_names:
+        Dict mapping variable token names to DataArrays (or other values).
+
+    Returns
+    -------
+    Any
+        Result of evaluating the expression — typically an
+        ``xr.DataArray``.
+
     Example:
         >>> _safe_eval("x + 2", {"x": 3})
         5
@@ -145,17 +259,32 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
 
 
 class Mapping:
-    """Load and evaluate a CMIP mapping YAML file.
+    """Load and evaluate a CMIP7 variable mapping YAML file.
+
+    The YAML file must have a top-level ``variables:`` dict (see module
+    docstring for format details).  On load, each entry is parsed into a
+    :class:`VarConfig`.  Entries with a ``variants:`` list are expanded into
+    numbered internal keys (``<name>:0``, ``<name>:1``, …); the bare name
+    resolves to the first variant for backward compatibility.
 
     Parameters
     ----------
-    path : str or Path
+    path:
         Path to the YAML mapping file.
+
+    Attributes
+    ----------
+    default_freq:
+        If set, used as the fallback frequency when ``freq`` is not supplied
+        to :meth:`realize` / :meth:`realize_all` / :meth:`get_cfg`.
 
     Notes
     -----
-    The loader accepts only a dict-based YAML style. All table names
-    are normalized to a short form (e.g., 'Amon').
+    Table names are normalized by stripping the ``"CMIP7_"`` prefix (e.g.
+    ``"CMIP7_Amon"`` → ``"Amon"``).
+
+    Use :meth:`from_packaged_default` to load the bundled mapping file without
+    specifying an explicit path.
     """
 
     def __init__(self, path: str | Path) -> None:
@@ -360,9 +489,17 @@ def _filter_sources(sources: List[Any], freq: Optional[str]) -> List[Any]:
 def _to_varconfig(
     name: str, cfg: TMapping[str, Any], freq: Optional[str] = None
 ) -> VarConfig:
-    """Normalize a CMIP7 YAML entry into a VarConfig.
+    """Normalize a raw CMIP7 YAML entry dict into a :class:`VarConfig`.
 
-    Only supports CMIP7 'sources' key.
+    The ``sources`` list is required.  When ``freq`` is provided, only source
+    entries whose ``freq`` tag matches (plus any untagged entries) are kept;
+    see :func:`_filter_sources` for the full selection rules.
+
+    If exactly one source remains after filtering and no formula is present,
+    the result uses ``source`` (direct variable) rather than
+    ``raw_variables``.  Scale factors defined on individual source entries are
+    promoted to ``unit_conversion``; explicit ``unit_conversion`` keys in
+    ``cfg`` take precedence.
 
     Example:
         >>> vc2 = _to_varconfig(
@@ -468,7 +605,24 @@ def _require_vars(
 
 
 def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
-    """Create a DataArray according to a VarConfig (without unit conversion)."""
+    """Extract or compute a DataArray from *ds* according to *vc*.
+
+    Resolution priority:
+
+    1. **Direct source** (``vc.source`` set) – returns ``ds[vc.source]``
+       unchanged.
+    2. **Single raw variable, no formula** – equivalent to direct source but
+       derived from ``vc.raw_variables``.
+    3. **Formula** – evaluates ``vc.formula`` via :func:`_safe_eval` using
+       either ``vc.source_aliases`` (alias → native var) or
+       ``vc.raw_variables`` as the variable namespace.
+
+    Special cases: ``sftlf`` always reads ``landfrac``; ``areacella`` always
+    reads ``area``, regardless of what ``raw_variables`` contains.
+
+    Unit conversion and attribute assignment are handled by the caller
+    (:meth:`Mapping.realize` / :meth:`Mapping.realize_all`).
+    """
     logger.debug("Realizing variable '%s' with config: %s", vc.name, vc.as_cfg())
     if vc.source:
         if vc.source not in ds:
