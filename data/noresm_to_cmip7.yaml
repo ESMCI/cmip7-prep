@@ -66,7 +66,7 @@ variables:
     description: Percentage of entire grid cell  that is covered by C3 PFTs (including
       grass, crops, and trees).
     dims: [lon, lat, time]
-    formula: (FATES_AREA_PLANTS- sumoverpft(FATES_CROWNAREA_PF,[14],"fates_levpft"))*FATES_FRACTION
+    formula: (FATES_AREA_PLANTS - sumoverpft(FATES_CROWNAREA_PF,[14],"fates_levpft"))*FATES_FRACTION
     long_name: Lmon.c3PftFrac
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -256,7 +256,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_VEGC_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION
+    formula: sumoverpft(FATES_VEGC_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION
     long_name: Emon.cVegTree
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
@@ -586,12 +586,12 @@ variables:
 
   cropFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by crop.
-    dims: [lon, lat, time, typecrop]
+    dims: [lon, lat, time]
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: (FATES_PATCHAREA_LU(5))*FATES_FRACTION, long_name: Eyr.cropFrac},
-      {formula: (FATES_PATCHAREA_LU(5))*FATES_FRACTION, long_name: Lmon.cropFrac}]
+    variants: [{formula: 'sumoverpft(FATES_PATCHAREA_LU,[5],"fates_levlanduse")*FATES_FRACTION', long_name: Eyr.cropFrac},
+               {formula: 'sumoverpft(FATES_PATCHAREA_LU,[5],"fates_levlanduse")*FATES_FRACTION', long_name: Lmon.cropFrac}]
 
   depthsl_ti-u-hxy-u:
     description: Total (cumulative) thickness of all soil layers. This is the sum
@@ -734,6 +734,7 @@ variables:
     sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: up
 
   fLitterSoil_tavg-u-hxy-lnd:
     description: Carbon mass flux per unit area into soil from litter (dead plant
@@ -1016,7 +1017,7 @@ variables:
   gpp_tavg-u-hxy-ng:
     description: Total GPP of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(12:14))*FATES_FRACTION
+    formula: sumoverpft(FATES_GPP_PF,[12,13,14],"fates_levpft")*FATES_FRACTION
     long_name: Emon.gppGrass
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1025,7 +1026,7 @@ variables:
   gpp_tavg-u-hxy-shb:
     description: Total GPP of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(7:11))*FATES_FRACTION
+    formula: sumoverpft(FATES_GPP_PF,[7,8,9,10,11],"fates_levpft")*FATES_FRACTION
     long_name: Emon.gppShrub
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1034,7 +1035,7 @@ variables:
   gpp_tavg-u-hxy-tree:
     description: Total GPP of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(1:6))*FATES_FRACTION
+    formula: sumoverpft(FATES_GPP_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION
     long_name: Emon.gppTree
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1555,29 +1556,32 @@ variables:
   npp_tavg-u-hxy-ng:
     description: Total NPP of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_NPP_PF(12:14))*FATES_FRACTION
+    formula: (sumoverpft(FATES_NPP_PF,[12,13,14],"fates_levpft"])*FATES_FRACTION
     long_name: Emon.nppGrass
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: down
 
   npp_tavg-u-hxy-shb:
     description: Total NPP of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_NPP_PF(7:11))*FATES_FRACTION
+    formula: (sumoverpft(FATES_NPP_PF,[7,8,9,10,11],"fates_levpft"])*FATES_FRACTION
     long_name: Emon.nppShrub
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: down
 
   npp_tavg-u-hxy-tree:
     description: Total NPP of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_NPP_PF(1:6))*FATES_FRACTION
+    formula: (sumoverpft(FATES_NPP_PF,[1,2,3,4,5,6],"fates_levpft"])*FATES_FRACTION
     long_name: Emon.nppTree
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: down
 
   orog_tavg-u-hxy-is:
     description: The surface called "surface" means the lower boundary of the atmosphere.
@@ -1605,7 +1609,7 @@ variables:
   pastureFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by anthropogenic pasture.
     dims: [lon, lat, time, typepasture]
-    formula: (FATES_PATCHAREA_LU(4))*FATES_FRACTION
+    formula: (sumoverpft(FATES_PATCHAREA_LU,[4],"fates_levlanduse"))*FATES_FRACTION
     long_name: Lmon.pastureFrac
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
@@ -1886,7 +1890,7 @@ variables:
   ra_tavg-u-hxy-ng:
     description: Total RA of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(12:14)-FATES_NPP_PF(12:14))*FATES_FRACTION
+    formula: (sumoverpft(FATES_GPP_PF,[12,13,14],"fates_levpft")-sumoverpft(FATES_NPP_PF,[12,13,14],"fates_levpft"))*FATES_FRACTION
     long_name: Emon.raGrass
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1895,7 +1899,7 @@ variables:
   ra_tavg-u-hxy-shb:
     description: Total RA of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(7:11)-FATES_NPP_PF(7:11))*FATES_FRACTION
+    formula: (sumoverpft(FATES_GPP_PF,[7,8,9,10,11],"fates_levpft")-sumoverpft(FATES_NPP_PF,[7,8,9,10,11],"fates_levpft"))*FATES_FRACTION
     long_name: Emon.raShrub
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1904,7 +1908,7 @@ variables:
   ra_tavg-u-hxy-tree:
     description: Total RA of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(1:6)-FATES_NPP_PF(1:6))*FATES_FRACTION
+    formula: (sumoverpft(FATES_GPP_PF,[1,2,3,4,5,6],"fates_levpft")-sumoverpft(FATES_NPP_PF,[1,2,3,4,5,6],"fates_levpft"))*FATES_FRACTION
     long_name: Emon.raTree
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1993,6 +1997,7 @@ variables:
     sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    postive: up
 
   rld_tpt-alh-hs-u:
     description: Downwelling Longwave Radiation (includes the fluxes at the surface
@@ -2241,6 +2246,7 @@ variables:
     sources: [model_var: FSDS]
     table: land
     units: W m-2
+    positive: down
 
   rsds_tavg-u-hxy-sn:
     description: Surface Downwelling Shortwave Radiation over the portion of a land
@@ -2251,6 +2257,7 @@ variables:
     sources: [model_var: FSDS]
     table: land
     units: W m-2
+    positive: down
 
   rsds_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
@@ -2369,6 +2376,7 @@ variables:
     sources: [model_var: FSR]
     table: land
     units: W m-2
+    positive: up
 
   rsus_tavg-u-hxy-sn:
     description: Surface Upwelling Shortwave Radiation over the portion of a land
@@ -2535,7 +2543,7 @@ variables:
     description: Percentage of grid cell covered by land ice (ice sheet, ice shelf,
       ice cap, glacier)
     dims: [lon, lat, time]
-    formula: PCT_LANDUNIT(4)
+    formula: sumoverpft(PCT_LANDUNIT,[4],"ltype")
     long_name: LImon.sftgif
     sources: [model_var: PCT_LANDUNIT]
     table: land
