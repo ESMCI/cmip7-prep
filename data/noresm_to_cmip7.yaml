@@ -148,7 +148,7 @@ variables:
       timber for construction, and crop harvest for food or fuel. Does NOT include
       residue which is deposited into soil or litter; end of year values (not annual
       mean).
-    dims: [lon, lat, landuse, time1]
+    dims: [lon, lat, fates_levlanduse, time1]
     formula: CROPPROD1C+TOT_WOODPRODC
     long_name: Eyr.cProductLut
     sources: [model_var: CROPPROD1C, model_var: TOT_WOODPRODC]
@@ -213,7 +213,7 @@ variables:
 
   cVegLut_tpt-u-hxy-multi:
     description: end of year values (not annual mean)
-    dims: [lon, lat, landuse, time1]
+    dims: [lon, lat, fates_levlanduse, time1]
     formula: (FATES_VEGC_LU)*FATES_FRACTION
     long_name: Eyr.cVegLut
     sources: [model_var: FATES_VEGC_LU, model_var: FATES_FRACTION]
@@ -759,7 +759,7 @@ variables:
       the atmosphere due to any land-use or land-cover change activities.  Include
       carbon transferred due to deforestation or agricultural directly into atmosphere,
       and  emissions form anthropogenic pools into atmosphere
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, fates_levlanduse, time]
     long_name: Emon.fLulccAtmLut
     sources: [model_var: DWT_CONV_CFLUX]
     table: land
@@ -961,7 +961,7 @@ variables:
   fracInLut_tsum-u-hxy-lnd:
     description: Cumulative percentage transitions over the year; note that percentage
       should be reported as a percentage of atmospheric grid cell
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, fates_levlanduse, time]
     formula: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
     long_name: Eyr.fracInLut
     sources: [model_var: FATES_TRANSITION_MATRIX_LULU, model_var: FATES_FRACTION]
@@ -973,16 +973,17 @@ variables:
       be reported as percentage of land grid cell (example: frac_lnd = 0.5, frac_ocn
       = 0.5, frac_crop_lnd = 0.2 (of land portion of grid cell), then frac_lut(crop)
       = 0.5*0.2 = 0.1)'
-    dims: [lon, lat, landuse, time1]
-    sources: [model_var: PCT_LANDUNIT]
+    dims: [lon, lat, fates_levlanduse, time1]
+    sources: [model_var: FATEs_PATCHAREA_LU, model_var: PCT_LANDUNIT]
     table: land
     units: '%'
     variants: [{long_name: Emon.fracLut}, {formula: (FATES_PATCHAREA_LU)*FATES_FRACTION,
         long_name: Eyr.fracLut}]
+
   fracOutLut_tsum-u-hxy-lnd:
     description: Cumulative percentage transitions over the year; note that percentage
       should be reported as percentage of atmospheric grid cell
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, fates_levlanduse, time]
     formula: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
     long_name: Eyr.fracOutLut
     sources: [model_var: FATES_TRANSITION_MATRIX_LULU, model_var: FATES_FRACTION]
@@ -995,7 +996,7 @@ variables:
       photosynthesis in plants or phytoplankton. The producers also respire some of
       this biomass and the difference is referred to as the net primary production.
       Reported on land-use tiles.
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, fates_levlanduse, time]
     formula: (FATES_GPP_LU)*FATES_FRACTION
     long_name: Emon.gppLut
     sources: [model_var: FATES_GPP_LU, model_var: FATES_FRACTION]
@@ -1501,7 +1502,7 @@ variables:
       of A. It means that the quantity indicated by the standard name is calculated
       solely with respect to the B contained in A, neglecting all other chemical constituents
       of A.'
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, fates_levlanduse, time]
     formula: (FATES_NPP_LU)*FATES_FRACTION
     long_name: Emon.nppLut
     sources: [model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
@@ -1552,6 +1553,7 @@ variables:
     sources: [model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: down
 
   npp_tavg-u-hxy-ng:
     description: Total NPP of grass in the grid cell
@@ -1839,7 +1841,7 @@ variables:
     description: Carbon mass flux per unit area into atmosphere due to autotrophic
       respiration on land (respiration by producers) [see rh for heterotrophic production].
       Calculated on land-use tiles.
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, fates_levlanduse, time]
     formula: (FATES_GPP_LU-FATES_NPP_LU)*FATES_FRACTION
     long_name: Emon.raLut
     sources: [model_var: FATES_GPP_LU, model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
@@ -1987,6 +1989,7 @@ variables:
     sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    postive: up
 
   rh_tavg-u-hxy-lnd:
     description: Carbon mass flux per unit area into atmosphere due to heterotrophic
@@ -2388,6 +2391,7 @@ variables:
       model_var: SNOFSRND]
     table: land
     units: W m-2
+    postive: up
 
   rsus_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
@@ -2397,6 +2401,7 @@ variables:
     units: W m-2
     variants: [{formula: FSDS-FSNS, long_name: 3hr.rsus}, {formula: FSDS-FSNS, long_name: Amon.rsus},
       {formula: FSDS-FSNS, long_name: day.rsus}]
+    postive: up
 
   rsus_tpt-u-hs-u:
     description: The surface called "surface" means the lower boundary of the atmosphere.
@@ -2591,7 +2596,7 @@ variables:
       of a layer of liquid water having the same mass per unit area. Surface amount
       refers to the amount on the ground, excluding that on the plant or vegetation
       canopy.
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, time]
     formula: SNOWICE+SNOWLIQ
     long_name: Emon.sweLut
     sources: [model_var: SNOWICE, model_var: SNOWLIQ]
@@ -2671,7 +2676,7 @@ variables:
   tasLut_tavg-h2m-hxy-multi:
     description: Air temperature is the bulk temperature of the air, not the surface
       (skin) temperature.
-    dims: [lon, lat, landuse, time, height2m]
+    dims: [lon, lat, fates_levlanduse, time, height2m]
     long_name: Emon.tasLut
     sources: [model_var: TSA]
     table: land
@@ -2813,6 +2818,7 @@ variables:
     sources: [model_var: QVEGT]
     table: land
     units: kg m-2 s-1
+    positive: up 
 
   tran_tavg-u-hxy-u:
     description: Transpiration
@@ -2821,6 +2827,7 @@ variables:
     sources: [model_var: QVEGT]
     table: land
     units: kg m-2 s-1
+    positive: up
 
   treeFracBdlDcd_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
@@ -2874,7 +2881,7 @@ variables:
   tsLut_tavg-u-hxy-multi:
     description: Surface temperature (i.e. temperature at which long-wave radiation
       emitted)
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, fates_levlanduse, time]
     long_name: Emon.tslsiLut
     sources: [model_var: TSKIN]
     table: land
