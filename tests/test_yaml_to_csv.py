@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
 from yaml_to_csv import CESM_COLUMNS, sources_to_expr, variable_to_rows, yaml_to_csv
 
-
 # ── sources_to_expr ───────────────────────────────────────────────────────────
 
 

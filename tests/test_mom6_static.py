@@ -6,7 +6,6 @@ import xarray as xr
 
 from cmip7_prep.mom6_static import compute_cell_bounds_from_corners, ocean_fx_fields
 
-
 # ---------------------------------------------------------------------------
 # compute_cell_bounds_from_corners
 # ---------------------------------------------------------------------------

@@ -28,7 +28,6 @@ from convert_csv_to_yaml import (
     write_yaml,
 )
 
-
 # ── is_math_expression ────────────────────────────────────────────────────────
 
 
@@ -323,7 +322,9 @@ class TestCleanStrings:
 
     def test_list_of_dims_normalize(self):
         """Each element in a list is cleaned."""
-        result = clean_strings(["time", "longitude", "latitude"], normalize_dim_names=True)
+        result = clean_strings(
+            ["time", "longitude", "latitude"], normalize_dim_names=True
+        )
         assert result == ["time", "lon", "lat"]
 
     def test_list_of_dims_no_normalize(self):

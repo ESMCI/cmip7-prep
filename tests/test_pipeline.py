@@ -9,7 +9,6 @@ from pathlib import Path
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.pipeline import _collect_required_model_vars, _filename_contains_var
 
-
 # ---------------------------------------------------------------------------
 # _filename_contains_var
 # ---------------------------------------------------------------------------

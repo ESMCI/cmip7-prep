@@ -3,6 +3,7 @@
 # zonal_p39 = zonal_mean_on_pressure_grid(ds, "ta", tables_path="cmip7-cmor-tables/tables")
 # cmip7_prep/regrid.py
 """Regridding utilities for CESM -> 1° lat/lon using precomputed ESMF weights."""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
@@ -529,7 +530,8 @@ def regrid_to_latlon(
         )  # ensure last two dims are ('lat','lon')
         da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
 
-    logger.debug("da2d dims %s da2_2d range: %f to %f lat, %f to %f lon",
+    logger.debug(
+        "da2d dims %s da2_2d range: %f to %f lat, %f to %f lon",
         da2_2d.dims,
         da2_2d["lat"].min().item(),
         da2_2d["lat"].max().item(),

@@ -123,7 +123,11 @@ def open_native_for_cmip_vars(
         elif cfg.get("raw_variables"):
             source_vars = list(cfg["raw_variables"])
 
-        missing = [v for v in source_vars if not any(_filename_contains_var(p, v) for p in files)]
+        missing = [
+            v
+            for v in source_vars
+            if not any(_filename_contains_var(p, v) for p in files)
+        ]
         if missing:
             logger.warning(
                 "Skipping '%s': no time series files found for source vars %s",
@@ -133,7 +137,11 @@ def open_native_for_cmip_vars(
             continue
 
         rvar = _collect_required_model_vars(mapping, [var])
-        logger.debug("Looking for native files for CMIP var '%s' needing model vars: %s", var, rvar)
+        logger.debug(
+            "Looking for native files for CMIP var '%s' needing model vars: %s",
+            var,
+            rvar,
+        )
         selected = sorted(
             {p for p in files if any(_filename_contains_var(p, v) for v in rvar)}
         )
@@ -258,7 +266,9 @@ def realize_regrid_prepare(
     ds_vars = xr.Dataset({cmip_var: da})
     for var in ("landfrac", "area", "landmask", "wet", "TLAT"):
         if var in ds_native and var not in ds_vars:
-            logger.debug("Adding auxiliary variable '%s' to dataset for regridding", var)
+            logger.debug(
+                "Adding auxiliary variable '%s' to dataset for regridding", var
+            )
             ds_vars = ds_vars.assign(**{var: ds_native[var]})
 
     # 3) Check whether hybrid-σ is required

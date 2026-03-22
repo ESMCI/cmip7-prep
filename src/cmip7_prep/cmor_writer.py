@@ -320,7 +320,9 @@ class CmorSession(
             )
             logger.debug("[CMOR axis debug] write geolon axes")
 
-            geo_path = Path(__file__).parent.parent.parent / "data" / "ocean_geometry.nc"
+            geo_path = (
+                Path(__file__).parent.parent.parent / "data" / "ocean_geometry.nc"
+            )
             if not geo_path.exists():
                 raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
             ds_geo = xr.open_dataset(geo_path)
@@ -382,9 +384,9 @@ class CmorSession(
             var_da = ds[str(var_name)]
             var_dims = list(var_da.dims)
 
-        #-------------------------
+        # -------------------------
         # --- horizontal axes (use CMOR names) ----
-        #-------------------------
+        # -------------------------
         elif has_latlon_dims:
             logger.debug("Defining horizontal axes")
             lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
@@ -405,9 +407,9 @@ class CmorSession(
                 cell_bounds=lon_bnds,
             )
 
-        #-------------------------
+        # -------------------------
         # ---- time axis ----
-        #-------------------------
+        # -------------------------
         time_id = None
         self.load_table(self.tables_root, self.primarytable)
         logger.debug("Define time axis (if present)")
@@ -421,9 +423,9 @@ class CmorSession(
             )
             logger.debug("time axis id: %s var_dims=%s", time_id, var_dims)
 
-        #-------------------------
+        # -------------------------
         # --- vertical: standard_hybrid_sigma
-        #-------------------------
+        # -------------------------
         levels = getattr(vdef, "levels", {}) or {}
         if (levels.get("name") or "").lower() in {
             "standard_hybrid_sigma",
@@ -497,9 +499,9 @@ class CmorSession(
             # stash to write before main variable
             self._pending_ps = (ps_zvar_id, ps_da)
 
-        #-------------------------
+        # -------------------------
         # --- vertical: pressure
-        #-------------------------
+        # -------------------------
         elif "plev" in var_dims:
             # Pressure levels expected in data
             plev = ds["plev"]
@@ -547,17 +549,21 @@ class CmorSession(
                 cell_bounds=pb if pb is not None else None,
             )
 
-        #-------------------------
+        # -------------------------
         # --- vertical: sdepth
-        #-------------------------
+        # -------------------------
         elif "sdepth" in var_dims:
             # Read sdepth values from ds as before
             values = ds["sdepth"].values
             logger.debug("Setting sdepth axis")
             # Read depth_bnds from the NetCDF file in the data directory
-            depth_bnds_path = Path(__file__).parent.parent.parent / "data" / "depth_bnds.nc"
+            depth_bnds_path = (
+                Path(__file__).parent.parent.parent / "data" / "depth_bnds.nc"
+            )
             if not depth_bnds_path.exists():
-                raise FileNotFoundError(f"Expected depth_bnds file not found: {depth_bnds_path}")
+                raise FileNotFoundError(
+                    f"Expected depth_bnds file not found: {depth_bnds_path}"
+                )
             with xr.open_dataset(depth_bnds_path) as ds_bnds:
                 depth_bnds = ds_bnds["depth_bnds"].values
             # Ensure depth_bnds matches the length of sdepth
@@ -575,9 +581,9 @@ class CmorSession(
                 cell_bounds=depth_bnds,
             )
 
-        #-------------------------
+        # -------------------------
         # --- vertical: z_l
-        #-------------------------
+        # -------------------------
         elif "z_l" in var_dims:
             values = ds["z_l"].values
             logger.debug("Setting z_l axis")
@@ -589,13 +595,15 @@ class CmorSession(
                 cell_bounds=bnds,
             )
 
-        #-------------------------
+        # -------------------------
         # --- vertical: zl
-        #-------------------------
+        # -------------------------
         elif "zl" in var_dims:
             ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
-            logger.debug("Renaming zl to olevel var_name %s var_dims=%s", var_name, var_dims)
+            logger.debug(
+                "Renaming zl to olevel var_name %s var_dims=%s", var_name, var_dims
+            )
             cmor.set_cur_dataset_attribute("vertical_label", "olevel")
             logger.debug("Defining olevel axis")
             values = ds["olevel"].values
@@ -609,14 +617,16 @@ class CmorSession(
                 cell_bounds=bnds,
             )
 
-        #-------------------------
+        # -------------------------
         # --- vertical: zl
-        #-------------------------
+        # -------------------------
         elif "zl" in var_dims:
             logger.debug("found zl axis in var_dims for variable %s", var_name)
             ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
-            logger.debug("rename zl to olevel var_name %s var_dims=%s", var_name, var_dims)
+            logger.debug(
+                "rename zl to olevel var_name %s var_dims=%s", var_name, var_dims
+            )
             cmor.set_cur_dataset_attribute("vertical_label", "olevel")
             logger.debug("Defining olevel axis")
             values = ds["olevel"].values
@@ -629,9 +639,9 @@ class CmorSession(
                 cell_bounds=bnds,
             )
 
-        #-------------------------
+        # -------------------------
         # Map dimension names to axis IDs
-        #-------------------------
+        # -------------------------
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma

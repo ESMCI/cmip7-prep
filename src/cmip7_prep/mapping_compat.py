@@ -43,6 +43,7 @@ pressure levels).
 All mapping access is via the :class:`VarConfig` / ``cfg`` dict structure;
 the raw YAML dicts are not exposed publicly.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -219,7 +220,6 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             summed = xr.where(summed > capped_at, capped_at, summed)
         return summed
 
-
     def sumoverpft(arr: xr.DataArray, pftlist: list, dimname: str) -> xr.DataArray:
         """
         Sum a DataArray over a subset of PFT indices along a named dimension.
@@ -240,19 +240,21 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             raise ValueError("pftlist must not be empty")
 
         # Account for zero-based indexing
-        pftlist = [x-1 for x in pftlist]
+        pftlist = [x - 1 for x in pftlist]
 
         # Select only the specified PFT indices before summing —
         # this ensures indices not in pftlist are excluded from the sum entirely.
         return arr.isel({dimname: pftlist}).sum(dim=dimname)
 
     safe_locals = local_names.copy()
-    safe_locals.update({
-        "np": np,
-        "xr": xr,
-        "verticalsum": verticalsum,
-        "sumoverpft": sumoverpft,
-    })
+    safe_locals.update(
+        {
+            "np": np,
+            "xr": xr,
+            "verticalsum": verticalsum,
+            "sumoverpft": sumoverpft,
+        }
+    )
     # pylint: disable=eval-used
     return eval(expr, safe_globals, safe_locals)
 
@@ -646,7 +648,7 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
     # Identity mapping from a formula
     if vc.formula:
         logger.debug("formula is %s", vc.formula)
-        logger.debug("source aliases are %s",vc.source_aliases.items())
+        logger.debug("source aliases are %s", vc.source_aliases.items())
 
         # Determine da_dict for formula
         if vc.source_aliases:

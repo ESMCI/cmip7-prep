@@ -8,6 +8,7 @@ Usage:
 
 Preserves all comments and error handling from both atm_monthly.py and lnd_monthly.py.
 """
+
 from __future__ import annotations
 import argparse
 from concurrent.futures import as_completed
@@ -31,7 +32,12 @@ from cmip7_prep.cmor_utils import (
     packaged_dataset_json,
 )
 from cmip7_prep.mapping_compat import Mapping
-from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars, _collect_required_model_vars, _filename_contains_var
+from cmip7_prep.pipeline import (
+    realize_regrid_prepare,
+    open_native_for_cmip_vars,
+    _collect_required_model_vars,
+    _filename_contains_var,
+)
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 
@@ -206,8 +212,8 @@ def parse_args():
     )
     parser.add_argument(
         "--log-level",
-        default='INFO',
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="log output level",
     )
 
@@ -308,7 +314,9 @@ def process_one_var(
             # Output ds_native keys
             logger.debug(
                 "ds_native keys: %s for var %s with dims %s",
-                list(ds_native.variables.keys()), varname, dims,
+                list(ds_native.variables.keys()),
+                varname,
+                dims,
             )
             # TODO: why does this not abort the program?
             # JPE: because I don't want to abort the whole program
@@ -627,7 +635,7 @@ def main():
         modelling_realm=realm,
         experiment=args.experiment,
     )
-    #cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
+    # cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
 
     # Determine cmip variables that will process
     if args.cmip_vars:
@@ -691,9 +699,13 @@ def main():
             tables_root = Path(TABLES_noresm)
 
         all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
-        logger.info(f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'")
+        logger.info(
+            f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'"
+        )
         if not all_ts_files:
-            logger.error(f"No timeseries files found in {TSDIR} matching '{glob_pattern}'")
+            logger.error(
+                f"No timeseries files found in {TSDIR} matching '{glob_pattern}'"
+            )
             sys.exit(1)
 
         results = []
@@ -705,7 +717,11 @@ def main():
             except Exception:
                 model_vars = []
             ts_files = sorted(
-                {p for p in all_ts_files if any(_filename_contains_var(p, mv) for mv in model_vars)}
+                {
+                    p
+                    for p in all_ts_files
+                    if any(_filename_contains_var(p, mv) for mv in model_vars)
+                }
             )
             logger.info("=" * 60)
             if not ts_files:
