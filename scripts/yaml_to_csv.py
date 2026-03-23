@@ -42,45 +42,6 @@ CESM_COLUMNS = [
 ]
 
 
-def sources_to_expr(sources: list[dict]) -> str:
-    """Build a human-readable expression from a list of source dicts.
-
-    Each source dict may have:
-        model_var : str  (required)
-        scale     : float (optional) — multiplied against the variable
-        freq      : str   (optional) — preferred sampling frequency, ignored here
-
-    Rules
-    -----
-    * Single source, no scale  →  "VAR"
-    * Single source, with scale →  "VAR * scale"
-    * Multiple sources          →  "VAR1 + VAR2 + ..."
-      (scale, if present on any source, is represented as "VAR * scale")
-
-    >>> sources_to_expr([{"model_var": "TREFHT"}])
-    'TREFHT'
-    >>> sources_to_expr([{"model_var": "QFLX", "scale": -1.0}])
-    'QFLX * -1.0'
-    >>> sources_to_expr([{"model_var": "PRECC"}, {"model_var": "PRECL"}])
-    'PRECC + PRECL'
-    >>> sources_to_expr([{"model_var": "SOIL1C", "scale": 0.001}, {"model_var": "SOIL2C", "scale": 0.001}])
-    'SOIL1C * 0.001 + SOIL2C * 0.001'
-    >>> sources_to_expr([])
-    ''
-    """
-    if not sources:
-        return ""
-    parts = []
-    for src in sources:
-        model_var = src.get("model_var", "")
-        scale = src.get("scale")
-        if scale is not None:
-            parts.append(f"{model_var} * {scale}")
-        else:
-            parts.append(model_var)
-    return " + ".join(parts)
-
-
 def sources_to_names(sources: list[dict]) -> str:
     """Return a comma-separated list of model variable names from *sources*.
 

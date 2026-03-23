@@ -1,4 +1,3 @@
-import sys
 import csv
 import json
 import yaml
@@ -351,10 +350,8 @@ def _parse_csv_identifiers(value: str) -> Optional[list[str]]:
     >>> _parse_csv_identifiers("PRECC + PRECL") is None
     True
     """
-    import re as _re
-
     parts = [p.strip() for p in value.split(",")]
-    if all(_re.match(r"^[A-Za-z_]\w*$", p) for p in parts if p):
+    if all(re.match(r"^[A-Za-z_]\w*$", p) for p in parts if p):
         return [p for p in parts if p]
     return None
 
@@ -538,11 +535,9 @@ def read_csv(filepath, config):
             # Base fields come from the first row (they are identical across rows).
             base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
             variants = []
-            # print(base)
             for e in entries:
                 variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
                 variants.append(variant)
-            # print(variants)
             base["variants"] = variants
             data[name] = base
 

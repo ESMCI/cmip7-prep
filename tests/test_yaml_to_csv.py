@@ -16,65 +16,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
 from yaml_to_csv import (
     CESM_COLUMNS,
-    sources_to_expr,
     sources_to_scale_freq_alias,
     variable_to_rows,
     yaml_to_csv,
 )
-
-# ── sources_to_expr ───────────────────────────────────────────────────────────
-
-
-class TestSourcesToExpr:
-    """Tests for sources_to_expr()."""
-
-    def test_single_source_no_scale(self):
-        """A single source without scale returns just the variable name."""
-        assert sources_to_expr([{"model_var": "TREFHT"}]) == "TREFHT"
-
-    def test_single_source_with_scale(self):
-        """A single source with a scale factor includes the multiplication."""
-        assert sources_to_expr([{"model_var": "QFLX", "scale": -1.0}]) == "QFLX * -1.0"
-
-    def test_two_sources_no_scale(self):
-        """Two sources without scale are joined with '+'."""
-        assert (
-            sources_to_expr([{"model_var": "PRECC"}, {"model_var": "PRECL"}])
-            == "PRECC + PRECL"
-        )
-
-    def test_three_sources(self):
-        """Three sources are joined with '+'."""
-        expr = sources_to_expr(
-            [
-                {"model_var": "SOIL1C"},
-                {"model_var": "SOIL2C"},
-                {"model_var": "SOIL3C"},
-            ]
-        )
-        assert expr == "SOIL1C + SOIL2C + SOIL3C"
-
-    def test_multiple_sources_with_scale(self):
-        """Multiple sources each with a scale factor are represented correctly."""
-        expr = sources_to_expr(
-            [
-                {"model_var": "SOIL1C", "scale": 0.001},
-                {"model_var": "SOIL2C", "scale": 0.001},
-            ]
-        )
-        assert expr == "SOIL1C * 0.001 + SOIL2C * 0.001"
-
-    def test_empty_sources(self):
-        """An empty sources list returns an empty string."""
-        assert sources_to_expr([]) == ""
-
-    def test_source_with_freq_ignored(self):
-        """The freq field is informational only and does not appear in the expression."""
-        expr = sources_to_expr([{"model_var": "siage_d", "freq": "day"}])
-        assert expr == "siage_d"
-        assert "freq" not in expr
-        assert "day" not in expr
-
 
 # ── sources_to_scale_freq_alias ───────────────────────────────────────────────
 
