@@ -26,7 +26,7 @@ CESM_COLUMNS = [
     "Standard Name",
     "Units",
     "Dimensions",
-    "CESM Variable Name",  # comma-separated source variable name(s); used by convert_csv as skip filter
+    "CESM Variable Name",  # comma-separated source variable name(s); used by convert_csv_to_yaml.py as skip filter
     "Formula",  # the formula string, present only when original had one
     "Scale",  # comma-separated scale factors, positionally aligned with CESM Variable Name
     "Freq",  # comma-separated sampling frequencies, positionally aligned with CESM Variable Name
