@@ -26,7 +26,7 @@ CESM_COLUMNS = [
     "Standard Name",
     "Units",
     "Dimensions",
-    "CESM Variable Name",  # human-readable expression; used by convert_csv as skip filter
+    "CESM Variable Name",  # comma-separated source variable name(s); used by convert_csv as skip filter
     "Formula",  # the formula string, present only when original had one
     "Sources JSON",  # full sources list (model_var + scale/freq/alias) as JSON
     "Cell Methods",
@@ -79,6 +79,27 @@ def sources_to_expr(sources: list) -> str:
     return " + ".join(parts)
 
 
+def sources_to_names(sources: list) -> str:
+    """Return a comma-separated list of model variable names from *sources*.
+
+    Only the ``model_var`` field is included; scale factors and other
+    sub-fields are intentionally omitted so the result is a plain list of
+    CESM variable names suitable for the ``CESM Variable Name`` CSV column.
+
+    >>> sources_to_names([{"model_var": "TREFHT"}])
+    'TREFHT'
+    >>> sources_to_names([{"model_var": "PRECC"}, {"model_var": "PRECL"}])
+    'PRECC, PRECL'
+    >>> sources_to_names([{"model_var": "QFLX", "scale": -1.0}])
+    'QFLX'
+    >>> sources_to_names([])
+    ''
+    """
+    return ", ".join(
+        src.get("model_var", "") for src in sources if src.get("model_var")
+    )
+
+
 def variable_to_rows(name: str, var: dict) -> list:
     """Convert one YAML variable entry to a list of CSV row dicts.
 
@@ -108,7 +129,7 @@ def variable_to_rows(name: str, var: dict) -> list:
     >>> rows2[0]["Formula"]
     'PRECC + PRECL'
     >>> rows2[0]["CESM Variable Name"]
-    'PRECC + PRECL'
+    'PRECC, PRECL'
 
     >>> var_with_scale = {"table": "atmos", "units": "kg m-2 s-1", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "QFLX", "scale": -1.0}]}
     >>> rows_scale = variable_to_rows("evspsbl", var_with_scale)
@@ -128,7 +149,7 @@ def variable_to_rows(name: str, var: dict) -> list:
     >>> rows3[0]["Formula"]
     'siconc.where(lat>0)'
     >>> rows3[0]["CESM Variable Name"]
-    'siconc.where(lat>0)'
+    'siconc, tarea'
     >>> rows3[1]["Region"]
     'sh'
     >>> import json; json.loads(rows3[0]["Sources JSON"]) == [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}]
@@ -161,22 +182,18 @@ def variable_to_rows(name: str, var: dict) -> list:
 
     if variants and isinstance(variants, list) and variants:
         rows = []
+        cesm_var = sources_to_names(sources)
         for v in variants:
             row = dict(base)
             row["Long Name"] = v.get("long_name", var.get("long_name", ""))
-            row["CESM Variable Name"] = v.get("formula", "")
+            row["CESM Variable Name"] = cesm_var
             row["Formula"] = v.get("formula", "")
             row["Region"] = v.get("region", "")
             rows.append(row)
         return rows
 
     # No variants — single row
-    if formula:
-        cesm_var = formula
-    elif sources:
-        cesm_var = sources_to_expr(sources)
-    else:
-        cesm_var = ""
+    cesm_var = sources_to_names(sources)
 
     row = dict(base)
     row["Long Name"] = var.get("long_name", "")

@@ -14,7 +14,12 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
-from yaml_to_csv import CESM_COLUMNS, sources_to_expr, variable_to_rows, yaml_to_csv
+from yaml_to_csv import (
+    CESM_COLUMNS,
+    sources_to_expr,
+    variable_to_rows,
+    yaml_to_csv,
+)
 
 # ── sources_to_expr ───────────────────────────────────────────────────────────
 
@@ -97,8 +102,8 @@ class TestVariableToRow:
         assert row["Dimensions"] == '["time", "lat", "lon"]'
         assert row["CESM Variable Name"] == "TREFHT"
 
-    def test_formula_takes_precedence_over_sources(self):
-        """When formula is present, it is used instead of sources."""
+    def test_cesm_var_name_uses_source_names_not_formula(self):
+        """CESM Variable Name is always source names, never the formula string."""
         row = variable_to_rows(
             "cl",
             {
@@ -109,10 +114,11 @@ class TestVariableToRow:
                 "sources": [{"model_var": "CLOUD"}],
             },
         )[0]
-        assert row["CESM Variable Name"] == "CLOUD * 100"
+        assert row["CESM Variable Name"] == "CLOUD"
+        assert row["Formula"] == "CLOUD * 100"
 
-    def test_no_formula_uses_sources(self):
-        """Without a formula, sources are joined into an expression."""
+    def test_no_formula_uses_source_names(self):
+        """Without a formula, CESM Variable Name is a comma-separated list of source names."""
         row = variable_to_rows(
             "pr",
             {
@@ -122,10 +128,10 @@ class TestVariableToRow:
                 "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}],
             },
         )[0]
-        assert row["CESM Variable Name"] == "PRECC + PRECL"
+        assert row["CESM Variable Name"] == "PRECC, PRECL"
 
-    def test_scale_in_sources_represented(self):
-        """A scale factor in a source is included in the expression."""
+    def test_scale_excluded_from_cesm_variable_name(self):
+        """Scale factors are not included in CESM Variable Name — only the variable name."""
         row = variable_to_rows(
             "evspsbl",
             {
@@ -135,7 +141,7 @@ class TestVariableToRow:
                 "sources": [{"model_var": "QFLX", "scale": -1.0}],
             },
         )[0]
-        assert row["CESM Variable Name"] == "QFLX * -1.0"
+        assert row["CESM Variable Name"] == "QFLX"
 
     def test_optional_fields_empty_when_absent(self):
         """Optional columns are empty strings when not present in the variable dict."""
@@ -203,6 +209,7 @@ class TestVariableToRow:
                 "table": "seaIce",
                 "units": "m2",
                 "dims": ["time"],
+                "sources": [{"model_var": "siconc"}, {"model_var": "tarea"}],
                 "variants": [
                     {"long_name": "NH", "formula": "formula_nh"},
                     {"long_name": "SH", "formula": "formula_sh"},
@@ -210,8 +217,10 @@ class TestVariableToRow:
             },
         )
         assert len(rows) == 2
-        assert rows[0]["CESM Variable Name"] == "formula_nh"
-        assert rows[1]["CESM Variable Name"] == "formula_sh"
+        assert rows[0]["CESM Variable Name"] == "siconc, tarea"
+        assert rows[1]["CESM Variable Name"] == "siconc, tarea"
+        assert rows[0]["Formula"] == "formula_nh"
+        assert rows[1]["Formula"] == "formula_sh"
 
     def test_no_sources_or_formula_gives_empty(self):
         """A variable with neither sources nor formula gets an empty expression."""
@@ -321,8 +330,8 @@ class TestYamlToCsv:
         assert r["Dimensions"] == '["time", "lat", "lon"]'
         assert r["CESM Variable Name"] == "TREFHT"
 
-    def test_formula_in_cesm_variable_name(self, tmp_path):
-        """A formula is written verbatim to the CESM Variable Name column."""
+    def test_cesm_var_name_is_source_names_not_formula(self, tmp_path):
+        """CESM Variable Name is the source variable name, not the formula string."""
         ypath = _make_yaml(
             tmp_path,
             {
@@ -338,10 +347,11 @@ class TestYamlToCsv:
         cpath = str(tmp_path / "out.csv")
         yaml_to_csv(ypath, cpath)
         rows = _read_csv(cpath)
-        assert rows[0]["CESM Variable Name"] == "CLDTOT * 100"
+        assert rows[0]["CESM Variable Name"] == "CLDTOT"
+        assert rows[0]["Formula"] == "CLDTOT * 100"
 
-    def test_multi_source_joined(self, tmp_path):
-        """A formula with multiple sources is written verbatim."""
+    def test_multi_source_names_comma_separated(self, tmp_path):
+        """Multiple sources produce a comma-separated list in CESM Variable Name."""
         ypath = _make_yaml(
             tmp_path,
             {
@@ -361,11 +371,11 @@ class TestYamlToCsv:
         cpath = str(tmp_path / "out.csv")
         yaml_to_csv(ypath, cpath)
         rows = _read_csv(cpath)
-        # Formula takes precedence
-        assert rows[0]["CESM Variable Name"] == "(SOIL1C + SOIL2C + SOIL3C)/1000.0"
+        assert rows[0]["CESM Variable Name"] == "SOIL1C, SOIL2C, SOIL3C"
+        assert rows[0]["Formula"] == "(SOIL1C + SOIL2C + SOIL3C)/1000.0"
 
-    def test_scale_preserved_in_expression(self, tmp_path):
-        """A scale factor in a source is preserved in the CSV expression."""
+    def test_scale_excluded_from_cesm_variable_name(self, tmp_path):
+        """Scale factors are not included in CESM Variable Name."""
         ypath = _make_yaml(
             tmp_path,
             {
@@ -380,7 +390,7 @@ class TestYamlToCsv:
         cpath = str(tmp_path / "out.csv")
         yaml_to_csv(ypath, cpath)
         rows = _read_csv(cpath)
-        assert rows[0]["CESM Variable Name"] == "QFLX * -1.0"
+        assert rows[0]["CESM Variable Name"] == "QFLX"
 
     def test_optional_fields_empty_when_absent(self, tmp_path):
         """Optional columns are empty when not present in the YAML."""
