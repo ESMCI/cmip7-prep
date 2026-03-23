@@ -8,6 +8,7 @@ Usage:
 
 Preserves all comments and error handling from both atm_monthly.py and lnd_monthly.py.
 """
+
 from __future__ import annotations
 import argparse
 from concurrent.futures import as_completed
@@ -31,7 +32,12 @@ from cmip7_prep.cmor_utils import (
     packaged_dataset_json,
 )
 from cmip7_prep.mapping_compat import Mapping
-from cmip7_prep.pipeline import realize_regrid_prepare, open_native_for_cmip_vars
+from cmip7_prep.pipeline import (
+    realize_regrid_prepare,
+    open_native_for_cmip_vars,
+    _collect_required_model_vars,
+    _filename_contains_var,
+)
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 
@@ -58,8 +64,7 @@ _DATE_RE = re.compile(
 
 # Path for cmor tables
 TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
-# TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
-TABLES_noresm = "/nird/home/masan/cmip7-cmor-tables/"
+TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -205,6 +210,12 @@ def parse_args():
         action="store_true",
         help="Enable debug logging output",
     )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="log output level",
+    )
 
     args = parser.parse_args()
     return args
@@ -241,6 +252,10 @@ def process_one_var(
         # This is what maps the CESM/NorESM history variable(s) to the cmor variable
         # This is obtained from reading cesm_to_cmip7.yaml or noresm_to_cmip7.yaml
         cfg = mapping.get_cfg(varname)
+    except KeyError:
+        logger.warning(f"Skipping '{varname}': no entry found in mapping YAML")
+        results.append((varname, "WARNING: no mapping in YAML"))
+        return results
     except Exception as e:
         logger.error(f"Error retrieving config for {varname}: {e}")
         results.append((varname, f"ERROR: {e}"))
@@ -283,7 +298,10 @@ def process_one_var(
                 parallel=False,
                 open_kwargs=open_kwargs,
             )
-            logger.info("realm is %s", realm)
+            if ds_native is None:
+                logger.warning(f"Source variable(s) not found for {varname}, skipping")
+                results.append((varname, "WARNING: Source variable(s) not found."))
+                continue
             if "TLAT" in ds_native:
                 logger.info("TLAT is present")
             if model == "cesm":
@@ -294,7 +312,7 @@ def process_one_var(
                     ds_native = ds_native.merge(ocn_fx_fields)
 
             # Output ds_native keys
-            logger.info(
+            logger.debug(
                 "ds_native keys: %s for var %s with dims %s",
                 list(ds_native.variables.keys()),
                 varname,
@@ -366,7 +384,7 @@ def process_one_var(
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
-                logger.info("ds_cmor is not None")
+                logger.debug("ds_cmor is not None")
 
                 # Attach ocn_fx_fields to regridded output for writing
                 if ocn_fx_fields is not None:
@@ -501,17 +519,18 @@ def get_include_patterns(model: str, realm: str, frequency: str) -> list[str]:
 
 def main():
     args = parse_args()
-    if getattr(args, "debug", False):
-        logger.setLevel(logging.DEBUG)
-        logging.getLogger().setLevel(logging.DEBUG)
-        logger.debug("Debug logging enabled.")
-        logger.debug(f"Parsed arguments: {args}")
+
+    # Set logging level
+    logger.setLevel(getattr(logging, args.log_level))
+    logger.debug(f"Parsed arguments: {args}")
+
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
     model = args.model
     frequency = args.frequency
     realm = args.realm
+    logger.debug("Realm is %s", realm)
 
     mom6_grid = None
     ocn_grid = None
@@ -524,7 +543,7 @@ def main():
     if args.tsdir:
         TSDIR = Path(args.tsdir)
         if not TSDIR.exists():
-            logger.info(f"Time series directory {str(TSDIR)} must exist")
+            logger.info(f"Time series directory {str(TSDIR)} does not exist")
             sys.exit(0)
         timeseries = latest_monthly_file(TSDIR)
         logger.info(f"latest monthly time series file is {timeseries}")
@@ -600,10 +619,13 @@ def main():
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
 
-    # Load all possible cmip vars for this realm and this experiment - create a data request
+    # Load all possible cmip vars for this realm and this experiment
+    # The data_request_api is a CMIP7-specific Python package that is
+    # separate from CMOR itself but closely related to it.
+    # It produce lists of variables requested for each CMIP7 experiment
     logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
-    logger.info("Content dic obtained")
+    logger.info("Content dictionary obtained")
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = []
     cmip_vars = DR.find_variables(
@@ -617,11 +639,13 @@ def main():
 
     # Determine cmip variables that will process
     if args.cmip_vars:
+        # Make a copy of the cmip_vars from the data request
         tmp_cmip_vars = cmip_vars
+        # Now process the cmip_vars from the input argument, if any
         cmip_vars = []
         for var in tmp_cmip_vars:
             logger.debug(
-                "Checking variable %s in %s",
+                "Checking variable %s in %s relative to the data request",
                 var.branded_variable_name.name,
                 args.cmip_vars,
             )
@@ -674,18 +698,40 @@ def main():
         else:
             tables_root = Path(TABLES_noresm)
 
+        all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
+        logger.info(
+            f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'"
+        )
+        if not all_ts_files:
+            logger.error(
+                f"No timeseries files found in {TSDIR} matching '{glob_pattern}'"
+            )
+            sys.exit(1)
+
         results = []
         for v in cmip_vars:
-            # Find all timeseries files for this variable
-            ts_files = sorted(Path(TSDIR).glob(glob_pattern))
-            logger.info(
-                f"Found {len(ts_files)} timeseries files for variable {v.branded_variable_name.name} with {glob_pattern}"
+            varname = v.branded_variable_name.name
+            # Filter to only files containing the native model vars needed for this variable
+            try:
+                model_vars = _collect_required_model_vars(mapping, [varname])
+            except Exception:
+                model_vars = []
+            ts_files = sorted(
+                {
+                    p
+                    for p in all_ts_files
+                    if any(_filename_contains_var(p, mv) for mv in model_vars)
+                }
             )
+            logger.info("=" * 60)
             if not ts_files:
-                logger.warning(
-                    f"No timeseries files found for variable {v.branded_variable_name.name}"
-                )
+                logger.warning(f"No timeseries files found for variable {varname}")
                 continue
+            else:
+                logger.info(
+                    f"Found {len(ts_files)} timeseries files for variable {varname} "
+                    f"(model vars: {model_vars})"
+                )
             if args.workers == 1:
                 res = process_one_var(
                     v,

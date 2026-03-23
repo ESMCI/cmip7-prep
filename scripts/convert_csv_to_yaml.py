@@ -1,3 +1,4 @@
+import sys
 import csv
 import json
 import yaml
@@ -27,10 +28,11 @@ MODEL_CONFIGS = {
             "institution_id": "NCC",
             "source_id": "NorESM3",
             "nominal_resolution": "200 km",
+            "yaml_coax_dummy": [0, 1, 2],
         },
         "key_column": "Branded Variable Name",
         "column_map": {
-            "Modelling Realm-Primary": "table",
+            "Modelling Realm - Primary": "table",
             "CMIP6 Compound Name": "long_name",
             "Description": "description",
             "Units (from Physical Parameter)": "units",
@@ -38,7 +40,7 @@ MODEL_CONFIGS = {
             "NorESM3 name (dependency)": "_source_expr",
             "CMIP7 Freq.": "freq",
         },
-        "realm_column": "Modelling Realm-Primary",
+        "realm_column": "Modelling Realm - Primary",
         "keep_realms": ["atmos", "land"],
         "source_column": "NorESM3 name (dependency)",
         "source_skip_phrases": [
@@ -110,13 +112,13 @@ def should_keep(row, config):
     Filters on realm and source-column content using the model config.
 
     >>> cfg = MODEL_CONFIGS["noresm"]
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": "T2M"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": "T2M"}, cfg)
     True
-    >>> should_keep({"Modelling Realm-Primary": "ocean", "NorESM3 name (dependency)": "SST"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "ocean", "NorESM3 name (dependency)": "SST"}, cfg)
     False
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": ""}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": ""}, cfg)
     False
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": "n/a"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": "n/a"}, cfg)
     False
     """
     realm_col = config["realm_column"]
@@ -162,6 +164,8 @@ def is_math_expression(expr: str) -> bool:
     # if re.search(r'\d', expr):
     #     return True
     if re.search(r"\w+\s+\w+", expr):
+        return True
+    if re.search("FATES", expr):
         return True
 
     return False
@@ -215,6 +219,8 @@ def extract_variables(expr: str) -> list:
         if word not in ignore:
             word_dict["model_var"] = word
             variables.append(word_dict)
+    if "FATES" in expr and "FATES_FRAC" not in expr:
+        variables.append({"model_var": "FATES_FRAC"})
     return variables
 
 
@@ -297,6 +303,8 @@ def clean_string(value, normalize_dim_names=False):
             value = "lon"
         elif value == "latitude":
             value = "lat"
+        elif value == "alevel":
+            value = "lev"
     return value
 
 
@@ -307,6 +315,15 @@ def clean_strings(values, normalize_dim_names=False):
     elif isinstance(values, str):
         return clean_string(values, normalize_dim_names)
     return values
+
+
+def include_fates_frac(expr):
+    """If the expression contains "FATES" but not "FATES_FRAC", include "FATES_FRAC" as an additional source variable."""
+    if "FATES" not in expr:
+        return expr
+    if "FATES_FRAC" in expr:
+        return expr
+    return f"({expr})*FATES_FRAC"
 
 
 # ── read csv ──────────────────────────────────────────────────────────────────
@@ -347,10 +364,11 @@ def _build_entry(row, config):
         elif yaml_key == "_source_expr":
             result = analyse_expression(value)
             if result["is_math"]:
-                entry["formula"] = value
+                entry["formula"] = include_fates_frac(value)
                 entry["sources"] = result["variables"]
             else:
                 entry["sources"] = result["variables"]
+
         elif yaml_key == "_formula":
             entry["formula"] = value
         elif yaml_key == "_sources_json":
@@ -358,6 +376,7 @@ def _build_entry(row, config):
                 entry["sources"] = json.loads(value)
             except (json.JSONDecodeError, ValueError):
                 pass
+
         else:
             # Includes: table, long_name, standard_name, cell_methods,
             # regrid_method, region, positive, _levels_name, _levels_units,
@@ -420,12 +439,14 @@ def read_csv(filepath, config):
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
+
             if not should_keep(row, config):
                 continue
             name = row[key_col].strip()
             if not name:
                 continue
             entry = _build_entry(row, config)
+
             all_entries.append((name, entry))
 
     # Second pass: group by name and reconstruct variants where multiple rows
@@ -443,9 +464,11 @@ def read_csv(filepath, config):
             # Base fields come from the first row (they are identical across rows).
             base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
             variants = []
+            # print(base)
             for e in entries:
                 variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
                 variants.append(variant)
+            # print(variants)
             base["variants"] = variants
             data[name] = base
 
@@ -468,9 +491,26 @@ def write_yaml(data, filepath):
             # Only reformat single-key source dicts: {model_var: VAR} → model_var: VAR
             # Leave multi-key dicts (e.g. {model_var: VAR, scale: -1.0}) untouched.
             line = re.sub(r"\{model_var: (\w+)\}", r"model_var: \1", line)
-        modified_lines.append(line)
-        if "units:" in line or "source_id:" in line:
+        if "FATES_FRAC" in line:
+            line = line.replace("FATES_FRAC", "FATES_FRACTION")
+        if "yaml_coax_dummy" in line:
+            continue
+        time_signifiers = [
+            "_tavg-",
+            "_tpt-",
+            "_tclmdc-",
+            "_ti-",
+            "_tmin-",
+            "_tminavg-",
+            "_tmax-",
+            "_tmaxavg-",
+        ]
+        add_newline = (
+            any(sig in line for sig in time_signifiers) or "variables:" in line
+        )
+        if add_newline:
             modified_lines.append("\n")
+        modified_lines.append(line)
     with open(filepath, "w") as f:
         f.writelines(modified_lines)
 

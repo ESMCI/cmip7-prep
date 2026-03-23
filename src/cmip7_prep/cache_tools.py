@@ -1,5 +1,6 @@
 # cmip7_prep/cache_tools.py
 """Tools for caching and reuse in regridding."""
+
 from pathlib import Path
 from typing import Dict
 import logging
@@ -54,10 +55,10 @@ def _make_dummy_grids(mapfile: Path) -> tuple[xr.Dataset, xr.Dataset]:
     if len(in_shape) == 1:
         dumbdim = True
         in_shape = [1, in_shape.item()]
+    logger.debug("in_shape  from weights: %s", in_shape)
 
     # output variable shape
     out_shape = weights.dst_grid_dims.load().data.tolist()[::-1]
-    logger.info("in_shape  from weights: %s", in_shape)
     # Some prep to get the bounds:
     # Note that bounds are needed for conservative regridding and not for bilinear
     lat_b_out = np.zeros(out_shape[0] + 1)
@@ -126,7 +127,7 @@ class FXCache:
     @classmethod
     def put(cls, key: Path, ds_fx: xr.Dataset) -> None:
         """put variable into cache"""
-        logger.info("Caching FX fields : %s", ds_fx.data_vars.keys())
+        logger.debug("Caching FX fields : %s", ds_fx.data_vars.keys())
         cls._cache[key] = ds_fx
 
     @classmethod
@@ -162,7 +163,8 @@ class RegridderCache:
                 raise FileNotFoundError(f"Regrid weights not found: {mapfile}")
             ds_in, ds_out = _make_dummy_grids(mapfile)
 
-            logger.info("Creating xESMF Regridder from weights: %s", mapfile)
+            logger.debug("Creating xESMF Regridder from weights: %s", mapfile)
+
             # import pdb; pdb.set_trace()
             cls._cache[cache_key] = xe.Regridder(
                 ds_in,

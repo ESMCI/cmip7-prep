@@ -71,9 +71,8 @@ def _collect_required_model_vars(
             needed.update({"PS", "hyam", "hybm", "P0"})
         elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
-        for var in ("area", "landmask", "landfrac", "TLAT"):
-            logger.info("Adding auxiliary variable '%s' ", var)
-            needed.add(var)
+        for varconst in ("area", "landmask", "landfrac", "TLAT"):
+            needed.add(varconst)
 
     return sorted(needed)
 
@@ -111,9 +110,34 @@ def open_native_for_cmip_vars(
     new_cmip_vars = []
 
     for var in cmip_vars:
-        logger.info("Processing CMIP var; collecting model vars '%s'", var)
+        logger.debug("Processing CMIP var; collecting model vars '%s'", var)
+        # Get the source variables explicitly listed in the YAML 'sources' entry
+        # and check they all have matching time series files before doing anything else
+        try:
+            cfg = mapping.get_cfg(var) or {}
+        except KeyError:
+            cfg = {}
+        source_vars = []
+        if cfg.get("source"):
+            source_vars = [cfg["source"]]
+        elif cfg.get("raw_variables"):
+            source_vars = list(cfg["raw_variables"])
+
+        missing = [
+            v
+            for v in source_vars
+            if not any(_filename_contains_var(p, v) for p in files)
+        ]
+        if missing:
+            logger.warning(
+                "Skipping '%s': no time series files found for source vars %s",
+                var,
+                missing,
+            )
+            continue
+
         rvar = _collect_required_model_vars(mapping, [var])
-        logger.info(
+        logger.debug(
             "Looking for native files for CMIP var '%s' needing model vars: %s",
             var,
             rvar,
@@ -123,6 +147,13 @@ def open_native_for_cmip_vars(
         )
         if selected:
             new_cmip_vars.append(var)
+        else:
+            logger.warning(
+                "Skipping '%s': found in mapping but no time series files match "
+                "required model vars %s",
+                var,
+                rvar,
+            )
     required = _collect_required_model_vars(mapping, new_cmip_vars)
 
     # keep any file that contains ANY of the required model vars as '.var.' in the name
@@ -153,7 +184,7 @@ def open_native_for_cmip_vars(
     if "ilev" in ds:
         ds["ilev"] = ds["ilev"] / 1000
 
-    logger.info("Returning from open_native_for_cmip_vars")
+    logger.debug("Returning from open_native_for_cmip_vars")
     return ds, new_cmip_vars
 
 
@@ -171,7 +202,7 @@ def _apply_vertical_if_needed(
     """Apply vertical transforms (e.g., plev19) to a single CMIP variable if required."""
     cfg = mapping.get_cfg(cmip_var) or {}
     levels = cfg.get("levels") or {}
-    logger.info("levels for %s: %s", cmip_var, levels)
+    logger.debug("levels for %s: %s", cmip_var, levels)
     if "plev" not in (levels.get("name") or "").lower():
         return ds_var
     if not tables_path:
@@ -224,7 +255,7 @@ def realize_regrid_prepare(
         ds_native = open_native_for_cmip_vars(
             [cmip_var], ds_or_glob, mapping, **open_kwargs
         )
-    logger.info("Opened native dataset with dims: %s", ds_native.dims)
+    logger.debug("Opened native dataset with dims: %s", ds_native.dims)
 
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
@@ -232,16 +263,17 @@ def realize_regrid_prepare(
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
     if time_chunk and "time" in da.dims:
         da = da.chunk({"time": int(time_chunk)})
-    logger.info("Realized variable '%s' with dims: %s", cmip_var, da.dims)
     ds_vars = xr.Dataset({cmip_var: da})
     for var in ("landfrac", "area", "landmask", "wet", "TLAT"):
         if var in ds_native and var not in ds_vars:
-            logger.info("Adding auxiliary variable '%s' to dataset for regridding", var)
+            logger.debug(
+                "Adding auxiliary variable '%s' to dataset for regridding", var
+            )
             ds_vars = ds_vars.assign(**{var: ds_native[var]})
 
     # 3) Check whether hybrid-σ is required
     cfg = mapping.get_cfg(cmip_var) or {}
-    logger.info("Mapping cfg for %s: %s", cmip_var, cfg)
+    logger.debug("Obtaining mapping cfg for %s: %s", cmip_var, cfg)
     levels = cfg.get("levels", {}) or {}
     lev_kind = (levels.get("name") or "").lower()
     is_hybrid = lev_kind in {"standard_hybrid_sigma", "alev", "alevel"}
@@ -261,11 +293,11 @@ def realize_regrid_prepare(
 
     # 5) Apply vertical transform if needed (plev19, etc.).
     #    Single-var helper already takes cfg + tables_path
-    logger.info("Applying vertical handling if needed for variable: %s", cmip_var)
+    logger.debug("Applying vertical handling if needed for variable: %s", cmip_var)
     ds_vert = _apply_vertical_if_needed(
         ds_vars, ds_native, cmip_var, mapping, tables_path=tables_path
     )
-    logger.info("After vertical handling, dataset dims: %s", ds_vert.dims)
+    logger.debug("After vertical handling, dataset dims: %s", ds_vert.dims)
 
     # 6) Regrid (include PS if present)
     names_to_regrid = [str(cmip_var)]
@@ -273,18 +305,17 @@ def realize_regrid_prepare(
         names_to_regrid.append("PS")
 
     # 7) Rename levgrnd if present to sdepth
-    logger.info(
+    logger.debug(
         "Checking for 'levgrnd' dimension in variables to regrid. %s", names_to_regrid
     )
     for lev in ("levgrnd", "levsoi"):
         if lev in ds_vert.dims:
-            logger.info("Renaming '%s' dimension to 'sdepth'", lev)
-            ds_vert = ds_vert.rename_dims({lev: "sdepth"})
-            # Ensure the coordinate variable is also copied
+            logger.debug("Renaming '%s' dimension to 'sdepth'", lev)
+            ds_vert = ds_vert.rename({lev: "sdepth"})
             ds_vert = ds_vert.assign_coords(sdepth=ds_native[lev].values)
 
     # 8) Regrid to lat/lon
-    logger.info("Calling regrid_to_latlon_ds")
+    logger.debug("Calling regrid_to_latlon_ds")
     ds_regr = regrid_to_latlon_ds(
         ds_vert,
         names_to_regrid,
@@ -293,7 +324,7 @@ def realize_regrid_prepare(
         time_from=ds_native,
         **regrid_kwargs,
     )
-    logger.info("Regridded dataset dims: %s", ds_regr.dims)
+    logger.debug("Regridded dataset dims: %s", ds_regr.dims)
     if aux:
         ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 

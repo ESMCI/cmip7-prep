@@ -9,7 +9,6 @@ import xarray as xr
 
 from cmip7_prep.vertical import _read_requested_levels, _resolve_p0, to_plev
 
-
 # ---------------------------------------------------------------------------
 # _read_requested_levels
 # ---------------------------------------------------------------------------

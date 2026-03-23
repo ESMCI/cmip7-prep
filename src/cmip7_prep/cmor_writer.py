@@ -152,7 +152,7 @@ class CmorSession(
             # caller passed a context manager directly
             self._dataset_json_cm = dj
             p = dj.__enter__()  # ← ENTER the CM, get a Path
-        logger.info("Using dataset JSON: %s", p)
+        logger.info("CMOR JSON dataset: %s", p)
         with open(p, encoding="utf-8") as f:
             cfg = json.load(f)
         cfg["outpath"] = str(self._outdir)
@@ -162,7 +162,7 @@ class CmorSession(
         if not Path(tmp.name).exists():
             raise FileNotFoundError(f"Temporary dataset_json not found: {tmp.name}")
         cmor.dataset_json(str(tmp.name))
-        logger.info("CMOR dataset_json loaded from: %s", tmp.name)
+        logger.debug("CMOR dataset_json loaded from: %s", tmp.name)
         try:
             prod = cmor.get_cur_dataset_attribute("product")  # type: ignore[attr-defined]
         except Exception:  # pylint: disable=broad-except
@@ -188,15 +188,15 @@ class CmorSession(
         # Default region to "glb"; overridden per-variable in cmor_driver.py for NH/SH variants
         cmor.set_cur_dataset_attribute("region", "glb")
 
-        logger.info("set _controlled_vocabulary_file:")
+        logger.debug("set _controlled_vocabulary_file:")
         cmor.set_cur_dataset_attribute(
             "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")
         )
-        logger.info("set _axis_entry_file:")
+        logger.debug("set _axis_entry_file:")
         cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
-        logger.info("set _formula_var_file:")
+        logger.debug("set _formula_var_file:")
         cmor.set_cur_dataset_attribute("_FORMULA_VAR_FILE", "CMIP7_formula_terms.json")
-        logger.info("CMOR session initialized")
+        logger.debug("CMOR session initialized")
         return self
 
     def __exit__(self, exc_type, exc, tb):
@@ -234,7 +234,7 @@ class CmorSession(
         # ---- helpers ----
 
         def _get_time_and_bounds(dsi: xr.Dataset):
-            logger.info("*** Define time axis")
+            logger.debug("Defining time axis")
             time_da = (
                 dsi.coords["time"]
                 if "time" in dsi.coords
@@ -242,19 +242,20 @@ class CmorSession(
             )
             if time_da is None:
                 return None, None, None
-            logger.info("Found time coordinate: %s", time_da.name)
+            logger.debug("Found time coordinate: %s", time_da.name)
+            # get time units
             units = time_da.attrs.get(
                 "units", time_da.encoding.get("units", "days since 1850-01-01")
             )
-            # spinup run calendar adjustment
+            # get calendar - spinup run calendar adjustment
             cal = time_da.attrs.get(
                 "calendar", time_da.encoding.get("calendar", "noleap")
             )
             logger.info("time units: %s calendar: %s", units, cal)
             tvals = encode_time_to_num(time_da, units, cal)
-
             bname = time_da.attrs.get("bounds")
 
+            # set time bounds
             tb = (
                 dsi[bname]
                 if isinstance(bname, str) and bname in dsi
@@ -265,7 +266,6 @@ class CmorSession(
                 )
             )
             tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
-
             return tvals, tbnum, str(units)
 
         def _get_1d_with_bounds(dsi: xr.Dataset, name: str, units_default: str):
@@ -287,8 +287,9 @@ class CmorSession(
             if var_name is None or var_name not in ds:
                 raise KeyError(f"Variable to write not found in dataset: {var_name!r}")
         var_da = ds[str(var_name)]
-        logger.info("found var_da with name: %s", var_da.name)
         var_dims = list(var_da.dims)
+        logger.debug("found var_da with name: %s and dims: %s", var_da.name, var_dims)
+
         alev_id = None
         plev_id = None
         lat_id = None
@@ -319,7 +320,9 @@ class CmorSession(
             )
             logger.debug("[CMOR axis debug] write geolon axes")
 
-            geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
+            geo_path = (
+                Path(__file__).parent.parent.parent / "data" / "ocean_geometry.nc"
+            )
             if not geo_path.exists():
                 raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
             ds_geo = xr.open_dataset(geo_path)
@@ -381,20 +384,22 @@ class CmorSession(
             var_da = ds[str(var_name)]
             var_dims = list(var_da.dims)
 
+        # -------------------------
         # --- horizontal axes (use CMOR names) ----
+        # -------------------------
         elif has_latlon_dims:
-            logger.info("*** Define horizontal axes")
+            logger.debug("Defining horizontal axes")
             lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
             lon_vals, lon_bnds, _ = _get_1d_with_bounds(ds, "lon", "degrees_east")
 
-            logger.info("write lat axis")
+            logger.debug("Setting lat axis")
             lat_id = cmor.axis(
                 table_entry="latitude",
                 units="degrees_north",
                 coord_vals=lat_vals,
                 cell_bounds=lat_bnds,
             )
-            logger.info("write lon axis")
+            logger.debug("Setting lon axis")
             lon_id = cmor.axis(
                 table_entry="longitude",
                 units="degrees_east",
@@ -402,10 +407,12 @@ class CmorSession(
                 cell_bounds=lon_bnds,
             )
 
+        # -------------------------
         # ---- time axis ----
+        # -------------------------
         time_id = None
         self.load_table(self.tables_root, self.primarytable)
-        logger.info("*** Define time axis (if present)")
+        logger.debug("Define time axis (if present)")
         tvals, tbnds, t_units = _get_time_and_bounds(ds)
         if tvals is not None:
             time_id = cmor.axis(
@@ -414,10 +421,12 @@ class CmorSession(
                 coord_vals=tvals,
                 cell_bounds=tbnds if tbnds is not None else None,
             )
-            logger.info("time axis id: %s var_dims=%s", time_id, var_dims)
-        # --- vertical: standard_hybrid_sigma ---
-        levels = getattr(vdef, "levels", {}) or {}
+            logger.debug("time axis id: %s var_dims=%s", time_id, var_dims)
 
+        # -------------------------
+        # --- vertical: standard_hybrid_sigma
+        # -------------------------
+        levels = getattr(vdef, "levels", {}) or {}
         if (levels.get("name") or "").lower() in {
             "standard_hybrid_sigma",
             "alevel",
@@ -432,7 +441,7 @@ class CmorSession(
                     "Hybrid sigma coordinates are only supported for atmospheric tables."
                 )
             # names in the native ds
-            logger.info("*** Define hybrid sigma axis")
+            logger.debug(" Defining hybrid sigma axis")
             hyam_name = levels.get("hyam", "hyam")  # A mid (dimensionless)
             hybm_name = levels.get("hybm", "hybm")  # B mid (dimensionless)
             hyai_name = levels.get("hyai", "hyai")  # A interfaces (optional)
@@ -490,6 +499,9 @@ class CmorSession(
             # stash to write before main variable
             self._pending_ps = (ps_zvar_id, ps_da)
 
+        # -------------------------
+        # --- vertical: pressure
+        # -------------------------
         elif "plev" in var_dims:
             # Pressure levels expected in data
             plev = ds["plev"]
@@ -536,12 +548,22 @@ class CmorSession(
                 coord_vals=pvals,
                 cell_bounds=pb if pb is not None else None,
             )
+
+        # -------------------------
+        # --- vertical: sdepth
+        # -------------------------
         elif "sdepth" in var_dims:
             # Read sdepth values from ds as before
             values = ds["sdepth"].values
-            logger.info("write sdepth axis")
+            logger.debug("Setting sdepth axis")
             # Read depth_bnds from the NetCDF file in the data directory
-            depth_bnds_path = Path(__file__).parent / "data" / "depth_bnds.nc"
+            depth_bnds_path = (
+                Path(__file__).parent.parent.parent / "data" / "depth_bnds.nc"
+            )
+            if not depth_bnds_path.exists():
+                raise FileNotFoundError(
+                    f"Expected depth_bnds file not found: {depth_bnds_path}"
+                )
             with xr.open_dataset(depth_bnds_path) as ds_bnds:
                 depth_bnds = ds_bnds["depth_bnds"].values
             # Ensure depth_bnds matches the length of sdepth
@@ -558,9 +580,13 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=depth_bnds,
             )
+
+        # -------------------------
+        # --- vertical: z_l
+        # -------------------------
         elif "z_l" in var_dims:
             values = ds["z_l"].values
-            logger.info("write z_l axis")
+            logger.debug("Setting z_l axis")
             bnds = bounds_from_centers_1d(values, "z_l")
             lev_id = cmor.axis(
                 table_entry="depth_coord",
@@ -568,16 +594,20 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+
+        # -------------------------
+        # --- vertical: zl
+        # -------------------------
         elif "zl" in var_dims:
             ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
-            logger.info(
-                "rename zl to olevel var_name %s var_dims=%s", var_name, var_dims
+            logger.debug(
+                "Renaming zl to olevel var_name %s var_dims=%s", var_name, var_dims
             )
             cmor.set_cur_dataset_attribute("vertical_label", "olevel")
-            logger.info("*** Define olevel axis")
+            logger.debug("Defining olevel axis")
             values = ds["olevel"].values
-            logger.info("write olevel axis")
+            logger.debug("Setting olevel axis")
             zi = ds["zi"].values
             bnds = np.column_stack((zi[:-1], zi[1:]))
             lev_id = cmor.axis(
@@ -586,17 +616,20 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+
+        # -------------------------
+        # --- vertical: zl
+        # -------------------------
         elif "zl" in var_dims:
-            logger.info("found zl axis in var_dims for variable %s", var_name)
+            logger.debug("found zl axis in var_dims for variable %s", var_name)
             ds[var_name] = ds[var_name].rename({"zl": "olevel"})
             var_dims = list(ds[var_name].dims)
-            logger.info(
+            logger.debug(
                 "rename zl to olevel var_name %s var_dims=%s", var_name, var_dims
             )
             cmor.set_cur_dataset_attribute("vertical_label", "olevel")
-            logger.info("*** Define olevel axis")
+            logger.debug("Defining olevel axis")
             values = ds["olevel"].values
-            logger.info("write olevel axis")
             zl = ds["zl"].values
             bnds = np.column_stack((zl[:-1], zl[1:]))
             lev_id = cmor.axis(
@@ -605,7 +638,10 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+
+        # -------------------------
         # Map dimension names to axis IDs
+        # -------------------------
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
@@ -642,7 +678,7 @@ class CmorSession(
 
         # Handle curvilinear grid (yh, xh) for deptho
         da = ds[name]
-        logger.info("FX variable %s dims: %s", name, da.dims)
+        logger.debug("Setting FX variable %s dims: %s", name, da.dims)
         if set(da.dims) == {"xh", "yh"}:
             self.load_table(self.tables_root, "ocean")
             geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
@@ -672,16 +708,15 @@ class CmorSession(
             lat_id = cmor.axis(
                 "latitude", "degrees_north", coord_vals=lat, cell_bounds=lat_b
             )
-            logger.info("FX variable %s define lat_id %s", name, lat_id)
-
+            logger.debug("FX variable %s define lat_id %s", name, lat_id)
             lon_id = cmor.axis(
                 "longitude",
                 "degrees_east",
                 coord_vals=lon_vals_1d,
                 cell_bounds=lon_bnds,
             )
-            logger.info("FX variable %s define lon_id %s", name, lon_id)
-            logger.info("Writing fx variable %s on curvilinear grid", name)
+            logger.debug("FX variable %s define lon_id %s", name, lon_id)
+            logger.debug("Writing fx variable %s on curvilinear grid", name)
             cmor.set_cur_dataset_attribute("grid", "curvilinear")
             cmor.set_cur_dataset_attribute("grid_label", "gn")
             if name == "deptho":
@@ -716,18 +751,18 @@ class CmorSession(
                 "longitude", "degrees_east", coord_vals=lon, cell_bounds=lon_b
             )
             data_filled, fillv = filled_for_cmor(da)
-        logger.info("Defining fx variable %s", name)
+        logger.debug("Defining fx variable %s", name)
 
         var_id = cmor.variable(name, units, [lat_id, lon_id], missing_value=fillv)
         if cmor.has_variable_attribute(var_id, "outputpath"):
-            logger.info(
+            logger.debug(
                 "CMOR variable object has outputpath attribute: %s",
                 cmor.get_variable_attribute(var_id, "outputpath"),
             )
-        logger.info("Now writing FX variable %s id: %s", name, var_id)
+        logger.info("Writing FX variable %s id: %s", name, var_id)
         cmor.write(var_id, np.asarray(data_filled))
         cmor.close(var_id)
-        logger.info("Finished writing fx variable %s", name)
+        logger.debug("Finished writing fx variable %s", name)
 
     def ensure_fx_written_and_cached(self, ds_regr: xr.Dataset) -> xr.Dataset:
         """Ensure <fx variables> exist in ds_regr and are written once as fx.
@@ -758,7 +793,7 @@ class CmorSession(
 
         # Write sftof_ti-u-hxy-u if present (native grid sea fraction: wet)
         if "sftof_ti-u-hxy-u" in ds_regr and "sftof_ti-u-hxy-u" not in self._fx_written:
-            logger.info("Writing fx variable sftof_ti-u-hxy-u")
+            logger.debug("Writing fx variable sftof_ti-u-hxy-u")
             self.load_table(self.tables_root, "ocean")
             self._write_fx_2d(ds_regr, "sftof_ti-u-hxy-u", "%")
             self._fx_written.add("sftof_ti-u-hxy-u")
@@ -828,9 +863,7 @@ class CmorSession(
             getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "atmos"
         )
 
-        logger.info(
-            "Using CMOR table key: %s %s", self.tables_root, self.primarytable
-        )  # debug
+        logger.info("Using CMOR table key: %s %s", self.tables_root, self.primarytable)
         self.load_table(self.tables_root, self.primarytable)
         bvn_attr = getattr(cmip_var, "branded_variable_name", None)
         bvn = bvn_attr.name if bvn_attr is not None else None
@@ -857,9 +890,9 @@ class CmorSession(
 
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_root, self.primarytable)
-        logger.debug("Define CMOR axes for variable %s", bvn)  # debug
+        logger.debug("Define CMOR axes for variable %s", bvn)
         axes_ids = self._define_axes(ds, vdef)
-        logger.debug("Prepare data for CMOR %s", data.dtype)  # debug
+        logger.debug("Prepare data for CMOR %s", data.dtype)
         data_filled, fillv = filled_for_cmor(data)
         if "zl" in data_filled.dims:
             data_filled = data_filled.rename({"zl": "olevel"})
@@ -875,7 +908,7 @@ class CmorSession(
         else:
             var_entry = str(var_entry)
 
-        logger.info("Define CMOR variable %s", var_entry)  # debug
+        logger.debug("Define CMOR variable %s", var_entry)
         var_id = cmor.variable(
             var_entry,
             units,
@@ -883,7 +916,7 @@ class CmorSession(
             positive=getattr(vdef, "positive", None),
             missing_value=fillv,
         )
-        logger.info("Now define time dimension and write data")  # debug
+        logger.debug("Now define time dimension and write data")
         if "lat" in data.dims and "lon" in data.dims:
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
             cmor.set_cur_dataset_attribute("grid_label", "gr")
@@ -904,6 +937,7 @@ class CmorSession(
             ntimes_passed=nt,
         )
         logger.info("Finished writing CMOR variable %s", var_id)  # debug
+
         # ---- Hybrid ps streaming (if present) ----
         if self._pending_ps is not None:
             ps_id, ps_da = self._pending_ps

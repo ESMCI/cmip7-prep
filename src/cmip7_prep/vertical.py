@@ -20,7 +20,6 @@ import numpy as np
 import xarray as xr
 from geocat.comp import interp_hybrid_to_pressure
 
-
 logger = logging.getLogger(__name__)
 
 

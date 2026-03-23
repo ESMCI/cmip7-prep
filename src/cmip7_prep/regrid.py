@@ -3,6 +3,7 @@
 # zonal_p39 = zonal_mean_on_pressure_grid(ds, "ta", tables_path="cmip7-cmor-tables/tables")
 # cmip7_prep/regrid.py
 """Regridding utilities for CESM -> 1° lat/lon using precomputed ESMF weights."""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
@@ -280,8 +281,6 @@ def _pick_maps(
                 Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE16_noresm
             )
 
-    logger.info("Conservative_map is %s", str(cons))
-
     if force_method:
         if force_method not in {"conservative", "bilinear"}:
             raise ValueError("force_method must be 'conservative' or 'bilinear'")
@@ -335,7 +334,7 @@ def regrid_to_latlon_ds(
     out_vars: dict[str, xr.DataArray] = {}
     names = [varnames] if isinstance(varnames, str) else list(varnames)
     for name in names:
-        logger.info("Regridding var %s", name)
+        logger.debug("Regridding var %s", name)
         out_vars[name] = regrid_to_latlon(
             ds_in,
             name,
@@ -349,9 +348,6 @@ def regrid_to_latlon_ds(
             output_time_chunk=output_time_chunk,
         )
         logger.info("Finished regridding var %s", name)
-
-    logger.info("conservative map is %s", conservative_map)
-    logger.info("bilinear map is %s", bilinear_map)
 
     # Create an xarray dataset with the output vars
     ds_out = xr.Dataset(out_vars)
@@ -371,7 +367,7 @@ def regrid_to_latlon_ds(
     )  # fx always conservative
 
     # Regrid the fx data
-    logger.info("using fx map: %s", spec.path)
+    logger.debug("Regriding fx data using fx map: %s", spec.path)
     ds_fx = _regrid_fx_once(spec.path, ds_in, sftlf_path)  # ← uses cache
     if ds_fx is not None and len(ds_fx.data_vars) > 0:
         # Don’t overwrite if user already computed and passed them in
@@ -388,14 +384,14 @@ def regrid_to_latlon_ds(
             if name in ds_fx and name not in ds_out:
                 ds_out[name] = ds_fx[name]
 
-    # --- NEW: carry hybrid metadata (or any requested 1-D fields) unchanged ---
+    # Carry hybrid metadata (or any requested 1-D fields) unchanged ---
     ds_out = _attach_vertical_metadata(ds_out, ds_in)
     return ds_out
 
 
 def _normalize_land_field(da2: xr.DataArray, ds_in: xr.Dataset) -> xr.DataArray:
     """Normalize source field by source landfrac."""
-    logger.info("Normalizing land field by source landfrac")
+    logger.debug("Normalizing land field by source landfrac")
     if "landfrac" not in ds_in:
         raise ValueError("Missing required variables for land normalization: landfrac")
     landfrac = ds_in["landfrac"].fillna(0)
@@ -407,7 +403,7 @@ def _denormalize_land_field(
     out_norm: xr.DataArray, ds_in: xr.Dataset, mapfile: Path
 ) -> xr.DataArray:
     """Denormalize field by destination landfrac."""
-    logger.info("Denormalizing land field ")
+    logger.debug("Denormalizing land field mapped landfrac ")
     ds_fx = _regrid_fx_once(mapfile, ds_in)
     if "sftlf" not in ds_fx:
         raise ValueError(
@@ -511,7 +507,7 @@ def regrid_to_latlon(
         "Regridding %s using %s map: %s ", varname, spec.method_label, spec.path
     )
     regridder = RegridderCache.get(spec.path, spec.method_label)
-    logger.info("Regridder ready to use")
+    logger.debug("Regridder ready to use")
     # Tell xESMF to produce chunked output
     kwargs = {}
     if "time" in da2.dims and output_time_chunk:
@@ -527,14 +523,14 @@ def regrid_to_latlon(
             )  # ensure last two dims are ('lat','lon')
         )
     else:
-        logger.info("Creating da2_2d for ocean grid")
+        logger.debug("Creating da2_2d for ocean grid")
         da2_2d = da2.rename({hdim_x: "lon", hdim_y: "lat"})
         da2_2d = da2_2d.transpose(
             ..., "lat", "lon"
         )  # ensure last two dims are ('lat','lon')
         da2_2d = da2_2d.assign_coords(lon=((da2_2d.lon % 360)))
 
-    logger.info(
+    logger.debug(
         "da2d dims %s da2_2d range: %f to %f lat, %f to %f lon",
         da2_2d.dims,
         da2_2d["lat"].min().item(),
@@ -542,7 +538,8 @@ def regrid_to_latlon(
         da2_2d["lon"].min().item(),
         da2_2d["lon"].max().item(),
     )
-    logger.info("Invoking esmf regridder, da2_2d dims %s", da2_2d.dims)
+    logger.debug("Invoking esmf regridder, da2_2d dims %s", da2_2d.dims)
+
     # Regrid the data
     out_norm = regridder(da2_2d, skipna=True, na_thres=1.0, **kwargs)
     logger.info("Regridding complete. out_norms dims: %s", out_norm.dims)
@@ -732,7 +729,7 @@ def _build_fx_native(ds_native: xr.Dataset) -> xr.Dataset:
     ds_fx = xr.Dataset(pieces)
     # normalize horizontal dim name to what your regrid code expects
     #    ds_fx = ds_fx.rename({"lndgrid": "ncol"})
-    logger.info("sftlf in ds_fx: %s", "sftlf" in ds_fx)
+    logger.debug("sftlf in ds_fx: %s", "sftlf" in ds_fx)
     return ds_fx
 
 
@@ -745,7 +742,7 @@ def _regrid_fx_once(
     """
     cached = FXCache.get(mapfile)
     if cached is not None:
-        logger.info("Getting cached fx variables")
+        logger.debug("Getting cached fx variables")
         return cached
 
     out_vars = {}
@@ -780,7 +777,7 @@ def _regrid_fx_once(
 
     # For regridded grid, set sftof = 1 - sftlf
     if "sftlf" in out_vars:
-        logger.info("Obtaining sftlf")
+        logger.debug("Obtaining sftlf")
         sftlf = out_vars["sftlf"]
         logger.info("Computing regridded sftof as 1 - sftlf")
         sftof = (1.0 - sftlf / 100.0) * 100.0
