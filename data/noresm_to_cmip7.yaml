@@ -76,7 +76,7 @@ variables:
     description: Percentage of entire grid cell  that is covered by C4 PFTs (including
       grass and crops).
     dims: [lon, lat, time]
-    formula: sumoverpft(FATES_CROWNAREA_PF,[1,2,3,4],"fates_levpft")*FATES_FRACTION
+    formula: sumoverpft(FATES_CROWNAREA_PF,[14],"fates_levpft")*FATES_FRACTION
     long_name: Lmon.c4PftFrac
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
