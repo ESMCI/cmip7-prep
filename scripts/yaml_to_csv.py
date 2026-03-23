@@ -28,7 +28,9 @@ CESM_COLUMNS = [
     "Dimensions",
     "CESM Variable Name",  # comma-separated source variable name(s); used by convert_csv as skip filter
     "Formula",  # the formula string, present only when original had one
-    "Sources JSON",  # full sources list (model_var + scale/freq/alias) as JSON
+    "Scale",  # comma-separated scale factors, positionally aligned with CESM Variable Name
+    "Freq",  # comma-separated sampling frequencies, positionally aligned with CESM Variable Name
+    "Alias",  # comma-separated source aliases, positionally aligned with CESM Variable Name
     "Cell Methods",
     "Regrid Method",
     "Region",
@@ -100,14 +102,43 @@ def sources_to_names(sources: list) -> str:
     )
 
 
+def sources_to_scale_freq_alias(sources: list) -> tuple:
+    """Return (scale_str, freq_str, alias_str) for the Scale/Freq/Alias CSV columns.
+
+    Each returned string is a comma-separated list positionally aligned with
+    the ``CESM Variable Name`` column.  If all sources lack a given attribute
+    the corresponding string is empty.
+
+    >>> sources_to_scale_freq_alias([{"model_var": "TREFHT"}])
+    ('', '', '')
+    >>> sources_to_scale_freq_alias([{"model_var": "QFLX", "scale": -1.0}])
+    ('-1.0', '', '')
+    >>> sources_to_scale_freq_alias([{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}])
+    ('', 'day, ', '')
+    >>> sources_to_scale_freq_alias([{"model_var": "A", "scale": 0.001, "freq": "day", "alias": "a"}, {"model_var": "B", "scale": 0.001}])
+    ('0.001, 0.001', 'day, ', 'a, ')
+    >>> sources_to_scale_freq_alias([])
+    ('', '', '')
+    """
+    if not sources:
+        return ("", "", "")
+
+    def _col(attr):
+        vals = [str(src.get(attr, "")) for src in sources]
+        return ", ".join(vals) if any(v for v in vals) else ""
+
+    return (_col("scale"), _col("freq"), _col("alias"))
+
+
 def variable_to_rows(name: str, var: dict) -> list:
     """Convert one YAML variable entry to a list of CSV row dicts.
 
     Variables without ``variants`` produce a single row.  Variables with
     ``variants`` produce one row per variant, each carrying the variant's
-    ``formula``, ``long_name``, and ``region``.  The full ``sources`` list
-    (including ``scale``, ``freq``, and ``alias`` sub-fields) is serialised as
-    JSON in the ``Sources JSON`` column so the round-trip is lossless.
+    ``formula``, ``long_name``, and ``region``.  Per-source attributes
+    (``scale``, ``freq``, ``alias``) are written to the ``Scale``, ``Freq``,
+    and ``Alias`` columns as comma-separated values positionally aligned with
+    ``CESM Variable Name``.
 
     >>> rows = variable_to_rows("tas", {"table": "atmos", "units": "K", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "TREFHT"}]})
     >>> len(rows)
@@ -118,8 +149,8 @@ def variable_to_rows(name: str, var: dict) -> list:
     'TREFHT'
     >>> rows[0]["Formula"]
     ''
-    >>> rows[0]["Sources JSON"]
-    '[{"model_var": "TREFHT"}]'
+    >>> rows[0]["Scale"]
+    ''
     >>> rows[0]["Dimensions"]
     '["time", "lat", "lon"]'
     >>> rows[0]["Region"]
@@ -135,8 +166,8 @@ def variable_to_rows(name: str, var: dict) -> list:
     >>> rows_scale = variable_to_rows("evspsbl", var_with_scale)
     >>> rows_scale[0]["Formula"]
     ''
-    >>> import json; json.loads(rows_scale[0]["Sources JSON"])
-    [{'model_var': 'QFLX', 'scale': -1.0}]
+    >>> rows_scale[0]["Scale"]
+    '-1.0'
 
     >>> var_with_variants = {"table": "seaIce", "units": "m2", "dims": ["time"], "sources": [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}], "variants": [{"long_name": "NH", "region": "nh", "formula": "siconc.where(lat>0)"}, {"long_name": "SH", "region": "sh", "formula": "siconc.where(lat<0)"}]}
     >>> rows3 = variable_to_rows("siarea_tavg-u-hm-u", var_with_variants)
@@ -152,8 +183,8 @@ def variable_to_rows(name: str, var: dict) -> list:
     'siconc, tarea'
     >>> rows3[1]["Region"]
     'sh'
-    >>> import json; json.loads(rows3[0]["Sources JSON"]) == [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}]
-    True
+    >>> rows3[0]["Freq"]
+    'day, '
     """
     formula = var.get("formula")
     sources = var.get("sources", [])
@@ -164,6 +195,8 @@ def variable_to_rows(name: str, var: dict) -> list:
     # Use JSON so that list-of-lists dims round-trip correctly.
     dims_str = json.dumps(dims)
 
+    scale_str, freq_str, alias_str = sources_to_scale_freq_alias(sources)
+
     base = {
         "CMIP Variable Name": name,
         "Table": var.get("table", ""),
@@ -173,7 +206,9 @@ def variable_to_rows(name: str, var: dict) -> list:
         "Cell Methods": var.get("cell_methods", ""),
         "Regrid Method": var.get("regrid_method", ""),
         "Positive": var.get("positive", ""),
-        "Sources JSON": json.dumps(sources) if sources else "",
+        "Scale": scale_str,
+        "Freq": freq_str,
+        "Alias": alias_str,
         "Levels Name": levels.get("name", ""),
         "Levels Units": levels.get("units", ""),
         "Levels Src Axis Name": levels.get("src_axis_name", ""),

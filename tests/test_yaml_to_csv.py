@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from yaml_to_csv import (
     CESM_COLUMNS,
     sources_to_expr,
+    sources_to_scale_freq_alias,
     variable_to_rows,
     yaml_to_csv,
 )
@@ -73,6 +74,78 @@ class TestSourcesToExpr:
         assert expr == "siage_d"
         assert "freq" not in expr
         assert "day" not in expr
+
+
+# ── sources_to_scale_freq_alias ───────────────────────────────────────────────
+
+
+class TestSourcesToScaleFreqAlias:
+    """Tests for sources_to_scale_freq_alias()."""
+
+    def test_empty(self):
+        """Empty sources list returns three empty strings."""
+        assert sources_to_scale_freq_alias([]) == ("", "", "")
+
+    def test_single_no_extras(self):
+        """A single source with no extra attrs returns three empty strings."""
+        assert sources_to_scale_freq_alias([{"model_var": "TREFHT"}]) == ("", "", "")
+
+    def test_single_with_scale(self):
+        """A single source with scale is reflected in the Scale string."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "QFLX", "scale": -1.0}]
+        )
+        assert scale == "-1.0"
+        assert freq == ""
+        assert alias == ""
+
+    def test_single_with_freq(self):
+        """A single source with freq is reflected in the Freq string."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "siconc", "freq": "day"}]
+        )
+        assert scale == ""
+        assert freq == "day"
+        assert alias == ""
+
+    def test_two_sources_first_has_freq(self):
+        """Positional alignment: first source has freq, second does not."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}]
+        )
+        assert scale == ""
+        assert freq == "day, "
+        assert alias == ""
+
+    def test_two_sources_both_have_scale(self):
+        """Both sources with identical scales."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "A", "scale": 0.001}, {"model_var": "B", "scale": 0.001}]
+        )
+        assert scale == "0.001, 0.001"
+        assert freq == ""
+        assert alias == ""
+
+    def test_all_three_attrs(self):
+        """A source with all three extra attrs populates all three columns."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "siconc_d", "scale": 1.0, "freq": "day", "alias": "siconc"}]
+        )
+        assert scale == "1.0"
+        assert freq == "day"
+        assert alias == "siconc"
+
+    def test_mixed_attrs_positional(self):
+        """Mixed attrs across three sources are aligned positionally."""
+        sources = [
+            {"model_var": "siconc_d", "freq": "day", "alias": "siconc"},
+            {"model_var": "siconc", "freq": "mon"},
+            {"model_var": "tarea"},
+        ]
+        scale, freq, alias = sources_to_scale_freq_alias(sources)
+        assert scale == ""
+        assert freq == "day, mon, "
+        assert alias == "siconc, , "
 
 
 # ── variable_to_rows ──────────────────────────────────────────────────────────
@@ -142,6 +215,27 @@ class TestVariableToRow:
             },
         )[0]
         assert row["CESM Variable Name"] == "QFLX"
+        assert row["Scale"] == "-1.0"
+        assert row["Freq"] == ""
+        assert row["Alias"] == ""
+
+    def test_freq_in_freq_column(self):
+        """Freq attributes appear in the Freq column, aligned with CESM Variable Name."""
+        row = variable_to_rows(
+            "siarea",
+            {
+                "table": "seaIce",
+                "units": "m2",
+                "dims": ["time"],
+                "sources": [
+                    {"model_var": "siconc", "freq": "day"},
+                    {"model_var": "tarea"},
+                ],
+            },
+        )[0]
+        assert row["CESM Variable Name"] == "siconc, tarea"
+        assert row["Freq"] == "day, "
+        assert row["Scale"] == ""
 
     def test_optional_fields_empty_when_absent(self):
         """Optional columns are empty strings when not present in the variable dict."""
@@ -374,8 +468,8 @@ class TestYamlToCsv:
         assert rows[0]["CESM Variable Name"] == "SOIL1C, SOIL2C, SOIL3C"
         assert rows[0]["Formula"] == "(SOIL1C + SOIL2C + SOIL3C)/1000.0"
 
-    def test_scale_excluded_from_cesm_variable_name(self, tmp_path):
-        """Scale factors are not included in CESM Variable Name."""
+    def test_scale_in_scale_column(self, tmp_path):
+        """Scale factors appear in the Scale column, not in CESM Variable Name."""
         ypath = _make_yaml(
             tmp_path,
             {
@@ -391,6 +485,9 @@ class TestYamlToCsv:
         yaml_to_csv(ypath, cpath)
         rows = _read_csv(cpath)
         assert rows[0]["CESM Variable Name"] == "QFLX"
+        assert rows[0]["Scale"] == "-1.0"
+        assert rows[0]["Freq"] == ""
+        assert rows[0]["Alias"] == ""
 
     def test_optional_fields_empty_when_absent(self, tmp_path):
         """Optional columns are empty when not present in the YAML."""
@@ -443,6 +540,12 @@ class TestYamlToCsv:
                 "sources": [{"model_var": "CLOUD"}],
                 "cell_methods": "time: mean",
             },
+            "evspsbl": {
+                "table": "atmos",
+                "units": "kg m-2 s-1",
+                "dims": ["time", "lat", "lon"],
+                "sources": [{"model_var": "QFLX", "scale": -1.0}],
+            },
         }
         ypath = _make_yaml(tmp_path, variables)
         cpath = str(tmp_path / "cesm.csv")
@@ -455,7 +558,11 @@ class TestYamlToCsv:
         assert tas["table"] == "atmos"
         assert tas["units"] == "K"
         assert tas["sources"] == [{"model_var": "TREFHT"}]
+        assert "scale" not in tas["sources"][0]
 
         cl = result["variables"]["cl"]
         assert cl["formula"] == "CLOUD * 100"
         assert "levels" in cl  # lev dim → levels block added
+
+        evspsbl = result["variables"]["evspsbl"]
+        assert evspsbl["sources"] == [{"model_var": "QFLX", "scale": -1.0}]

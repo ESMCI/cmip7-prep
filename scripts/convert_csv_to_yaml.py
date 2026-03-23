@@ -68,9 +68,12 @@ MODEL_CONFIGS = {
             "Units": "units",
             "Dimensions": "dims",
             "CESM Variable Name": "_source_expr",
-            # "Formula" and "Sources JSON" override _source_expr when present (round-trip format).
+            # "Formula" overrides _source_expr when present (round-trip format).
+            # "Scale", "Freq", "Alias" are merged into sources in post-processing.
             "Formula": "_formula",
-            "Sources JSON": "_sources_json",
+            "Scale": "_scale",
+            "Freq": "_freq",
+            "Alias": "_alias",
             "Cell Methods": "cell_methods",
             "Regrid Method": "regrid_method",
             "Region": "region",
@@ -327,6 +330,53 @@ def include_fates_frac(expr):
 
 
 # ── read csv ──────────────────────────────────────────────────────────────────
+def _parse_csv_identifiers(value: str) -> list:
+    """Parse *value* as a comma-separated list of plain variable-name identifiers.
+
+    Returns a list of identifier strings if every comma-separated token is a
+    valid Python identifier (letters/digits/underscores, starting with a
+    letter or underscore).  Returns ``None`` if any token is not a plain
+    identifier, signalling that the value should be handled as a formula
+    expression by ``analyse_expression`` instead.
+
+    >>> _parse_csv_identifiers("TREFHT")
+    ['TREFHT']
+    >>> _parse_csv_identifiers("siconc, tarea")
+    ['siconc', 'tarea']
+    >>> _parse_csv_identifiers("PRECC, PRECL")
+    ['PRECC', 'PRECL']
+    >>> _parse_csv_identifiers("CLDTOT * 100") is None
+    True
+    >>> _parse_csv_identifiers("PRECC + PRECL") is None
+    True
+    """
+    import re as _re
+
+    parts = [p.strip() for p in value.split(",")]
+    if all(_re.match(r"^[A-Za-z_]\w*$", p) for p in parts if p):
+        return [p for p in parts if p]
+    return None
+
+
+def _split_positional(s: str, n: int) -> list:
+    """Split comma-separated string *s* into exactly *n* stripped tokens.
+
+    Pads with empty strings if *s* has fewer than *n* tokens; truncates if more.
+
+    >>> _split_positional("day, mon, ", 3)
+    ['day', 'mon', '']
+    >>> _split_positional("-1.0", 1)
+    ['-1.0']
+    >>> _split_positional("", 2)
+    ['', '']
+    >>> _split_positional("a, b", 3)
+    ['a', 'b', '']
+    """
+    parts = [p.strip() for p in s.split(",")]
+    parts.extend([""] * (n - len(parts)))
+    return parts[:n]
+
+
 def _build_entry(row, config):
     """Build a single variable entry dict from one CSV row."""
     column_map = config["column_map"]
@@ -362,20 +412,22 @@ def _build_entry(row, config):
         elif yaml_key == "units":
             entry["units"] = fix_number_norwegian_format(value)
         elif yaml_key == "_source_expr":
-            result = analyse_expression(value)
-            if result["is_math"]:
-                entry["formula"] = include_fates_frac(value)
-                entry["sources"] = result["variables"]
+            names = _parse_csv_identifiers(value)
+            if names is not None:
+                # New format: comma-separated plain variable names.
+                # Scale/Freq/Alias will be merged in post-processing.
+                entry["sources"] = [{"model_var": n} for n in names]
             else:
-                entry["sources"] = result["variables"]
+                # Fallback: legacy formula expression in CESM Variable Name.
+                result = analyse_expression(value)
+                if result["is_math"]:
+                    entry["formula"] = include_fates_frac(value)
+                    entry["sources"] = result["variables"]
+                else:
+                    entry["sources"] = result["variables"]
 
-        elif yaml_key == "_formula":
-            entry["formula"] = value
-        elif yaml_key == "_sources_json":
-            try:
-                entry["sources"] = json.loads(value)
-            except (json.JSONDecodeError, ValueError):
-                pass
+        elif yaml_key in ("_scale", "_freq", "_alias"):
+            entry[yaml_key] = value
 
         else:
             # Includes: table, long_name, standard_name, cell_methods,
@@ -408,6 +460,27 @@ def _build_entry(row, config):
             "src_axis_name": "lev",
             "src_axis_bnds": "ilev",
         }
+
+    # Merge Scale/Freq/Alias columns into the per-source dicts.
+    scale_str = entry.pop("_scale", None)
+    freq_str = entry.pop("_freq", None)
+    alias_str = entry.pop("_alias", None)
+    if "sources" in entry and (scale_str or freq_str or alias_str):
+        sources = entry["sources"]
+        n = len(sources)
+        scales = _split_positional(scale_str or "", n)
+        freqs = _split_positional(freq_str or "", n)
+        aliases = _split_positional(alias_str or "", n)
+        for i, src in enumerate(sources):
+            if scales[i]:
+                try:
+                    src["scale"] = float(scales[i])
+                except ValueError:
+                    pass
+            if freqs[i]:
+                src["freq"] = freqs[i]
+            if aliases[i]:
+                src["alias"] = aliases[i]
 
     return entry
 
