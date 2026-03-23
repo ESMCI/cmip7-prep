@@ -119,6 +119,36 @@ cl_tavg-al-hxy-u:
 
 Both CESM (`cesm_to_cmip7.yaml`) and NorESM (`noresm_to_cmip7.yaml`) mappings are included.
 
+## Maintaining the CESM variable mapping via Google Sheets
+
+The CESM variable mapping is maintained in a Google Spreadsheet and stored in version control as `data/cesm_to_cmip7.yaml`.
+
+**Spreadsheet:** <https://docs.google.com/spreadsheets/d/1BJV6CLgCTUpuaUlEQoFc-7ATBCsoJezYkyCvU1NTlxw/edit?usp=sharing>
+
+### Column format
+
+Columns A–F and L–S are populated from CMIP7 table metadata.  Columns G–K describe how each CMIP variable is generated from CESM model output and are the ones to fill in:
+
+| Col | Column | Description |
+|-----|--------|-------------|
+| G | `CESM Variable Name` | The CESM variable(s) needed as input, comma-separated, e.g. `PRECC, PRECL` |
+| H | `Formula` | Expression used to compute the CMIP variable from the CESM inputs, e.g. `(PRECC + PRECL) * 1000.0` — leave blank when the input variable needs only a rename or scaling |
+| I | `Scale` | Multiplicative scale factor applied to each input variable, comma-separated and positionally aligned with column G, e.g. `1000.0` |
+| J | `Freq` | Sampling frequency of each input variable, e.g. `day` for daily fields |
+| K | `Alias` | Rename each input variable before use, comma-separated and positionally aligned with column G |
+
+### Workflow
+
+1. Open the spreadsheet and fill in columns G–K for any variables that are missing a `CESM Variable Name`.
+2. Export as CSV: **File → Download → Comma Separated Values (.csv)**
+3. Save the downloaded file as `data/cesm_data.csv`.
+4. Regenerate the YAML:
+   ```bash
+   python scripts/convert_csv_to_yaml.py --model cesm \
+       --input data/cesm_data.csv \
+       --output data/cesm_to_cmip7.yaml
+   ```
+
 ## Key modules
 
 | Module | Purpose |
