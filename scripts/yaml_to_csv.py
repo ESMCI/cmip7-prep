@@ -42,7 +42,7 @@ CESM_COLUMNS = [
 ]
 
 
-def sources_to_expr(sources: list) -> str:
+def sources_to_expr(sources: list[dict]) -> str:
     """Build a human-readable expression from a list of source dicts.
 
     Each source dict may have:
@@ -81,7 +81,7 @@ def sources_to_expr(sources: list) -> str:
     return " + ".join(parts)
 
 
-def sources_to_names(sources: list) -> str:
+def sources_to_names(sources: list[dict]) -> str:
     """Return a comma-separated list of model variable names from *sources*.
 
     Only the ``model_var`` field is included; scale factors and other
@@ -102,7 +102,7 @@ def sources_to_names(sources: list) -> str:
     )
 
 
-def sources_to_scale_freq_alias(sources: list) -> tuple:
+def sources_to_scale_freq_alias(sources: list[dict]) -> tuple[str, str, str]:
     """Return (scale_str, freq_str, alias_str) for the Scale/Freq/Alias CSV columns.
 
     Each returned string is a comma-separated list positionally aligned with

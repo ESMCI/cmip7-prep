@@ -4,6 +4,7 @@ import json
 import yaml
 import re
 import argparse
+from typing import Optional
 
 # ── model configurations ─────────────────────────────────────────────────────
 # Each config defines how to read a model-specific CSV and what metadata to write.
@@ -330,7 +331,7 @@ def include_fates_frac(expr):
 
 
 # ── read csv ──────────────────────────────────────────────────────────────────
-def _parse_csv_identifiers(value: str) -> list:
+def _parse_csv_identifiers(value: str) -> Optional[list[str]]:
     """Parse *value* as a comma-separated list of plain variable-name identifiers.
 
     Returns a list of identifier strings if every comma-separated token is a

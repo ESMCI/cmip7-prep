@@ -599,8 +599,8 @@ class TestReadCsvNorESM:
         assert data["variables"]["tas"]["dims"] == ["time", "lon", "lat"]
 
 
-class TestParseCsvIdentifiers:
-    """Tests for _parse_csv_identifiers()."""
+class TestCsvHelpers:
+    """Tests for _parse_csv_identifiers() and _split_positional()."""
 
     def test_valid_identifiers(self):
         """Single, comma-separated, underscored, and digit-containing names all parse."""
@@ -619,18 +619,11 @@ class TestParseCsvIdentifiers:
         assert _parse_csv_identifiers("CLDTOT * 100") is None
         assert _parse_csv_identifiers("PRECC + PRECL") is None
 
-
-class TestSplitPositional:
-    """Tests for _split_positional()."""
-
-    def test_padding_and_trimming(self):
+    def test_split_padding_and_trimming(self):
         """Short lists are padded; long lists are trimmed; exact length is unchanged."""
         assert _split_positional("day, mon, ", 3) == ["day", "mon", ""]
         assert _split_positional("a, b", 3) == ["a", "b", ""]
         assert _split_positional("a, b, c, d", 2) == ["a", "b"]
-
-    def test_empty_and_single(self):
-        """Empty string produces n empties; single value with no commas is one element."""
         assert _split_positional("", 2) == ["", ""]
         assert _split_positional("-1.0", 1) == ["-1.0"]
 
@@ -735,7 +728,8 @@ class TestReadCsvCESM:
                     "Table": "atmos",
                     "Units": "%",
                     "Dimensions": "time, lev, lat, lon",
-                    "CESM Variable Name": "CLOUD * 100",
+                    "CESM Variable Name": "CLOUD",
+                    "Formula": "CLOUD * 100",
                     "Cell Methods": "time: mean",
                 }
             )
@@ -769,7 +763,8 @@ class TestReadCsvCESM:
                     "Table": "atmos",
                     "Units": "%",
                     "Dimensions": "time, lev, lat, lon",
-                    "CESM Variable Name": "CLOUD * 100",
+                    "CESM Variable Name": "CLOUD",
+                    "Formula": "CLOUD * 100",
                 }
             )
         ]
@@ -807,7 +802,7 @@ class TestReadCsvCESM:
         assert len(data["variables"]) == 0
 
     def test_formula_expression(self, tmp_path):
-        """Formula in the Formula column is stored correctly (new-style CSV)."""
+        """Formula column is stored and sources are derived from CESM Variable Name."""
         rows = [
             self._row(
                 **{
@@ -823,7 +818,7 @@ class TestReadCsvCESM:
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
         var = data["variables"]["clt"]
         assert var["formula"] == "CLDTOT * 100"
-        assert [v["model_var"] for v in var["sources"]] == ["CLDTOT"]
+        assert var["sources"] == [{"model_var": "CLDTOT"}]
 
     def test_scale_from_column(self, tmp_path):
         """Scale column is merged into the sources list as a float."""
@@ -904,24 +899,24 @@ class TestReadCsvCESM:
         assert isinstance(scale, float)
         assert scale == 1000.0
 
-    def test_formula_column_with_plain_cesm_var_name(self, tmp_path):
-        """Formula in the Formula column with plain var name in CESM Variable Name."""
+    def test_multi_source_formula(self, tmp_path):
+        """Multiple sources in CESM Variable Name with a formula expression."""
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "clt",
+                    "CMIP Variable Name": "pr",
                     "Table": "atmos",
-                    "Units": "%",
+                    "Units": "kg m-2 s-1",
                     "Dimensions": "time, lat, lon",
-                    "CESM Variable Name": "CLDTOT",
-                    "Formula": "CLDTOT * 100",
+                    "CESM Variable Name": "PRECC, PRECL",
+                    "Formula": "(PRECC + PRECL) * 1000.0",
                 }
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        var = data["variables"]["clt"]
-        assert var["formula"] == "CLDTOT * 100"
-        assert var["sources"] == [{"model_var": "CLDTOT"}]
+        var = data["variables"]["pr"]
+        assert var["formula"] == "(PRECC + PRECL) * 1000.0"
+        assert [s["model_var"] for s in var["sources"]] == ["PRECC", "PRECL"]
 
 
 # ── write_yaml round-trip ─────────────────────────────────────────────────────
