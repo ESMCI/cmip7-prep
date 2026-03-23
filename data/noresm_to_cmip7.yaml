@@ -2818,7 +2818,7 @@ variables:
     sources: [model_var: QVEGT]
     table: land
     units: kg m-2 s-1
-    positive: up 
+    positive: up
 
   tran_tavg-u-hxy-u:
     description: Transpiration
