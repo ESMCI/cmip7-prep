@@ -53,6 +53,11 @@ _SCRIPTS = Path(__file__).parent
 sys.path.insert(0, str(_SCRIPTS))
 from yaml_to_csv import CESM_COLUMNS, variable_to_rows  # noqa: E402
 
+# Extended column list for this script's output only.  The two extra columns
+# (Priority, Experiments) are data-request metadata and are not part of the
+# standard CESM_COLUMNS used by yaml_to_csv / convert_csv_to_yaml.
+_OUTPUT_COLUMNS = CESM_COLUMNS + ["Priority", "Experiments"]
+
 # ── constants ─────────────────────────────────────────────────────────────────
 
 # Table JSON files that do not contain variable_entry blocks.
@@ -188,6 +193,8 @@ def table_entry_to_stub_row(bvn: str, entry: dict) -> dict:
         "Regrid Method": "",
         "Region": "",
         "Positive": entry.get("positive", ""),
+        "Priority": entry.get("_priority", ""),
+        "Experiments": json.dumps(entry.get("_experiments", [])),
         "Levels Name": levels.get("name", ""),
         "Levels Units": levels.get("units", ""),
         "Levels Src Axis Name": levels.get("src_axis_name", ""),
@@ -198,12 +205,17 @@ def table_entry_to_stub_row(bvn: str, entry: dict) -> dict:
 # ── data request helper ───────────────────────────────────────────────────────
 
 
-def get_requested_bvns(realms: list[str] | None = None) -> set[str]:
-    """Query the CMIP7 data request API and return requested branded variable names.
+def get_requested_var_metadata(
+    realms: list[str] | None = None,
+) -> dict[str, dict]:
+    """Query the CMIP7 data request API and return metadata for requested variables.
 
     Args:
         realms: Optional realm filter list (e.g. ``["atmos", "land"]``).
                 ``None`` retrieves all realms.
+
+    Returns:
+        Mapping of branded variable name → ``{"priority": int, "experiments": [str, ...]}``.
     """
     from data_request_api.query import data_request as dr
     from data_request_api.content import dump_transformation as dt
@@ -214,16 +226,29 @@ def get_requested_bvns(realms: list[str] | None = None) -> set[str]:
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
 
     kwargs: dict = dict(skip_if_missing=False, operation="all")
-    if realms:
-        bvns: set[str] = set()
-        for realm in realms:
-            for v in DR.find_variables(modelling_realm=realm, **kwargs):
-                bvns.add(str(v.attributes["branded_variable_name"]))
-        return bvns
+    variables = (
+        [
+            v
+            for realm in realms
+            for v in DR.find_variables(modelling_realm=realm, **kwargs)
+        ]
+        if realms
+        else list(DR.find_variables(**kwargs))
+    )
 
-    return {
-        str(v.attributes["branded_variable_name"]) for v in DR.find_variables(**kwargs)
-    }
+    result: dict[str, dict] = {}
+    for v in variables:
+        bvn = str(v.attributes["branded_variable_name"])
+        priority = DR.find_priority_per_variable(v)
+        experiments = sorted(
+            {
+                str(e.attributes["id"])
+                for opp in DR.find_opportunities_per_variable(v)
+                for e in DR.find_experiments_per_opportunity(opp)
+            }
+        )
+        result[bvn] = {"priority": priority, "experiments": experiments}
+    return result
 
 
 # ── core logic ────────────────────────────────────────────────────────────────
@@ -257,7 +282,15 @@ def build_merged_rows(
     table_lookup = load_cmip7_tables(tables_dir)
 
     print(f"Querying CMIP7 data request (realms={realms or 'all'}) …", flush=True)
-    requested = get_requested_bvns(realms)
+    var_metadata = get_requested_var_metadata(realms)
+    requested = set(var_metadata)
+
+    # Annotate existing rows with priority and experiments from the data request.
+    for row in existing_rows:
+        meta = var_metadata.get(row["CMIP Variable Name"])
+        if meta:
+            row["Priority"] = meta["priority"]
+            row["Experiments"] = json.dumps(meta["experiments"])
     print(f"  {len(requested)} variables requested by CMIP7 data request")
     print(f"  {len(existing_vars)} variables already in {yaml_path.name}")
 
@@ -271,7 +304,15 @@ def build_merged_rows(
         )
 
     stub_rows = [
-        table_entry_to_stub_row(bvn, table_lookup[bvn]) for bvn in missing_bvns
+        table_entry_to_stub_row(
+            bvn,
+            dict(
+                table_lookup[bvn],
+                _priority=var_metadata[bvn]["priority"],
+                _experiments=var_metadata[bvn]["experiments"],
+            ),
+        )
+        for bvn in missing_bvns
     ]
     stub_rows.sort(key=lambda r: (r["Table"], r["CMIP Variable Name"]))
     print(f"  {len(stub_rows)} new stub rows added")
@@ -330,7 +371,7 @@ def main() -> None:
 
     output_path = Path(args.output)
     with open(output_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CESM_COLUMNS)
+        writer = csv.DictWriter(f, fieldnames=_OUTPUT_COLUMNS, restval="")
         writer.writeheader()
         writer.writerows(all_rows)
 
