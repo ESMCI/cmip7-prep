@@ -70,6 +70,18 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 INCLUDE_PATTERN_MAP = {
     "cesm": {
+        "aerosol": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h3a"],
+        },
+        "atmosChem": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h3a"],
+        },
         "atmos": {
             "mon": ["cam.h0a"],
             "day": ["cam.h1a"],
@@ -78,6 +90,10 @@ INCLUDE_PATTERN_MAP = {
         },
         "land": {
             "mon": ["clm2.h0a"],
+        },
+        "ocnBgchem": {
+            "mon": ["mom6.h.z", "mom6.h.native."],
+            "day": ["mom6.h.sfc"],
         },
         "ocean": {
             "mon": ["mom6.h.z", "mom6.h.native."],
