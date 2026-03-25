@@ -22,24 +22,6 @@ variables:
     sources: [model_var: TOTPRODC, model_var: CWD_P]
     table: land
     units: kg m-2
-  cSoilFast:
-    dims: [time, lat, lon]
-    formula: (SOIL1C)/1000.0
-    sources: [model_var: SOIL1C]
-    table: land
-    units: kg m-2
-  cSoilMedium:
-    dims: [time, lat, lon]
-    formula: (SOIL2C)/1000.0
-    sources: [model_var: SOIL2C]
-    table: land
-    units: kg m-2
-  cSoilSlow:
-    dims: [time, lat, lon]
-    formula: (SOIL3C)/1000.0
-    sources: [model_var: SOIL3C]
-    table: land
-    units: kg m-2
 
   cSoil_tavg-u-hxy-lnd:
     dims: [time, lat, lon]
@@ -231,13 +213,6 @@ variables:
     formula: COL_FIRE_CLOSS/1000.0
     positive: up
     sources: [model_var: COL_FIRE_CLOSS]
-    table: land
-    units: kg m-2 s-1
-  fHarvest:
-    dims: [time, lat, lon]
-    formula: WOOD_HARVESTC/1000.0
-    positive: up
-    sources: [model_var: WOOD_HARVESTC]
     table: land
     units: kg m-2 s-1
 
@@ -648,12 +623,6 @@ variables:
     sources: [model_var: U10]
     table: atmos
     units: m s-1
-  sftlf:
-    dims: [lat, lon]
-    formula: LANDFRAC * 100.0
-    sources: [model_var: LANDFRAC]
-    table: fx
-    units: '%'
 
   siage_tavg-u-hxy-si:
     dims: [time, nj, ni]
@@ -1375,30 +1344,6 @@ variables:
     sources: [{freq: day, model_var: sivol_d}, {freq: mon, model_var: sivol}]
     table: seaIce
     units: m3 m-3
-  snld:
-    dims: [time, lat, lon]
-    sources: [model_var: SNOW_DEPTH]
-    table: land
-    units: m
-  soga:
-    dims: [[time, latitude, longitude], [time, lat, lon]]
-    regrid_method: conservative
-    sources: [model_var: soga]
-    table: ocean
-    units: 1e-3
-  sos_max:
-    dims: [[time, latitude, longitude], [time, lat, lon]]
-    regrid_method: conservative
-    sources: [model_var: sos_max]
-    table: ocean
-    units: 1e-3
-  sos_min:
-    dims: [[time, latitude, longitude], [time, lat, lon]]
-    regrid_method: conservative
-    sources: [model_var: sos_min]
-    table: ocean
-    units: 1e-3
-
   sos_tavg-u-hxy-sea:
     dims: [[time, latitude, longitude], [time, lat, lon]]
     regrid_method: conservative
@@ -1430,18 +1375,8 @@ variables:
     dims: [time, lat, lon]
     long_name: Near-Surface Air Temperature
     regrid_method: bilinear
-    sources: [model_var: TS]
+    sources: [model_var: TREFHT]
     standard_name: air_temperature
-    table: atmos
-    units: K
-  tasmax:
-    dims: [time, lat, lon]
-    sources: [model_var: TREFHTMX]
-    table: atmos
-    units: K
-  tasmin:
-    dims: [time, lat, lon]
-    sources: [model_var: TREFHTMN]
     table: atmos
     units: K
 
@@ -1472,12 +1407,6 @@ variables:
     sources: [model_var: tauvo]
     table: ocean
     units: N m-2
-  tdps:
-    dims: [time, plev, lat, lon]
-    levels: {name: plev19, units: Pa}
-    sources: [model_var: TD]
-    table: atmos
-    units: K
 
   thetao_tavg-ol-hxy-sea:
     dims: [[time, z_l, latitude, longitude], [time, z_l, lat, lon]]
@@ -1485,24 +1414,6 @@ variables:
     sources: [model_var: thetao]
     table: ocean
     units: K
-  thetaoga:
-    dims: [[time, z_l, latitude, longitude], [time, z_l, lat, lon]]
-    regrid_method: bilinear
-    sources: [model_var: thetaoga]
-    table: ocean
-    units: K
-  tnhus:
-    dims: [time, plev, lat, lon]
-    levels: {name: plev19, units: Pa}
-    sources: [model_var: Q]
-    table: atmos
-    units: kg kg-1
-  tnt:
-    dims: [time, plev, lat, lon]
-    levels: {name: plev19, units: Pa}
-    sources: [model_var: T]
-    table: atmos
-    units: K s-1
 
   tos_tavg-u-hxy-sea:
     dims: [[time, latitude, longitude], [time, lat, lon]]
@@ -1599,11 +1510,6 @@ variables:
     sources: [model_var: vo]
     table: ocean
     units: m s-1
-  volcello:
-    dims: [time, z_l, latitude, longitude]
-    sources: [model_var: volcello]
-    table: ocean
-    units: m3
 
   wap_tavg-p19-hxy-air:
     dims: [time, plev, lat, lon]
@@ -1611,12 +1517,6 @@ variables:
     sources: [model_var: OMEGA]
     table: atmos
     units: Pa s-1
-  wfo:
-    dims: [time, latitude, longitude]
-    long_name: Freshwater Flux into Sea Water
-    sources: [model_var: wfo]
-    table: ocean
-    units: kg m-2 s-1
 
   wo_tavg-ol-hxy-sea:
     dims: [[time, z_l, latitude, longitude], [time, z_l, lat, lon]]
@@ -1638,9 +1538,3 @@ variables:
     sources: [model_var: zos]
     table: ocean
     units: m
-  zossq:
-    dims: [time, latitude, longitude]
-    regrid_method: bilinear
-    sources: [model_var: zossq]
-    table: ocean
-    units: m2

@@ -56,7 +56,12 @@ from yaml_to_csv import CESM_COLUMNS, variable_to_rows  # noqa: E402
 # Extended column list for this script's output only.  The two extra columns
 # (Priority, Experiments) are data-request metadata and are not part of the
 # standard CESM_COLUMNS used by yaml_to_csv / convert_csv_to_yaml.
-_OUTPUT_COLUMNS = CESM_COLUMNS + ["Priority", "Experiments"]
+_OUTPUT_COLUMNS = (
+    CESM_COLUMNS[:1]
+    + ["Physical Parameter"]
+    + CESM_COLUMNS[1:]
+    + ["Priority", "Experiments"]
+)
 
 # ── constants ─────────────────────────────────────────────────────────────────
 
@@ -167,6 +172,8 @@ def table_entry_to_stub_row(bvn: str, entry: dict) -> dict:
     '["longitude", "latitude", "time"]'
     >>> row["CESM Variable Name"]
     ''
+    >>> row["Physical Parameter"]
+    ''
     >>> row["Levels Name"]
     ''
     """
@@ -193,6 +200,7 @@ def table_entry_to_stub_row(bvn: str, entry: dict) -> dict:
         "Regrid Method": "",
         "Region": "",
         "Positive": entry.get("positive", ""),
+        "Physical Parameter": entry.get("_physical_parameter", ""),
         "Priority": entry.get("_priority", ""),
         "Experiments": json.dumps(entry.get("_experiments", [])),
         "Levels Name": levels.get("name", ""),
@@ -247,7 +255,12 @@ def get_requested_var_metadata(
                 for e in DR.find_experiments_per_opportunity(opp)
             }
         )
-        result[bvn] = {"priority": priority, "experiments": experiments}
+        physical_parameter = str(v.physical_parameter.name)
+        result[bvn] = {
+            "priority": priority,
+            "experiments": experiments,
+            "physical_parameter": physical_parameter,
+        }
     return result
 
 
@@ -289,6 +302,7 @@ def build_merged_rows(
     for row in existing_rows:
         meta = var_metadata.get(row["CMIP Variable Name"])
         if meta:
+            row["Physical Parameter"] = meta["physical_parameter"]
             row["Priority"] = meta["priority"]
             row["Experiments"] = json.dumps(meta["experiments"])
     print(f"  {len(requested)} variables requested by CMIP7 data request")
@@ -308,6 +322,7 @@ def build_merged_rows(
             bvn,
             dict(
                 table_lookup[bvn],
+                _physical_parameter=var_metadata[bvn]["physical_parameter"],
                 _priority=var_metadata[bvn]["priority"],
                 _experiments=var_metadata[bvn]["experiments"],
             ),

@@ -577,12 +577,17 @@ def main():
             with Case(caseroot, read_only=True) as case:
                 inputroot = case.get_value("DOUT_S_ROOT")
                 casename = case.get_value("CASE")
-            TSDIR = Path(inputroot).parent / "timeseries" / casename / subdir / "hist"
-            INPUTDIR = os.path.join(inputroot, subdir, "hist")
-            native = latest_monthly_file(Path(INPUTDIR))
-            if native is None:
-                print(f"No output files found in {INPUTDIR}")
-                sys.exit(0)
+            if realm in ("atmos", "aerosol", "atmosChem"):
+                TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
+            elif realm == "land":
+                TSDIR = Path(inputroot) / "lnd" / "proc" / "tseries"
+            elif realm in ("ocean", "ocnBgchem"):
+                TSDIR = Path(inputroot) / "ocn" / "proc" / "tseries"
+            elif realm == "seaIce":
+                TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
+            elif realm == "landIce":
+                TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
+            TSDIR = TSDIR / args.frequency
         elif not TSDIR or not os.path.exists(TSDIR):
             # testing path
             scratch = os.getenv("SCRATCH")
