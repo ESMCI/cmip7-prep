@@ -351,8 +351,12 @@ def _parse_csv_identifiers(value: str) -> Optional[list[str]]:
     True
     """
     parts = [p.strip() for p in value.split(",")]
-    if all(re.match(r"^[A-Za-z_]\w*$", p) for p in parts if p):
-        return [p for p in parts if p]
+    identifiers = [p for p in parts if p]
+    # Treat values that contain only commas/whitespace as non-identifier expressions.
+    if not identifiers:
+        return None
+    if all(re.match(r"^[A-Za-z_]\w*$", p) for p in identifiers):
+        return identifiers
     return None
 
 

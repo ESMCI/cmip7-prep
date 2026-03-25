@@ -223,7 +223,11 @@ def get_requested_var_metadata(
                 ``None`` retrieves all realms.
 
     Returns:
-        Mapping of branded variable name → ``{"priority": int, "experiments": [str, ...]}``.
+        Mapping of branded variable name → metadata dict with keys:
+
+        * ``"priority"`` (int): Data request priority.
+        * ``"experiments"`` (list[str]): Experiment IDs where the variable is requested.
+        * ``"physical_parameter"`` (str): Name of the associated physical parameter.
     """
     from data_request_api.query import data_request as dr
     from data_request_api.content import dump_transformation as dt
