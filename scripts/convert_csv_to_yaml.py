@@ -32,7 +32,7 @@ MODEL_CONFIGS = {
         },
         "key_column": "Branded Variable Name",
         "column_map": {
-            "Modelling Realm - Primary": "table",
+            "Modelling Realm-Primary": "table",
             "CMIP6 Compound Name": "long_name",
             "Description": "description",
             "Units (from Physical Parameter)": "units",
@@ -40,7 +40,7 @@ MODEL_CONFIGS = {
             "NorESM3 name (dependency)": "_source_expr",
             "CMIP7 Freq.": "freq",
         },
-        "realm_column": "Modelling Realm - Primary",
+        "realm_column": "Modelling Realm-Primary",
         "keep_realms": ["atmos", "land"],
         "source_column": "NorESM3 name (dependency)",
         "source_skip_phrases": [
@@ -115,13 +115,13 @@ def should_keep(row, config):
     Filters on realm and source-column content using the model config.
 
     >>> cfg = MODEL_CONFIGS["noresm"]
-    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": "T2M"}, cfg)
+    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": "T2M"}, cfg)
     True
-    >>> should_keep({"Modelling Realm - Primary": "ocean", "NorESM3 name (dependency)": "SST"}, cfg)
+    >>> should_keep({"Modelling Realm-Primary": "ocean", "NorESM3 name (dependency)": "SST"}, cfg)
     False
-    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": ""}, cfg)
+    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": ""}, cfg)
     False
-    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": "n/a"}, cfg)
+    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": "n/a"}, cfg)
     False
     """
     realm_col = config["realm_column"]
@@ -351,8 +351,12 @@ def _parse_csv_identifiers(value: str) -> Optional[list[str]]:
     True
     """
     parts = [p.strip() for p in value.split(",")]
-    if all(re.match(r"^[A-Za-z_]\w*$", p) for p in parts if p):
-        return [p for p in parts if p]
+    identifiers = [p for p in parts if p]
+    # Treat values that contain only commas/whitespace as non-identifier expressions.
+    if not identifiers:
+        return None
+    if all(re.match(r"^[A-Za-z_]\w*$", p) for p in identifiers):
+        return identifiers
     return None
 
 

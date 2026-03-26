@@ -70,6 +70,18 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 INCLUDE_PATTERN_MAP = {
     "cesm": {
+        "aerosol": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h3a"],
+        },
+        "atmosChem": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h3a"],
+        },
         "atmos": {
             "mon": ["cam.h0a"],
             "day": ["cam.h1a"],
@@ -78,6 +90,10 @@ INCLUDE_PATTERN_MAP = {
         },
         "land": {
             "mon": ["clm2.h0a"],
+        },
+        "ocnBgchem": {
+            "mon": ["mom6.h.z", "mom6.h.native."],
+            "day": ["mom6.h.sfc"],
         },
         "ocean": {
             "mon": ["mom6.h.z", "mom6.h.native."],
@@ -577,12 +593,17 @@ def main():
             with Case(caseroot, read_only=True) as case:
                 inputroot = case.get_value("DOUT_S_ROOT")
                 casename = case.get_value("CASE")
-            TSDIR = Path(inputroot).parent / "timeseries" / casename / subdir / "hist"
-            INPUTDIR = os.path.join(inputroot, subdir, "hist")
-            native = latest_monthly_file(Path(INPUTDIR))
-            if native is None:
-                print(f"No output files found in {INPUTDIR}")
-                sys.exit(0)
+            if realm in ("atmos", "aerosol", "atmosChem"):
+                TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
+            elif realm == "land":
+                TSDIR = Path(inputroot) / "lnd" / "proc" / "tseries"
+            elif realm in ("ocean", "ocnBgchem"):
+                TSDIR = Path(inputroot) / "ocn" / "proc" / "tseries"
+            elif realm == "seaIce":
+                TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
+            elif realm == "landIce":
+                TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
+            TSDIR = TSDIR / args.frequency
         elif not TSDIR or not os.path.exists(TSDIR):
             # testing path
             scratch = os.getenv("SCRATCH")
