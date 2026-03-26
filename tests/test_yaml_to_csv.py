@@ -14,60 +14,83 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
-from yaml_to_csv import CESM_COLUMNS, sources_to_expr, variable_to_rows, yaml_to_csv
+from yaml_to_csv import (
+    CESM_COLUMNS,
+    sources_to_scale_freq_alias,
+    variable_to_rows,
+    yaml_to_csv,
+)
 
-# ── sources_to_expr ───────────────────────────────────────────────────────────
+# ── sources_to_scale_freq_alias ───────────────────────────────────────────────
 
 
-class TestSourcesToExpr:
-    """Tests for sources_to_expr()."""
+class TestSourcesToScaleFreqAlias:
+    """Tests for sources_to_scale_freq_alias()."""
 
-    def test_single_source_no_scale(self):
-        """A single source without scale returns just the variable name."""
-        assert sources_to_expr([{"model_var": "TREFHT"}]) == "TREFHT"
+    def test_empty(self):
+        """Empty sources list returns three empty strings."""
+        assert sources_to_scale_freq_alias([]) == ("", "", "")
 
-    def test_single_source_with_scale(self):
-        """A single source with a scale factor includes the multiplication."""
-        assert sources_to_expr([{"model_var": "QFLX", "scale": -1.0}]) == "QFLX * -1.0"
+    def test_single_no_extras(self):
+        """A single source with no extra attrs returns three empty strings."""
+        assert sources_to_scale_freq_alias([{"model_var": "TREFHT"}]) == ("", "", "")
 
-    def test_two_sources_no_scale(self):
-        """Two sources without scale are joined with '+'."""
-        assert (
-            sources_to_expr([{"model_var": "PRECC"}, {"model_var": "PRECL"}])
-            == "PRECC + PRECL"
+    def test_single_with_scale(self):
+        """A single source with scale is reflected in the Scale string."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "QFLX", "scale": -1.0}]
         )
+        assert scale == "-1.0"
+        assert freq == ""
+        assert alias == ""
 
-    def test_three_sources(self):
-        """Three sources are joined with '+'."""
-        expr = sources_to_expr(
-            [
-                {"model_var": "SOIL1C"},
-                {"model_var": "SOIL2C"},
-                {"model_var": "SOIL3C"},
-            ]
+    def test_single_with_freq(self):
+        """A single source with freq is reflected in the Freq string."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "siconc", "freq": "day"}]
         )
-        assert expr == "SOIL1C + SOIL2C + SOIL3C"
+        assert scale == ""
+        assert freq == "day"
+        assert alias == ""
 
-    def test_multiple_sources_with_scale(self):
-        """Multiple sources each with a scale factor are represented correctly."""
-        expr = sources_to_expr(
-            [
-                {"model_var": "SOIL1C", "scale": 0.001},
-                {"model_var": "SOIL2C", "scale": 0.001},
-            ]
+    def test_two_sources_first_has_freq(self):
+        """Positional alignment: first source has freq, second does not."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}]
         )
-        assert expr == "SOIL1C * 0.001 + SOIL2C * 0.001"
+        assert scale == ""
+        assert freq == "day, "
+        assert alias == ""
 
-    def test_empty_sources(self):
-        """An empty sources list returns an empty string."""
-        assert sources_to_expr([]) == ""
+    def test_two_sources_both_have_scale(self):
+        """Both sources with identical scales."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "A", "scale": 0.001}, {"model_var": "B", "scale": 0.001}]
+        )
+        assert scale == "0.001, 0.001"
+        assert freq == ""
+        assert alias == ""
 
-    def test_source_with_freq_ignored(self):
-        """The freq field is informational only and does not appear in the expression."""
-        expr = sources_to_expr([{"model_var": "siage_d", "freq": "day"}])
-        assert expr == "siage_d"
-        assert "freq" not in expr
-        assert "day" not in expr
+    def test_all_three_attrs(self):
+        """A source with all three extra attrs populates all three columns."""
+        scale, freq, alias = sources_to_scale_freq_alias(
+            [{"model_var": "siconc_d", "scale": 1.0, "freq": "day", "alias": "siconc"}]
+        )
+        assert scale == "1.0"
+        assert freq == "day"
+        assert alias == "siconc"
+
+    def test_mixed_attrs_positional(self):
+        """Mixed attrs across three sources are aligned positionally."""
+        sources = [
+            {"model_var": "siconc_d", "freq": "day", "alias": "siconc"},
+            {"model_var": "siconc", "freq": "mon"},
+            {"model_var": "tarea"},
+        ]
+        scale, freq, alias = sources_to_scale_freq_alias(sources)
+        assert scale == ""
+        assert freq == "day, mon, "
+        assert alias == "siconc, , "
 
 
 # ── variable_to_rows ──────────────────────────────────────────────────────────
@@ -97,8 +120,8 @@ class TestVariableToRow:
         assert row["Dimensions"] == '["time", "lat", "lon"]'
         assert row["CESM Variable Name"] == "TREFHT"
 
-    def test_formula_takes_precedence_over_sources(self):
-        """When formula is present, it is used instead of sources."""
+    def test_cesm_var_name_uses_source_names_not_formula(self):
+        """CESM Variable Name is always source names, never the formula string."""
         row = variable_to_rows(
             "cl",
             {
@@ -109,10 +132,11 @@ class TestVariableToRow:
                 "sources": [{"model_var": "CLOUD"}],
             },
         )[0]
-        assert row["CESM Variable Name"] == "CLOUD * 100"
+        assert row["CESM Variable Name"] == "CLOUD"
+        assert row["Formula"] == "CLOUD * 100"
 
-    def test_no_formula_uses_sources(self):
-        """Without a formula, sources are joined into an expression."""
+    def test_no_formula_uses_source_names(self):
+        """Without a formula, CESM Variable Name is a comma-separated list of source names."""
         row = variable_to_rows(
             "pr",
             {
@@ -122,10 +146,10 @@ class TestVariableToRow:
                 "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}],
             },
         )[0]
-        assert row["CESM Variable Name"] == "PRECC + PRECL"
+        assert row["CESM Variable Name"] == "PRECC, PRECL"
 
-    def test_scale_in_sources_represented(self):
-        """A scale factor in a source is included in the expression."""
+    def test_scale_excluded_from_cesm_variable_name(self):
+        """Scale factors are not included in CESM Variable Name — only the variable name."""
         row = variable_to_rows(
             "evspsbl",
             {
@@ -135,7 +159,28 @@ class TestVariableToRow:
                 "sources": [{"model_var": "QFLX", "scale": -1.0}],
             },
         )[0]
-        assert row["CESM Variable Name"] == "QFLX * -1.0"
+        assert row["CESM Variable Name"] == "QFLX"
+        assert row["Scale"] == "-1.0"
+        assert row["Freq"] == ""
+        assert row["Alias"] == ""
+
+    def test_freq_in_freq_column(self):
+        """Freq attributes appear in the Freq column, aligned with CESM Variable Name."""
+        row = variable_to_rows(
+            "siarea",
+            {
+                "table": "seaIce",
+                "units": "m2",
+                "dims": ["time"],
+                "sources": [
+                    {"model_var": "siconc", "freq": "day"},
+                    {"model_var": "tarea"},
+                ],
+            },
+        )[0]
+        assert row["CESM Variable Name"] == "siconc, tarea"
+        assert row["Freq"] == "day, "
+        assert row["Scale"] == ""
 
     def test_optional_fields_empty_when_absent(self):
         """Optional columns are empty strings when not present in the variable dict."""
@@ -203,6 +248,7 @@ class TestVariableToRow:
                 "table": "seaIce",
                 "units": "m2",
                 "dims": ["time"],
+                "sources": [{"model_var": "siconc"}, {"model_var": "tarea"}],
                 "variants": [
                     {"long_name": "NH", "formula": "formula_nh"},
                     {"long_name": "SH", "formula": "formula_sh"},
@@ -210,8 +256,10 @@ class TestVariableToRow:
             },
         )
         assert len(rows) == 2
-        assert rows[0]["CESM Variable Name"] == "formula_nh"
-        assert rows[1]["CESM Variable Name"] == "formula_sh"
+        assert rows[0]["CESM Variable Name"] == "siconc, tarea"
+        assert rows[1]["CESM Variable Name"] == "siconc, tarea"
+        assert rows[0]["Formula"] == "formula_nh"
+        assert rows[1]["Formula"] == "formula_sh"
 
     def test_no_sources_or_formula_gives_empty(self):
         """A variable with neither sources nor formula gets an empty expression."""
@@ -321,8 +369,8 @@ class TestYamlToCsv:
         assert r["Dimensions"] == '["time", "lat", "lon"]'
         assert r["CESM Variable Name"] == "TREFHT"
 
-    def test_formula_in_cesm_variable_name(self, tmp_path):
-        """A formula is written verbatim to the CESM Variable Name column."""
+    def test_cesm_var_name_is_source_names_not_formula(self, tmp_path):
+        """CESM Variable Name is the source variable name, not the formula string."""
         ypath = _make_yaml(
             tmp_path,
             {
@@ -338,10 +386,11 @@ class TestYamlToCsv:
         cpath = str(tmp_path / "out.csv")
         yaml_to_csv(ypath, cpath)
         rows = _read_csv(cpath)
-        assert rows[0]["CESM Variable Name"] == "CLDTOT * 100"
+        assert rows[0]["CESM Variable Name"] == "CLDTOT"
+        assert rows[0]["Formula"] == "CLDTOT * 100"
 
-    def test_multi_source_joined(self, tmp_path):
-        """A formula with multiple sources is written verbatim."""
+    def test_multi_source_names_comma_separated(self, tmp_path):
+        """Multiple sources produce a comma-separated list in CESM Variable Name."""
         ypath = _make_yaml(
             tmp_path,
             {
@@ -361,11 +410,11 @@ class TestYamlToCsv:
         cpath = str(tmp_path / "out.csv")
         yaml_to_csv(ypath, cpath)
         rows = _read_csv(cpath)
-        # Formula takes precedence
-        assert rows[0]["CESM Variable Name"] == "(SOIL1C + SOIL2C + SOIL3C)/1000.0"
+        assert rows[0]["CESM Variable Name"] == "SOIL1C, SOIL2C, SOIL3C"
+        assert rows[0]["Formula"] == "(SOIL1C + SOIL2C + SOIL3C)/1000.0"
 
-    def test_scale_preserved_in_expression(self, tmp_path):
-        """A scale factor in a source is preserved in the CSV expression."""
+    def test_scale_in_scale_column(self, tmp_path):
+        """Scale factors appear in the Scale column, not in CESM Variable Name."""
         ypath = _make_yaml(
             tmp_path,
             {
@@ -380,7 +429,10 @@ class TestYamlToCsv:
         cpath = str(tmp_path / "out.csv")
         yaml_to_csv(ypath, cpath)
         rows = _read_csv(cpath)
-        assert rows[0]["CESM Variable Name"] == "QFLX * -1.0"
+        assert rows[0]["CESM Variable Name"] == "QFLX"
+        assert rows[0]["Scale"] == "-1.0"
+        assert rows[0]["Freq"] == ""
+        assert rows[0]["Alias"] == ""
 
     def test_optional_fields_empty_when_absent(self, tmp_path):
         """Optional columns are empty when not present in the YAML."""
@@ -433,6 +485,12 @@ class TestYamlToCsv:
                 "sources": [{"model_var": "CLOUD"}],
                 "cell_methods": "time: mean",
             },
+            "evspsbl": {
+                "table": "atmos",
+                "units": "kg m-2 s-1",
+                "dims": ["time", "lat", "lon"],
+                "sources": [{"model_var": "QFLX", "scale": -1.0}],
+            },
         }
         ypath = _make_yaml(tmp_path, variables)
         cpath = str(tmp_path / "cesm.csv")
@@ -445,7 +503,11 @@ class TestYamlToCsv:
         assert tas["table"] == "atmos"
         assert tas["units"] == "K"
         assert tas["sources"] == [{"model_var": "TREFHT"}]
+        assert "scale" not in tas["sources"][0]
 
         cl = result["variables"]["cl"]
         assert cl["formula"] == "CLOUD * 100"
         assert "levels" in cl  # lev dim → levels block added
+
+        evspsbl = result["variables"]["evspsbl"]
+        assert evspsbl["sources"] == [{"model_var": "QFLX", "scale": -1.0}]

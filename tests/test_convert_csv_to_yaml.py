@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
 from convert_csv_to_yaml import (
     MODEL_CONFIGS,
+    _parse_csv_identifiers,
+    _split_positional,
     analyse_expression,
     clean_string,
     clean_strings,
@@ -597,6 +599,35 @@ class TestReadCsvNorESM:
         assert data["variables"]["tas"]["dims"] == ["time", "lon", "lat"]
 
 
+class TestCsvHelpers:
+    """Tests for _parse_csv_identifiers() and _split_positional()."""
+
+    def test_valid_identifiers(self):
+        """Single, comma-separated, underscored, and digit-containing names all parse."""
+        assert _parse_csv_identifiers("TREFHT") == ["TREFHT"]
+        assert _parse_csv_identifiers("siconc, tarea") == ["siconc", "tarea"]
+        assert _parse_csv_identifiers("SOIL1C, SOIL2C, SOIL3C") == [
+            "SOIL1C",
+            "SOIL2C",
+            "SOIL3C",
+        ]
+        assert _parse_csv_identifiers("FATES_FRAC, GPP") == ["FATES_FRAC", "GPP"]
+        assert _parse_csv_identifiers("T2M") == ["T2M"]
+
+    def test_expressions_return_none(self):
+        """Formula and arithmetic expressions return None (fallback to analyse_expression)."""
+        assert _parse_csv_identifiers("CLDTOT * 100") is None
+        assert _parse_csv_identifiers("PRECC + PRECL") is None
+
+    def test_split_padding_and_trimming(self):
+        """Short lists are padded; long lists are trimmed; exact length is unchanged."""
+        assert _split_positional("day, mon, ", 3) == ["day", "mon", ""]
+        assert _split_positional("a, b", 3) == ["a", "b", ""]
+        assert _split_positional("a, b, c, d", 2) == ["a", "b"]
+        assert _split_positional("", 2) == ["", ""]
+        assert _split_positional("-1.0", 1) == ["-1.0"]
+
+
 class TestReadCsvCESM:
     """Integration tests for read_csv() with the CESM model config."""
 
@@ -608,6 +639,10 @@ class TestReadCsvCESM:
         "Units",
         "Dimensions",
         "CESM Variable Name",
+        "Formula",
+        "Scale",
+        "Freq",
+        "Alias",
         "Cell Methods",
         "Regrid Method",
     ]
@@ -693,7 +728,8 @@ class TestReadCsvCESM:
                     "Table": "atmos",
                     "Units": "%",
                     "Dimensions": "time, lev, lat, lon",
-                    "CESM Variable Name": "CLOUD * 100",
+                    "CESM Variable Name": "CLOUD",
+                    "Formula": "CLOUD * 100",
                     "Cell Methods": "time: mean",
                 }
             )
@@ -727,7 +763,8 @@ class TestReadCsvCESM:
                     "Table": "atmos",
                     "Units": "%",
                     "Dimensions": "time, lev, lat, lon",
-                    "CESM Variable Name": "CLOUD * 100",
+                    "CESM Variable Name": "CLOUD",
+                    "Formula": "CLOUD * 100",
                 }
             )
         ]
@@ -765,7 +802,7 @@ class TestReadCsvCESM:
         assert len(data["variables"]) == 0
 
     def test_formula_expression(self, tmp_path):
-        """A math expression in CESM Variable Name is stored as formula."""
+        """Formula column is stored and sources are derived from CESM Variable Name."""
         rows = [
             self._row(
                 **{
@@ -773,15 +810,113 @@ class TestReadCsvCESM:
                     "Table": "atmos",
                     "Units": "%",
                     "Dimensions": "time, lat, lon",
-                    "CESM Variable Name": "CLDTOT * 100",
+                    "CESM Variable Name": "CLDTOT",
+                    "Formula": "CLDTOT * 100",
                 }
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
         var = data["variables"]["clt"]
-        print(var)
         assert var["formula"] == "CLDTOT * 100"
-        assert [v["model_var"] for v in var["sources"]] == ["CLDTOT"]
+        assert var["sources"] == [{"model_var": "CLDTOT"}]
+
+    def test_scale_from_column(self, tmp_path):
+        """Scale column is merged into the sources list as a float."""
+        rows = [
+            self._row(
+                **{
+                    "CMIP Variable Name": "evspsbl",
+                    "Table": "atmos",
+                    "Units": "kg m-2 s-1",
+                    "Dimensions": "time, lat, lon",
+                    "CESM Variable Name": "QFLX",
+                    "Scale": "-1.0",
+                }
+            )
+        ]
+        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        var = data["variables"]["evspsbl"]
+        assert var["sources"] == [{"model_var": "QFLX", "scale": -1.0}]
+
+    def test_freq_from_column(self, tmp_path):
+        """Freq column is merged positionally into the sources list."""
+        rows = [
+            self._row(
+                **{
+                    "CMIP Variable Name": "siarea",
+                    "Table": "seaIce",
+                    "Units": "m2",
+                    "Dimensions": "time",
+                    "CESM Variable Name": "siconc_d, siconc",
+                    "Freq": "day, mon",
+                }
+            )
+        ]
+        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        sources = data["variables"]["siarea"]["sources"]
+        assert sources == [
+            {"model_var": "siconc_d", "freq": "day"},
+            {"model_var": "siconc", "freq": "mon"},
+        ]
+
+    def test_alias_from_column(self, tmp_path):
+        """Alias column is merged positionally into the sources list."""
+        rows = [
+            self._row(
+                **{
+                    "CMIP Variable Name": "siarea",
+                    "Table": "seaIce",
+                    "Units": "m2",
+                    "Dimensions": "time",
+                    "CESM Variable Name": "siconc_d, siconc, tarea",
+                    "Freq": "day, mon, ",
+                    "Alias": "siconc, , ",
+                }
+            )
+        ]
+        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        sources = data["variables"]["siarea"]["sources"]
+        assert sources[0] == {"model_var": "siconc_d", "freq": "day", "alias": "siconc"}
+        assert sources[1] == {"model_var": "siconc", "freq": "mon"}
+        assert sources[2] == {"model_var": "tarea"}
+
+    def test_scale_stored_as_float(self, tmp_path):
+        """Scale values are stored as floats, not strings."""
+        rows = [
+            self._row(
+                **{
+                    "CMIP Variable Name": "pr",
+                    "Table": "atmos",
+                    "Units": "kg m-2 s-1",
+                    "Dimensions": "time, lat, lon",
+                    "CESM Variable Name": "PRECT",
+                    "Scale": "1000.0",
+                }
+            )
+        ]
+        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        scale = data["variables"]["pr"]["sources"][0]["scale"]
+        assert isinstance(scale, float)
+        assert scale == 1000.0
+
+    def test_multi_source_formula(self, tmp_path):
+        """Multiple sources in CESM Variable Name with a formula expression."""
+        rows = [
+            self._row(
+                **{
+                    "CMIP Variable Name": "pr",
+                    "Table": "atmos",
+                    "Units": "kg m-2 s-1",
+                    "Dimensions": "time, lat, lon",
+                    "CESM Variable Name": "PRECC, PRECL",
+                    "Formula": "(PRECC + PRECL) * 1000.0",
+                }
+            )
+        ]
+        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        var = data["variables"]["pr"]
+        assert var["formula"] == "(PRECC + PRECL) * 1000.0"
+        assert [s["model_var"] for s in var["sources"]] == ["PRECC", "PRECL"]
 
 
 # ── write_yaml round-trip ─────────────────────────────────────────────────────

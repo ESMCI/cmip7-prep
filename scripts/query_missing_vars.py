@@ -11,8 +11,8 @@ The output CSV contains two sections:
 2. **Missing variables** — stub rows for CMIP7-requested variables that have no
    entry in the YAML.  Metadata (long name, units, dimensions, cell methods, …)
    comes from the CMIP7 table JSON files; CESM-specific columns
-   (``CESM Variable Name``, ``Formula``, ``Sources JSON``) are left blank for
-   the user to fill in.
+   (``CESM Variable Name``, ``Formula``, ``Scale``, ``Freq``, ``Alias``) are
+   left blank for the user to fill in.
 
 Usage
 -----
@@ -27,7 +27,7 @@ Workflow
     # 1.  Generate the merged CSV
     python scripts/query_missing_vars.py --output cesm_full.csv
 
-    # 2.  Fill in CESM Variable Name / Formula / Sources JSON for new entries
+    # 2.  Fill in CESM Variable Name / Formula / Scale / Freq / Alias for new entries
 
     # 3.  Regenerate the YAML (existing variables round-trip perfectly;
     #     filled-in new ones are appended)
@@ -147,8 +147,8 @@ def _infer_levels(dims: list) -> dict:
 def table_entry_to_stub_row(bvn: str, entry: dict) -> dict:
     """Convert a CMIP7 table entry to a stub CSV row.
 
-    CESM-specific columns (``CESM Variable Name``, ``Formula``,
-    ``Sources JSON``, ``Regrid Method``) are left blank for the user to fill in.
+    CESM-specific columns (``CESM Variable Name``, ``Formula``, ``Scale``,
+    ``Freq``, ``Alias``, ``Regrid Method``) are left blank for the user to fill in.
 
     >>> entry = {"long_name": "Surface Temperature", "units": "K", "dimensions": ["longitude", "latitude", "time"], "modeling_realm": "atmos", "standard_name": "surface_temperature", "cell_methods": "time: mean", "positive": "", "_table_id": "atmos"}
     >>> row = table_entry_to_stub_row("ts_foo", entry)
@@ -181,7 +181,9 @@ def table_entry_to_stub_row(bvn: str, entry: dict) -> dict:
         "Dimensions": json.dumps(dims),
         "CESM Variable Name": "",
         "Formula": "",
-        "Sources JSON": "",
+        "Scale": "",
+        "Freq": "",
+        "Alias": "",
         "Cell Methods": entry.get("cell_methods", ""),
         "Regrid Method": "",
         "Region": "",
@@ -338,7 +340,7 @@ def main() -> None:
     if stub_rows:
         print(
             "\nNext steps:\n"
-            "  1. Fill in 'CESM Variable Name' / 'Formula' / 'Sources JSON' for new rows.\n"
+            "  1. Fill in 'CESM Variable Name' / 'Formula' / 'Scale' / 'Freq' / 'Alias' for new rows.\n"
             f"  2. python scripts/convert_csv_to_yaml.py --model cesm \\\n"
             f"         --input {output_path} --output data/cesm_to_cmip7.yaml"
         )
