@@ -2,6 +2,7 @@ import csv
 import json
 import yaml
 import re
+import sys
 import argparse
 from typing import Optional
 
@@ -32,7 +33,7 @@ MODEL_CONFIGS = {
         },
         "key_column": "Branded Variable Name",
         "column_map": {
-            "Modelling Realm-Primary": "table",
+            "Modelling Realm - Primary": "table",
             "CMIP6 Compound Name": "long_name",
             "Description": "description",
             "Units (from Physical Parameter)": "units",
@@ -40,7 +41,7 @@ MODEL_CONFIGS = {
             "NorESM3 name (dependency)": "_source_expr",
             "CMIP7 Freq.": "freq",
         },
-        "realm_column": "Modelling Realm-Primary",
+        "realm_column": "Modelling Realm - Primary",
         "keep_realms": ["atmos", "land"],
         "source_column": "NorESM3 name (dependency)",
         "source_skip_phrases": [
@@ -115,13 +116,13 @@ def should_keep(row, config):
     Filters on realm and source-column content using the model config.
 
     >>> cfg = MODEL_CONFIGS["noresm"]
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": "T2M"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": "T2M"}, cfg)
     True
-    >>> should_keep({"Modelling Realm-Primary": "ocean", "NorESM3 name (dependency)": "SST"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "ocean", "NorESM3 name (dependency)": "SST"}, cfg)
     False
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": ""}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": ""}, cfg)
     False
-    >>> should_keep({"Modelling Realm-Primary": "atmos", "NorESM3 name (dependency)": "n/a"}, cfg)
+    >>> should_keep({"Modelling Realm - Primary": "atmos", "NorESM3 name (dependency)": "n/a"}, cfg)
     False
     """
     realm_col = config["realm_column"]
@@ -131,6 +132,7 @@ def should_keep(row, config):
 
     if keep_realms is not None and row.get(realm_col) not in keep_realms:
         return False
+    print("Passed realm filter")
 
     source = row.get(source_col, "").strip()
     if not source:
@@ -328,6 +330,61 @@ def include_fates_frac(expr):
         return expr
     return f"({expr})*FATES_FRAC"
 
+def sum_dim_detect(variable):
+    """ Detect the dimension to be summed over for a variable"""
+    if variable.startswith("FATES") and variable.endswith("PF"):
+        return "fates_levpft"
+    return "lev"
+
+def parse_level_sum_formulas(expr):
+    """If the expression contains "FATES" but not "FATES_FRAC", include "FATES_FRAC" as an additional source variable."""
+    pattern = r"\([0-9:,]+\)"
+    if not re.search(pattern, expr):
+        return expr
+    expr_fix = expr
+    print(f"Found pattern {pattern} in expression: {expr}")
+    all_level_sums = re.findall(pattern, expr)
+    # TODO : proof against level sum over the same dimensions several times
+    lev_sum_found = {}
+    print(all_level_sums)
+
+    for level_sum in all_level_sums:
+        print(level_sum)
+        if level_sum not in lev_sum_found:
+            lev_sum_found[level_sum] = 0
+        else:
+            lev_sum_found[level_sum] += 1
+        print(expr.split(level_sum)[lev_sum_found[level_sum]])
+        print(expr.split(level_sum))
+        var_sum = extract_variables(expr.split(level_sum)[lev_sum_found[level_sum]])
+        print(var_sum)
+        if len(var_sum) != 1:
+            if var_sum[-1]["model_var"] == "FATES_FRAC":
+                var_sum = var_sum[-2]["model_var"]
+            else:
+                var_sum = var_sum[-1]["model_var"]    
+        else:
+            var_sum = var_sum[0]["model_var"]
+
+        print(var_sum)
+        sum_dim = sum_dim_detect(var_sum)
+        if ":" not in level_sum and "," not in level_sum:
+            sumlist = [int(level_sum.strip("()"))]
+        elif "," in level_sum:
+            sumlist = [int(x.strip()) for x in level_sum.strip("()").split(",")]
+        else:
+            start, end = level_sum.strip("()").split(":")
+            sumlist = list(range(int(start.strip()), int(end.strip()) + 1))
+        sum_expr = f"sumpft({var_sum}, pftlist={sumlist}, dim='{sum_dim}')"
+        expr_fix = expr_fix.replace(f"{var_sum}{level_sum}", sum_expr)
+    return expr_fix
+
+def perform_formula_transformations(expr):
+    """Apply any necessary transformations to the formula expression."""
+    expr = parse_level_sum_formulas(expr)
+    expr = include_fates_frac(expr)
+    return expr
+
 
 # ── read csv ──────────────────────────────────────────────────────────────────
 def _parse_csv_identifiers(value: str) -> Optional[list[str]]:
@@ -420,10 +477,9 @@ def _build_entry(row, config):
                 # Scale/Freq/Alias will be merged in post-processing.
                 entry["sources"] = [{"model_var": n} for n in names]
             else:
-                # Fallback: legacy formula expression in CESM Variable Name.
                 result = analyse_expression(value)
                 if result["is_math"]:
-                    entry["formula"] = include_fates_frac(value)
+                    entry["formula"] = perform_formula_transformations(value)
                     entry["sources"] = result["variables"]
                 else:
                     entry["sources"] = result["variables"]
@@ -508,15 +564,17 @@ def read_csv(filepath, config):
     are reconstructed into a ``variants`` list.
     """
     key_col = config["key_column"]
+    print(key_col)
 
     # First pass: collect all (name, entry) pairs, preserving order.
     all_entries = []
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-
+            #print(row)
             if not should_keep(row, config):
                 continue
+            print("keeping row")
             name = row[key_col].strip()
             if not name:
                 continue
@@ -616,6 +674,7 @@ def main():
     output_file = args.output or config["default_output"]
 
     data = read_csv(input_file, config)
+    print(data)
     write_yaml(data, output_file)
     print(f"wrote {len(data['variables'])} entries to {output_file}")
 
