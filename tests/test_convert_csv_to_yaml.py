@@ -430,9 +430,9 @@ class TestReadCsvNorESM:
         assert var["table"] == "atmos"
         assert var["long_name"] == "Near-Surface Air Temperature"
         assert var["units"] == "K"
-        assert var["sources"] == [{"model_var": "TREFHT"}]
+        assert var["sources"] == [{"model_var": "TREFHT", "freq": "mon"}]
         assert "formula" not in var
-        assert var["freq"] == "mon"
+        assert var["sources"][0]["freq"] == "mon"
 
     def test_math_formula_stored(self, tmp_path):
         """A math expression is stored as formula and sources are extracted."""
