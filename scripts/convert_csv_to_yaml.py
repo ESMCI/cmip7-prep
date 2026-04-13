@@ -51,6 +51,13 @@ MODEL_CONFIGS = {
             "IN SURF DATASET",
             "can be derived",
         ],
+        "key_column_skip_phrases": [
+            "_tpt-",
+            "_tclm-",
+            "_tclmdc-",
+            "_tminavg-",
+            "_tminavg-",
+        ],
     },
     "cesm": {
         "default_input": "cesm_data.csv",
@@ -88,6 +95,7 @@ MODEL_CONFIGS = {
         "keep_realms": None,  # keep all realms
         "source_column": "CESM Variable Name",
         "source_skip_phrases": [],
+        "key_column_skip_phrases": [],
     },
 }
 
@@ -139,6 +147,9 @@ def should_keep(row, config):
         return False
     for phrase in skip_phrases:
         if phrase in source:
+            return False
+    for phrase in config.get("key_column_skip_phrases", []):
+        if phrase in row.get(config["key_column"], ""):
             return False
     return True
 
@@ -634,6 +645,7 @@ def write_yaml(data, filepath):
         time_signifiers = [
             "_tavg-",
             "_tpt-",
+            "_tclm-",
             "_tclmdc-",
             "_ti-",
             "_tmin-",
