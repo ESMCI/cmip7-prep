@@ -9,7 +9,6 @@ variables:
     description: Time-means are weighted by the ISCCP Total Cloud Fraction - see  https://www.cfmip.org/tools-and-data/cosp.
       Values will be missing where there are no clouds or no sunlight.
     dims: [lon, lat, time]
-    freq: day
     sources: [model_var: MEANCLDALB_ISCCP, model_var: CLDTOT_ISCCP]
     table: atmos
     units: '1'
@@ -20,7 +19,6 @@ variables:
     description: This is the monthly averaged aerosol optical thickness at 550 nm
       due to stratospheric volcanic sulphate aerosols
     dims: [lon, lat, time, lambda550nm]
-    freq: mon
     long_name: Amon.aod550volso4
     sources: [model_var: AODVVOLC]
     table: atmos
@@ -32,7 +30,6 @@ variables:
       areas should be defined to enable exact calculation of global integrals (e.g.,
       of vertical fluxes of energy at the surface and top of the atmosphere).
     dims: [lon, lat]
-    freq: fx
     long_name: fx.areacella
     sources: [model_var: area]
     table: atmos
@@ -41,7 +38,6 @@ variables:
   baresoilFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by bare soil.
     dims: [lon, lat, time, typebare]
-    freq: yr
     sources: [model_var: AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -51,7 +47,6 @@ variables:
   bldep_tavg-u-hxy-u:
     description: Boundary layer depth
     dims: [lon, lat, time]
-    freq: mon
     long_name: AERmon.bldep
     sources: [model_var: PBLH]
     table: atmos
@@ -62,7 +57,6 @@ variables:
       and anthropogenic fires and those associated with anthropogenic land use change
     dims: [lon, lat, time, typeburnt]
     formula: (FATES_BURNFRAC *3600*24*30*100)*FATES_FRACTION
-    freq: mon
     long_name: Lmon.burntFractionAll
     sources: [model_var: FATES_BURNFRAC, model_var: FATES_FRACTION]
     table: land
@@ -71,9 +65,8 @@ variables:
   c3PftFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by C3 PFTs (including
       grass, crops, and trees).
-    dims: [lon, lat, time, typec3pft]
-    formula: (FATES_AREA_PLANTS-FATES_CROWNAREA_PF(14))*FATES_FRACTION
-    freq: mon
+    dims: [lon, lat, time]
+    formula: (FATES_AREA_PLANTS - sumoverpft(FATES_CROWNAREA_PF,[14],"fates_levpft"))*FATES_FRACTION
     long_name: Lmon.c3PftFrac
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -82,9 +75,8 @@ variables:
   c4PftFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by C4 PFTs (including
       grass and crops).
-    dims: [lon, lat, time, typec4pft]
-    formula: FATES_CROWNAREA_PF(14)*FATES_FRACTION
-    freq: mon
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[14],"fates_levpft")*FATES_FRACTION
     long_name: Lmon.c4PftFrac
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -94,7 +86,6 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.cLand
     sources: [model_var: TOTECOSYSC]
     table: land
@@ -103,9 +94,9 @@ variables:
   cLeaf_tavg-u-hxy-lnd:
     description: Carbon mass per unit area in leaves.
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_LEAFC)*FATES_FRACTION
     long_name: Lmon.cLeaf
-    sources: [model_var: FATES_LEAFC]
+    sources: [model_var: FATES_LEAFC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
@@ -114,9 +105,9 @@ variables:
       dead organic matter composed of coarse wood. It is distinct from fine litter.
       The precise distinction between "fine" and "coarse" is model dependent.'
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_LITTER_BG_CWD_EL)*FATES_FRACTION
     long_name: Emon.cLitterCwd
-    sources: [model_var: FATES_LITTER_BG_CWD_EL]
+    sources: [model_var: FATES_LITTER_BG_CWD_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
@@ -124,7 +115,6 @@ variables:
     description: subsurface litter pool fed by root inputs.
     dims: [lon, lat, time]
     formula: (FATES_LITTER_BG_FINE_EL + FATES_LITTER_BG_CWD_EL)*FATES_FRACTION
-    freq: mon
     long_name: Emon.cLitterSubSurf
     sources: [model_var: FATES_LITTER_BG_FINE_EL, model_var: FATES_LITTER_BG_CWD_EL,
       model_var: FATES_FRACTION]
@@ -135,18 +125,18 @@ variables:
     description: Surface or near-surface litter pool fed by leaf and above-ground
       litterfall
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_LITTER_AG_FINE_EL)*FATES_FRACTION
     long_name: Emon.cLitterSurf
-    sources: [model_var: FATES_LITTER_AG_FINE_EL]
+    sources: [model_var: FATES_LITTER_AG_FINE_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
   cOther_tavg-u-hxy-lnd:
     description: E.g. fruits, seeds, etc.
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_SEED_BANK)*FATES_FRACTION
     long_name: Emon.cOther
-    sources: [model_var: FATES_SEED_BANK]
+    sources: [model_var: FATES_SEED_BANK, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
@@ -158,9 +148,8 @@ variables:
       timber for construction, and crop harvest for food or fuel. Does NOT include
       residue which is deposited into soil or litter; end of year values (not annual
       mean).
-    dims: [lon, lat, landuse, time1]
+    dims: [lon, lat, fates_levlanduse, time1]
     formula: CROPPROD1C+TOT_WOODPRODC
-    freq: yr
     long_name: Eyr.cProductLut
     sources: [model_var: CROPPROD1C, model_var: TOT_WOODPRODC]
     table: land
@@ -171,7 +160,6 @@ variables:
       through  land use change.
     dims: [lon, lat, time]
     formula: CROPPROD1C+TOT_WOODPRODC
-    freq: mon
     long_name: Lmon.cProduct
     sources: [model_var: CROPPROD1C, model_var: TOT_WOODPRODC]
     table: land
@@ -181,9 +169,8 @@ variables:
     description: For models with multiple soil carbon pools, report each pool here.
       If models also have vertical discretisation these should be aggregated
     dims: [lon, lat, soilpools, time]
-    freq: mon
     long_name: Emon.cSoilPools
-    sources: [model_var: SOIL1C, model_var: SOIL2C, model_var: SOIL3C, model_var: SOIL4C]
+    sources: [{model_var: 'SOIL1C,SOIL2C,SOIL3C,SOIL4C'}]
     table: land
     units: kg m-2
 
@@ -191,7 +178,6 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     dims: [lon, lat, time, sdepth100cm]
-    freq: mon
     long_name: Emon.cSoilAbove1m
     sources: [model_var: TOTSOMC_1m]
     table: land
@@ -202,7 +188,6 @@ variables:
       soil carbon for each level
     dims: [lon, lat, sdepth, time]
     formula: SOIL1C_vr+SOIL2C_vr+SOIL3C_vr+SOIL4C_vr
-    freq: mon
     long_name: Emon.cSoilLevels
     sources: [model_var: SOIL1C_vr, model_var: SOIL2C_vr, model_var: SOIL3C_vr,
       model_var: SOIL4C_vr]
@@ -212,7 +197,6 @@ variables:
   cSoil_tavg-u-hxy-lnd:
     description: Carbon mass in the full depth of the soil model.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.cSoil
     sources: [model_var: TOTSOMC]
     table: land
@@ -221,18 +205,18 @@ variables:
   cStem_tavg-u-hxy-lnd:
     description: including sapwood and hardwood.
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_STRUCTC)*FATES_FRACTION
     long_name: Emon.cStem
-    sources: [model_var: FATES_STRUCTC]
+    sources: [model_var: FATES_STRUCTC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
   cVegLut_tpt-u-hxy-multi:
     description: end of year values (not annual mean)
-    dims: [lon, lat, landuse, time1]
-    freq: yr
+    dims: [lon, lat, fates_levlanduse, time1]
+    formula: (FATES_VEGC_LU)*FATES_FRACTION
     long_name: Eyr.cVegLut
-    sources: [model_var: FATES_VEGC_LU]
+    sources: [model_var: FATES_VEGC_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
@@ -240,7 +224,6 @@ variables:
     description: Carbon mass per unit area in vegetation.
     dims: [lon, lat, time]
     formula: FATES_VEGC *FATES_FRACTION
-    freq: mon
     long_name: Lmon.cVeg
     sources: [model_var: FATES_VEGC, model_var: FATES_FRACTION]
     table: land
@@ -251,8 +234,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (FATES_VEGC_PF(12:14))*FATES_FRACTION
-    freq: mon
+    formula: sumoverpft(FATES_VEGC_PF, [12,13,14], "fates_levpft) * FATES_FRACTION
     long_name: Emon.cVegGrass
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
@@ -263,8 +245,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (FATES_VEGC_PF(7:11))*FATES_FRACTION
-    freq: mon
+    formula: sumovertpft(FATES_VEGC_PF, [7,8,9,10,11], "fates_levpft)*FATES_FRACTION
     long_name: Emon.cVegShrub
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
@@ -275,8 +256,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (FATES_VEGC_PF(1:6))*FATES_FRACTION
-    freq: mon
+    formula: sumoverpft(FATES_VEGC_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION
     long_name: Emon.cVegTree
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
@@ -285,7 +265,6 @@ variables:
   cfadDbze94_tavg-h40-hxy-air:
     description: CloudSat Radar Reflectivity
     dims: [lon, lat, alt40, dbze, time]
-    freq: mon
     long_name: Emon.cfadDbze94
     sources: [model_var: CFAD_DBZE94_CS]
     table: atmos
@@ -294,7 +273,6 @@ variables:
   cfadLidarsr532_tavg-h40-hxy-air:
     description: CALIPSO Scattering Ratio
     dims: [lon, lat, alt40, scatratio, time]
-    freq: mon
     long_name: Emon.cfadLidarsr532
     sources: [model_var: CFAD_SR532_CAL]
     table: atmos
@@ -303,7 +281,6 @@ variables:
   cl_tavg-al-hxy-u:
     description: Includes both large-scale and convective cloud.
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: CLOUD]
@@ -314,7 +291,6 @@ variables:
   cl_tpt-al-hs-u:
     description: Includes both large-scale and convective cloud.
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.cl
@@ -325,7 +301,6 @@ variables:
   clcalipso_tavg-220hPa-hxy-air:
     description: Percentage cloud cover in layer centred on 220hPa
     dims: [lon, lat, time, p220]
-    freq: day
     sources: [model_var: CLDGHG_CAL]
     table: atmos
     units: '%'
@@ -334,7 +309,6 @@ variables:
   clcalipso_tavg-560hPa-hxy-air:
     description: Percentage cloud cover in layer centred on 560hPa
     dims: [lon, lat, time, p560]
-    freq: day
     sources: [model_var: CLDMED_CAL]
     table: atmos
     units: '%'
@@ -343,7 +317,6 @@ variables:
   clcalipso_tavg-840hPa-hxy-air:
     description: Percentage cloud cover in layer centred on 840hPa
     dims: [lon, lat, time, p840]
-    freq: day
     sources: [model_var: CLDLOW_CAL]
     table: atmos
     units: '%'
@@ -352,7 +325,6 @@ variables:
   clcalipsoice_tavg-h40-hxy-air:
     description: CALIPSO Ice Cloud Fraction
     dims: [lon, lat, alt40, time]
-    freq: mon
     long_name: Emon.clcalipsoice
     sources: [model_var: CLDTOT_CAL_ICE]
     table: atmos
@@ -361,7 +333,6 @@ variables:
   clcalipsoliq_tavg-h40-hxy-air:
     description: CALIPSO Liquid Cloud Fraction
     dims: [lon, lat, alt40, time]
-    freq: mon
     long_name: Emon.clcalipsoliq
     sources: [model_var: CLDTOT_CAL_LIQ]
     table: atmos
@@ -374,7 +345,6 @@ variables:
       ONLY if the precipitating hydrometeors affect the calculation of radiative transfer
       in model.
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: CLDICE]
@@ -389,7 +359,6 @@ variables:
       if the precipitating hydrometeors affect the calculation of radiative transfer
       in model.
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.cli
@@ -400,7 +369,6 @@ variables:
   climodis_tavg-u-hxy-u:
     description: MODIS Ice Cloud Fraction
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.climodis
     sources: [model_var: CLIMODIS]
     table: atmos
@@ -409,7 +377,6 @@ variables:
   clisccp_tavg-p7c-hxy-air:
     description: Percentage cloud cover in optical depth categories.
     dims: [lon, lat, plev7c, tau, time]
-    freq: day
     sources: [model_var: FISCCP1_COSP]
     table: atmos
     units: '%'
@@ -421,7 +388,6 @@ variables:
       frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
       of radiative transfer in model.
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: TGCLDIWP]
     table: atmos
     units: kg m-2
@@ -433,7 +399,6 @@ variables:
       frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
       of radiative transfer in model.
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.clivi
     sources: [model_var: TGCLDIWP]
     table: atmos
@@ -445,7 +410,6 @@ variables:
       frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
       of radiative transfer in model.
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.clivi
     sources: [model_var: TGCLDIWP]
     table: atmos
@@ -454,7 +418,6 @@ variables:
   clt_tavg-u-hxy-lnd:
     description: Total cloud fraction
     dims: [lon, lat, time]
-    freq: day
     long_name: Eday.clt
     sources: [model_var: CLDTOT]
     table: atmos
@@ -465,7 +428,6 @@ variables:
       top of the atmosphere. Include both large-scale and convective cloud.  This
       is a 3-hour mean.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -476,7 +438,6 @@ variables:
     description: for the whole atmospheric column, as seen from the surface or the
       top of the atmosphere. Include both large-scale and convective cloud.
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.clt
     sources: [model_var: CLDTOT]
     table: atmos
@@ -486,7 +447,6 @@ variables:
     description: for the whole atmospheric column, as seen from the surface or the
       top of the atmosphere. Include both large-scale and convective cloud.
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.clt
     sources: [model_var: CLDTOT]
     table: atmos
@@ -496,7 +456,6 @@ variables:
     description: Convective cloud fraction
     dims: [lon, lat, time]
     formula: CONCLD*100
-    freq: mon
     long_name: AERmon.cltc
     sources: [model_var: CONCLD]
     table: atmos
@@ -508,7 +467,6 @@ variables:
       Satellite Observation (CALIPSO) instrument. Includes both large-scale and convective
       cloud.
     dims: [lon, lat, time]
-    freq: day
     sources: [model_var: CLDTOT_CAL]
     table: atmos
     units: '%'
@@ -517,7 +475,6 @@ variables:
   cltcalipso_tpt-u-hxy-u:
     description: CALIPSO Total Cloud Fraction
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: E3hrPt.cltcalipso
     sources: [model_var: CLDTOT_CAL]
     table: atmos
@@ -529,7 +486,6 @@ variables:
       Project (ISCCP) analysis. Includes both large-scale and convective cloud.  (MODIS).
       Includes both large-scale and convective cloud.
     dims: [lon, lat, time]
-    freq: day
     sources: [model_var: CLDTOT_ISCCP]
     table: atmos
     units: '%'
@@ -538,7 +494,6 @@ variables:
   cltmodis_tavg-u-hxy-u:
     description: Percentage of total cloud cover as seen by the MODIS instrument simulator.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.cltmodis
     sources: [model_var: CLTMODIS]
     table: atmos
@@ -551,7 +506,6 @@ variables:
       ONLY if the precipitating hydrometeors affect the calculation of radiative transfer
       in model.
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: CLDLIQ]
@@ -566,7 +520,6 @@ variables:
       ONLY if the precipitating hydrometeors affect the calculation of radiative transfer
       in model.
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.clw
@@ -577,7 +530,6 @@ variables:
   clwmodis_tavg-u-hxy-u:
     description: MODIS Liquid Cloud Fraction
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.clwmodis
     sources: [model_var: CLWMODIS]
     table: atmos
@@ -589,7 +541,6 @@ variables:
       Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
       the calculation of radiative transfer in model.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Amon.clwvi
     sources: [model_var: TGCLDCWP]
     table: atmos
@@ -598,9 +549,9 @@ variables:
   cnc_tavg-u-hxy-u:
     description: Canopy covered fraction
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_AREA_PLANTS)*FATES_FRACTION
     long_name: Emon.cnc
-    sources: [model_var: FATES_AREA_PLANTS]
+    sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -608,7 +559,6 @@ variables:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: AERmon.co2
@@ -620,7 +570,6 @@ variables:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
     dims: [lon, lat, plev19, time]
-    freq: mon
     long_name: Amon.co2
     sources: [model_var: CO2]
     table: atmos
@@ -630,7 +579,6 @@ variables:
     description: Total atmospheric mass of Carbon Dioxide
     dims: [time]
     formula: co2vmr*1.5172413793
-    freq: mon
     long_name: Amon.co2mass
     sources: [model_var: co2vmr]
     table: atmos
@@ -638,20 +586,18 @@ variables:
 
   cropFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by crop.
-    dims: [lon, lat, time, typecrop]
-    freq: yr
+    dims: [lon, lat, time]
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: (FATES_PATCHAREA_LU(5))*FATES_FRACTION, long_name: Eyr.cropFrac},
-      {formula: (FATES_PATCHAREA_LU(5))*FATES_FRACTION, long_name: Lmon.cropFrac}]
+    variants: [{formula: 'sumoverpft(FATES_PATCHAREA_LU,[5],"fates_levlanduse")*FATES_FRACTION', long_name: Eyr.cropFrac},
+               {formula: 'sumoverpft(FATES_PATCHAREA_LU,[5],"fates_levlanduse")*FATES_FRACTION', long_name: Lmon.cropFrac}]
 
   depthsl_ti-u-hxy-u:
     description: Total (cumulative) thickness of all soil layers. This is the sum
       of individual thicknesses of all soil layers.
     dims: [lon, lat]
     formula: sum(DZSOI)
-    freq: fx
     long_name: fx.depthsl
     sources: [model_var: DZSOI]
     table: land
@@ -661,7 +607,6 @@ variables:
     description: The flux due to conversion of liquid or solid water into vapor at
       the surface where there is snow on land
     dims: [lon, lat, time]
-    freq: day
     long_name: Eday.esn
     sources: [model_var: QSNOEVAP]
     table: land
@@ -673,7 +618,6 @@ variables:
       to vapor (from underlying surface and vegetation)'
     dims: [lon, lat, time]
     formula: QVEGT+QVEGE+QSOIL
-    freq: day
     long_name: Eday.evspsbl
     sources: [model_var: QVEGT, model_var: QVEGE, model_var: QSOIL]
     table: atmos
@@ -683,7 +627,6 @@ variables:
     description: at surface; flux of water into the atmosphere due to conversion of
       both liquid and solid phases to vapor (from underlying surface and vegetation)
     dims: [lon, lat, time]
-    freq: mon
     long_name: Amon.evspsbl
     sources: [model_var: QFLX]
     table: atmos
@@ -693,7 +636,6 @@ variables:
     description: at surface; flux of water into the atmosphere due to conversion of
       both liquid and solid phases to vapor (from underlying surface and vegetation)
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.evspsbl
     sources: [model_var: QFLX]
     table: atmos
@@ -702,7 +644,6 @@ variables:
   evspsblsoi_tavg-u-hxy-lnd:
     description: includes sublimation.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Lmon.evspsblsoi
     sources: [model_var: QSOIL]
     table: land
@@ -711,7 +652,6 @@ variables:
   evspsblsoi_tavg-u-hxy-u:
     description: Water evaporation from soil
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: QSOIL]
     table: land
     units: kg m-2 s-1
@@ -720,7 +660,6 @@ variables:
   evspsblveg_tavg-u-hxy-lnd:
     description: the canopy evaporation+sublimation (if present in model).
     dims: [lon, lat, time]
-    freq: mon
     long_name: Lmon.evspsblveg
     sources: [model_var: QVEGE]
     table: land
@@ -729,7 +668,6 @@ variables:
   evspsblveg_tavg-u-hxy-u:
     description: Evaporation from canopy
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: QVEGE]
     table: land
     units: kg m-2 s-1
@@ -739,7 +677,6 @@ variables:
     description: The fixation (uptake of nitrogen gas directly from the atmosphere)
       of nitrogen due to biological processes.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.fBNF
     sources: [model_var: NFIX_TO_SMINN]
     table: land
@@ -750,7 +687,6 @@ variables:
       its way into ocean should be reported here.
     dims: [lon, lat, time]
     formula: SOM_C_LEACHED *1000
-    freq: mon
     long_name: Emon.fCLandToOcean
     sources: [model_var: SOM_C_LEACHED]
     table: land
@@ -763,7 +699,6 @@ variables:
       to compare deforested biomass across models.
     dims: [lon, lat, time]
     formula: DWT_CROPPROD1C_GAIN+DWT_WOODPRODC_GAIN
-    freq: mon
     long_name: Emon.fDeforestToProduct
     sources: [model_var: DWT_CROPPROD1C_GAIN, model_var: DWT_WOODPRODC_GAIN]
     table: land
@@ -773,18 +708,18 @@ variables:
     description: From all sources,  Including natural, anthropogenic and Land-use
       change. Only total fire emissions can be compared to observations.
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
     long_name: Emon.fFireAll
-    sources: [model_var: FATES_FIRE_CLOSS]
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
   fFireNat_tavg-u-hxy-lnd:
     description: CO2 emissions from natural fires
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
     long_name: Emon.fFireNat
-    sources: [model_var: FATES_FIRE_CLOSS]
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -794,26 +729,26 @@ variables:
       any CO2 flux from fire included in fLuc, defined below (CO2 Flux to Atmosphere
       from Land Use Change).
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
     long_name: Lmon.fFire
-    sources: [model_var: FATES_FIRE_CLOSS]
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: up
 
   fLitterSoil_tavg-u-hxy-lnd:
     description: Carbon mass flux per unit area into soil from litter (dead plant
       material in or above the soil).
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_LITTER_OUT_EL)*FATES_FRACTION
     long_name: Lmon.fLitterSoil
-    sources: [model_var: FATES_LITTER_OUT_EL]
+    sources: [model_var: FATES_LITTER_OUT_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
   fLuc_tavg-u-hxy-lnd:
     description: Net Carbon Mass Flux into Atmosphere due to Land Use Change
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.fLuc
     sources: [model_var: LAND_USE_FLUX]
     table: land
@@ -824,8 +759,7 @@ variables:
       the atmosphere due to any land-use or land-cover change activities.  Include
       carbon transferred due to deforestation or agricultural directly into atmosphere,
       and  emissions form anthropogenic pools into atmosphere
-    dims: [lon, lat, landuse, time]
-    freq: mon
+    dims: [lon, lat, fates_levlanduse, time]
     long_name: Emon.fLulccAtmLut
     sources: [model_var: DWT_CONV_CFLUX]
     table: land
@@ -837,7 +771,6 @@ variables:
       soil), soil.
     dims: [lon, lat, time]
     formula: F_N2O_DENIT+F_N2O_NIT
-    freq: mon
     long_name: Emon.fN2O
     sources: [model_var: F_N2O_DENIT, model_var: F_N2O_NIT]
     table: land
@@ -847,7 +780,6 @@ variables:
     description: leached nitrogen etc that goes into run off or river routing and
       finds its way into ocean should be reported here.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.fNLandToOcean
     sources: [model_var: SMIN_NO3_LEACHED]
     table: land
@@ -866,7 +798,6 @@ variables:
       "Litter" is dead plant material in or above the soil.
     dims: [lon, lat, time]
     formula: SMIN_NO3_LEACHED+SMIN_NO3_RUNOFF
-    freq: mon
     long_name: Emon.fNOx
     sources: [model_var: SMIN_NO3_LEACHED, model_var: SMIN_NO3_RUNOFF]
     table: land
@@ -879,7 +810,6 @@ variables:
       to compare deforested biomass across models.
     dims: [lon, lat, time]
     formula: DWT_WOODPRODN_GAIN + DWT_CROPPROD1N_GAIN
-    freq: mon
     long_name: Emon.fNProduct
     sources: [model_var: DWT_WOODPRODN_GAIN, model_var: DWT_CROPPROD1N_GAIN]
     table: land
@@ -888,7 +818,6 @@ variables:
   fNdep_tavg-u-hxy-lnd:
     description: Surface deposition rate of nitrogen.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.fNdep
     sources: [model_var: NDEP_TO_SMINN]
     table: land
@@ -897,7 +826,6 @@ variables:
   fNgasFire_tavg-u-hxy-lnd:
     description: Flux of Nitrogen from the land into the atmosphere due to fire
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.fNgasFire
     sources: [model_var: COL_FIRE_NLOSS]
     table: land
@@ -908,7 +836,6 @@ variables:
       other than fire
     dims: [lon, lat, time]
     formula: DENIT+F_N2O_NIT
-    freq: mon
     long_name: Emon.fNgasNonFire
     sources: [model_var: DENIT, model_var: F_N2O_NIT]
     table: land
@@ -918,7 +845,6 @@ variables:
     description: Total flux of Nitrogen from the land into the atmosphere.
     dims: [lon, lat, time]
     formula: DENIT+F_N2O_NIT+COL_FIRE_NLOSS
-    freq: mon
     long_name: Emon.fNgas
     sources: [model_var: DENIT, model_var: F_N2O_NIT, model_var: COL_FIRE_NLOSS]
     table: land
@@ -934,7 +860,6 @@ variables:
       specified, "runoff" refers to the sum of surface runoff and subsurface drainage.
     dims: [lon, lat, time]
     formula: SMIN_NO3_LEACHED+ SMIN_NO3_RUNOFF
-    freq: mon
     long_name: Emon.fNleach
     sources: [model_var: SMIN_NO3_LEACHED, model_var: SMIN_NO3_RUNOFF]
     table: land
@@ -944,7 +869,6 @@ variables:
     description: Not all models split losses into gaseous and leaching
     dims: [lon, lat, time]
     formula: DENIT+ F_N2O_NIT+ SMIN_NO3_LEACHED + SMIN_NO3_RUNOFF
-    freq: mon
     long_name: Emon.fNloss
     sources: [model_var: DENIT, model_var: F_N2O_NIT, model_var: SMIN_NO3_LEACHED,
       model_var: SMIN_NO3_RUNOFF]
@@ -958,7 +882,6 @@ variables:
       and releases energy. Immobilisation of nitrogen refers to retention of nitrogen
       by micro-organisms under certain conditions, making it unavailable for plants.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.fNnetmin
     sources: [model_var: NET_NMIN]
     table: land
@@ -973,7 +896,6 @@ variables:
       when the products decompose in landfill sites.
     dims: [lon, lat, time]
     formula: TOT_WOODPRODC_LOSS+CROPPROD1C_LOSS
-    freq: mon
     long_name: Emon.fProductDecomp
     sources: [model_var: TOT_WOODPRODC_LOSS, model_var: CROPPROD1C_LOSS]
     table: land
@@ -983,9 +905,9 @@ variables:
     description: Required for unambiguous separation of vegetation and soil + litter
       turnover times, since total fire flux draws from both sources
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
     long_name: Emon.fVegFire
-    sources: [model_var: FATES_FIRE_CLOSS]
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -994,7 +916,6 @@ variables:
       from changing allocation versus changing mortality
     dims: [lon, lat, time]
     formula: (FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
-    freq: mon
     long_name: Emon.fVegLitterMortality
     sources: [model_var: FATES_MORTALITY_CFLUX_CANOPY, model_var: FATES_MORTALITY_CFLUX_USTORY,
       model_var: FATES_FRACTION]
@@ -1006,7 +927,6 @@ variables:
       from changing allocation versus changing mortality
     dims: [lon, lat, time]
     formula: (FATES_LITTER_IN_EL-FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
-    freq: mon
     long_name: Emon.fVegLitterSenescence
     sources: [model_var: FATES_LITTER_IN_EL, model_var: FATES_MORTALITY_CFLUX_CANOPY,
       model_var: FATES_MORTALITY_CFLUX_USTORY, model_var: FATES_FRACTION]
@@ -1022,9 +942,9 @@ variables:
       standard names mass_flux_of_carbon_into_litter_from_vegetation_due_to_mortality
       and mass_flux_of_carbon_into_litter_from_vegetation_due_to_senescence is mass_flux_of_carbon_into_litter_from_vegetation.
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_LITTER_IN_EL)*FATES_FRACTION
     long_name: Lmon.fVegLitter
-    sources: [model_var: FATES_LITTER_IN_EL]
+    sources: [model_var: FATES_LITTER_IN_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -1033,7 +953,6 @@ variables:
       from changing allocation versus changing mortality
     dims: [lon, lat, time]
     formula: (FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
-    freq: mon
     long_name: Emon.fVegSoilMortality
     sources: [model_var: FATES_MORTALITY_CFLUX_CANOPY, model_var: FATES_MORTALITY_CFLUX_USTORY,
       model_var: FATES_FRACTION]
@@ -1042,10 +961,10 @@ variables:
   fracInLut_tsum-u-hxy-lnd:
     description: Cumulative percentage transitions over the year; note that percentage
       should be reported as a percentage of atmospheric grid cell
-    dims: [lon, lat, landuse, time]
-    freq: yr
+    dims: [lon, lat, fates_levlanduse, time]
+    formula: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
     long_name: Eyr.fracInLut
-    sources: [model_var: FATES_TRANSITION_MATRIX_LULU]
+    sources: [model_var: FATES_TRANSITION_MATRIX_LULU, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -1054,19 +973,20 @@ variables:
       be reported as percentage of land grid cell (example: frac_lnd = 0.5, frac_ocn
       = 0.5, frac_crop_lnd = 0.2 (of land portion of grid cell), then frac_lut(crop)
       = 0.5*0.2 = 0.1)'
-    dims: [lon, lat, landuse, time1]
-    freq: mon
-    sources: [model_var: PCT_LANDUNIT]
+    dims: [lon, lat, fates_levlanduse, time1]
+    sources: [model_var: FATEs_PATCHAREA_LU, model_var: PCT_LANDUNIT]
     table: land
     units: '%'
-    variants: [{long_name: Emon.fracLut}, {long_name: Eyr.fracLut}]
+    variants: [{long_name: Emon.fracLut}, {formula: (FATES_PATCHAREA_LU)*FATES_FRACTION,
+        long_name: Eyr.fracLut}]
+
   fracOutLut_tsum-u-hxy-lnd:
     description: Cumulative percentage transitions over the year; note that percentage
       should be reported as percentage of atmospheric grid cell
-    dims: [lon, lat, landuse, time]
-    freq: yr
+    dims: [lon, lat, fates_levlanduse, time]
+    formula: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
     long_name: Eyr.fracOutLut
-    sources: [model_var: FATES_TRANSITION_MATRIX_LULU]
+    sources: [model_var: FATES_TRANSITION_MATRIX_LULU, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -1076,10 +996,10 @@ variables:
       photosynthesis in plants or phytoplankton. The producers also respire some of
       this biomass and the difference is referred to as the net primary production.
       Reported on land-use tiles.
-    dims: [lon, lat, landuse, time]
-    freq: mon
+    dims: [lon, lat, fates_levlanduse, time]
+    formula: (FATES_GPP_LU)*FATES_FRACTION
     long_name: Emon.gppLut
-    sources: [model_var: FATES_GPP_LU]
+    sources: [model_var: FATES_GPP_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -1089,17 +1009,16 @@ variables:
       photosynthesis in plants or phytoplankton. The producers also respire some of
       this biomass and the difference is referred to as the net primary production.
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_GPP)*FATES_FRACTION
     long_name: Lmon.gpp
-    sources: [model_var: FATES_GPP]
+    sources: [model_var: FATES_GPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
   gpp_tavg-u-hxy-ng:
     description: Total GPP of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(12:14))*FATES_FRACTION
-    freq: mon
+    formula: sumoverpft(FATES_GPP_PF,[12,13,14],"fates_levpft")*FATES_FRACTION
     long_name: Emon.gppGrass
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1108,8 +1027,7 @@ variables:
   gpp_tavg-u-hxy-shb:
     description: Total GPP of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(7:11))*FATES_FRACTION
-    freq: mon
+    formula: sumoverpft(FATES_GPP_PF,[7,8,9,10,11],"fates_levpft")*FATES_FRACTION
     long_name: Emon.gppShrub
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1118,8 +1036,7 @@ variables:
   gpp_tavg-u-hxy-tree:
     description: Total GPP of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(1:6))*FATES_FRACTION
-    freq: mon
+    formula: sumoverpft(FATES_GPP_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION
     long_name: Emon.gppTree
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -1127,9 +1044,8 @@ variables:
 
   grassFracC3_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C3 natural grass.
-    dims: [lon, lat, time, typec3natg]
-    formula: (FATES_CROWNAREA_PF(12+13))*FATES_FRACTION
-    freq: mon
+    dims: [lon, lat, time]
+    formula: (sumoverpft(FATES_CROWNAREA_PF,[12,13],"fates_levpft"))*FATES_FRACTION
     long_name: Emon.grassFracC3
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -1137,9 +1053,8 @@ variables:
 
   grassFracC4_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C4 natural grass.
-    dims: [lon, lat, time, typec4natg]
-    formula: (FATES_CROWNAREA_PF(14))*FATES_FRACTION
-    freq: mon
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[14],"fates_levpft")*FATES_FRACTION
     long_name: Emon.grassFracC4
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -1147,18 +1062,16 @@ variables:
 
   grassFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell that is covered by natural grass.
-    dims: [lon, lat, time, typenatgr]
-    freq: yr
+    dims: [lon, lat, time]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: 'FATES_CROWNAREA_PF(12:14) *FATES_FRACTION', long_name: Eyr.grassFrac},
-      {formula: 'ATES_CROWNAREA_PF(12:14)*FATES_FRACTION', long_name: Lmon.grassFrac}]
+    variants: [{formula: 'sumoverpft(FATES_CROWNAREA_PF,[12,13,14],"fates_levpft")*FATES_FRACTION', long_name: Eyr.grassFrac},
+               {formula: 'sumoverpft(FATES_CROWNAREA_PF,[12,13,14],"fates_levpft")*FATES_FRACTION', long_name: Lmon.grassFrac}]
 
   hfdsl_tavg-u-hxy-lnd:
     description: Ground heat flux at 3hr
     dims: [lon, lat, time]
-    freq: 3hr
     long_name: 3hr.hfdsl
     sources: [model_var: FGR]
     table: land
@@ -1167,7 +1080,6 @@ variables:
   hfls_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: LHFLX]
     table: atmos
     units: W m-2
@@ -1176,7 +1088,6 @@ variables:
   hfls_tpt-u-hs-u:
     description: includes both evaporation and sublimation
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.hfls
     sources: [model_var: LHFLX]
     table: atmos
@@ -1185,7 +1096,6 @@ variables:
   hfss_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
@@ -1195,7 +1105,6 @@ variables:
     description: The surface sensible heat flux, also called turbulent heat flux,
       is the exchange of heat between the surface and the air by motion of air.
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.hfss
     sources: [model_var: SHFLX]
     table: atmos
@@ -1205,7 +1114,6 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, lev, time]
-    freq: day
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: RELHUM]
@@ -1217,9 +1125,8 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, plev19, time]
-    freq: mon
     long_name: Amon.hur
-    sources: [model_var: RELHUM, model_var: RHW]
+    sources: [{model_var: 'RELHUM,RHW'}]
     table: atmos
     units: '%'
 
@@ -1227,7 +1134,6 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, plev19, time]
-    freq: day
     long_name: day.hur
     sources: [model_var: RELHUM]
     table: atmos
@@ -1237,7 +1143,6 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.hur
@@ -1249,7 +1154,6 @@ variables:
     description: The relative humidity with respect to liquid water for T> 0 C, and
       with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
-    freq: 6hr
     sources: [model_var: RHREFHT]
     table: atmos
     units: '%'
@@ -1259,7 +1163,6 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
-    freq: day
     long_name: day.hursmax
     sources: [{model_var: 'X: RHREFHT'}]
     table: atmos
@@ -1269,7 +1172,6 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [site, time1, height2m]
-    freq: subhr
     long_name: CFsubhr.hurs
     sources: [model_var: RHREFHT]
     table: atmos
@@ -1279,7 +1181,6 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time1, height2m]
-    freq: 3hr
     long_name: CF3hr.hurs
     sources: [model_var: RHREFHT]
     table: atmos
@@ -1289,7 +1190,6 @@ variables:
     description: Specific humidity is the mass fraction of water vapor in (moist)
       air.
     dims: [lon, lat, lev, time]
-    freq: day
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: Q]
@@ -1301,7 +1201,6 @@ variables:
     description: Specific humidity is the mass fraction of water vapor in (moist)
       air.
     dims: [lon, lat, plev19, time]
-    freq: mon
     sources: [model_var: Q]
     table: atmos
     units: '1'
@@ -1311,7 +1210,6 @@ variables:
     description: Specific humidity is the mass fraction of water vapor in (moist)
       air.
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.hus
@@ -1323,7 +1221,6 @@ variables:
     description: Specific humidity is the mass fraction of water vapor in (moist)
       air.
     dims: [lon, lat, lev, time1]
-    freq: 6hr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: Q]
@@ -1334,7 +1231,6 @@ variables:
   huss_tavg-h2m-hxy-u:
     description: Near-surface (usually, 2 meter) specific humidity.
     dims: [lon, lat, time, height2m]
-    freq: mon
     sources: [model_var: QREFHT]
     table: atmos
     units: '1'
@@ -1343,7 +1239,6 @@ variables:
   huss_tpt-h2m-hs-u:
     description: Near-surface (usually, 2 meter) specific humidity.
     dims: [site, time1, height2m]
-    freq: subhr
     long_name: CFsubhr.huss
     sources: [model_var: QREFHT]
     table: atmos
@@ -1352,7 +1247,6 @@ variables:
   huss_tpt-h2m-hxy-u:
     description: This is sampled synoptically.
     dims: [lon, lat, time1, height2m]
-    freq: 3hr
     long_name: 3hr.huss
     sources: [model_var: QREFHT]
     table: atmos
@@ -1362,11 +1256,11 @@ variables:
     description: A ratio obtained by dividing the total upper leaf surface area of
       vegetation by the (horizontal) surface area of the land on which it grows.
     dims: [lon, lat, time]
-    freq: day
-    sources: [model_var: FATES_LAI]
+    sources: [model_var: FATES_LAI, model_var: FATES_FRACTION]
     table: land
     units: '1'
-    variants: [{long_name: Eday.lai}, {long_name: Lmon.lai}]
+    variants: [{formula: (FATES_LAI)*FATES_FRACTION, long_name: Eday.lai}, {formula: (FATES_LAI)*FATES_FRACTION,
+        long_name: Lmon.lai}]
 
   landCoverFrac_tavg-u-hxy-u:
     description: The categories may differ from model to model, depending on their  PFT
@@ -1374,7 +1268,6 @@ variables:
       lakes, urban areas, etc.   Sum of all should equal the fraction of the grid-cell
       that is land.
     dims: [lon, lat, vegtype, time]
-    freq: mon
     long_name: Lmon.landCoverFrac
     sources: [model_var: PCT_LANDUNIT]
     table: land
@@ -1384,7 +1277,6 @@ variables:
     description: The total dry mass of black carbon aerosol particles per unit area.
     dims: [lon, lat, time]
     formula: BC_A+BC_AC+BC_AI+BC_AX+BC_N+BC_NI
-    freq: day
     long_name: Eday.loadbc
     sources: [model_var: BC_A, model_var: BC_AC, model_var: BC_AI, model_var: BC_AX,
       model_var: BC_N, model_var: BC_NI]
@@ -1395,7 +1287,6 @@ variables:
     description: The total dry mass of dust aerosol particles per unit area.
     dims: [lon, lat, time]
     formula: DST_A2+DST_A3
-    freq: day
     long_name: Eday.loaddust
     sources: [model_var: DST_A2, model_var: DST_A3]
     table: atmos
@@ -1405,7 +1296,6 @@ variables:
     description: The total dry mass of sulfate aerosol particles per unit area.
     dims: [lon, lat, time]
     formula: SO4_A1*3+SO4_A2*3+SO4_AC*3+SO4_N*3+SO4_NA*3+SO4_PR*3
-    freq: day
     long_name: Eday.loadso4
     sources: [model_var: SO4_A1, model_var: SO4_A2, model_var: SO4_AC, model_var: SO4_N,
       model_var: SO4_NA, model_var: SO4_PR]
@@ -1416,7 +1306,6 @@ variables:
     description: The total dry mass of sea salt aerosol particles per unit area.
     dims: [lon, lat, time]
     formula: SS_A1+SS_A2+SS_A3
-    freq: day
     long_name: Eday.loadss
     sources: [model_var: SS_A1, model_var: SS_A2, model_var: SS_A3]
     table: atmos
@@ -1428,7 +1317,6 @@ variables:
       of the grid cell.
     dims: [lon, lat, alevhalf, time]
     formula: CMFMC+CMFMCDZM
-    freq: mon
     long_name: Amon.mc
     sources: [model_var: CMFMC, model_var: CMFMCDZM]
     table: atmos
@@ -1439,7 +1327,6 @@ variables:
       model) leaving the land portion of the grid cell divided by the land area in
       the grid cell, averaged over the 3-hour interval.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: QRUNOFF]
     table: land
     units: kg m-2 s-1
@@ -1448,7 +1335,6 @@ variables:
   mrrob_tavg-u-hxy-lnd:
     description: subsurface_runoff_flux
     dims: [lon, lat, time]
-    freq: day
     long_name: Eday.mrrob
     sources: [model_var: QDRAI]
     table: land
@@ -1457,7 +1343,6 @@ variables:
   mrros_tavg-u-hxy-lnd:
     description: surface_runoff_flux
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: QOVER]
     table: land
     units: kg m-2 s-1
@@ -1467,7 +1352,6 @@ variables:
     description: in each soil layer, the mass of water in ice phase.  Reported as
       "missing" for grid cells occupied entirely by "sea"
     dims: [lon, lat, sdepth, time]
-    freq: day
     sources: [model_var: SOILICE]
     table: land
     units: kg m-2
@@ -1477,7 +1361,6 @@ variables:
     description: in each soil layer, the mass of water in liquid phase.  Reported
       as "missing" for grid cells occupied entirely by "sea"
     dims: [lon, lat, sdepth, time]
-    freq: day
     sources: [model_var: SOILLIQ]
     table: land
     units: kg m-2
@@ -1487,7 +1370,6 @@ variables:
     description: the mass per unit area  (summed over all soil layers) of water in
       all phases.
     dims: [lon, lat, time]
-    freq: day
     sources: [model_var: TOTSOILLIQ, model_var: TOTSOILICE]
     table: land
     units: kg m-2
@@ -1499,7 +1381,6 @@ variables:
       all the soil in the grid cell by the land area in the grid cell;  reported as
       "missing" where the land fraction is 0.'
     dims: [lon, lat]
-    freq: fx
     long_name: fx.mrsofc
     sources: [model_var: SUCSAT]
     table: land
@@ -1508,7 +1389,6 @@ variables:
   mrsol_tavg-d10cm-hxy-lnd:
     description: the mass of water in all phases in a thin surface soil layer.
     dims: [lon, lat, time, sdepth10cm]
-    freq: day
     sources: [model_var: SOILWATER_10CM]
     table: land
     units: kg m-2
@@ -1518,7 +1398,6 @@ variables:
     description: in each soil layer, the mass of water in all phases, including ice.  Reported
       as "missing" for grid cells occupied entirely by "sea"
     dims: [lon, lat, sdepth, time]
-    freq: day
     sources: [model_var: SOILLIQ, model_var: SOILICE]
     table: land
     units: kg m-2
@@ -1528,7 +1407,6 @@ variables:
   mrsol_tpt-d10cm-hxy-lnd:
     description: the mass of water in all phases in a thin surface soil layer.
     dims: [lon, lat, time1, sdepth10cm]
-    freq: 3hr
     long_name: 3hr.mrsos
     sources: [model_var: SOILWATER_10CM]
     table: land
@@ -1537,7 +1415,6 @@ variables:
   mrtws_tavg-u-hxy-lnd:
     description: canopy_and_surface_and_subsurface_water_amount
     dims: [lon, lat, time]
-    freq: day
     sources: [model_var: TWS]
     table: land
     units: kg m-2
@@ -1547,7 +1424,6 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.nLand
     sources: [model_var: TOTECOSYSN]
     table: land
@@ -1556,7 +1432,6 @@ variables:
   nMineralNH4_tavg-u-hxy-lnd:
     description: SUM of ammonium over all soil layers
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.nMineralNH4
     sources: [model_var: SMIN_NH4]
     table: land
@@ -1565,7 +1440,6 @@ variables:
   nMineralNO3_tavg-u-hxy-lnd:
     description: SUM of nitrate over all soil layers
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.nMineralNO3
     sources: [model_var: SMIN_NO3]
     table: land
@@ -1574,7 +1448,6 @@ variables:
   nMineral_tavg-u-hxy-lnd:
     description: SUM of ammonium, nitrite, nitrate, etc over all soil layers
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.nMineral
     sources: [model_var: SMINN]
     table: land
@@ -1585,7 +1458,6 @@ variables:
       value averaged over the land fraction.
     dims: [lon, lat, time]
     formula: SOIL1N+SOIL2N+SOIL3N
-    freq: mon
     long_name: Emon.nSoil
     sources: [model_var: SOIL1N, model_var: SOIL2N, model_var: SOIL3N]
     table: land
@@ -1597,7 +1469,6 @@ variables:
       fire, harvest, grazing  and land use change. Positive flux  is into the land.
     dims: [lon, lat, time]
     formula: FCO2 /1000 / conv
-    freq: mon
     long_name: Lmon.nbp
     sources: [model_var: FCO2, model_var: conv]
     table: land
@@ -1606,7 +1477,6 @@ variables:
   nep_tavg-u-hxy-lnd:
     description: Net Ecosystem Exchange
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.nep
     sources: [model_var: NEP]
     table: land
@@ -1615,9 +1485,9 @@ variables:
   nppLeaf_tavg-u-hxy-lnd:
     description: This is the rate of carbon uptake by leaves due to NPP
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_LEAF_ALLOC)*FATES_FRACTION
     long_name: Lmon.nppLeaf
-    sources: [model_var: FATES_LEAF_ALLOC]
+    sources: [model_var: FATES_LEAF_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -1632,10 +1502,10 @@ variables:
       of A. It means that the quantity indicated by the standard name is calculated
       solely with respect to the B contained in A, neglecting all other chemical constituents
       of A.'
-    dims: [lon, lat, landuse, time]
-    freq: mon
+    dims: [lon, lat, fates_levlanduse, time]
+    formula: (FATES_NPP_LU)*FATES_FRACTION
     long_name: Emon.nppLut
-    sources: [model_var: FATES_NPP_LU]
+    sources: [model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -1643,7 +1513,6 @@ variables:
     description: added for completeness with npp_root
     dims: [lon, lat, time]
     formula: (FATES_SEED_ALLOC+FATES_STORE_ALLOC)*FATES_FRACTION
-    freq: mon
     long_name: Emon.nppOther
     sources: [model_var: FATES_SEED_ALLOC, model_var: FATES_STORE_ALLOC, model_var: FATES_FRACTION]
     table: land
@@ -1653,7 +1522,6 @@ variables:
     description: This is the rate of carbon uptake by roots due to NPP
     dims: [lon, lat, time]
     formula: (FATES_CROOT_ALLOC+FATES_FROOT_ALLOC)*FATES_FRACTION
-    freq: mon
     long_name: Lmon.nppRoot
     sources: [model_var: FATES_CROOT_ALLOC, model_var: FATES_FROOT_ALLOC, model_var: FATES_FRACTION]
     table: land
@@ -1662,9 +1530,9 @@ variables:
   nppStem_tavg-u-hxy-lnd:
     description: added for completeness with npp_root
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_STEM_ALLOC)*FATES_FRACTION
     long_name: Emon.nppStem
-    sources: [model_var: FATES_STEM_ALLOC]
+    sources: [model_var: FATES_STEM_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -1680,48 +1548,48 @@ variables:
       solely with respect to the B contained in A, neglecting all other chemical constituents
       of A.'
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_NPP)*FATES_FRACTION
     long_name: Lmon.npp
-    sources: [model_var: FATES_NPP]
+    sources: [model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: down
 
   npp_tavg-u-hxy-ng:
     description: Total NPP of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_NPP_PF(12:14))*FATES_FRACTION
-    freq: mon
+    formula: (sumoverpft(FATES_NPP_PF,[12,13,14],"fates_levpft"])*FATES_FRACTION
     long_name: Emon.nppGrass
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: down
 
   npp_tavg-u-hxy-shb:
     description: Total NPP of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_NPP_PF(7:11))*FATES_FRACTION
-    freq: mon
+    formula: (sumoverpft(FATES_NPP_PF,[7,8,9,10,11],"fates_levpft"])*FATES_FRACTION
     long_name: Emon.nppShrub
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: down
 
   npp_tavg-u-hxy-tree:
     description: Total NPP of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_NPP_PF(1:6))*FATES_FRACTION
-    freq: mon
+    formula: (sumoverpft(FATES_NPP_PF,[1,2,3,4,5,6],"fates_levpft"])*FATES_FRACTION
     long_name: Emon.nppTree
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    positive: down
 
   orog_tavg-u-hxy-is:
     description: The surface called "surface" means the lower boundary of the atmosphere.
       Altitude is the (geometric) height above the geoid, which is the reference geopotential
       surface. The geoid is similar to mean sea level.
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: PHIS]
     table: land
     units: m
@@ -1735,7 +1603,6 @@ variables:
       of the ocean changes (e.g., due to glacial melt, or global warming of the ocean).  Reported
       here is the height above the present-day geoid (0.0 over ocean).
     dims: [lon, lat]
-    freq: fx
     long_name: fx.orog
     sources: [model_var: PHIS]
     table: land
@@ -1744,8 +1611,7 @@ variables:
   pastureFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by anthropogenic pasture.
     dims: [lon, lat, time, typepasture]
-    formula: (FATES_PATCHAREA_LU(4))*FATES_FRACTION
-    freq: mon
+    formula: (sumoverpft(FATES_PATCHAREA_LU,[4],"fates_levlanduse"))*FATES_FRACTION
     long_name: Lmon.pastureFrac
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
@@ -1754,7 +1620,6 @@ variables:
   pctisccp_tavg-u-hxy-cl:
     description: time-means are weighted by the ISCCP Total Cloud Fraction - see  https://www.cfmip.org/tools-and-data/cosp
     dims: [lon, lat, time]
-    freq: day
     sources: [model_var: MEANPTOP_ISCCP, model_var: CLDTOT_ISCCP]
     table: atmos
     units: Pa
@@ -1763,7 +1628,6 @@ variables:
   pfull_tclm-al-hxy-u:
     description: Air pressure on model levels
     dims: [lon, lat, lev, time2]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: Amon.pfull
@@ -1774,7 +1638,6 @@ variables:
   pfull_tpt-al-hxy-u:
     description: Air pressure on model levels
     dims: [lon, lat, lev, time1]
-    freq: 3hr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CF3hr.pfull
@@ -1784,7 +1647,6 @@ variables:
   phalf_tclm-alh-hxy-u:
     description: Air pressure on model half-levels
     dims: [lon, lat, alevhalf, time2]
-    freq: mon
     long_name: Amon.phalf
     sources: [model_var: PINT]
     table: atmos
@@ -1794,7 +1656,6 @@ variables:
     description: at surface; includes both liquid and solid phases.  This is the 3-hour
       mean precipitation flux.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: PRECT]
     table: atmos
     units: kg m-2 s-1
@@ -1805,7 +1666,6 @@ variables:
     description: at surface; includes both liquid and solid phases from all types
       of clouds (both large-scale and convective)
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.pr
     sources: [model_var: PRECT]
     table: atmos
@@ -1815,7 +1675,6 @@ variables:
     description: at surface; includes both liquid and solid phases from all types
       of clouds (both large-scale and convective)
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.pr
     sources: [model_var: PRECT]
     table: atmos
@@ -1824,7 +1683,6 @@ variables:
   prc_tavg-u-hxy-u:
     description: at surface; includes both liquid and solid phases.
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: PRECC]
     table: atmos
     units: kg m-2 s-1
@@ -1833,7 +1691,6 @@ variables:
   prc_tpt-u-hs-u:
     description: at surface; includes both liquid and solid phases.
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.prc
     sources: [model_var: PRECC]
     table: atmos
@@ -1843,7 +1700,6 @@ variables:
     description: rainfall_flux
     dims: [lon, lat, time]
     formula: PRECT-PRECSC-PRECSL
-    freq: day
     long_name: Eday.prra
     sources: [model_var: PRECT, model_var: PRECSC, model_var: PRECSL]
     table: atmos
@@ -1853,7 +1709,6 @@ variables:
     description: at surface.  Includes precipitation of all forms water in the solid
       phase.  This is the 3-hour mean snowfall flux.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: PRECSC, model_var: PRECSL]
     table: atmos
     units: kg m-2 s-1
@@ -1865,7 +1720,6 @@ variables:
       phase
     dims: [site, time1]
     formula: PRECSC+PRECSL
-    freq: subhr
     long_name: CFsubhr.prsn
     sources: [model_var: PRECSC, model_var: PRECSL]
     table: atmos
@@ -1875,7 +1729,6 @@ variables:
     description: the precipitation flux that is intercepted by the vegetation canopy
       (if present in model) before reaching the ground.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Lmon.prveg
     sources: [model_var: QINTR]
     table: land
@@ -1885,7 +1738,6 @@ variables:
     description: Vertically integrated mass of water vapour through the atmospheric
       column
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: Q]
     table: atmos
     units: kg m-2
@@ -1895,7 +1747,6 @@ variables:
     description: Vertically integrated mass of water vapour through the atmospheric
       column
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.prw
     sources: [model_var: Q]
     table: atmos
@@ -1905,7 +1756,6 @@ variables:
     description: Vertically integrated mass of water vapour through the atmospheric
       column
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.prw
     sources: [model_var: Q]
     table: atmos
@@ -1915,7 +1765,6 @@ variables:
     description: surface pressure (not mean sea-level pressure), 2-D field to calculate
       the 3-D pressure field from hybrid coordinates
     dims: [lon, lat, time]
-    freq: 1hr
     sources: [model_var: PS]
     table: atmos
     units: Pa
@@ -1924,7 +1773,6 @@ variables:
   ps_tpt-u-hs-u:
     description: not, in general, the same as mean sea-level pressure
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.ps
     sources: [model_var: PS]
     table: atmos
@@ -1934,7 +1782,6 @@ variables:
     description: sampled synoptically to diagnose atmospheric tides, this is better
       than mean sea level pressure.
     dims: [lon, lat, time1]
-    freq: 3hr
     sources: [model_var: PS]
     table: atmos
     units: Pa
@@ -1943,7 +1790,6 @@ variables:
   psl_tavg-u-hxy-u:
     description: Sea Level Pressure
     dims: [lon, lat, time]
-    freq: 6hr
     sources: [model_var: PSL]
     table: atmos
     units: Pa
@@ -1952,7 +1798,6 @@ variables:
   psl_tpt-u-hs-u:
     description: not, in general, the same as surface pressure
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.psl
     sources: [model_var: PSL]
     table: atmos
@@ -1961,7 +1806,6 @@ variables:
   psl_tpt-u-hxy-u:
     description: Sea Level Pressure
     dims: [lon, lat, time1]
-    freq: 6hr
     sources: [model_var: PSL]
     table: atmos
     units: Pa
@@ -1971,7 +1815,6 @@ variables:
     description: 2D monthly mean thermal tropopause calculated using WMO tropopause
       definition on 3d temperature
     dims: [lon, lat, time]
-    freq: mon
     long_name: AERmon.ptp
     sources: [model_var: TROP_P]
     table: atmos
@@ -1980,7 +1823,6 @@ variables:
   qgwr_tavg-u-hxy-lnd:
     description: water_flux_from_soil_layer_to_groundwater
     dims: [lon, lat, time]
-    freq: day
     long_name: Eday.qgwr
     sources: [model_var: QCHARGE]
     table: land
@@ -1989,9 +1831,9 @@ variables:
   raLeaf_tavg-u-hxy-lnd:
     description: added for completeness with Ra_root
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_LEAFMAINTAR)*FATES_FRACTION
     long_name: Emon.raLeaf
-    sources: [model_var: FATES_LEAFMAINTAR]
+    sources: [model_var: FATES_LEAFMAINTAR, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -1999,9 +1841,8 @@ variables:
     description: Carbon mass flux per unit area into atmosphere due to autotrophic
       respiration on land (respiration by producers) [see rh for heterotrophic production].
       Calculated on land-use tiles.
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, fates_levlanduse, time]
     formula: (FATES_GPP_LU-FATES_NPP_LU)*FATES_FRACTION
-    freq: mon
     long_name: Emon.raLut
     sources: [model_var: FATES_GPP_LU, model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
     table: land
@@ -2013,7 +1854,6 @@ variables:
       to observations of total soil respiration.
     dims: [lon, lat, time]
     formula: FROOTMAINTAR+CROOTMAINTAR
-    freq: mon
     long_name: Emon.raRoot
     sources: [model_var: FROOTMAINTAR, model_var: CROOTMAINTAR]
     table: land
@@ -2022,9 +1862,9 @@ variables:
   raStem_tavg-u-hxy-lnd:
     description: added for completeness with Ra_root
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_LSTEMMAINTAR)*FATES_FRACTION
     long_name: Emon.raStem
-    sources: [model_var: FATES_LSTEMMAINTAR]
+    sources: [model_var: FATES_LSTEMMAINTAR, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -2033,9 +1873,9 @@ variables:
       respiration on land (respiration by producers) [see rh for heterotrophic production].
       Calculated on vegetation type.
     dims: [lon, lat, vegtype, time]
-    freq: day
+    formula: (FATES_AUTORESP)*FATES_FRACTION
     long_name: Eday.raVgt
-    sources: [model_var: FATES_AUTORESP]
+    sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -2044,7 +1884,6 @@ variables:
       respiration on land (respiration by producers) [see rh for heterotrophic production]
     dims: [lon, lat, time]
     formula: FATES_AUTORESP*FATES_FRACTIONTION
-    freq: mon
     long_name: Lmon.ra
     sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTIONTION]
     table: land
@@ -2053,8 +1892,7 @@ variables:
   ra_tavg-u-hxy-ng:
     description: Total RA of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(12:14)-FATES_NPP_PF(12:14))*FATES_FRACTION
-    freq: mon
+    formula: (sumoverpft(FATES_GPP_PF,[12,13,14],"fates_levpft")-sumoverpft(FATES_NPP_PF,[12,13,14],"fates_levpft"))*FATES_FRACTION
     long_name: Emon.raGrass
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -2063,8 +1901,7 @@ variables:
   ra_tavg-u-hxy-shb:
     description: Total RA of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(7:11)-FATES_NPP_PF(7:11))*FATES_FRACTION
-    freq: mon
+    formula: (sumoverpft(FATES_GPP_PF,[7,8,9,10,11],"fates_levpft")-sumoverpft(FATES_NPP_PF,[7,8,9,10,11],"fates_levpft"))*FATES_FRACTION
     long_name: Emon.raShrub
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -2073,8 +1910,7 @@ variables:
   ra_tavg-u-hxy-tree:
     description: Total RA of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (FATES_GPP_PF(1:6)-FATES_NPP_PF(1:6))*FATES_FRACTION
-    freq: mon
+    formula: (sumoverpft(FATES_GPP_PF,[1,2,3,4,5,6],"fates_levpft")-sumoverpft(FATES_NPP_PF,[1,2,3,4,5,6],"fates_levpft"))*FATES_FRACTION
     long_name: Emon.raTree
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
@@ -2086,7 +1922,6 @@ variables:
       and the time-mean should be calculated, weighting the individual samples by
       the cloudy fraction of the grid cell.
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: Emon.reffclws
@@ -2097,7 +1932,6 @@ variables:
   reffclws_tpt-al-hs-scl:
     description: alevel site time1
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: Esubhr.reffclws
@@ -2110,7 +1944,6 @@ variables:
       second moment of the particle size distribution (obtained by considering only
       the cloudy portion of the grid cell).
     dims: [lon, lat, lev, time1]
-    freq: 3hr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CF3hr.reffclws
@@ -2122,7 +1955,6 @@ variables:
     description: Percentage of entire grid cell  that is land and is covered by  neither
       vegetation nor bare-soil (e.g., urban, ice, lakes, etc.)
     dims: [lon, lat, time, typeresidual]
-    freq: yr
     sources: [model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -2134,7 +1966,6 @@ variables:
       from CWD as well.
     dims: [lon, lat, time]
     formula: LITTERC_HR /1000
-    freq: mon
     long_name: Emon.rhLitter
     sources: [model_var: LITTERC_HR]
     table: land
@@ -2144,7 +1975,6 @@ variables:
     description: Needed to calculate soil bulk turnover time
     dims: [lon, lat, time]
     formula: SOILC_HR /1000
-    freq: mon
     long_name: Emon.rhSoil
     sources: [model_var: SOILC_HR]
     table: land
@@ -2154,28 +1984,28 @@ variables:
     description: Carbon mass flux per unit area into atmosphere due to heterotrophic
       respiration on land (respiration by consumers), calculated on vegetation type.
     dims: [lon, lat, vegtype, time]
-    freq: day
+    formula: (FATES_HET_RESP)*FATES_FRACTION
     long_name: Eday.rhVgt
-    sources: [model_var: FATES_HET_RESP]
+    sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    postive: up
 
   rh_tavg-u-hxy-lnd:
     description: Carbon mass flux per unit area into atmosphere due to heterotrophic
       respiration on land (respiration by consumers)
     dims: [lon, lat, time]
     formula: FATES_HET_RESP*FATES_FRACTION
-    freq: mon
     long_name: Lmon.rh
     sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
+    postive: up
 
   rld_tpt-alh-hs-u:
     description: Downwelling Longwave Radiation (includes the fluxes at the surface
       and TOA)
     dims: [alevhalf, site, time1]
-    freq: subhr
     long_name: CFsubhr.rld
     sources: [model_var: FDL]
     table: atmos
@@ -2184,7 +2014,6 @@ variables:
   rldcs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
-    freq: mon
     long_name: CFmon.rldcs
     sources: [model_var: FDLC]
     table: atmos
@@ -2194,7 +2023,6 @@ variables:
     description: Downwelling clear-sky longwave radiation (includes the fluxes at
       the surface and TOA)
     dims: [alevhalf, site, time1]
-    freq: subhr
     long_name: CFsubhr.rldcs
     sources: [model_var: FDLC]
     table: atmos
@@ -2203,7 +2031,6 @@ variables:
   rlds_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -2218,7 +2045,6 @@ variables:
       sometimes called "vector irradiance". In accordance with common usage in geophysical
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.rlds
     sources: [model_var: FLDS]
     table: atmos
@@ -2233,7 +2059,6 @@ variables:
       sometimes called "vector irradiance". In accordance with common usage in geophysical
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.rlds
     sources: [model_var: FLDS]
     table: atmos
@@ -2242,7 +2067,6 @@ variables:
   rldscs_tavg-u-hxy-u:
     description: Surface downwelling clear-sky longwave radiation
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: FLDSC]
     table: atmos
     units: W m-2
@@ -2251,7 +2075,6 @@ variables:
   rldscs_tpt-u-hs-u:
     description: Surface downwelling clear-sky longwave radiation
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.rldscs
     sources: [model_var: FLDSC]
     table: atmos
@@ -2260,7 +2083,6 @@ variables:
   rldscs_tpt-u-hxy-u:
     description: Surface downwelling clear-sky longwave radiation
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.rldscs
     sources: [model_var: FLDSC]
     table: atmos
@@ -2269,7 +2091,6 @@ variables:
   rls_tavg-u-hxy-u:
     description: Net longwave surface radiation
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.rls
     sources: [model_var: FLNS]
     table: atmos
@@ -2278,7 +2099,6 @@ variables:
   rlu_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
-    freq: mon
     long_name: CFmon.rlu
     sources: [model_var: FUL]
     table: atmos
@@ -2287,7 +2107,6 @@ variables:
   rlucs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
-    freq: mon
     long_name: CFmon.rlucs
     sources: [model_var: FULC]
     table: atmos
@@ -2296,7 +2115,6 @@ variables:
   rlus_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: FLDS, model_var: FLNS]
     table: atmos
     units: W m-2
@@ -2313,7 +2131,6 @@ variables:
       "flux" implies per unit area, called "flux density" in physics.
     dims: [site, time1]
     formula: FLDS+FLNS
-    freq: subhr
     long_name: CFsubhr.rlus
     sources: [model_var: FLDS, model_var: FLNS]
     table: atmos
@@ -2322,7 +2139,6 @@ variables:
   rluscs_tavg-u-hxy-u:
     description: Surface Upwelling Clear-sky Longwave Radiation
     dims: [lon, lat, time]
-    freq: mon
     long_name: Amon.rluscs
     sources: [model_var: FULC]
     table: atmos
@@ -2331,7 +2147,6 @@ variables:
   rlut_tavg-u-hxy-u:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
     units: W m-2
@@ -2342,7 +2157,6 @@ variables:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     dims: [lon, lat, time3]
     formula: FSNTOA-FSNT+FLNT
-    freq: 1hr
     long_name: E1hrClimMon.rlut
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
@@ -2352,7 +2166,6 @@ variables:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     dims: [site, time1]
     formula: FSNTOA-FSNT+FLNT
-    freq: subhr
     long_name: CFsubhr.rlut
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
@@ -2362,7 +2175,6 @@ variables:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     dims: [lon, lat, time1]
     formula: FSNTOA-FSNT+FLNT
-    freq: 3hr
     long_name: CF3hr.rlut
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
@@ -2371,7 +2183,6 @@ variables:
   rlutcs_tavg-u-hxy-u:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
     units: W m-2
@@ -2382,7 +2193,6 @@ variables:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     dims: [lon, lat, time3]
     formula: FSNTOAC-FSNTC+FLNTC
-    freq: 1hr
     long_name: E1hrClimMon.rlutcs
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
@@ -2392,7 +2202,6 @@ variables:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     dims: [site, time1]
     formula: FSNTOAC-FSNTC+FLNTC
-    freq: subhr
     long_name: CFsubhr.rlutcs
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
@@ -2402,7 +2211,6 @@ variables:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     dims: [lon, lat, time1]
     formula: FSNTOAC-FSNTC+FLNTC
-    freq: 3hr
     long_name: CF3hr.rlutcs
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
@@ -2411,7 +2219,6 @@ variables:
   rsd_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
-    freq: mon
     long_name: CFmon.rsd
     sources: [model_var: FDS]
     table: atmos
@@ -2420,7 +2227,6 @@ variables:
   rsdcs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
-    freq: mon
     long_name: CFmon.rsdcs
     sources: [model_var: FDSC]
     table: atmos
@@ -2430,7 +2236,6 @@ variables:
     description: Downwelling clear-sky shortwave radiation (includes the fluxes at
       the surface and top-of-atmosphere)
     dims: [alevhalf, site, time1]
-    freq: subhr
     long_name: CFsubhr.rsdcs
     sources: [model_var: FDSC]
     table: atmos
@@ -2440,27 +2245,26 @@ variables:
     description: Surface Downwelling Shortwave Radiation over land. Can be used for
       computation of surface albedo.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.rsds
     sources: [model_var: FSDS]
     table: land
     units: W m-2
+    positive: down
 
   rsds_tavg-u-hxy-sn:
     description: Surface Downwelling Shortwave Radiation over the portion of a land
       grid cell covered by snow but not by ice. Can be used for computation of surface
       albedo.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.rsdss
     sources: [model_var: FSDS]
     table: land
     units: W m-2
+    positive: down
 
   rsds_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: FSDS]
     table: atmos
     units: W m-2
@@ -2469,7 +2273,6 @@ variables:
   rsds_tpt-u-hs-u:
     description: Surface solar irradiance for UV calculations.
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.rsds
     sources: [model_var: FSDS]
     table: atmos
@@ -2478,7 +2281,6 @@ variables:
   rsds_tpt-u-hxy-u:
     description: Surface solar irradiance for UV calculations.
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.rsds
     sources: [model_var: FSDS]
     table: atmos
@@ -2487,7 +2289,6 @@ variables:
   rsdscs_tavg-u-hxy-u:
     description: Surface solar irradiance clear sky for UV calculations
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: FSDSC]
     table: atmos
     units: W m-2
@@ -2496,7 +2297,6 @@ variables:
   rsdscs_tpt-u-hs-u:
     description: Surface solar irradiance clear sky for UV calculations
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.rsdscs
     sources: [model_var: FSDSC]
     table: atmos
@@ -2505,7 +2305,6 @@ variables:
   rsdscs_tpt-u-hxy-u:
     description: Surface solar irradiance clear sky for UV calculations
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.rsdscs
     sources: [model_var: FSDSC]
     table: atmos
@@ -2516,7 +2315,6 @@ variables:
       calculations.
     dims: [lon, lat, time]
     formula: SOLLD+SOLSD
-    freq: day
     long_name: Eday.rsdsdiff
     sources: [model_var: SOLLD, model_var: SOLSD]
     table: atmos
@@ -2525,7 +2323,6 @@ variables:
   rsdt_tavg-u-hxy-u:
     description: at the top of the atmosphere
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: FSNTOA, model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -2536,7 +2333,6 @@ variables:
     description: Shortwave radiation incident at the top of the atmosphere
     dims: [lon, lat, time3]
     formula: FSNTOA+FSUTOA
-    freq: 1hr
     long_name: E1hrClimMon.rsdt
     sources: [model_var: FSNTOA, model_var: FSUTOA]
     table: atmos
@@ -2546,7 +2342,6 @@ variables:
     description: at the top of the atmosphere
     dims: [site, time1]
     formula: FSNTOA+FSUTOA
-    freq: subhr
     long_name: CFsubhr.rsdt
     sources: [model_var: FSNTOA, model_var: FSUTOA]
     table: atmos
@@ -2555,7 +2350,6 @@ variables:
   rss_tavg-u-hxy-u:
     description: Net downward shortwave radiation at the surface
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.rss
     sources: [model_var: FSNS]
     table: atmos
@@ -2564,7 +2358,6 @@ variables:
   rsu_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
-    freq: mon
     long_name: CFmon.rsu
     sources: [model_var: FUS]
     table: atmos
@@ -2573,7 +2366,6 @@ variables:
   rsucs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
-    freq: mon
     long_name: CFmon.rsucs
     sources: [model_var: FUSC]
     table: atmos
@@ -2583,33 +2375,33 @@ variables:
     description: Surface Upwelling Shortwave Radiation over land. Can be used for
       computation of surface albedo.
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.rsus
     sources: [model_var: FSR]
     table: land
     units: W m-2
+    positive: up
 
   rsus_tavg-u-hxy-sn:
     description: Surface Upwelling Shortwave Radiation over the portion of a land
       grid cell covered by snow. Can be used for computation of surface albedo.
     dims: [lon, lat, time]
     formula: SNOFSRVI+SNOFSRVD+SNOFSRNI+SNOFSRND
-    freq: mon
     long_name: Emon.rsuss
     sources: [model_var: SNOFSRVI, model_var: SNOFSRVD, model_var: SNOFSRNI,
       model_var: SNOFSRND]
     table: land
     units: W m-2
+    postive: up
 
   rsus_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
-    freq: 3hr
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
     units: W m-2
     variants: [{formula: FSDS-FSNS, long_name: 3hr.rsus}, {formula: FSDS-FSNS, long_name: Amon.rsus},
       {formula: FSDS-FSNS, long_name: day.rsus}]
+    postive: up
 
   rsus_tpt-u-hs-u:
     description: The surface called "surface" means the lower boundary of the atmosphere.
@@ -2621,7 +2413,6 @@ variables:
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     dims: [site, time1]
     formula: FSDS-FSNS
-    freq: subhr
     long_name: CFsubhr.rsus
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
@@ -2630,7 +2421,6 @@ variables:
   rsuscs_tavg-u-hxy-u:
     description: Surface Upwelling Clear-sky Shortwave Radiation
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
     units: W m-2
@@ -2641,7 +2431,6 @@ variables:
     description: Surface Upwelling Clear-sky Shortwave Radiation
     dims: [site, time1]
     formula: FSDSC-FSNSC
-    freq: subhr
     long_name: CFsubhr.rsuscs
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
@@ -2650,7 +2439,6 @@ variables:
   rsut_tavg-u-hxy-u:
     description: at the top of the atmosphere
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -2659,7 +2447,6 @@ variables:
   rsut_tclmdc-u-hxy-u:
     description: at the top of the atmosphere
     dims: [lon, lat, time3]
-    freq: 1hr
     long_name: E1hrClimMon.rsut
     sources: [model_var: FSUTOA]
     table: atmos
@@ -2668,7 +2455,6 @@ variables:
   rsut_tpt-u-hs-u:
     description: at the top of the atmosphere
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.rsut
     sources: [model_var: FSUTOA]
     table: atmos
@@ -2677,7 +2463,6 @@ variables:
   rsut_tpt-u-hxy-u:
     description: at the top of the atmosphere
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: CF3hr.rsut
     sources: [model_var: FSUTOA]
     table: atmos
@@ -2686,7 +2471,6 @@ variables:
   rsutcs_tavg-u-hxy-u:
     description: Calculated in the absence of clouds.
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
     units: W m-2
@@ -2697,7 +2481,6 @@ variables:
     description: Calculated in the absence of clouds.
     dims: [lon, lat, time3]
     formula: SOLIN-FSNTOAC
-    freq: 1hr
     long_name: E1hrClimMon.rsutcs
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
@@ -2707,7 +2490,6 @@ variables:
     description: Calculated in the absence of clouds.
     dims: [site, time1]
     formula: SOLIN-FSNTOAC
-    freq: subhr
     long_name: CFsubhr.rsutcs
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
@@ -2717,7 +2499,6 @@ variables:
     description: Calculated in the absence of clouds.
     dims: [lon, lat, time1]
     formula: SOLIN-FSNTOAC
-    freq: 3hr
     long_name: CF3hr.rsutcs
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
@@ -2729,7 +2510,6 @@ variables:
       the net downward radiative flux at the top of the atmosphere.
     dims: [lon, lat, time]
     formula: FSNT-FLNT
-    freq: mon
     long_name: Amon.rtmt
     sources: [model_var: FSNT, model_var: FLNT]
     table: atmos
@@ -2741,7 +2521,6 @@ variables:
       the net downward radiative flux at the top of the atmosphere.
     dims: [site, time1]
     formula: FSNT-FLNT
-    freq: subhr
     long_name: CFsubhr.rtmt
     sources: [model_var: FSNT, model_var: FLNT]
     table: atmos
@@ -2750,7 +2529,6 @@ variables:
   sfcWind_tavg-h10m-hxy-u:
     description: near-surface (usually, 10 meters) wind speed.
     dims: [lon, lat, time, height10m]
-    freq: 6hr
     sources: [model_var: U10]
     table: atmos
     units: m s-1
@@ -2761,7 +2539,6 @@ variables:
     description: This is the mean of the speed, not the speed computed from the mean
       u and v components of wind
     dims: [site, time1, height10m]
-    freq: subhr
     long_name: CFsubhr.sfcWind
     sources: [model_var: U10]
     table: atmos
@@ -2771,8 +2548,7 @@ variables:
     description: Percentage of grid cell covered by land ice (ice sheet, ice shelf,
       ice cap, glacier)
     dims: [lon, lat, time]
-    formula: PCT_LANDUNIT(4)
-    freq: mon
+    formula: sumoverpft(PCT_LANDUNIT,[4],"ltype")
     long_name: LImon.sftgif
     sources: [model_var: PCT_LANDUNIT]
     table: land
@@ -2781,7 +2557,6 @@ variables:
   sftlf_ti-u-hxy-u:
     description: Percentage of horizontal area occupied by land.
     dims: [lon, lat]
-    freq: fx
     long_name: fx.sftlf
     sources: [model_var: LANDFRAC]
     table: atmos
@@ -2789,18 +2564,16 @@ variables:
 
   shrubFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by shrub.
-    dims: [lon, lat, time, typeshrub]
-    freq: yr
+    dims: [lon, lat, time]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: 'FATES_CROWNAREA_PF(7:11) *FATES_FRACTION', long_name: Eyr.shrubFrac},
-      {formula: 'FATES_CROWNAREA_PF(7:11) *FATES_FRACTION', long_name: Lmon.shrubFrac}]
+    variants: [{formula: 'sumoverpft(FATES_CROWNAREA_PF,[7,8,9,10,11],"fates_levpft")*FATES_FRACTION', long_name: Eyr.shrubFrac},
+               {formula: 'sumoverpft(FATES_CROWNAREA_PF,[7,8,9,10,11],"fates_levpft")*FATES_FRACTION', long_name: Lmon.shrubFrac}]
 
   slthick_ti-sl-hxy-lnd:
     description: Thickness of Soil Layers
     dims: [lon, lat, sdepth]
-    freq: fx
     long_name: Efx.slthick
     sources: [model_var: DZSOI]
     table: land
@@ -2811,7 +2584,6 @@ variables:
       storage (i.e. lakes, river channel or depression storage).
     dims: [lon, lat, time]
     formula: H2OSFC+ VOLR
-    freq: day
     long_name: Eday.sw
     sources: [model_var: H2OSFC, model_var: VOLR]
     table: land
@@ -2824,9 +2596,8 @@ variables:
       of a layer of liquid water having the same mass per unit area. Surface amount
       refers to the amount on the ground, excluding that on the plant or vegetation
       canopy.
-    dims: [lon, lat, landuse, time]
+    dims: [lon, lat, time]
     formula: SNOWICE+SNOWLIQ
-    freq: mon
     long_name: Emon.sweLut
     sources: [model_var: SNOWICE, model_var: SNOWLIQ]
     table: land
@@ -2835,7 +2606,6 @@ variables:
   ta_tavg-700hPa-hxy-air:
     description: Air temperature at 700hPa
     dims: [lon, lat, time, p700]
-    freq: day
     long_name: CFday.ta700
     sources: [model_var: T700]
     table: atmos
@@ -2844,7 +2614,6 @@ variables:
   ta_tavg-850hPa-hxy-air:
     description: Air temperature at 850hPa
     dims: [lon, lat, time, p850]
-    freq: day
     long_name: Eday.ta850
     sources: [model_var: T850]
     table: atmos
@@ -2853,7 +2622,6 @@ variables:
   ta_tavg-al-hxy-u:
     description: Air Temperature
     dims: [lon, lat, lev, time]
-    freq: day
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: T]
@@ -2864,7 +2632,6 @@ variables:
   ta_tavg-p19-hxy-air:
     description: Air Temperature
     dims: [lon, lat, plev19, time]
-    freq: mon
     sources: [model_var: T]
     table: atmos
     units: K
@@ -2873,7 +2640,6 @@ variables:
   ta_tavg-p39-hy-air:
     description: Air Temperature
     dims: [lat, plev39, time]
-    freq: mon
     sources: [model_var: T]
     table: atmos
     units: K
@@ -2882,7 +2648,6 @@ variables:
   ta_tpt-al-hs-u:
     description: Air Temperature
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.ta
@@ -2893,7 +2658,6 @@ variables:
   ta_tpt-al-hxy-u:
     description: Air Temperature
     dims: [lon, lat, lev, time1]
-    freq: 6hr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: T]
@@ -2904,7 +2668,6 @@ variables:
   ta_tpt-p3-hxy-air:
     description: Air Temperature
     dims: [lon, lat, plev3, time1]
-    freq: 6hr
     long_name: 6hrPlevPt.ta
     sources: [model_var: T]
     table: atmos
@@ -2913,8 +2676,7 @@ variables:
   tasLut_tavg-h2m-hxy-multi:
     description: Air temperature is the bulk temperature of the air, not the surface
       (skin) temperature.
-    dims: [lon, lat, landuse, time, height2m]
-    freq: mon
+    dims: [lon, lat, fates_levlanduse, time, height2m]
     long_name: Emon.tasLut
     sources: [model_var: TSA]
     table: land
@@ -2923,7 +2685,6 @@ variables:
   tas_tavg-h2m-hxy-u:
     description: near-surface (usually, 2 meter) air temperature
     dims: [lon, lat, time, height2m]
-    freq: 6hr
     sources: [model_var: TREFHT]
     table: atmos
     units: K
@@ -2933,7 +2694,6 @@ variables:
   tas_tavg-u-hxy-u:
     description: Hourly Temperature at 2m above the surface
     dims: [lon, lat, time]
-    freq: 1hr
     sources: [model_var: TSA]
     table: land
     units: K
@@ -2943,7 +2703,6 @@ variables:
     description: 'maximum near-surface (usually, 2 meter) air temperature (add cell_method
       attribute "time: max")'
     dims: [lon, lat, time, height2m]
-    freq: day
     long_name: day.tasmax
     sources: [model_var: TREFHTMX]
     table: atmos
@@ -2952,7 +2711,6 @@ variables:
   tas_tmaxavg-h2m-hxy-u:
     description: monthly mean of the daily-maximum near-surface air temperature.
     dims: [lon, lat, time4, height2m]
-    freq: mon
     long_name: Amon.tasmax
     sources: [model_var: TREFMXAV]
     table: atmos
@@ -2962,7 +2720,6 @@ variables:
     description: 'minimum near-surface (usually, 2 meter) air temperature (add cell_method
       attribute "time: min")'
     dims: [lon, lat, time, height2m]
-    freq: day
     long_name: day.tasmin
     sources: [model_var: TREFHTMN]
     table: atmos
@@ -2971,7 +2728,6 @@ variables:
   tas_tminavg-h2m-hxy-u:
     description: monthly mean of the daily-minimum near-surface air temperature.
     dims: [lon, lat, time4, height2m]
-    freq: mon
     long_name: Amon.tasmin
     sources: [model_var: TREFMNAV]
     table: atmos
@@ -2980,7 +2736,6 @@ variables:
   tas_tpt-h2m-hs-u:
     description: near-surface (usually, 2 meter) air temperature
     dims: [site, time1, height2m]
-    freq: subhr
     long_name: CFsubhr.tas
     sources: [model_var: TREFHT]
     table: atmos
@@ -2989,7 +2744,6 @@ variables:
   tas_tpt-h2m-hxy-u:
     description: This is sampled synoptically.
     dims: [lon, lat, time1, height2m]
-    freq: 3hr
     long_name: 3hr.tas
     sources: [model_var: TREFHT]
     table: atmos
@@ -2998,7 +2752,6 @@ variables:
   tauu_tavg-u-hxy-u:
     description: Downward eastward wind stress at the surface
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: TAUX]
     table: atmos
     units: Pa
@@ -3007,7 +2760,6 @@ variables:
   tauu_tpt-u-hs-u:
     description: Downward eastward wind stress at the surface
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.tauu
     sources: [model_var: TAUX]
     table: atmos
@@ -3016,7 +2768,6 @@ variables:
   tauv_tavg-u-hxy-u:
     description: Downward northward wind stress at the surface
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: TAUY]
     table: atmos
     units: Pa
@@ -3025,7 +2776,6 @@ variables:
   tauv_tpt-u-hs-u:
     description: Downward northward wind stress at the surface
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.tauv
     sources: [model_var: TAUY]
     table: atmos
@@ -3034,7 +2784,6 @@ variables:
   tnta_tavg-al-hxy-u:
     description: Tendency of Air Temperature due to Advection
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFmon.tnta
@@ -3045,7 +2794,6 @@ variables:
   tntrl_tavg-al-hxy-u:
     description: longwave heating rates
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: AERmon.tntrl
@@ -3056,7 +2804,6 @@ variables:
   tntrs_tavg-al-hxy-u:
     description: shortwave heating rates
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: AERmon.tntrs
@@ -3067,27 +2814,26 @@ variables:
   tran_tavg-u-hxy-lnd:
     description: Transpiration (may include dew formation as a negative flux).
     dims: [lon, lat, time]
-    freq: mon
     long_name: Lmon.tran
     sources: [model_var: QVEGT]
     table: land
     units: kg m-2 s-1
+    positive: up
 
   tran_tavg-u-hxy-u:
     description: Transpiration
     dims: [lon, lat, time]
-    freq: 3hr
     long_name: 3hr.tran
     sources: [model_var: QVEGT]
     table: land
     units: kg m-2 s-1
+    positive: up
 
   treeFracBdlDcd_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf deciduous trees.
-    dims: [lon, lat, time, typetreebd]
-    formula: (FATES_CROWNAREA_PF(5:6)*FATES_FRACTION
-    freq: mon
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[5,6],"fates_levpft")*FATES_FRACTION
     long_name: Emon.treeFracBdlDcd
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -3096,9 +2842,8 @@ variables:
   treeFracBdlEvg_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf evergreen trees.
-    dims: [lon, lat, time, typetreebe]
-    formula: (FATES_CROWNAREA_PF(1,4))*FATES_FRACTION
-    freq: mon
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[1,2,3,4],"fates_levpft")*FATES_FRACTION
     long_name: Emon.treeFracBdlEvg
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -3107,9 +2852,8 @@ variables:
   treeFracNdlDcd_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf deciduous trees.
-    dims: [lon, lat, time, typetreend]
-    formula: (FATES_CROWNAREA_PF(3))*FATES_FRACTION
-    freq: mon
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[3],"fates_levpft")*FATES_FRACTION
     long_name: Emon.treeFracNdlDcd
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -3118,9 +2862,8 @@ variables:
   treeFracNdlEvg_tavg-u-hxy-u:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf evergreen trees.
-    dims: [lon, lat, time, typetreene]
-    formula: (FATES_CROWNAREA_PF(2))*FATES_FRACTION
-    freq: mon
+    dims: [lon, lat, time]
+    formula: sumoverpft(FATES_CROWNAREA_PF,[2],"fates_levpft")*FATES_FRACTION
     long_name: Emon.treeFracNdlEvg
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -3128,19 +2871,17 @@ variables:
 
   treeFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by trees.
-    dims: [lon, lat, time, typetree]
-    freq: yr
+    dims: [lon, lat, time]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{formula: 'FATES_CROWNAREA_PF(1:6) *FATES_FRACTION', long_name: Eyr.treeFrac},
-      {formula: 'FATES_CROWNAREA_PF(1:6) *FATES_FRACTION', long_name: Lmon.treeFrac}]
+    variants: [{formula: 'sumoverpft(FATES_CROWNAREA_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION', long_name: Eyr.treeFrac},
+               {formula: 'sumoverpft(FATES_CROWNAREA_PF,[1,2,3,4,5,6],"fates_levpft")*FATES_FRACTION', long_name: Lmon.treeFrac}]
 
   tsLut_tavg-u-hxy-multi:
     description: Surface temperature (i.e. temperature at which long-wave radiation
       emitted)
-    dims: [lon, lat, landuse, time]
-    freq: mon
+    dims: [lon, lat, fates_levlanduse, time]
     long_name: Emon.tslsiLut
     sources: [model_var: TSKIN]
     table: land
@@ -3149,7 +2890,6 @@ variables:
   ts_tavg-u-hxy-u:
     description: Surface temperature (skin for open ocean)
     dims: [lon, lat, time]
-    freq: mon
     sources: [model_var: TS]
     table: atmos
     units: K
@@ -3158,7 +2898,6 @@ variables:
   ts_tpt-u-hs-u:
     description: Surface temperature (skin for open ocean)
     dims: [site, time1]
-    freq: subhr
     long_name: CFsubhr.ts
     sources: [model_var: TS]
     table: atmos
@@ -3167,7 +2906,6 @@ variables:
   ts_tpt-u-hxy-u:
     description: Temperature of the lower boundary of the atmosphere
     dims: [lon, lat, time1]
-    freq: 6hr
     sources: [model_var: TS]
     table: atmos
     units: K
@@ -3177,7 +2915,6 @@ variables:
     description: Temperature of each soil layer.  Reported as "missing" for grid cells
       occupied entirely by "sea".
     dims: [lon, lat, sdepth, time]
-    freq: day
     sources: [model_var: TSOI]
     table: land
     units: K
@@ -3186,7 +2923,6 @@ variables:
   tslsi_tavg-u-hxy-u:
     description: Surface temperature of all surfaces except open ocean.
     dims: [lon, lat, time]
-    freq: day
     long_name: day.tslsi
     sources: [model_var: TSA]
     table: land
@@ -3195,7 +2931,6 @@ variables:
   tslsi_tpt-u-hxy-lsi:
     description: Surface temperature of all surfaces except open ocean, sampled synoptically.
     dims: [lon, lat, time1]
-    freq: 3hr
     long_name: 3hr.tslsi
     sources: [model_var: TSA]
     table: land
@@ -3204,7 +2939,6 @@ variables:
   ua_tavg-al-hxy-u:
     description: Zonal wind (positive in a eastward direction).
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: U]
@@ -3215,7 +2949,6 @@ variables:
   ua_tavg-p19-hxy-air:
     description: Zonal wind (positive in a eastward direction).
     dims: [lon, lat, plev19, time]
-    freq: mon
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -3224,7 +2957,6 @@ variables:
   ua_tavg-p39-hy-air:
     description: Zonal wind (positive in a eastward direction).
     dims: [lat, plev39, time]
-    freq: mon
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -3234,7 +2966,6 @@ variables:
     description: Zonal wind (positive in a eastward direction) at 200 hPa, 6hourly
       instantaneous
     dims: [lon, lat, time1, p200]
-    freq: 6hr
     long_name: 6hrPlevPt.ua200
     sources: [model_var: U200]
     table: atmos
@@ -3243,7 +2974,6 @@ variables:
   ua_tpt-al-hs-u:
     description: Zonal wind (positive in a eastward direction).
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.ua
@@ -3254,7 +2984,6 @@ variables:
   ua_tpt-al-hxy-u:
     description: Zonal wind (positive in a eastward direction).
     dims: [lon, lat, lev, time1]
-    freq: 6hr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: 6hrLev.ua
@@ -3265,7 +2994,6 @@ variables:
   ua_tpt-p3-hxy-air:
     description: Zonal wind (positive in a eastward direction).
     dims: [lon, lat, plev3, time1]
-    freq: 6hr
     long_name: 6hrPlevPt.ua
     sources: [model_var: U]
     table: atmos
@@ -3274,7 +3002,6 @@ variables:
   va_tavg-al-hxy-u:
     description: Meridional wind (positive in a northward direction).
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: V]
@@ -3285,7 +3012,6 @@ variables:
   va_tavg-p19-hxy-air:
     description: Meridional wind (positive in a northward direction).
     dims: [lon, lat, plev19, time]
-    freq: mon
     sources: [model_var: V]
     table: atmos
     units: m s-1
@@ -3294,7 +3020,6 @@ variables:
   va_tavg-p39-hy-air:
     description: Meridional wind (positive in a northward direction).
     dims: [lat, plev39, time]
-    freq: mon
     long_name: AERmonZ.va
     sources: [model_var: V]
     table: atmos
@@ -3304,7 +3029,6 @@ variables:
     description: Meridional wind (positive in a northward direction) at 200 hPa, 6
       hourly instantaneous
     dims: [lon, lat, time1, p200]
-    freq: 6hr
     long_name: 6hrPlevPt.va200
     sources: [model_var: V200]
     table: atmos
@@ -3313,7 +3037,6 @@ variables:
   va_tpt-al-hs-u:
     description: Meridional wind (positive in a northward direction).
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.va
@@ -3324,7 +3047,6 @@ variables:
   va_tpt-al-hxy-u:
     description: Meridional wind (positive in a northward direction).
     dims: [lon, lat, lev, time1]
-    freq: 6hr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: 6hrLev.va
@@ -3335,7 +3057,6 @@ variables:
   va_tpt-p3-hxy-air:
     description: Meridional wind (positive in a northward direction).
     dims: [lon, lat, plev3, time1]
-    freq: 6hr
     long_name: 6hrPlevPt.va
     sources: [model_var: V]
     table: atmos
@@ -3344,20 +3065,19 @@ variables:
   vegFrac_tavg-u-hxy-u:
     description: Percentage of grid cell that is covered by vegetation.This SHOULD
       be the sum of tree, grass (natural and pasture), crop and shrub fractions.
-    dims: [lon, lat, time, typeveg]
-    freq: mon
-    sources: [model_var: FATES_AREA_PLANTS]
+    dims: [lon, lat, time]
+    sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
-    variants: [{long_name: Emon.vegFrac}, {formula: (sum(FATES_CROWNAREA_PF))*FATES_FRACTION,
-        long_name: Eyr.vegFrac}]
+    variants: [{formula: 'FATES_AREA_PLANTS*FATES_FRACTION', long_name: Emon.vegFrac},
+               {formula: 'FATES_AREA_PLANTS*FATES_FRACTION', long_name: Eyr.vegFrac}]
 
   vegHeight_tavg-u-hxy-ng:
     description: Vegetation height averaged over the grass fraction of a grid cell.
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
     long_name: Emon.vegHeightGrass
-    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT]
+    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT, model_var: FATES_FRACTION]
     table: land
     units: m
 
@@ -3365,9 +3085,9 @@ variables:
     description: Vegetation height averaged over all vegetation types and over the
       vegetated fraction of a grid cell.
     dims: [lon, lat, time]
-    freq: mon
+    formula: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
     long_name: Emon.vegHeight
-    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT]
+    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT, model_var: FATES_FRACTION]
     table: land
     units: m
 
@@ -3375,7 +3095,6 @@ variables:
     description: at 500 hPa level; commonly referred to as "omega", this represents
       the vertical component of velocity in pressure coordinates (positive down)
     dims: [lon, lat, time, p500]
-    freq: day
     long_name: CFday.wap500
     sources: [model_var: OMEGA500]
     table: atmos
@@ -3385,7 +3104,6 @@ variables:
     description: commonly referred to as "omega", this represents the vertical component
       of velocity in pressure coordinates (positive down)
     dims: [lon, lat, lev, time]
-    freq: day
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFday.wap
@@ -3397,7 +3115,6 @@ variables:
     description: commonly referred to as "omega", this represents the vertical component
       of velocity in pressure coordinates (positive down)
     dims: [lon, lat, plev19, time]
-    freq: mon
     long_name: Amon.wap
     sources: [model_var: OMEGA]
     table: atmos
@@ -3407,7 +3124,6 @@ variables:
     description: commonly referred to as "omega", this represents the vertical component
       of velocity in pressure coordinates (positive down)
     dims: [lon, lat, plev19, time]
-    freq: day
     long_name: day.wap
     sources: [model_var: OMEGA]
     table: atmos
@@ -3417,7 +3133,6 @@ variables:
     description: commonly referred to as "omega", this represents the vertical component
       of velocity in pressure coordinates (positive down)
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.wap
@@ -3431,7 +3146,6 @@ variables:
       year or for varying periods of time during the year, including during the growing
       season).
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.wetlandCH4
     sources: [model_var: FCH4]
     table: land
@@ -3443,7 +3157,6 @@ variables:
       of the soil all year or for varying periods of time during the year, including
       during the growing season).
     dims: [lon, lat, time]
-    freq: mon
     long_name: Emon.wetlandCH4prod
     sources: [model_var: CH4PROD]
     table: land
@@ -3453,7 +3166,6 @@ variables:
     description: Percentage of grid cell covered by wetland. Report only one year
       if  fixed percentage is used, or time series if values are determined dynamically.
     dims: [lon, lat, time, typewetla]
-    freq: mon
     long_name: Emon.wetlandFrac
     sources: [model_var: FINUNDATED]
     table: land
@@ -3462,7 +3174,6 @@ variables:
   wtd_tavg-u-hxy-lnd:
     description: depth_of_soil_moisture_saturation
     dims: [lon, lat, time]
-    freq: day
     long_name: Eday.wtd
     sources: [model_var: ZWT]
     table: land
@@ -3471,7 +3182,6 @@ variables:
   zg_tavg-1000hPa-hxy-air:
     description: Geopotential height on the 1000 hPa surface
     dims: [lon, lat, time, p1000]
-    freq: 6hr
     sources: [model_var: Z1000]
     table: atmos
     units: m
@@ -3480,7 +3190,6 @@ variables:
   zg_tavg-500hPa-hxy-air:
     description: geopotential height on the 500 hPa surface
     dims: [lon, lat, time, p500]
-    freq: day
     long_name: AERday.zg500
     sources: [model_var: Z500]
     table: atmos
@@ -3493,7 +3202,6 @@ variables:
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
     dims: [lon, lat, lev, time]
-    freq: mon
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: Z3]
@@ -3508,7 +3216,6 @@ variables:
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
     dims: [lon, lat, plev19, time]
-    freq: mon
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -3521,7 +3228,6 @@ variables:
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
     dims: [lat, plev39, time]
-    freq: mon
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -3530,7 +3236,6 @@ variables:
   zg_tpt-500hPa-hxy-air:
     description: geopotential height on the 500 hPa surface
     dims: [lon, lat, time1, p500]
-    freq: 6hr
     long_name: 6hrPlevPt.zg500
     sources: [model_var: Z500]
     table: atmos
@@ -3539,7 +3244,6 @@ variables:
   zg_tpt-700hPa-hxy-u:
     description: 700 hPa geopotential height at 6 hourly instantaneous frequency
     dims: [lon, lat, time1, p700]
-    freq: 6hr
     long_name: 6hrPlevPt.zg700
     sources: [model_var: Z700]
     table: atmos
@@ -3552,7 +3256,6 @@ variables:
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
     dims: [lev, site, time1]
-    freq: subhr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: CFsubhr.zg
@@ -3563,7 +3266,6 @@ variables:
   zg_tpt-al-hxy-u:
     description: Geopotential height
     dims: [lon, lat, lev, time1]
-    freq: 6hr
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: 6hrLev.zg
@@ -3578,7 +3280,6 @@ variables:
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
     dims: [lon, lat, plev3, time1]
-    freq: 6hr
     long_name: 6hrPlevPt.zg
     sources: [model_var: Z3]
     table: atmos
@@ -3591,7 +3292,6 @@ variables:
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
     dims: [lon, lat, plev7h, time1]
-    freq: 6hr
     long_name: 6hrPlevPt.zg7h
     sources: [model_var: Z3]
     table: atmos
@@ -3601,7 +3301,6 @@ variables:
     description: 2D monthly mean thermal tropopause calculated using WMO tropopause
       definition on 3d temperature
     dims: [lon, lat, time]
-    freq: mon
     long_name: AERmon.ztp
     sources: [model_var: TROP_Z]
     table: atmos
