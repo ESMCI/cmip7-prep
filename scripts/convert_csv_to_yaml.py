@@ -348,6 +348,8 @@ def sum_dim_detect(variable):
         return "fates_levpft"
     if variable.startswith("FATES") and variable.endswith("LU"):
         return "fates_levlanduse"
+    if variable == "PCT_LANDUNIT":
+        return "ltype"
     return "lev"
 
 
@@ -580,7 +582,6 @@ def read_csv(filepath, config):
     are reconstructed into a ``variants`` list.
     """
     key_col = config["key_column"]
-    print(key_col)
 
     # First pass: collect all (name, entry) pairs, preserving order.
     all_entries = []
