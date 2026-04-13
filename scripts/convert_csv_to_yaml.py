@@ -330,11 +330,15 @@ def include_fates_frac(expr):
         return expr
     return f"({expr})*FATES_FRAC"
 
+
 def sum_dim_detect(variable):
-    """ Detect the dimension to be summed over for a variable"""
+    """Detect the dimension to be summed over for a variable"""
     if variable.startswith("FATES") and variable.endswith("PF"):
         return "fates_levpft"
+    if variable.startswith("FATES") and variable.endswith("LU"):
+        return "fates_levlanduse"
     return "lev"
+
 
 def parse_level_sum_formulas(expr):
     """If the expression contains "FATES" but not "FATES_FRAC", include "FATES_FRAC" as an additional source variable."""
@@ -362,7 +366,7 @@ def parse_level_sum_formulas(expr):
             if var_sum[-1]["model_var"] == "FATES_FRAC":
                 var_sum = var_sum[-2]["model_var"]
             else:
-                var_sum = var_sum[-1]["model_var"]    
+                var_sum = var_sum[-1]["model_var"]
         else:
             var_sum = var_sum[0]["model_var"]
 
@@ -375,9 +379,10 @@ def parse_level_sum_formulas(expr):
         else:
             start, end = level_sum.strip("()").split(":")
             sumlist = list(range(int(start.strip()), int(end.strip()) + 1))
-        sum_expr = f"sumpft({var_sum}, pftlist={sumlist}, dim='{sum_dim}')"
+        sum_expr = f"sumoverpft({var_sum}, pftlist={sumlist}, dim='{sum_dim}')"
         expr_fix = expr_fix.replace(f"{var_sum}{level_sum}", sum_expr)
     return expr_fix
+
 
 def perform_formula_transformations(expr):
     """Apply any necessary transformations to the formula expression."""
@@ -571,7 +576,7 @@ def read_csv(filepath, config):
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            #print(row)
+            # print(row)
             if not should_keep(row, config):
                 continue
             print("keeping row")
