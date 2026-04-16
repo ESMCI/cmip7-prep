@@ -24,13 +24,6 @@ from pathlib import Path
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 
-# Dask
-from dask.distributed import LocalCluster, client
-from dask.distributed import wait, as_completed
-from dask import delayed
-
-from dask_jobqueue import SLURMCluster
-
 #++++++++++++++++++++++++++++++
 # Input argument parser function
 #++++++++++++++++++++++++++++++
@@ -72,8 +65,8 @@ def parse_arguments():
                         ' (default: all files in inputdir are placed in one time series file)')
     parser.add_argument("--workers",
                         type=int,
-                        default=1,
-                        help="Number of Dask workers (default: 1, set to >1 for parallel execution)",
+                        default=32,
+                        help="Number of workers (default: 32)",
                         )
 
     # Parse Argument inputs
@@ -102,26 +95,14 @@ def main():
     )
     logger = logging.getLogger("gen_timseries")
 
-    # Set up dask if appropriate
-    if args.workers == 1:
-        client = None
-        cluster = None
-    else:
-        cluster = LocalCluster(
-            n_workers=args.workers, threads_per_worker=1, memory_limit="8GB",
-        )
-        client = cluster.get_client()
-
     # For each file in list of files - regrid data
     debug = args.debug
 
     # Determine include patterns
     if args.realm == "atmos":
-        include_patterns = ["*cam.h0a*"]
-        frequency = "mon"
+        include_patterns = ["*cam.h0a*","*cam.h0i*","*cam.h1a*"]
     elif args.realm == "land":
         include_patterns = ["*clm2.h0a*"]
-        frequency = "mon"
 
     # Determine input directory
     inputdir = Path(args.inputdir)
@@ -132,6 +113,10 @@ def main():
     else:
         outputdir = inputdir / '..' / 'time_series'
 
+    # Determine parallelization
+    workers = args.workers
+    logger.info(f"Number of workers is {workers}")
+
     # Create time series by default
     logger.info(f"Timeseries generation starting for files in {inputdir}...")
     logger.info(f"  output will be placed in {outputdir}...")
@@ -139,7 +124,12 @@ def main():
     # Determine number of files used in time series creation
     cnt = 0
     for include_pattern in include_patterns:
-        cnt = cnt + len(glob.glob(os.path.join(inputdir, include_pattern)))
+        num = len(glob.glob(os.path.join(inputdir, include_pattern)))
+        if num == 0:
+            include_patterns.remove(include_pattern)
+        else:
+            cnt = cnt + num
+            logger.info(f"Processing {num} files with {include_pattern}")
     if cnt == 0:
         logger.warning(f"No input files to process in {inputdir} with {include_patterns}")
         sys.exit(0)
@@ -147,15 +137,18 @@ def main():
     # Determine how time series will be created
     if not args.years_spec:
 
-        logger.info("Starting ts_collection")
+        logger.info(f"Include patterns are {[include_patterns]}")
 
         # Create base HFCollection
-        hf_collection = HFCollection(inputdir, dask_client=client)
-        hf_collection = hf_collection.include_patterns([include_pattern])
-        hf_collection.pull_metadata()
+        logger.info("Starting hf_collection")
+        hf_collection = HFCollection(inputdir, num_processes=workers)
+        #hf_collection = hf_collection.include(["*cam.h0a*"])
+        hf_collection = hf_collection.include(include_patterns)
+        logger.info("Finished hf_collection")
         
         # Create base TSCollection
-        ts_collection = TSCollection(hf_collection, outputdir)
+        logger.info("Starting ts_collection")
+        ts_collection = TSCollection(hf_collection, outputdir, num_processes=workers)
         ts_collection = ts_collection.apply_overwrite("*")
         ts_collection.execute()
         logger.info("Finished ts_collection")
@@ -170,7 +163,7 @@ def main():
         logger.info("Last year to use is %s",year_last)
         logger.info("Year increment for time series generation is %s",nyears)
 
-        hf_collection = HFCollection(inputdir, dask_client=client)
+        hf_collection = HFCollection(inputdir, num_processes=workers)
         for include_pattern in include_patterns:
             logger.info("Processing files with pattern: %s", include_pattern)
 
@@ -189,9 +182,7 @@ def main():
 
                 # Set up the time series generation for this pattern's files
                 logger.info("Calling ts_collection")
-                ts_collection = TSCollection(
-                    hfp_collection, outputdir, ts_orders=None, dask_client=client
-                )
+                ts_collection = TSCollection(hfp_collection, outputdir, ts_orders=None, num_processes=workers)
                 logger.info("Finished ts_collection")
 
                 # Apply overwrite if requested:
@@ -202,11 +193,6 @@ def main():
                 # Perform the time series generation for this pattern
                 ts_collection.execute()
                 logger.info("Timeseries processing complete")
-
-    if client:
-        client.close()
-    if cluster:
-        cluster.close()
 
 if __name__ == "__main__":
     main()
