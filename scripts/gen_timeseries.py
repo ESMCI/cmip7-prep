@@ -117,7 +117,7 @@ def main():
     if args.realm == "atmos":
         include_patterns = ["*cam.h0a*", "*cam.h0i*", "*cam.h1a*"]
     elif args.realm == "land":
-        include_patterns = ["*clm2.h0a*"]
+        include_patterns = ["*clm2.h0a*", "*clm2.h0i*"]
 
     # Determine input directory
     inputdir = Path(args.inputdir)
@@ -154,12 +154,11 @@ def main():
     # Determine how time series will be created
     if not args.years_spec:
 
-        logger.info(f"Include patterns are {[include_patterns]}")
+        logger.info(f"Include patterns are {include_patterns}")
 
         # Create base HFCollection
         logger.info("Starting hf_collection")
         hf_collection = HFCollection(inputdir, num_processes=workers)
-        # hf_collection = hf_collection.include(["*cam.h0a*"])
         hf_collection = hf_collection.include(include_patterns)
         logger.info("Finished hf_collection")
 
