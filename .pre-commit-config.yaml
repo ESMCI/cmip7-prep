@@ -8,10 +8,10 @@ repos:
       - id: trailing-whitespace
       - id: debug-statements
   - repo: https://github.com/psf/black
-    rev: 25.9.0
+    rev: 26.3.1
     hooks:
       - id: black
   - repo: https://github.com/PyCQA/pylint
-    rev: v3.3.9
+    rev: v4.0.5
     hooks:
       - id: pylint
