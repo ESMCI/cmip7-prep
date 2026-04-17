@@ -190,7 +190,7 @@ class TestShouldKeepNorESM:
 
     def _row(self, realm, source):
         return {
-            "Modelling Realm-Primary": realm,
+            "Modelling Realm - Primary": realm,
             "NorESM3 name (dependency)": source,
         }
 
@@ -400,7 +400,7 @@ class TestReadCsvNorESM:
 
     FIELDNAMES = [
         "Branded Variable Name",
-        "Modelling Realm-Primary",
+        "Modelling Realm - Primary",
         "CMIP6 Compound Name",
         "Description",
         "Units (from Physical Parameter)",
@@ -415,7 +415,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tas",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "CMIP6 Compound Name": "Near-Surface Air Temperature",
                 "Description": "Temperature at 2m",
                 "Units (from Physical Parameter)": "K",
@@ -430,16 +430,16 @@ class TestReadCsvNorESM:
         assert var["table"] == "atmos"
         assert var["long_name"] == "Near-Surface Air Temperature"
         assert var["units"] == "K"
-        assert var["sources"] == [{"model_var": "TREFHT"}]
+        assert var["sources"] == [{"model_var": "TREFHT", "freq": "mon"}]
         assert "formula" not in var
-        assert var["freq"] == "mon"
+        assert var["sources"][0]["freq"] == "mon"
 
     def test_math_formula_stored(self, tmp_path):
         """A math expression is stored as formula and sources are extracted."""
         rows = [
             {
                 "Branded Variable Name": "pr",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "Units (from Physical Parameter)": "kg m-2 s-1",
                 "Dimensions": "time, lat, lon",
                 "NorESM3 name (dependency)": "PRECC + PRECL",
@@ -459,7 +459,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "ta",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "Units (from Physical Parameter)": "K",
                 "Dimensions": "time, lev, lat, lon",
                 "NorESM3 name (dependency)": "T",
@@ -480,7 +480,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tos",
-                "Modelling Realm-Primary": "atmos",  # contrived, just testing dim logic
+                "Modelling Realm - Primary": "atmos",  # contrived, just testing dim logic
                 "Dimensions": "time, olevel, lat, lon",
                 "NorESM3 name (dependency)": "SST",
                 "CMIP6 Compound Name": "",
@@ -497,7 +497,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tas",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "Dimensions": "time, lat, lon",
                 "NorESM3 name (dependency)": "TREFHT",
                 "CMIP6 Compound Name": "",
@@ -514,7 +514,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tos",
-                "Modelling Realm-Primary": "ocean",
+                "Modelling Realm - Primary": "ocean",
                 "NorESM3 name (dependency)": "SST",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -531,7 +531,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "v1",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "n/a",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -541,7 +541,7 @@ class TestReadCsvNorESM:
             },
             {
                 "Branded Variable Name": "v2",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "derived",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -551,7 +551,7 @@ class TestReadCsvNorESM:
             },
             {
                 "Branded Variable Name": "v3",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "TREFHT",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -568,7 +568,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tas",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "TREFHT",
                 "CMIP6 Compound Name": "",
                 "Description": "",
@@ -586,7 +586,7 @@ class TestReadCsvNorESM:
         rows = [
             {
                 "Branded Variable Name": "tas",
-                "Modelling Realm-Primary": "atmos",
+                "Modelling Realm - Primary": "atmos",
                 "NorESM3 name (dependency)": "TREFHT",
                 "Dimensions": "time, longitude, latitude",
                 "CMIP6 Compound Name": "",
