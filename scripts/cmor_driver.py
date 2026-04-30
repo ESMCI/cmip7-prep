@@ -106,13 +106,17 @@ INCLUDE_PATTERN_MAP = {
     },
     "noresm": {
         "atmos": {
-            "mon": ["cam.h0"],
-            "day": ["cam.h1"],
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
             "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
+            "3hr": ["cam.h4a"],
         },
         "land": {
             "mon": ["clm2.h0a"],
+            "day": ["clm2.h1a"],
+            "3hr": ["clm2.h2a"],
+            "yr": ["clm2.h3a"],
+
         },
     },
 }
