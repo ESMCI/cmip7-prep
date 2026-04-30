@@ -544,7 +544,6 @@ def _build_entry(row, config):
     if "sources" in entry and (scale_str or freq_str or alias_str):
         sources = entry["sources"]
         n = len(sources)
-
         scales = _split_positional(scale_str or "", n)
         freqs = _split_positional(freq_str or "", n)
         aliases = _split_positional(alias_str or "", n)
