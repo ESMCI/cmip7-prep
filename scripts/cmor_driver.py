@@ -239,6 +239,11 @@ def parse_args():
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="log output level",
     )
+    parser.add_argument(
+        "--custom-yaml",
+        default=False,
+        help="Path to custom YAML mapping file (optional, overrides default packaged YAML)",
+    )
 
     args = parser.parse_args()
     return args
@@ -369,7 +374,7 @@ def process_one_var(
                 results.append(
                     (str(varname), "analyzed native mom6 grid (realize applied)")
                 )
-            elif model == "cesm" and realm == "seaIce" and len(dims) == 1:
+            elif realm == "seaIce" and len(dims) == 1:
                 logger.info(
                     f"Preparing seaIce field variants via realize_all for {varname}"
                 )
@@ -714,7 +719,10 @@ def main():
             glob_pattern = "*.nc"
 
         # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml or noresm_to_cmip7.yaml)
-        if model == "noresm":
+        if custom_yaml := args.custom_yaml:
+            logger.info(f"Using custom YAML mapping file: {custom_yaml}")
+            mapping = Mapping.from_yaml(custom_yaml)
+        elif model == "noresm":
             mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
         else:
             mapping = Mapping.from_packaged_default()
