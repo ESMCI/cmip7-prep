@@ -626,6 +626,9 @@ def read_csv(filepath, config):
 
                 base["variants"] = variants
                 data[name] = base
+            else:
+                # For atmos/land: no variants, no freq — just use first entry's base fields.
+                data[name] = base
 
     return {
         "dataset_overrides": config["dataset_overrides"],
