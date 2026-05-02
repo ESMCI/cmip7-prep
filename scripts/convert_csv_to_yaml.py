@@ -541,18 +541,24 @@ def _build_entry(row, config):
     scale_str = entry.pop("_scale", None)
     freq_str = entry.pop("_freq", None)
     alias_str = entry.pop("_alias", None)
-    if "sources" in entry and (scale_str or freq_str or alias_str):
+    if (
+        "sources" in entry
+        and (scale_str or freq_str or alias_str)
+        and entry.get("table") == "seaIce"
+    ):
         sources = entry["sources"]
         n = len(sources)
         scales = _split_positional(scale_str or "", n)
         freqs = _split_positional(freq_str or "", n)
         aliases = _split_positional(alias_str or "", n)
+
         for i, src in enumerate(sources):
             if scales[i]:
                 try:
                     src["scale"] = float(scales[i])
                 except ValueError:
                     pass
+
             if freqs[i]:
                 src["freq"] = freqs[i]
             if aliases[i]:
@@ -588,10 +594,8 @@ def read_csv(filepath, config):
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            # print(row)
             if not should_keep(row, config):
                 continue
-            print("keeping row")
             name = row[key_col].strip()
             if not name:
                 continue
@@ -613,12 +617,15 @@ def read_csv(filepath, config):
             # Multiple rows → variants variable.
             # Base fields come from the first row (they are identical across rows).
             base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
-            variants = []
-            for e in entries:
-                variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
-                variants.append(variant)
-            base["variants"] = variants
-            data[name] = base
+            if entries[0]["table"] == "seaIce":
+                variants = []
+                for e in entries:
+
+                    variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
+                    variants.append(variant)
+
+                base["variants"] = variants
+                data[name] = base
 
     return {
         "dataset_overrides": config["dataset_overrides"],
