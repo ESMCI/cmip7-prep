@@ -34,7 +34,6 @@ MODEL_CONFIGS = {
         "key_column": "Branded Variable Name",
         "column_map": {
             "Modelling Realm - Primary": "table",
-            "CMIP6 Compound Name": "long_name",
             "Description": "description",
             "Units (from Physical Parameter)": "units",
             "Dimensions": "dims",
