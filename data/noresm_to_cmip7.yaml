@@ -833,6 +833,7 @@ variables:
   hfls_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: LHFLX]
     table: atmos
     units: W m-2
@@ -840,6 +841,7 @@ variables:
   hfss_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
@@ -1450,6 +1452,7 @@ variables:
   rlds_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -1464,6 +1467,7 @@ variables:
   rls_tavg-u-hxy-u:
     description: Net longwave surface radiation
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FLNS]
     table: atmos
     units: W m-2
@@ -1499,6 +1503,7 @@ variables:
   rlut_tavg-u-hxy-u:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
     units: W m-2
@@ -1506,6 +1511,7 @@ variables:
   rlutcs_tavg-u-hxy-u:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
     units: W m-2
@@ -1544,6 +1550,7 @@ variables:
   rsds_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FSDS]
     table: atmos
     units: W m-2
@@ -1551,6 +1558,7 @@ variables:
   rsdscs_tavg-u-hxy-u:
     description: Surface solar irradiance clear sky for UV calculations
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FSDSC]
     table: atmos
     units: W m-2
@@ -1567,6 +1575,7 @@ variables:
   rsdt_tavg-u-hxy-u:
     description: at the top of the atmosphere
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FSNTOA, model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -1574,6 +1583,7 @@ variables:
   rss_tavg-u-hxy-u:
     description: Net downward shortwave radiation at the surface
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FSNS]
     table: atmos
     units: W m-2
@@ -1620,6 +1630,7 @@ variables:
   rsuscs_tavg-u-hxy-u:
     description: Surface Upwelling Clear-sky Shortwave Radiation
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
     units: W m-2
@@ -1627,6 +1638,7 @@ variables:
   rsut_tavg-u-hxy-u:
     description: at the top of the atmosphere
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -1634,6 +1646,7 @@ variables:
   rsutcs_tavg-u-hxy-u:
     description: Calculated in the absence of clouds.
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
     units: W m-2
@@ -1644,6 +1657,7 @@ variables:
       the net downward radiative flux at the top of the atmosphere.
     dims: [lon, lat, time]
     formula: FSNT-FLNT
+    positive: down
     sources: [model_var: FSNT, model_var: FLNT]
     table: atmos
     units: W m-2
@@ -1794,6 +1808,7 @@ variables:
   tauu_tavg-u-hxy-u:
     description: Downward eastward wind stress at the surface
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: TAUX]
     table: atmos
     units: Pa
@@ -1801,6 +1816,7 @@ variables:
   tauv_tavg-u-hxy-u:
     description: Downward northward wind stress at the surface
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: TAUY]
     table: atmos
     units: Pa

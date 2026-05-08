@@ -6,6 +6,33 @@ import sys
 import argparse
 from typing import Optional
 
+# ── NorESM positive attribute overrides ──────────────────────────────────────
+# Maps branded variable name → "up" or "down".
+# Entries here are written as `positive: <value>` in the NorESM output YAML.
+NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
+    # "<branded_variable_name>": "up",
+    # "<branded_variable_name>": "down",
+    "hfls_tavg-u-hxy-u": "down",
+    "hfss_tavg-u-hxy-u": "down",
+    "rlds_tavg-u-hxy-u": "down",
+    "rls_tavg-u-hxy-u": "down",
+    "rlut_tavg-u-hxy-u": "down",
+    "rlutcs_tavg-u-hxy-u": "down",
+    "rlut_tavg-u-hxy-u": "down",
+    "rlutcs_tavg-u-hxy-u": "down",
+    "rsds_tavg-u-hxy-u": "down",
+    "rsdscs_tavg-u-hxy-u": "down",
+    "rsdt_tavg-u-hxy-u": "down",
+    "rss_tavg-u-hxy-u": "down",
+    "rsuscs_tavg-u-hxy-u": "down",
+    "rsutcs_tavg-u-hxy-u": "down",
+    "rsut_tavg-u-hxy-u": "down",
+    "rsutcs_tavg-u-hxy-u": "down",
+    "rtmt_tavg-u-hxy-u": "down",
+    "tauu_tavg-u-hxy-u": "down",
+    "tauv_tavg-u-hxy-u": "down"
+}
+
 # ── model configurations ─────────────────────────────────────────────────────
 # Each config defines how to read a model-specific CSV and what metadata to write.
 #
@@ -57,6 +84,7 @@ MODEL_CONFIGS = {
             "_tminavg-",
             "_tminavg-",
         ],
+        "positive_overrides": NORESM_POSITIVE_OVERRIDES,
     },
     "cesm": {
         "default_input": "cesm_data.csv",
@@ -616,6 +644,9 @@ def read_csv(filepath, config):
             if not name:
                 continue
             entry = _build_entry(row, config)
+            positive = config.get("positive_overrides", {}).get(name)
+            if positive:
+                entry["positive"] = positive
 
             all_entries.append((name, entry))
 
