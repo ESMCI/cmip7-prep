@@ -18,8 +18,6 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "rls_tavg-u-hxy-u": "down",
     "rlut_tavg-u-hxy-u": "down",
     "rlutcs_tavg-u-hxy-u": "down",
-    "rlut_tavg-u-hxy-u": "down",
-    "rlutcs_tavg-u-hxy-u": "down",
     "rsds_tavg-u-hxy-u": "down",
     "rsdscs_tavg-u-hxy-u": "down",
     "rsdt_tavg-u-hxy-u": "down",
@@ -27,7 +25,6 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "rsuscs_tavg-u-hxy-u": "down",
     "rsutcs_tavg-u-hxy-u": "down",
     "rsut_tavg-u-hxy-u": "down",
-    "rsutcs_tavg-u-hxy-u": "down",
     "rtmt_tavg-u-hxy-u": "down",
     "tauu_tavg-u-hxy-u": "down",
     "tauv_tavg-u-hxy-u": "down"
