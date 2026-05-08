@@ -569,6 +569,9 @@ def _build_entry(row, config):
         entry["levels"] = levels
     elif plev_name:
         entry["levels"] = {"name": plev_name, "units": "Pa"}
+        if plev_name == "plev39" and entry.get("sources"):
+            src_var = entry["sources"][0]["model_var"]
+            entry["formula"] = f'zonal_mean_on_pressure_grid("{src_var}")'
     elif "dims" in entry and "lev" in entry["dims"]:
         # Fallback for models without explicit levels columns (e.g., NorESM).
         entry["levels"] = {
