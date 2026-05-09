@@ -1755,6 +1755,7 @@ variables:
   ta_tavg-p39-hy-air:
     description: Air Temperature
     dims: [time, plev, lat]
+    formula: zonal_mean_on_pressure_grid("T")
     levels: {name: plev39, units: Pa}
     sources: [model_var: T]
     table: atmos
@@ -1955,6 +1956,7 @@ variables:
   ua_tavg-p39-hy-air:
     description: Zonal wind (positive in a eastward direction).
     dims: [time, plev, lat]
+    formula: zonal_mean_on_pressure_grid("U")
     levels: {name: plev39, units: Pa}
     sources: [model_var: U]
     table: atmos
@@ -1980,6 +1982,7 @@ variables:
   va_tavg-p39-hy-air:
     description: Meridional wind (positive in a northward direction).
     dims: [time, plev, lat]
+    formula: zonal_mean_on_pressure_grid("V")
     levels: {name: plev39, units: Pa}
     sources: [model_var: V]
     table: atmos
@@ -2125,6 +2128,7 @@ variables:
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
     dims: [time, plev, lat]
+    formula: zonal_mean_on_pressure_grid("Z3")
     levels: {name: plev39, units: Pa}
     sources: [model_var: Z3]
     table: atmos
