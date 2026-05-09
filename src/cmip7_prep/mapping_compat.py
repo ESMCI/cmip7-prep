@@ -56,7 +56,6 @@ import logging
 import numpy as np
 import xarray as xr
 import yaml  # runtime dep
-from cmip7_prep.regrid import zonal_mean_on_pressure_grid as _zonal_mean_on_pressure_grid
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -174,7 +173,7 @@ class VarConfig:
         return {k: v for k, v in d.items() if v is not None}
 
 
-def _safe_eval(expr: str, local_names: Dict[str, Any], ds: Optional[xr.Dataset] = None) -> Any:
+def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     """Evaluate a formula string in a restricted namespace.
 
     Built-in Python names are blocked (``__builtins__`` is empty).  The
@@ -187,9 +186,6 @@ def _safe_eval(expr: str, local_names: Dict[str, Any], ds: Optional[xr.Dataset] 
       along a soil/vertical dimension, optionally capping the result.
     * ``sumoverpft(arr, pftlist, dimname)`` – sum a DataArray over a subset
       of PFT indices along a named dimension.
-    * ``zonal_mean_on_pressure_grid(var_name)`` – interpolate a model variable
-      to a pressure grid and compute the zonal mean; only available when *ds*
-      is provided.
 
     Parameters
     ----------
@@ -259,11 +255,6 @@ def _safe_eval(expr: str, local_names: Dict[str, Any], ds: Optional[xr.Dataset] 
             "sumoverpft": sumoverpft,
         }
     )
-
-    if ds is not None:
-        def zonal_mean_on_pressure_grid(var_name: str) -> xr.DataArray:
-            return _zonal_mean_on_pressure_grid(ds, var_name)
-        safe_locals["zonal_mean_on_pressure_grid"] = zonal_mean_on_pressure_grid
     # pylint: disable=eval-used
     return eval(expr, safe_globals, safe_locals)
 
@@ -680,7 +671,7 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
                 vc.name,
                 model_vars,
             )
-            result = _safe_eval(vc.formula, da_dict, ds=ds)
+            result = _safe_eval(vc.formula, da_dict)
 
         except Exception as exc:
             raise ValueError(f"Error evaluating formula for {vc.name}: {exc}") from exc
