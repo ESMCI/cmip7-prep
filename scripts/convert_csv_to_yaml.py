@@ -62,7 +62,6 @@ MODEL_CONFIGS = {
             "Units (from Physical Parameter)": "units",
             "Dimensions": "dims",
             "NorESM3 name (dependency)": "_source_expr",
-            "CMIP7 Freq.": "_freq",
         },
         "realm_column": "Modelling Realm - Primary",
         "keep_realms": ["atmos", "land"],
