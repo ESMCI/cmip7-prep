@@ -28,7 +28,6 @@ CESM_COLUMNS = [
     "Dimensions",
     "CESM Variable Name",  # comma-separated source variable name(s); used by convert_csv_to_yaml.py as skip filter
     "Formula",  # the formula string, present only when original had one
-    "Scale",  # comma-separated scale factors, positionally aligned with CESM Variable Name
     "Freq",  # comma-separated sampling frequencies, positionally aligned with CESM Variable Name
     "Alias",  # comma-separated source aliases, positionally aligned with CESM Variable Name
     "Cell Methods",
@@ -45,15 +44,15 @@ CESM_COLUMNS = [
 def sources_to_names(sources: list[dict]) -> str:
     """Return a comma-separated list of model variable names from *sources*.
 
-    Only the ``model_var`` field is included; scale factors and other
-    sub-fields are intentionally omitted so the result is a plain list of
+    Only the ``model_var`` field is included;
+    sub-fields that are intentionally omitted so the result is a plain list of
     CESM variable names suitable for the ``CESM Variable Name`` CSV column.
 
     >>> sources_to_names([{"model_var": "TREFHT"}])
     'TREFHT'
     >>> sources_to_names([{"model_var": "PRECC"}, {"model_var": "PRECL"}])
     'PRECC, PRECL'
-    >>> sources_to_names([{"model_var": "QFLX", "scale": -1.0}])
+    >>> sources_to_names([{"model_var": "sialgc", "freq": "day"}])
     'QFLX'
     >>> sources_to_names([])
     ''
@@ -63,32 +62,30 @@ def sources_to_names(sources: list[dict]) -> str:
     )
 
 
-def sources_to_scale_freq_alias(sources: list[dict]) -> tuple[str, str, str]:
-    """Return (scale_str, freq_str, alias_str) for the Scale/Freq/Alias CSV columns.
+def sources_to_freq_alias(sources: list[dict]) -> tuple[str, str, str]:
+    """Return (freq_str, alias_str) for the Freq/Alias CSV columns.
 
     Each returned string is a comma-separated list positionally aligned with
     the ``CESM Variable Name`` column.  If all sources lack a given attribute
     the corresponding string is empty.
 
-    >>> sources_to_scale_freq_alias([{"model_var": "TREFHT"}])
-    ('', '', '')
-    >>> sources_to_scale_freq_alias([{"model_var": "QFLX", "scale": -1.0}])
-    ('-1.0', '', '')
-    >>> sources_to_scale_freq_alias([{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}])
-    ('', 'day, ', '')
-    >>> sources_to_scale_freq_alias([{"model_var": "A", "scale": 0.001, "freq": "day", "alias": "a"}, {"model_var": "B", "scale": 0.001}])
-    ('0.001, 0.001', 'day, ', 'a, ')
-    >>> sources_to_scale_freq_alias([])
+    >>> sources_to_freq_alias([{"model_var": "TREFHT"}])
+    ('', '')
+    >>> sources_to_freq_alias([{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}])
+    ( 'day, ', '')
+    >>> sources_to_freq_alias([{"model_var": "A", "freq": "day", "alias": "a"}, {"model_var": "B"}])
+    ('day, ', 'a, ')
+    >>> sources_to_freq_alias([])
     ('', '', '')
     """
     if not sources:
-        return ("", "", "")
+        return ("", "")
 
     def _col(attr):
         vals = [str(src.get(attr, "")) for src in sources]
         return ", ".join(vals) if any(v for v in vals) else ""
 
-    return (_col("scale"), _col("freq"), _col("alias"))
+    return (_col("freq"), _col("alias"))
 
 
 def variable_to_rows(name: str, var: dict) -> list:
@@ -97,7 +94,7 @@ def variable_to_rows(name: str, var: dict) -> list:
     Variables without ``variants`` produce a single row.  Variables with
     ``variants`` produce one row per variant, each carrying the variant's
     ``formula``, ``long_name``, and ``region``.  Per-source attributes
-    (``scale``, ``freq``, ``alias``) are written to the ``Scale``, ``Freq``,
+    (``freq``, ``alias``) are written to the ``Freq``,
     and ``Alias`` columns as comma-separated values positionally aligned with
     ``CESM Variable Name``.
 
@@ -110,8 +107,6 @@ def variable_to_rows(name: str, var: dict) -> list:
     'TREFHT'
     >>> rows[0]["Formula"]
     ''
-    >>> rows[0]["Scale"]
-    ''
     >>> rows[0]["Dimensions"]
     '["time", "lat", "lon"]'
     >>> rows[0]["Region"]
@@ -122,13 +117,6 @@ def variable_to_rows(name: str, var: dict) -> list:
     'PRECC + PRECL'
     >>> rows2[0]["CESM Variable Name"]
     'PRECC, PRECL'
-
-    >>> var_with_scale = {"table": "atmos", "units": "kg m-2 s-1", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "QFLX", "scale": -1.0}]}
-    >>> rows_scale = variable_to_rows("evspsbl", var_with_scale)
-    >>> rows_scale[0]["Formula"]
-    ''
-    >>> rows_scale[0]["Scale"]
-    '-1.0'
 
     >>> var_with_variants = {"table": "seaIce", "units": "m2", "dims": ["time"], "sources": [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}], "variants": [{"long_name": "NH", "region": "nh", "formula": "siconc.where(lat>0)"}, {"long_name": "SH", "region": "sh", "formula": "siconc.where(lat<0)"}]}
     >>> rows3 = variable_to_rows("siarea_tavg-u-hm-u", var_with_variants)
@@ -156,7 +144,7 @@ def variable_to_rows(name: str, var: dict) -> list:
     # Use JSON so that list-of-lists dims round-trip correctly.
     dims_str = json.dumps(dims)
 
-    scale_str, freq_str, alias_str = sources_to_scale_freq_alias(sources)
+    freq_str, alias_str = sources_to_freq_alias(sources)
 
     base = {
         "CMIP Variable Name": name,
@@ -167,7 +155,6 @@ def variable_to_rows(name: str, var: dict) -> list:
         "Cell Methods": var.get("cell_methods", ""),
         "Regrid Method": var.get("regrid_method", ""),
         "Positive": var.get("positive", ""),
-        "Scale": scale_str,
         "Freq": freq_str,
         "Alias": alias_str,
         "Levels Name": levels.get("name", ""),
