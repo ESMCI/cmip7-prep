@@ -835,7 +835,7 @@ class TestReadCsvCESM:
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
         var = data["variables"]["evspsbl"]
-        assert var["sources"] == [{"model_var": "QFLX", "scale": -1.0}]
+        assert var["sources"] == [{"model_var": "QFLX"}]
 
     def test_freq_from_column(self, tmp_path):
         """Freq column is merged positionally into the sources list."""
@@ -878,25 +878,6 @@ class TestReadCsvCESM:
         assert sources[0] == {"model_var": "siconc_d", "freq": "day", "alias": "siconc"}
         assert sources[1] == {"model_var": "siconc", "freq": "mon"}
         assert sources[2] == {"model_var": "tarea"}
-
-    def test_scale_stored_as_float(self, tmp_path):
-        """Scale values are stored as floats, not strings."""
-        rows = [
-            self._row(
-                **{
-                    "CMIP Variable Name": "pr",
-                    "Table": "atmos",
-                    "Units": "kg m-2 s-1",
-                    "Dimensions": "time, lat, lon",
-                    "CESM Variable Name": "PRECT",
-                    "Scale": "1000.0",
-                }
-            )
-        ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        scale = data["variables"]["pr"]["sources"][0]["scale"]
-        assert isinstance(scale, float)
-        assert scale == 1000.0
 
     def test_multi_source_formula(self, tmp_path):
         """Multiple sources in CESM Variable Name with a formula expression."""

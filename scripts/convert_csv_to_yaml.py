@@ -27,7 +27,7 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "rsut_tavg-u-hxy-u": "down",
     "rtmt_tavg-u-hxy-u": "down",
     "tauu_tavg-u-hxy-u": "down",
-    "tauv_tavg-u-hxy-u": "down"
+    "tauv_tavg-u-hxy-u": "down",
 }
 
 # ── model configurations ─────────────────────────────────────────────────────
@@ -100,9 +100,8 @@ MODEL_CONFIGS = {
             "Dimensions": "dims",
             "CESM Variable Name": "_source_expr",
             # "Formula" overrides _source_expr when present (round-trip format).
-            # "Scale", "Freq", "Alias" are merged into sources in post-processing.
+            # "Freq", "Alias" are merged into sources in post-processing.
             "Formula": "_formula",
-            "Scale": "_scale",
             "Freq": "_freq",
             "Alias": "_alias",
             "Cell Methods": "cell_methods",
@@ -509,18 +508,14 @@ def _build_entry(row, config):
             else:
                 dims = clean_strings(value.split(","), normalize)
             entry["dims"] = dims
-            plev_dim = next(
-                (d for d in entry["dims"] if re.match(r"^plev\d", d)), None
-            )
+            plev_dim = next((d for d in entry["dims"] if re.match(r"^plev\d", d)), None)
             if plev_dim:
                 _DIM_ORDER = ["time", "plev", "lat", "lon"]
-                entry["dims"] = [
-                    "plev" if d == plev_dim else d for d in entry["dims"]
-                ]
+                entry["dims"] = ["plev" if d == plev_dim else d for d in entry["dims"]]
                 entry["dims"].sort(
-                    key=lambda d: _DIM_ORDER.index(d)
-                    if d in _DIM_ORDER
-                    else len(_DIM_ORDER)
+                    key=lambda d: (
+                        _DIM_ORDER.index(d) if d in _DIM_ORDER else len(_DIM_ORDER)
+                    )
                 )
                 entry["_plev_name"] = plev_dim
         elif yaml_key == "units":
@@ -529,7 +524,7 @@ def _build_entry(row, config):
             names = _parse_csv_identifiers(value)
             if names is not None:
                 # New format: comma-separated plain variable names.
-                # Scale/Freq/Alias will be merged in post-processing.
+                # Freq/Alias will be merged in post-processing.
                 entry["sources"] = [{"model_var": n} for n in names]
             else:
                 result = analyse_expression(value)
@@ -539,7 +534,7 @@ def _build_entry(row, config):
                 else:
                     entry["sources"] = result["variables"]
 
-        elif yaml_key in ("_scale", "_freq", "_alias"):
+        elif yaml_key in ("_freq", "_alias"):
             entry[yaml_key] = value
 
         else:
@@ -577,28 +572,20 @@ def _build_entry(row, config):
             "src_axis_bnds": "ilev",
         }
 
-    # Merge Scale/Freq/Alias columns into the per-source dicts.
-    scale_str = entry.pop("_scale", None)
+    # Merge Freq/Alias columns into the per-source dicts.
     freq_str = entry.pop("_freq", None)
     alias_str = entry.pop("_alias", None)
     if (
         "sources" in entry
-        and (scale_str or freq_str or alias_str)
+        and (freq_str or alias_str)
         and entry.get("table") == "seaIce"
     ):
         sources = entry["sources"]
         n = len(sources)
-        scales = _split_positional(scale_str or "", n)
         freqs = _split_positional(freq_str or "", n)
         aliases = _split_positional(alias_str or "", n)
 
         for i, src in enumerate(sources):
-            if scales[i]:
-                try:
-                    src["scale"] = float(scales[i])
-                except ValueError:
-                    pass
-
             if freqs[i]:
                 src["freq"] = freqs[i]
             if aliases[i]:
@@ -690,7 +677,7 @@ def write_yaml(data, filepath):
     for line in lines:
         if "{model_var:" in line:
             # Only reformat single-key source dicts: {model_var: VAR} → model_var: VAR
-            # Leave multi-key dicts (e.g. {model_var: VAR, scale: -1.0}) untouched.
+            # Leave multi-key dicts (e.g. {model_var: VAR, freq: mon}) untouched.
             line = re.sub(r"\{model_var: (\w+)\}", r"model_var: \1", line)
         if "FATES_FRAC" in line:
             line = line.replace("FATES_FRAC", "FATES_FRACTION")
