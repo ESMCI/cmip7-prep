@@ -328,4 +328,9 @@ def realize_regrid_prepare(
     if aux:
         ds_regr = ds_regr.merge(ds_native[aux], compat="override")
 
+    # 9) For plev39: take zonal mean over lon after regridding to lat/lon.
+    if lev_kind == "plev39" and "lon" in ds_regr[str(cmip_var)].dims:
+        logger.info("Applying zonal mean over lon for plev39 variable: %s", cmip_var)
+        ds_regr[str(cmip_var)] = ds_regr[str(cmip_var)].mean("lon")
+
     return ds_regr

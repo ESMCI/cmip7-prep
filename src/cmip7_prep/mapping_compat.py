@@ -533,7 +533,6 @@ def _to_varconfig(
 
     # Only support CMIP7 'sources' key
     raw_from_sources: Optional[List[str]] = None
-    scale_from_sources = None
     formula = cfg.get("formula")
     source = None
 
@@ -548,8 +547,7 @@ def _to_varconfig(
             raw_from_sources.append(mv)
             alias = str(item.get("alias", mv))
             aliases[alias] = mv
-            if scale_from_sources is None and "scale" in item:
-                scale_from_sources = item["scale"]
+
         elif isinstance(item, str):
             raw_from_sources.append(item)
             aliases[item] = item
@@ -561,8 +559,6 @@ def _to_varconfig(
         aliases = {}
 
     unit_conversion = cfg.get("unit_conversion")
-    if scale_from_sources is not None:
-        unit_conversion = {"scale": scale_from_sources}
 
     vc = VarConfig(
         name=name,
@@ -686,37 +682,4 @@ def _realize_core(ds: xr.Dataset, vc: VarConfig) -> xr.DataArray:
 
     raise ValueError(
         f"Mapping for {vc.name} is incomplete: set 'source' or 'raw_variables' or 'formula'."
-    )
-
-
-def _apply_unit_conversion(da: xr.DataArray, rule: Any) -> xr.DataArray:
-    """Apply a unit conversion rule to a DataArray.
-
-    >>> import xarray as xr
-    >>> da = xr.DataArray([1.0, 2.0, 3.0])
-    >>> _apply_unit_conversion(da, {"scale": 2.0}).values.tolist()
-    [2.0, 4.0, 6.0]
-    >>> _apply_unit_conversion(da, {"offset": 10.0}).values.tolist()
-    [11.0, 12.0, 13.0]
-    >>> _apply_unit_conversion(da, "x * 2").values.tolist()
-    [2.0, 4.0, 6.0]
-    """
-    if isinstance(rule, str):
-        try:
-            out = _safe_eval(rule, {"x": da})
-        except Exception as exc:
-            raise ValueError(
-                f"Error evaluating unit_conversion expression: {exc}"
-            ) from exc
-        if not isinstance(out, xr.DataArray):
-            raise ValueError("unit_conversion expression did not return a DataArray")
-        return out
-
-    if isinstance(rule, dict):
-        scale = rule.get("scale", 1.0)
-        offset = rule.get("offset", 0.0)
-        return da * float(scale) + float(offset)
-
-    raise TypeError(
-        "unit_conversion must be a string expression or a dict with 'scale'/'offset'"
     )

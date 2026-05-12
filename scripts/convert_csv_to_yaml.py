@@ -6,6 +6,30 @@ import sys
 import argparse
 from typing import Optional
 
+# ── NorESM positive attribute overrides ──────────────────────────────────────
+# Maps branded variable name → "up" or "down".
+# Entries here are written as `positive: <value>` in the NorESM output YAML.
+NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
+    # "<branded_variable_name>": "up",
+    # "<branded_variable_name>": "down",
+    "hfls_tavg-u-hxy-u": "down",
+    "hfss_tavg-u-hxy-u": "down",
+    "rlds_tavg-u-hxy-u": "down",
+    "rls_tavg-u-hxy-u": "down",
+    "rlut_tavg-u-hxy-u": "down",
+    "rlutcs_tavg-u-hxy-u": "down",
+    "rsds_tavg-u-hxy-u": "down",
+    "rsdscs_tavg-u-hxy-u": "down",
+    "rsdt_tavg-u-hxy-u": "down",
+    "rss_tavg-u-hxy-u": "down",
+    "rsuscs_tavg-u-hxy-u": "down",
+    "rsutcs_tavg-u-hxy-u": "down",
+    "rsut_tavg-u-hxy-u": "down",
+    "rtmt_tavg-u-hxy-u": "down",
+    "tauu_tavg-u-hxy-u": "down",
+    "tauv_tavg-u-hxy-u": "down",
+}
+
 # ── model configurations ─────────────────────────────────────────────────────
 # Each config defines how to read a model-specific CSV and what metadata to write.
 #
@@ -34,12 +58,10 @@ MODEL_CONFIGS = {
         "key_column": "Branded Variable Name",
         "column_map": {
             "Modelling Realm - Primary": "table",
-            "CMIP6 Compound Name": "long_name",
             "Description": "description",
             "Units (from Physical Parameter)": "units",
             "Dimensions": "dims",
             "NorESM3 name (dependency)": "_source_expr",
-            "CMIP7 Freq.": "_freq",
         },
         "realm_column": "Modelling Realm - Primary",
         "keep_realms": ["atmos", "land"],
@@ -58,6 +80,7 @@ MODEL_CONFIGS = {
             "_tminavg-",
             "_tminavg-",
         ],
+        "positive_overrides": NORESM_POSITIVE_OVERRIDES,
     },
     "cesm": {
         "default_input": "cesm_data.csv",
@@ -77,9 +100,8 @@ MODEL_CONFIGS = {
             "Dimensions": "dims",
             "CESM Variable Name": "_source_expr",
             # "Formula" overrides _source_expr when present (round-trip format).
-            # "Scale", "Freq", "Alias" are merged into sources in post-processing.
+            # "Freq", "Alias" are merged into sources in post-processing.
             "Formula": "_formula",
-            "Scale": "_scale",
             "Freq": "_freq",
             "Alias": "_alias",
             "Cell Methods": "cell_methods",
@@ -486,13 +508,23 @@ def _build_entry(row, config):
             else:
                 dims = clean_strings(value.split(","), normalize)
             entry["dims"] = dims
+            plev_dim = next((d for d in entry["dims"] if re.match(r"^plev\d", d)), None)
+            if plev_dim:
+                _DIM_ORDER = ["time", "plev", "lat", "lon"]
+                entry["dims"] = ["plev" if d == plev_dim else d for d in entry["dims"]]
+                entry["dims"].sort(
+                    key=lambda d: (
+                        _DIM_ORDER.index(d) if d in _DIM_ORDER else len(_DIM_ORDER)
+                    )
+                )
+                entry["_plev_name"] = plev_dim
         elif yaml_key == "units":
             entry["units"] = fix_number_norwegian_format(value)
         elif yaml_key == "_source_expr":
             names = _parse_csv_identifiers(value)
             if names is not None:
                 # New format: comma-separated plain variable names.
-                # Scale/Freq/Alias will be merged in post-processing.
+                # Freq/Alias will be merged in post-processing.
                 entry["sources"] = [{"model_var": n} for n in names]
             else:
                 result = analyse_expression(value)
@@ -502,7 +534,7 @@ def _build_entry(row, config):
                 else:
                     entry["sources"] = result["variables"]
 
-        elif yaml_key in ("_scale", "_freq", "_alias"):
+        elif yaml_key in ("_freq", "_alias"):
             entry[yaml_key] = value
 
         else:
@@ -518,6 +550,7 @@ def _build_entry(row, config):
     levels_units = entry.pop("_levels_units", None)
     levels_src_axis_name = entry.pop("_levels_src_axis_name", None)
     levels_src_axis_bnds = entry.pop("_levels_src_axis_bnds", None)
+    plev_name = entry.pop("_plev_name", None)
 
     if levels_name:
         levels = {"name": levels_name}
@@ -528,6 +561,8 @@ def _build_entry(row, config):
         if levels_src_axis_bnds:
             levels["src_axis_bnds"] = levels_src_axis_bnds
         entry["levels"] = levels
+    elif plev_name:
+        entry["levels"] = {"name": plev_name, "units": "Pa"}
     elif "dims" in entry and "lev" in entry["dims"]:
         # Fallback for models without explicit levels columns (e.g., NorESM).
         entry["levels"] = {
@@ -537,22 +572,20 @@ def _build_entry(row, config):
             "src_axis_bnds": "ilev",
         }
 
-    # Merge Scale/Freq/Alias columns into the per-source dicts.
-    scale_str = entry.pop("_scale", None)
+    # Merge Freq/Alias columns into the per-source dicts.
     freq_str = entry.pop("_freq", None)
     alias_str = entry.pop("_alias", None)
-    if "sources" in entry and (scale_str or freq_str or alias_str):
+    if (
+        "sources" in entry
+        and (freq_str or alias_str)
+        and entry.get("table") == "seaIce"
+    ):
         sources = entry["sources"]
         n = len(sources)
-        scales = _split_positional(scale_str or "", n)
         freqs = _split_positional(freq_str or "", n)
         aliases = _split_positional(alias_str or "", n)
+
         for i, src in enumerate(sources):
-            if scales[i]:
-                try:
-                    src["scale"] = float(scales[i])
-                except ValueError:
-                    pass
             if freqs[i]:
                 src["freq"] = freqs[i]
             if aliases[i]:
@@ -588,14 +621,15 @@ def read_csv(filepath, config):
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            # print(row)
             if not should_keep(row, config):
                 continue
-            print("keeping row")
             name = row[key_col].strip()
             if not name:
                 continue
             entry = _build_entry(row, config)
+            positive = config.get("positive_overrides", {}).get(name)
+            if positive:
+                entry["positive"] = positive
 
             all_entries.append((name, entry))
 
@@ -613,12 +647,18 @@ def read_csv(filepath, config):
             # Multiple rows → variants variable.
             # Base fields come from the first row (they are identical across rows).
             base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
-            variants = []
-            for e in entries:
-                variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
-                variants.append(variant)
-            base["variants"] = variants
-            data[name] = base
+            if entries[0]["table"] == "seaIce":
+                variants = []
+                for e in entries:
+
+                    variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
+                    variants.append(variant)
+
+                base["variants"] = variants
+                data[name] = base
+            else:
+                # For atmos/land: no variants, no freq — just use first entry's base fields.
+                data[name] = base
 
     return {
         "dataset_overrides": config["dataset_overrides"],
@@ -637,7 +677,7 @@ def write_yaml(data, filepath):
     for line in lines:
         if "{model_var:" in line:
             # Only reformat single-key source dicts: {model_var: VAR} → model_var: VAR
-            # Leave multi-key dicts (e.g. {model_var: VAR, scale: -1.0}) untouched.
+            # Leave multi-key dicts (e.g. {model_var: VAR, freq: mon}) untouched.
             line = re.sub(r"\{model_var: (\w+)\}", r"model_var: \1", line)
         if "FATES_FRAC" in line:
             line = line.replace("FATES_FRAC", "FATES_FRACTION")
