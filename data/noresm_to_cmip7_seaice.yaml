@@ -694,4 +694,3 @@ variables:
     sources: [{freq: day, model_var: sivol_d}, {freq: mon, model_var: sivol}]
     table: seaIce
     units: m3 m-3
-
