@@ -1,5 +1,7 @@
-import xarray as xr
+"""Utility functions for unit conversion and related transformations."""
 from typing import Any
+
+import xarray as xr
 
 from cmip7_prep.mapping_compat import _safe_eval
 
