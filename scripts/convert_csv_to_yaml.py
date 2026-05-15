@@ -515,7 +515,11 @@ def _build_entry(row, config):
             entry["dims"] = dims
             # Only search for plev in flat string lists; nested lists are left intact.
             plev_dim = next(
-                (d for d in entry["dims"] if isinstance(d, str) and re.match(r"^plev\d", d)),
+                (
+                    d
+                    for d in entry["dims"]
+                    if isinstance(d, str) and re.match(r"^plev\d", d)
+                ),
                 None,
             )
             if plev_dim:
