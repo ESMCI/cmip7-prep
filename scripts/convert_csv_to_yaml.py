@@ -513,7 +513,11 @@ def _build_entry(row, config):
             else:
                 dims = clean_strings(value.split(","), normalize)
             entry["dims"] = dims
-            plev_dim = next((d for d in entry["dims"] if re.match(r"^plev\d", d)), None)
+            # Only search for plev in flat string lists; nested lists are left intact.
+            plev_dim = next(
+                (d for d in entry["dims"] if isinstance(d, str) and re.match(r"^plev\d", d)),
+                None,
+            )
             if plev_dim:
                 _DIM_ORDER = ["time", "plev", "lat", "lon"]
                 entry["dims"] = ["plev" if d == plev_dim else d for d in entry["dims"]]
@@ -580,11 +584,7 @@ def _build_entry(row, config):
     # Merge Freq/Alias columns into the per-source dicts.
     freq_str = entry.pop("_freq", None)
     alias_str = entry.pop("_alias", None)
-    if (
-        "sources" in entry
-        and (freq_str or alias_str)
-        and entry.get("table") == "seaIce"
-    ):
+    if "sources" in entry and (freq_str or alias_str):
         sources = entry["sources"]
         n = len(sources)
         freqs = _split_positional(freq_str or "", n)

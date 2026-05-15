@@ -2,6 +2,13 @@ dataset_overrides: {institution_id: NCAR, nominal_resolution: 100 km, source_id:
 
 variables:
 
+  agessc_tavg-ol-hxy-sea:
+    dims: [time, olevel, latitude, longitude]
+    long_name: Ideal Age of Sea Water
+    sources: [model_var: agessc]
+    table: ocean
+    units: yr
+
   deptho_ti-u-hxy-sea:
     dims: [yh, xh]
     long_name: Sea Floor Depth
@@ -10,13 +17,6 @@ variables:
     standard_name: depth_below_sea_level
     table: fx
     units: m
-
-  agessc_tavg-ol-hxy-sea:
-    dims: [time, olevel, latitude, longitude]
-    long_name: Ideal Age of Sea Water
-    sources: [model_var: agessc]
-    table: ocean
-    units: yr
 
   evspsbl_tavg-u-hxy-ifs:
     dims: [time, latitude, longitude]
@@ -92,7 +92,7 @@ variables:
     regrid_method: conservative
     sources: [model_var: sos]
     table: ocean
-    units: 1e-3
+    units: 100E-03
 
   tauuo_tavg-u-hxy-sea:
     dims: [time, latitude, longitude]

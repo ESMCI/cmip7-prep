@@ -2,6 +2,44 @@ dataset_overrides: {institution_id: NCAR, nominal_resolution: 100 km, source_id:
 
 variables:
 
+  ccb_tavg-u-hxy-ccl:
+    cell_methods: 'area: time: mean where convective_cloud (weighted by total convective
+      cloud area)'
+    dims: [longitude, latitude, time]
+    long_name: Air Pressure at Convective Cloud Base
+    sources: [model_var: PCLDBOT]
+    standard_name: air_pressure_at_convective_cloud_base
+    table: atmos
+    units: Pa
+
+  ccb_tpt-u-hs-u:
+    cell_methods: 'area: point time: point'
+    dims: [site, time1]
+    long_name: Air Pressure at Convective Cloud Base
+    sources: [model_var: N, model_var: A]
+    standard_name: air_pressure_at_convective_cloud_base
+    table: atmos
+    units: Pa
+
+  cct_tavg-u-hxy-ccl:
+    cell_methods: 'area: time: mean where convective_cloud (weighted by total convective
+      cloud area)'
+    dims: [longitude, latitude, time]
+    long_name: Air Pressure at Convective Cloud Top
+    sources: [model_var: PCLDTOP]
+    standard_name: air_pressure_at_convective_cloud_top
+    table: atmos
+    units: Pa
+
+  cct_tpt-u-hs-u:
+    cell_methods: 'area: point time: point'
+    dims: [site, time1]
+    long_name: Air Pressure at Convective Cloud Top
+    sources: [model_var: N, model_var: A]
+    standard_name: air_pressure_at_convective_cloud_top
+    table: atmos
+    units: Pa
+
   cl_tavg-al-hxy-u:
     cell_methods: 'time: mean'
     dims: [time, lev, lat, lon]
@@ -14,6 +52,26 @@ variables:
     table: atmos
     units: '%'
 
+  cldnci_tavg-u-hxy-cl:
+    cell_methods: 'area: time: mean where cloud (mean over the portion of the cell
+      containing ice topped cloud, as seen from top of atmosphere)'
+    dims: [longitude, latitude, time]
+    long_name: Ice Crystal Number Concentration of Cloud Tops
+    sources: [model_var: ACTNI]
+    standard_name: number_concentration_of_ice_crystals_in_air_at_ice_cloud_top
+    table: atmos
+    units: m-3
+
+  cldncl_tavg-u-hxy-cl:
+    cell_methods: 'area: time: mean where cloud (mean over the portion of the cell
+      containing liquid topped cloud, as seen from top of atmosphere)'
+    dims: [longitude, latitude, time]
+    long_name: Cloud Droplet Number Concentration of Cloud Tops
+    sources: [model_var: ACTNL]
+    standard_name: number_concentration_of_cloud_liquid_water_particles_in_air_at_liquid_water_cloud_top
+    table: atmos
+    units: m-3
+
   cli_tavg-al-hxy-u:
     dims: [time, lev, lat, lon]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
@@ -22,11 +80,68 @@ variables:
     table: atmos
     units: kg kg-1
 
+  climodis_tavg-u-hxy-u:
+    cell_methods: 'area: time: mean'
+    dims: [longitude, latitude, time]
+    long_name: MODIS Ice Cloud Area Percentage
+    sources: [{model_var: 'CLIMODIS [COSP]'}]
+    standard_name: modis_ice_topped_cloud_area_fraction
+    table: atmos
+    units: '%'
+
   clivi_tavg-u-hxy-u:
     dims: [time, lat, lon]
     sources: [model_var: TGCLDIWP]
     table: atmos
     units: kg m-2
+
+  clivic_tavg-u-hxy-u:
+    cell_methods: 'area: time: mean'
+    dims: [longitude, latitude, time]
+    long_name: Convective Ice Water Path
+    sources: [model_var: N, model_var: A]
+    standard_name: atmosphere_mass_content_of_convective_cloud_ice
+    table: atmos
+    units: kg m-2
+
+  clivimodis_tavg-u-hxy-u:
+    cell_methods: 'area: time: mean'
+    dims: [longitude, latitude, time]
+    long_name: MODIS Ice Water Path
+    sources: [{model_var: 'IWPMODIS [COSP]'}]
+    standard_name: atmosphere_mass_content_of_cloud_ice
+    table: atmos
+    units: kg m-2
+
+  clmodis_tavg-p7c-hxy-air:
+    cell_methods: 'area: time: mean where air'
+    dims: [time, plev, longitude, latitude, tau]
+    levels: {name: plev7c, units: Pa}
+    long_name: MODIS Cloud Area Percentage
+    sources: [{model_var: 'CLMODIS [COSP]'}]
+    standard_name: modis_cloud_area_fraction
+    table: atmos
+    units: '%'
+
+  clmodisice_tavg-p7c-hxy-air:
+    cell_methods: 'area: time: mean where air'
+    dims: [time, plev, longitude, latitude, tau]
+    levels: {name: plev7c, units: Pa}
+    long_name: MODIS Ice Topped Cloud Area Percentage
+    sources: [{model_var: 'CLIMODIS [COSP]'}]
+    standard_name: modis_ice_topped_cloud_area_fraction
+    table: atmos
+    units: '%'
+
+  clmodisliquid_tavg-p7c-hxy-air:
+    cell_methods: 'area: time: mean where air'
+    dims: [time, plev, longitude, latitude, tau]
+    levels: {name: plev7c, units: Pa}
+    long_name: MODIS Liquid Topped Cloud Area Percentage
+    sources: [model_var: N, model_var: A]
+    standard_name: modis_liquid_topped_cloud_area_fraction
+    table: atmos
+    units: '%'
 
   clt_tavg-u-hxy-u:
     dims: [time, lat, lon]
@@ -49,28 +164,52 @@ variables:
     table: atmos
     units: kg m-2
 
+  clwvimodis_tavg-u-hxy-u:
+    cell_methods: 'area: time: mean'
+    dims: [longitude, latitude, time]
+    formula: IWPMODIS+CLWMODIS
+    long_name: MODIS Condensed Water Path
+    sources: [{model_var: 'IWPMODIS [COSP], CLWMODIS [COSP]'}]
+    standard_name: atmosphere_mass_content_of_cloud_condensed_water
+    table: atmos
+    units: kg m-2
+
+  co23D_tavg-al-hxy-u:
+    cell_methods: 'area: time: mean'
+    dims: [longitude, latitude, alevel, time]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    long_name: 3D-Field of Transported CO2
+    sources: [model_var: CO2]
+    standard_name: mass_fraction_of_carbon_dioxide_tracer_in_air
+    table: atmos
+    units: kg kg-1
+
   evspsbl_tavg-u-hxy-u:
     cell_methods: 'time: mean'
     dims: [time, lat, lon]
+    formula: QFLX * -1.
     long_name: Evaporation
     regrid_method: conservative
-    sources: [{model_var: QFLX, scale: -1.0}]
+    sources: [model_var: QFLX]
     table: atmos
     units: kg m-2 s-1
 
   evspsblsoi_tavg-u-hxy-u:
     dims: [time, lat, lon]
+    formula: QSOIL * -1.
     long_name: Water Evaporation from Soil
     regrid_method: conservative
-    sources: [{model_var: QSOIL, scale: -1.0}]
+    sources: [model_var: QSOIL]
     table: atmos
     units: kg m-2 s-1
 
   evspsblveg_tavg-u-hxy-u:
     dims: [time, lat, lon]
+    formula: QVEGE * -1.
     long_name: Water Evaporation from Vegetation
     regrid_method: conservative
-    sources: [{model_var: QVEGE, scale: -1.0}]
+    sources: [model_var: QVEGE]
     table: atmos
     units: kg m-2 s-1
 
@@ -163,9 +302,10 @@ variables:
   pr_tavg-u-hxy-u:
     cell_methods: 'time: mean'
     dims: [time, lat, lon]
+    formula: PRECT * 1000.
     long_name: Precipitation
     regrid_method: conservative
-    sources: [{model_var: PRECT, scale: 1000.0}]
+    sources: [model_var: PRECT]
     standard_name: precipitation_flux
     table: atmos
     units: kg m-2 s-1
