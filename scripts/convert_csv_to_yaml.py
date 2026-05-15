@@ -120,6 +120,7 @@ MODEL_CONFIGS = {
             "land": "cesm_to_cmip7_land.yaml",
             "seaIce": "cesm_to_cmip7_seaice.yaml",
             "ocean": "cesm_to_cmip7_ocean.yaml",
+            "fx": "cesm_to_cmip7_ocean.yaml",
         },
         "source_column": "CESM Variable Name",
         "source_skip_phrases": [],
@@ -737,14 +738,22 @@ def main():
     input_file = args.input or config["default_input"]
     data = read_csv(input_file, config)
 
-    total = 0
+    # Merge realms that share the same output file (e.g. ocean + fx → ocean yaml).
+    merged: dict = {}
     for realm, realm_data in data.items():
         output_file = config["realm_outputs"][realm]
-        write_yaml(realm_data, output_file)
-        count = len(realm_data["variables"])
+        if output_file not in merged:
+            merged[output_file] = realm_data
+        else:
+            merged[output_file]["variables"].update(realm_data["variables"])
+
+    total = 0
+    for output_file, file_data in merged.items():
+        write_yaml(file_data, output_file)
+        count = len(file_data["variables"])
         total += count
         print(f"wrote {count} entries to {output_file}")
-    print(f"total: {total} entries written across {len(config['realm_outputs'])} files")
+    print(f"total: {total} entries written across {len(merged)} files")
 
 
 if __name__ == "__main__":

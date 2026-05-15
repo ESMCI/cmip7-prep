@@ -268,7 +268,7 @@ class TestShouldKeepCESM:
         assert should_keep(self._row("seaIce", "siconc"), self.CFG) is True
 
     def test_keep_fx(self):
-        """FX rows are kept for CESM."""
+        """FX rows are kept for CESM (written into the ocean yaml)."""
         assert should_keep(self._row("fx", "deptho"), self.CFG) is True
 
     def test_skip_empty_source(self):
