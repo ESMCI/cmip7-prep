@@ -119,6 +119,7 @@ MODEL_CONFIGS = {
             "atmos": "cesm_to_cmip7_atmos.yaml",
             "land": "cesm_to_cmip7_land.yaml",
             "seaIce": "cesm_to_cmip7_seaice.yaml",
+            "ocean": "cesm_to_cmip7_ocean.yaml",
         },
         "source_column": "CESM Variable Name",
         "source_skip_phrases": [],

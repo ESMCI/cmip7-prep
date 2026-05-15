@@ -425,8 +425,8 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert "variables" in data
-        var = data["variables"]["tas"]
+        assert "atmos" in data
+        var = data["atmos"]["variables"]["tas"]
         assert var["table"] == "atmos"
         assert "long_name" not in var
         assert var["units"] == "K"
@@ -448,7 +448,7 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        var = data["variables"]["pr"]
+        var = data["atmos"]["variables"]["pr"]
         assert var["formula"] == "PRECC + PRECL"
         assert {"model_var": "PRECC"} in var["sources"]
         assert {"model_var": "PRECL"} in var["sources"]
@@ -468,7 +468,7 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        var = data["variables"]["ta"]
+        var = data["atmos"]["variables"]["ta"]
         assert "levels" in var
         assert var["levels"]["name"] == "standard_hybrid_sigma"
         assert var["levels"]["src_axis_name"] == "lev"
@@ -489,7 +489,7 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert "levels" not in data["variables"]["tos"]
+        assert "levels" not in data["atmos"]["variables"]["tos"]
 
     def test_no_levels_without_lev_dim(self, tmp_path):
         """Without a 'lev' dimension, no levels block is added."""
@@ -506,7 +506,7 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert "levels" not in data["variables"]["tas"]
+        assert "levels" not in data["atmos"]["variables"]["tas"]
 
     def test_ocean_rows_filtered(self, tmp_path):
         """Ocean rows are filtered out for NorESM."""
@@ -523,7 +523,7 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert len(data["variables"]) == 0
+        assert all(len(rd["variables"]) == 0 for rd in data.values())
 
     def test_skip_phrases_filter_rows(self, tmp_path):
         """Rows with skip phrases in the source field are excluded."""
@@ -560,7 +560,7 @@ class TestReadCsvNorESM:
             },
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert list(data["variables"].keys()) == ["v3"]
+        assert list(data["atmos"]["variables"].keys()) == ["v3"]
 
     def test_dataset_overrides_noresm(self, tmp_path):
         """NorESM dataset_overrides are populated correctly."""
@@ -577,8 +577,8 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert data["dataset_overrides"]["institution_id"] == "NCC"
-        assert data["dataset_overrides"]["source_id"] == "NorESM3"
+        assert data["atmos"]["dataset_overrides"]["institution_id"] == "NCC"
+        assert data["atmos"]["dataset_overrides"]["source_id"] == "NorESM3"
 
     def test_dims_normalised(self, tmp_path):
         """'longitude' and 'latitude' in dims are normalised to 'lon' and 'lat'."""
@@ -595,7 +595,7 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert data["variables"]["tas"]["dims"] == ["time", "lon", "lat"]
+        assert data["atmos"]["variables"]["tas"]["dims"] == ["time", "lon", "lat"]
 
 
 class TestCsvHelpers:
@@ -667,7 +667,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        var = data["variables"]["tas"]
+        var = data["atmos"]["variables"]["tas"]
         assert var["table"] == "atmos"
         assert var["long_name"] == "Near-Surface Air Temperature"
         assert var["units"] == "K"
@@ -685,7 +685,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert "tos" in data["variables"]
+        assert "tos" in data["ocean"]["variables"]
 
     def test_seaice_kept(self, tmp_path):
         """SeaIce rows are kept for CESM."""
@@ -699,7 +699,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert "siconc" in data["variables"]
+        assert "siconc" in data["seaIce"]["variables"]
 
     def test_standard_name_stored(self, tmp_path):
         """Standard name is stored in the output variable dict."""
@@ -716,7 +716,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert data["variables"]["pr"]["standard_name"] == "precipitation_flux"
+        assert data["atmos"]["variables"]["pr"]["standard_name"] == "precipitation_flux"
 
     def test_cell_methods_stored(self, tmp_path):
         """Cell methods are stored in the output variable dict."""
@@ -734,7 +734,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert data["variables"]["cl"]["cell_methods"] == "time: mean"
+        assert data["atmos"]["variables"]["cl"]["cell_methods"] == "time: mean"
 
     def test_regrid_method_stored(self, tmp_path):
         """Regrid method is stored in the output variable dict."""
@@ -751,7 +751,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert data["variables"]["pr"]["regrid_method"] == "conservative"
+        assert data["atmos"]["variables"]["pr"]["regrid_method"] == "conservative"
 
     def test_levels_added_for_lev_dim(self, tmp_path):
         """A 'lev' dimension triggers addition of a levels block."""
@@ -768,8 +768,8 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert "levels" in data["variables"]["cl"]
-        assert data["variables"]["cl"]["levels"]["src_axis_name"] == "lev"
+        assert "levels" in data["atmos"]["variables"]["cl"]
+        assert data["atmos"]["variables"]["cl"]["levels"]["src_axis_name"] == "lev"
 
     def test_dataset_overrides_cesm(self, tmp_path):
         """CESM dataset_overrides are populated correctly."""
@@ -783,8 +783,8 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert data["dataset_overrides"]["institution_id"] == "NCAR"
-        assert data["dataset_overrides"]["source_id"] == "CESM3"
+        assert data["atmos"]["dataset_overrides"]["institution_id"] == "NCAR"
+        assert data["atmos"]["dataset_overrides"]["source_id"] == "CESM3"
 
     def test_empty_source_skipped(self, tmp_path):
         """A row with an empty CESM Variable Name is skipped."""
@@ -798,7 +798,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert len(data["variables"]) == 0
+        assert len(data["atmos"]["variables"]) == 0
 
     def test_formula_expression(self, tmp_path):
         """Formula column is stored and sources are derived from CESM Variable Name."""
@@ -815,7 +815,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        var = data["variables"]["clt"]
+        var = data["atmos"]["variables"]["clt"]
         assert var["formula"] == "CLDTOT * 100"
         assert var["sources"] == [{"model_var": "CLDTOT"}]
 
@@ -834,7 +834,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        var = data["variables"]["evspsbl"]
+        var = data["atmos"]["variables"]["evspsbl"]
         assert var["sources"] == [{"model_var": "QFLX"}]
 
     def test_freq_from_column(self, tmp_path):
@@ -852,7 +852,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        sources = data["variables"]["siarea"]["sources"]
+        sources = data["seaIce"]["variables"]["siarea"]["sources"]
         assert sources == [
             {"model_var": "siconc_d", "freq": "day"},
             {"model_var": "siconc", "freq": "mon"},
@@ -874,7 +874,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        sources = data["variables"]["siarea"]["sources"]
+        sources = data["seaIce"]["variables"]["siarea"]["sources"]
         assert sources[0] == {"model_var": "siconc_d", "freq": "day", "alias": "siconc"}
         assert sources[1] == {"model_var": "siconc", "freq": "mon"}
         assert sources[2] == {"model_var": "tarea"}
@@ -894,7 +894,7 @@ class TestReadCsvCESM:
             )
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        var = data["variables"]["pr"]
+        var = data["atmos"]["variables"]["pr"]
         assert var["formula"] == "(PRECC + PRECL) * 1000.0"
         assert [s["model_var"] for s in var["sources"]] == ["PRECC", "PRECL"]
 
