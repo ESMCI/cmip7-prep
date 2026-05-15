@@ -1,0 +1,10 @@
+dataset_overrides: {institution_id: NCAR, nominal_resolution: 100 km, source_id: CESM3}
+
+variables:
+
+  mrfso_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: verticalsum(SOILICE, capped_at=5000)
+    sources: [model_var: SOILICE]
+    table: landIce
+    units: kg m-2

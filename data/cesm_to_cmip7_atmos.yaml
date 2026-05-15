@@ -1,0 +1,424 @@
+dataset_overrides: {institution_id: NCAR, nominal_resolution: 100 km, source_id: CESM3}
+
+variables:
+
+  cl_tavg-al-hxy-u:
+    cell_methods: 'time: mean'
+    dims: [time, lev, lat, lon]
+    formula: CLOUD * 100
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    long_name: Cloud Area Fraction
+    sources: [model_var: CLOUD]
+    standard_name: cloud_area_fraction
+    table: atmos
+    units: '%'
+
+  cli_tavg-al-hxy-u:
+    dims: [time, lev, lat, lon]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: CLDICE]
+    table: atmos
+    units: kg kg-1
+
+  clivi_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: TGCLDIWP]
+    table: atmos
+    units: kg m-2
+
+  clt_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    formula: CLDTOT * 100
+    sources: [model_var: CLDTOT]
+    table: atmos
+    units: '%'
+
+  clw_tavg-al-hxy-u:
+    dims: [time, lev, lat, lon]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: CLDLIQ]
+    table: atmos
+    units: kg kg-1
+
+  clwvi_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: TGCLDLWP]
+    table: atmos
+    units: kg m-2
+
+  evspsbl_tavg-u-hxy-u:
+    cell_methods: 'time: mean'
+    dims: [time, lat, lon]
+    long_name: Evaporation
+    regrid_method: conservative
+    sources: [{model_var: QFLX, scale: -1.0}]
+    table: atmos
+    units: kg m-2 s-1
+
+  evspsblsoi_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    long_name: Water Evaporation from Soil
+    regrid_method: conservative
+    sources: [{model_var: QSOIL, scale: -1.0}]
+    table: atmos
+    units: kg m-2 s-1
+
+  evspsblveg_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    long_name: Water Evaporation from Vegetation
+    regrid_method: conservative
+    sources: [{model_var: QVEGE, scale: -1.0}]
+    table: atmos
+    units: kg m-2 s-1
+
+  hfls_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: LHFLX]
+    table: atmos
+    units: W m-2
+
+  hfss_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: SHFLX]
+    table: atmos
+    units: W m-2
+
+  hur_tavg-p19-hxy-air:
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    sources: [model_var: RELHUM]
+    table: atmos
+    units: '%'
+
+  hurs_tavg-al-hxy-u:
+    dims: [time, lev, lat, lon]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: RELHUM]
+    table: atmos
+    units: '%'
+
+  hurs_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: RHREFHT]
+    table: atmos
+    units: '%'
+
+  hus_tavg-al-hxy-u:
+    dims: [time, lev, lat, lon]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: Q]
+    table: atmos
+    units: kg kg-1
+
+  hus_tavg-p19-hxy-u:
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    sources: [model_var: Q]
+    table: atmos
+    units: kg kg-1
+
+  huss_tavg-h2m-hxy-u:
+    dims: [time, lat, lon]
+    long_name: Near-Surface Specific Humidity
+    regrid_method: bilinear
+    sources: [model_var: QREFHT]
+    table: atmos
+    units: '1'
+
+  irrDem_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    long_name: Irrigation Demand
+    sources: [model_var: IRR_DEM]
+    table: atmos
+    units: kg m-2 s-1
+
+  irrGw_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    long_name: Groundwater Irrigation
+    sources: [model_var: IRR_GW]
+    table: atmos
+    units: kg m-2 s-1
+
+  irrLut_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    long_name: Surface Water Irrigation
+    sources: [model_var: IRR_LUT]
+    table: atmos
+    units: kg m-2 s-1
+
+  irrSurf_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    long_name: Irrigation from Surface Water
+    sources: [model_var: IRR_SURF]
+    table: atmos
+    units: kg m-2 s-1
+
+  pr_tavg-u-hxy-u:
+    cell_methods: 'time: mean'
+    dims: [time, lat, lon]
+    long_name: Precipitation
+    regrid_method: conservative
+    sources: [{model_var: PRECT, scale: 1000.0}]
+    standard_name: precipitation_flux
+    table: atmos
+    units: kg m-2 s-1
+
+  prc_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    formula: PRECC * 1000.0
+    sources: [model_var: PRECC]
+    table: atmos
+    units: kg m-2 s-1
+
+  prsn_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    formula: (PRECSC + PRECSL) * 1000.0
+    sources: [model_var: PRECSC, model_var: PRECSL]
+    table: atmos
+    units: kg m-2 s-1
+
+  prw_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: TMQ]
+    table: atmos
+    units: kg m-2
+
+  ps_tavg-u-hxy-u:
+    cell_methods: 'time: mean'
+    dims: [time, lat, lon]
+    long_name: Surface Air Pressure
+    regrid_method: bilinear
+    sources: [model_var: PS]
+    table: atmos
+    units: Pa
+
+  psl_tavg-u-hxy-u:
+    cell_methods: 'time: mean'
+    dims: [time, lat, lon]
+    long_name: Sea Level Pressure
+    regrid_method: bilinear
+    sources: [model_var: PSL]
+    table: atmos
+    units: Pa
+
+  rlds_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: FLDS]
+    table: atmos
+    units: W m-2
+
+  rldscs_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    formula: FLDS + FLNS - FLNSC
+    positive: up
+    sources: [model_var: FLDS, model_var: FLNS, model_var: FLNSC]
+    table: atmos
+    units: W m-2
+
+  rlus_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    formula: FLDS + FLNS
+    positive: up
+    sources: [model_var: FLDS, model_var: FLNS]
+    table: atmos
+    units: W m-2
+
+  rluscs_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: FLNSC]
+    table: atmos
+    units: W m-2
+
+  rlut_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: FLUT]
+    table: atmos
+    units: W m-2
+
+  rlutcs_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: FLUTC]
+    table: atmos
+    units: W m-2
+
+  rsds_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: FSDS]
+    table: atmos
+    units: W m-2
+
+  rsdscs_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: FSDSC]
+    table: atmos
+    units: W m-2
+
+  rsdt_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: SOLIN]
+    table: atmos
+    units: W m-2
+
+  rsus_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    formula: FSDS - FSNS
+    positive: up
+    sources: [model_var: FSDS, model_var: FSNS]
+    table: atmos
+    units: W m-2
+
+  rsuscs_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    formula: FSDSC - FSNSC
+    positive: up
+    sources: [model_var: FSDSC, model_var: FSNSC]
+    table: atmos
+    units: W m-2
+
+  rsut_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: FLUT]
+    table: atmos
+    units: W m-2
+
+  rsutcs_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    formula: SOLIN - FSNTOAC
+    positive: up
+    sources: [model_var: SOLIN, model_var: FSNTOAC]
+    table: atmos
+    units: W m-2
+
+  sfcWind_tavg-h10m-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: U10]
+    table: atmos
+    units: m s-1
+
+  ta_tavg-al-hxy-u:
+    dims: [time, lev, lat, lon]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    long_name: Air Temperature
+    regrid_method: bilinear
+    sources: [model_var: T]
+    table: atmos
+    units: K
+
+  ta_tavg-p19-hxy-air:
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    long_name: Air Temperature
+    regrid_method: bilinear
+    sources: [model_var: T]
+    table: atmos
+    units: K
+
+  tas_tavg-h2m-hxy-u:
+    cell_methods: 'time: mean'
+    dims: [time, lat, lon]
+    long_name: Near-Surface Air Temperature
+    regrid_method: bilinear
+    sources: [model_var: TREFHT]
+    standard_name: air_temperature
+    table: atmos
+    units: K
+
+  tauu_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: TAUX]
+    table: atmos
+    units: N m-2
+
+  tauv_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: TAUY]
+    table: atmos
+    units: N m-2
+
+  ts_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: TS]
+    table: atmos
+    units: K
+
+  ua_tavg-al-hxy-u:
+    dims: [time, lev, lat, lon]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    long_name: Zonal Wind
+    regrid_method: bilinear
+    sources: [model_var: U]
+    table: atmos
+    units: m s-1
+
+  ua_tavg-p19-hxy-air:
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    long_name: Zonal Wind
+    regrid_method: bilinear
+    sources: [model_var: U]
+    table: atmos
+    units: m s-1
+
+  uas_tavg-h10m-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: U10]
+    table: atmos
+    units: m s-1
+
+  va_tavg-al-hxy-u:
+    dims: [time, lev, lat, lon]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    long_name: Meridional Wind
+    regrid_method: bilinear
+    sources: [model_var: V]
+    table: atmos
+    units: m s-1
+
+  va_tavg-p19-hxy-air:
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    long_name: Meridional Wind
+    regrid_method: bilinear
+    sources: [model_var: V]
+    table: atmos
+    units: m s-1
+
+  vas_tavg-h10m-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: VBOT]
+    table: atmos
+    units: m s-1
+
+  wap_tavg-p19-hxy-air:
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    sources: [model_var: OMEGA]
+    table: atmos
+    units: Pa s-1
+
+  zg_tavg-p19-hxy-air:
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    sources: [model_var: Z3]
+    table: atmos
+    units: m

@@ -233,7 +233,6 @@ variables:
     table: seaIce
     units: W m-2
 
-
   siflfwbot_tavg-u-hxy-si:
     dims: [time, nj, ni]
     regrid_method: conservative
@@ -335,14 +334,12 @@ variables:
     table: seaIce
     units: N m-2
 
-
   sigpp_tavg-u-hxy-si:
     dims: [time, nj, ni]
     regrid_method: conservative
     sources: [{freq: day, model_var: sigpp_d}, {freq: mon, model_var: sigpp}]
     table: seaIce
     units: m s-1
-
 
   siitdconc_tavg-u-hxy-si:
     dims: [time, nj, ni]
@@ -597,6 +594,7 @@ variables:
     sources: [{freq: day, model_var: sistrxubot_d}, {freq: mon, model_var: sistrxubot}]
     table: seaIce
     units: N m-2
+
 
   sistrydtop_tavg-u-hxy-si:
     dims: [time, nj, ni]

@@ -68,6 +68,20 @@ TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
+REALM_YAML_MAP = {
+    "noresm": {
+        "atmos": "noresm_to_cmip7_atmos.yaml",
+        "land": "noresm_to_cmip7_land.yaml",
+        "seaIce": "noresm_to_cmip7_seaice.yaml",
+    },
+    "cesm": {
+        "atmos": "cesm_to_cmip7_atmos.yaml",
+        "land": "cesm_to_cmip7_land.yaml",
+        "seaIce": "cesm_to_cmip7_seaice.yaml",
+        "ocean": "cesm_to_cmip7_ocean.yaml",
+    },
+}
+
 INCLUDE_PATTERN_MAP = {
     "cesm": {
         "aerosol": {
@@ -278,7 +292,7 @@ def process_one_var(
 
     try:
         # This is what maps the CESM/NorESM history variable(s) to the cmor variable
-        # This is obtained from reading cesm_to_cmip7.yaml or noresm_to_cmip7.yaml
+        # This is obtained from reading the input yaml file
         cfg = mapping.get_cfg(varname)
     except KeyError:
         logger.warning(f"Skipping '{varname}': no entry found in mapping YAML")
@@ -718,14 +732,24 @@ def main():
         else:
             glob_pattern = "*.nc"
 
-        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml or noresm_to_cmip7.yaml)
+        # Load and evaluate the CMIP mapping YAML file for this model and realm
         if custom_yaml := args.custom_yaml:
             logger.info(f"Using custom YAML mapping file: {custom_yaml}")
             mapping = Mapping.from_yaml(custom_yaml)
-        elif model == "noresm":
-            mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
         else:
-            mapping = Mapping.from_packaged_default()
+            if model not in REALM_YAML_MAP:
+                logger.error(
+                    f"Unknown model '{model}': must be one of {list(REALM_YAML_MAP)}"
+                )
+                sys.exit(1)
+            yaml_filename = REALM_YAML_MAP[model].get(realm)
+            if yaml_filename is None:
+                logger.error(
+                    f"No YAML mapping defined for model={model}, realm={realm}"
+                )
+                sys.exit(1)
+            logger.info(f"Loading mapping YAML: {yaml_filename}")
+            mapping = Mapping.from_packaged_default(filename=yaml_filename)
         mapping.default_freq = frequency
 
         # Determine TABLES directory

@@ -1,0 +1,270 @@
+dataset_overrides: {institution_id: NCAR, nominal_resolution: 100 km, source_id: CESM3}
+
+variables:
+
+  cLitter_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: (TOTLITC + CWD_C)/1000.0
+    sources: [model_var: TOTLITC, model_var: CWD_C]
+    table: land
+    units: kg m-2
+
+  cProduct_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: (TOTPRODC + CWD_P)/1000.0
+    sources: [model_var: TOTPRODC, model_var: CWD_P]
+    table: land
+    units: kg m-2
+
+  cSoil_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: (SOIL1C + SOIL2C + SOIL3C)/1000.0
+    sources: [model_var: SOIL1C, model_var: SOIL2C, model_var: SOIL3C]
+    table: land
+    units: kg m-2
+
+  cVeg_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: (TOTVEGC)/1000.0
+    sources: [model_var: TOTVEGC]
+    table: land
+    units: kg m-2
+
+  cropFracC3_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: CROP_C3_FRAC]
+    table: land
+    units: '1'
+
+  cropFracC4_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: CROP_C4_FRAC]
+    table: land
+    units: '1'
+
+  dcw_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: DCW]
+    table: land
+    units: kg m-2
+
+  dgw_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: DGW]
+    table: land
+    units: kg m-2
+
+  drivw_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: DRIVW]
+    table: land
+    units: kg m-2
+
+  dslw_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: DSLW]
+    table: land
+    units: kg m-2
+
+  dsn_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: DSN]
+    table: land
+    units: kg m-2
+
+  dsw_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: DSW]
+    table: land
+    units: kg m-2
+
+  esn_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: ESN]
+    table: land
+    units: kg m-2
+
+  evspsbl_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    long_name: Evaporation over land
+    sources: [model_var: QVEGT]
+    table: land
+    units: kg m-2 s-1
+
+  evspsblpot_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    long_name: Potential Evaporation over Land
+    sources: [model_var: QVEGT_POT]
+    table: land
+    units: kg m-2 s-1
+
+  evspsblsoi_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    long_name: Water Evaporation from Soil
+    sources: [model_var: QSOIL]
+    table: land
+    units: kg m-2 s-1
+
+  evspsblveg_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    long_name: Water Evaporation from Vegetation
+    sources: [model_var: QVEGE]
+    table: land
+    units: kg m-2 s-1
+
+  fFire_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: COL_FIRE_CLOSS/1000.0
+    positive: up
+    sources: [model_var: COL_FIRE_CLOSS]
+    table: land
+    units: kg m-2 s-1
+
+  fNVegSoil_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: NVEG_SOIL_CLOSS/1000.0
+    positive: up
+    sources: [model_var: NVEG_SOIL_CLOSS]
+    table: land
+    units: kg m-2 s-1
+
+  gpp_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: GPP/1000.0
+    sources: [model_var: GPP]
+    table: land
+    units: kg m-2 s-1
+
+  lai_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: TLAI]
+    table: land
+    units: '1'
+
+  mrro_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: QRUNOFF]
+    table: land
+    units: kg m-2 s-1
+
+  mrrob_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: QBURDRUNOFF]
+    table: land
+    units: kg m-2 s-1
+
+  mrros_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: QOVER]
+    table: land
+    units: kg m-2 s-1
+
+  mrsfl_tavg-sl-hxy-lnd:
+    dims: [time, sdepth, lat, lon]
+    sources: [model_var: SOILMOIST]
+    table: land
+    units: kg m-2
+
+  mrsll_tavg-sl-hxy-lnd:
+    dims: [time, sdepth, lat, lon]
+    sources: [model_var: SOILLIQ]
+    table: land
+    units: kg m-2
+
+  mrso_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: verticalsum(SOILICE + SOILLIQ, capped_at=5000)
+    sources: [model_var: SOILICE, model_var: SOILLIQ]
+    table: land
+    units: kg m-2
+
+  mrsol_tavg-d10cm-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: SOILWATER_10CM]
+    table: land
+    units: kg m-2
+
+  mrsol_tavg-sl-hxy-lnd:
+    dims: [time, sdepth, lat, lon]
+    formula: SOILLIQ + SOILICE
+    sources: [model_var: SOILLIQ, model_var: SOILICE]
+    table: land
+    units: kg m-2
+
+  nVeg_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: (WOOD_C + LEAF_C + ROOT_C)/1000.0
+    sources: [model_var: WOOD_C, model_var: LEAF_C, model_var: ROOT_C]
+    table: land
+    units: kg m-2
+
+  nbp_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: NBP/1000.0
+    positive: down
+    sources: [model_var: NBP]
+    table: land
+    units: kg m-2 s-1
+
+  npp_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: NPP/1000.0
+    positive: down
+    sources: [model_var: NPP]
+    table: land
+    units: kg m-2 s-1
+
+  pastureFracC3_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: PASTURE_C3_FRAC]
+    table: land
+    units: '1'
+
+  pastureFracC4_tavg-u-hxy-u:
+    dims: [time, lat, lon]
+    sources: [model_var: PASTURE_C4_FRAC]
+    table: land
+    units: '1'
+
+  prveg_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    sources: [model_var: QINTR]
+    table: land
+    units: kg m-2 s-1
+
+  ra_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: AR/1000.0
+    positive: up
+    sources: [model_var: AR]
+    table: land
+    units: kg m-2 s-1
+
+  rh_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: HR/1000.0
+    positive: up
+    sources: [model_var: HR]
+    table: land
+    units: kg m-2 s-1
+
+  rsds_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    positive: up
+    sources: [model_var: FSDS]
+    table: land
+    units: W m-2
+
+  tran_tavg-u-hxy-lnd:
+    dims: [time, lat, lon]
+    formula: QSOIL + QVEGT
+    positive: up
+    sources: [model_var: QVEGT, model_var: QSOIL]
+    table: land
+    units: kg m-2 s-1
+
+  tsl_tavg-sl-hxy-lnd:
+    dims: [time, sdepth, lat, lon]
+    sources: [model_var: TSOI]
+    table: land
+    units: K

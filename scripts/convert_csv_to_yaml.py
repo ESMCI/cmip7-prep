@@ -64,8 +64,8 @@ MODEL_CONFIGS = {
         },
         "realm_column": "Modelling Realm - Primary",
         "realm_outputs": {
-            "atmos": "data_atmos.yaml",
-            "land": "data_land.yaml",
+            "atmos": "noresm_to_cmip7_atmos.yaml",
+            "land": "noresm_to_cmip7_land.yaml",
         },
         "source_column": "NorESM3 name (dependency)",
         "source_skip_phrases": [
@@ -116,9 +116,9 @@ MODEL_CONFIGS = {
         },
         "realm_column": "Table",
         "realm_outputs": {
-            "atmos": "cesm_data_atmos.yaml",
-            "land": "cesm_data_land.yaml",
-            "seaIce": "cesm_data_seaice.yaml",
+            "atmos": "cesm_to_cmip7_atmos.yaml",
+            "land": "cesm_to_cmip7_land.yaml",
+            "seaIce": "cesm_to_cmip7_seaice.yaml",
         },
         "source_column": "CESM Variable Name",
         "source_skip_phrases": [],
@@ -612,8 +612,12 @@ def read_csv(filepath, config):
     reconstructed into a ``variants`` list.
     """
     key_col = config["key_column"]
-    realm_col = config["realm_column"]  # required in all configs; KeyError is intentional if missing
-    realm_outputs = config.get("realm_outputs")  # optional; None means return a single combined dict
+    realm_col = config[
+        "realm_column"
+    ]  # required in all configs; KeyError is intentional if missing
+    realm_outputs = config.get(
+        "realm_outputs"
+    )  # optional; None means return a single combined dict
 
     all_entries = []
     with open(filepath, "r", newline="", encoding="utf-8") as f:
