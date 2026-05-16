@@ -435,7 +435,7 @@ variables:
     description: Vertically integrated mass of water vapour through the atmospheric
       column
     dims: [lon, lat, time]
-    sources: [model_var: Q]
+    sources: [model_var: TMQ]
     table: atmos
     units: kg m-2
 
