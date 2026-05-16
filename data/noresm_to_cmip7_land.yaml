@@ -8,6 +8,7 @@ variables:
   baresoilFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by bare soil.
     dims: [lon, lat, time, typebare]
+    formula: (1-AREA_PLANTS)*FATES_FRACTION
     sources: [model_var: AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -184,6 +185,7 @@ variables:
   cropFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by crop.
     dims: [lon, lat, time, typecrop]
+    formula: (sumoverpft(FATES_PATCHAREA_LU, pftlist=[5], dim='fates_levlanduse'))*FATES_FRACTION
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -564,6 +566,8 @@ variables:
   grassFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell that is covered by natural grass.
     dims: [lon, lat, time, typenatgr]
+    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[12, 13, 14], dim='fates_levpft')
+      *FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -636,6 +640,7 @@ variables:
     description: the mass per unit area  (summed over all soil layers) of water in
       all phases.
     dims: [lon, lat, time]
+    formula: TOTSOILLIQ+TOTSOILICE
     sources: [model_var: TOTSOILLIQ, model_var: TOTSOILICE]
     table: land
     units: kg m-2
@@ -660,6 +665,7 @@ variables:
     description: in each soil layer, the mass of water in all phases, including ice.  Reported
       as "missing" for grid cells occupied entirely by "sea"
     dims: [lon, lat, sdepth, time]
+    formula: SOILLIQ+SOILICE
     sources: [model_var: SOILLIQ, model_var: SOILICE]
     table: land
     units: kg m-2
@@ -938,6 +944,7 @@ variables:
     description: Percentage of entire grid cell  that is land and is covered by  neither
       vegetation nor bare-soil (e.g., urban, ice, lakes, etc.)
     dims: [lon, lat, time, typeresidual]
+    formula: 1-FATES_FRACTION
     sources: [model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1023,6 +1030,8 @@ variables:
   shrubFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by shrub.
     dims: [lon, lat, time, typeshrub]
+    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[7, 8, 9, 10, 11], dim='fates_levpft')
+      *FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1124,6 +1133,8 @@ variables:
   treeFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by trees.
     dims: [lon, lat, time, typetree]
+    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[1, 2, 3, 4, 5, 6], dim='fates_levpft')
+      *FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'

@@ -670,15 +670,16 @@ def _group_entries(all_entries):
         if len(entries) == 1:
             data[name] = entries[0]
         else:
-            base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
-            if entries[0]["table"] == "seaIce":
+            if entries[0].get("table") == "seaIce":
+                base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
                 variants = [
                     {k: e[k] for k in _VARIANT_FIELDS if k in e} for e in entries
                 ]
                 base["variants"] = variants
                 data[name] = base
             else:
-                data[name] = base
+                # Multiple rows for non-seaIce variables are duplicates; use the first.
+                data[name] = entries[0]
     return data
 
 
