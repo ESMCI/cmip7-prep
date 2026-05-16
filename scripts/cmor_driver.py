@@ -328,7 +328,7 @@ def process_one_var(
             open_kwargs = None
             if realm in ("ocean", "seaIce"):
                 open_kwargs = {"decode_timedelta": False}
-            logger.info("Opening native data for variable %s", varname)
+            logger.debug("Opening native data for variable %s", varname)
 
             # ds_native is an xarray dataset for the CESM/NorESM time series files
             # open_native_for_cmip_vars is in pipeline.py
@@ -345,12 +345,12 @@ def process_one_var(
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
             if "TLAT" in ds_native:
-                logger.info("TLAT is present")
+                logger.debug("TLAT is present")
             if model == "cesm":
                 # Append ocn_fx_fields to ds_native if available
                 # fx - grid definition like topography, fraction
                 if realm == "ocean" and ocn_fx_fields is not None:
-                    logger.info("adding ocn_fx_fields to ds_native")
+                    logger.debug("adding ocn_fx_fields to ds_native")
                     ds_native = ds_native.merge(ocn_fx_fields)
 
             # Output ds_native keys
@@ -471,11 +471,11 @@ def process_one_var(
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
                     region = write_cfg.get("region", "glb")
-                    logger.info("Setting region: %s", region)
+                    logger.debug("Setting region: %s", region)
                     set_cur_dataset_attribute("region", region)
 
                     logger.info(
-                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
+                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency} and dims {dims}"
                     )
                     vdef = type(
                         "VDef",
@@ -495,7 +495,6 @@ def process_one_var(
                     )()
 
                     # Now use CMOR utility to write out netcdf variable
-                    logger.info(f"Writing CMOR variable {varname} with dims {dims} ")
                     cm.write_variable(ds_cmor_write, cmip_var, vdef)
 
                 logger.info(f"Finished processing for {varname} with dims {dims}")
@@ -505,7 +504,7 @@ def process_one_var(
                     f"Exception while processing {varname} with dims {dims}: {e!r}"
                 )
                 results.append((str(varname), f"ERROR: {e!r}"))
-    logger.info(f"Completed all processing for variable: {varname}, results {results}")
+    logger.debug(f"Completed all processing for variable: {varname}, results {results}")
     return results
 
 
@@ -829,7 +828,7 @@ def main():
                     else:
                         results.append((str(result), "unknown"))
         for v, status in set(results):
-            logger.info(f"Variable {v} processed with status: {status}")
+            logger.debug(f"Variable {v} processed with status: {status}")
     else:
         logger.info("No results to process.")
     if client:

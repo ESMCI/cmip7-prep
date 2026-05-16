@@ -212,12 +212,12 @@ def _apply_vertical_if_needed(
     base = xr.Dataset({k: ds_native[k] for k in need if k in ds_native})
 
     base[str(cmip_var)] = ds_var[str(cmip_var)]
-    logger.info("Applying plev19 vertical transform for variable: %s", cmip_var)
+    logger.debug("Applying plev19 vertical transform for variable: %s", cmip_var)
 
     v_plev = to_plev(
         ds=base, var=cmip_var, tables_path=tables_path, target=levels.get("name")
     )  # returns dataset with var on 'plev'
-    logger.info("After vertical transform : %s", cmip_var)
+    logger.debug("After vertical transform : %s", cmip_var)
     return xr.Dataset({str(cmip_var): v_plev[str(cmip_var)]})
 
 
@@ -259,7 +259,7 @@ def realize_regrid_prepare(
 
     # 2) Realize the target variable
     ds_v = mapping.realize(ds_native, cmip_var)
-    logger.info("Realized variable '%s' with dims: %s", cmip_var, ds_v.dims)
+    logger.debug("Realized variable '%s' with dims: %s", cmip_var, ds_v.dims)
     da = ds_v if isinstance(ds_v, xr.DataArray) else ds_v[cmip_var]
     if time_chunk and "time" in da.dims:
         da = da.chunk({"time": int(time_chunk)})
@@ -330,7 +330,7 @@ def realize_regrid_prepare(
 
     # 9) For plev39: take zonal mean over lon after regridding to lat/lon.
     if lev_kind == "plev39" and "lon" in ds_regr[str(cmip_var)].dims:
-        logger.info("Applying zonal mean over lon for plev39 variable: %s", cmip_var)
+        logger.debug("Applying zonal mean over lon for plev39 variable: %s", cmip_var)
         ds_regr[str(cmip_var)] = ds_regr[str(cmip_var)].mean("lon")
 
     return ds_regr

@@ -152,7 +152,7 @@ class CmorSession(
             # caller passed a context manager directly
             self._dataset_json_cm = dj
             p = dj.__enter__()  # ← ENTER the CM, get a Path
-        logger.info("CMOR JSON dataset: %s", p)
+        logger.debug("CMOR JSON dataset: %s", p)
         with open(p, encoding="utf-8") as f:
             cfg = json.load(f)
         cfg["outpath"] = str(self._outdir)
@@ -217,7 +217,7 @@ class CmorSession(
             return {}  # already loaded
         table_filename = resolve_table_filename(tables_root / "tables", key)
         self.currenttable = key
-        logger.info("Loading CMOR table for key '%s': %s", key, table_filename)
+        logger.debug("Loading CMOR table for key '%s': %s", key, table_filename)
         return cmor.load_table(table_filename)
 
     def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
@@ -251,7 +251,7 @@ class CmorSession(
             cal = time_da.attrs.get(
                 "calendar", time_da.encoding.get("calendar", "noleap")
             )
-            logger.info("time units: %s calendar: %s", units, cal)
+            logger.debug("Time units: %s calendar: %s", units, cal)
             tvals = encode_time_to_num(time_da, units, cal)
             bname = time_da.attrs.get("bounds")
 
@@ -279,7 +279,7 @@ class CmorSession(
                 vals, bnds, _ = roll_for_monotonic_with_bounds(vals, bnds)
             return vals, bnds, units
 
-        logger.info("Defining CMOR axes for variable: %s", vdef.name)
+        logger.debug("Defining CMOR axes for variable: %s", vdef.name)
         axes_ids = []
         var_name = getattr(vdef, "name", None)
         if var_name is None or var_name not in ds:
@@ -759,7 +759,7 @@ class CmorSession(
                 "CMOR variable object has outputpath attribute: %s",
                 cmor.get_variable_attribute(var_id, "outputpath"),
             )
-        logger.info("Writing FX variable %s id: %s", name, var_id)
+        logger.debug("Writing FX variable %s id: %s", name, var_id)
         cmor.write(var_id, np.asarray(data_filled))
         cmor.close(var_id)
         logger.debug("Finished writing fx variable %s", name)
@@ -863,7 +863,7 @@ class CmorSession(
             getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "atmos"
         )
 
-        logger.info("Using CMOR table key: %s %s", self.tables_root, self.primarytable)
+        logger.debug("Using CMOR table key: %s %s", self.tables_root, self.primarytable)
         self.load_table(self.tables_root, self.primarytable)
         bvn_attr = getattr(cmip_var, "branded_variable_name", None)
         bvn = bvn_attr.name if bvn_attr is not None else None
@@ -930,13 +930,13 @@ class CmorSession(
         nt = 0
 
         # ---- Main variable write ----
-        logger.info("Writing CMOR variable %s", var_id)  # debug
+        logger.debug("Writing CMOR variable %s", var_id)  # debug
         cmor.write(
             var_id,
             np.asarray(data_filled),
             ntimes_passed=nt,
         )
-        logger.info("Finished writing CMOR variable %s", var_id)  # debug
+        logger.debug("Finished writing CMOR variable %s", var_id)  # debug
 
         # ---- Hybrid ps streaming (if present) ----
         if self._pending_ps is not None:
