@@ -423,7 +423,9 @@ def process_one_var(
                 # After this line, da_realized is always an xr.DataArray containing the CMIP variable
                 # on the native SE/ncol grid — whether it came from a direct mapping or a formula evaluation.
                 da_realized = (
-                    realized if isinstance(realized, xr.DataArray) else realized[varname]
+                    realized
+                    if isinstance(realized, xr.DataArray)
+                    else realized[varname]
                 )
 
                 # Build a dataset with the realized variable plus PS for pressure
