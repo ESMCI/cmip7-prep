@@ -407,6 +407,17 @@ class CmorSession(
                 cell_bounds=lon_bnds,
             )
 
+        elif "lat" in var_dims and "lon" not in var_dims:
+            # Zonal mean: latitude-only horizontal axis (no longitude)
+            logger.debug("Defining zonal-mean latitude axis (no lon)")
+            lat_vals, lat_bnds, _ = _get_1d_with_bounds(ds, "lat", "degrees_north")
+            lat_id = cmor.axis(
+                table_entry="latitude",
+                units="degrees_north",
+                coord_vals=lat_vals,
+                cell_bounds=lat_bnds,
+            )
+
         # -------------------------
         # ---- time axis ----
         # -------------------------
