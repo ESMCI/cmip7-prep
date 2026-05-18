@@ -32,6 +32,7 @@ from cmip7_prep.cmor_utils import (
     packaged_dataset_json,
 )
 from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
     realize_regrid_prepare,
     open_native_for_cmip_vars,
@@ -407,6 +408,54 @@ def process_one_var(
                         f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
                     )
                 )
+            elif cfg.get("levels", {}).get("name") == "plev39":
+                logger.info(
+                    "Processing plev39 variable %s: realize → regrid to lat/lon "
+                    "→ zonal_mean_on_pressure_grid",
+                    varname,
+                )
+                # Realize the variable — handles single-source and formula cases uniformly.
+                realized = mapping.realize(ds_native, varname)
+
+                # normalizes the result to always be a DataArray:
+                #   - If realize returned a DataArray directly → use it as-is
+                #   - If realize returned a Dataset → extract the named variable from it: realized[varname]
+                # After this line, da_realized is always an xr.DataArray containing the CMIP variable
+                # on the native SE/ncol grid — whether it came from a direct mapping or a formula evaluation.
+                da_realized = (
+                    realized if isinstance(realized, xr.DataArray) else realized[varname]
+                )
+
+                # Build a dataset with the realized variable plus PS for pressure
+                # computation.  The 1-D coefficients (hyam, hybm, P0, lev) are carried
+                # through unchanged by regrid_to_latlon_ds via _attach_vertical_metadata.
+                ds_to_regrid = xr.Dataset({varname: da_realized})
+                for aux in ("PS", "hyam", "hybm", "P0", "lev"):
+                    if aux in ds_native:
+                        ds_to_regrid[aux] = ds_native[aux]
+
+                # Regrid variable and PS from the native (SE/ncol) grid to lat/lon.
+                vars_to_regrid = [varname] + [v for v in ("PS",) if v in ds_to_regrid]
+                ds_latlon = regrid_to_latlon_ds(
+                    ds_to_regrid,
+                    vars_to_regrid,
+                    resolution,
+                    model,
+                    time_from=ds_native,
+                    dtype="float32",
+                )
+
+                # Zonal mean over lon then interpolate to plev39 pressure levels.
+                da = zonal_mean_on_pressure_grid(
+                    ds_latlon,
+                    varname,
+                    tables_path=tables_root / "tables",
+                    target="plev39",
+                )
+                ds_cmor = xr.Dataset({varname: da})
+                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+                cmor_items = [(ds_cmor, cfg)]
             else:
                 # For lnd/atm or any other dims, use existing logic
                 logger.debug(
