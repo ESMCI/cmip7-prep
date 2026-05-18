@@ -176,25 +176,21 @@ def zonal_mean_on_pressure_grid(
     >>> # zonal_mean_on_pressure_grid(ds, 'ta',
     >>> #      tables_path='cmip7-cmor-tables/tables', target='plev39')
     """
-    # 1. Zonal mean (average over longitude)
+    # Validate inputs
     if lon_dim not in ds[var].dims:
         raise ValueError(
             f"Longitude dimension '{lon_dim}' not found in variable '{var}'"
         )
-    zonal = ds[var].mean(dim=lon_dim, keep_attrs=keep_attrs)
-
-    # 2. Build a new dataset for vertical interpolation
     required = [ps_name, hyam_name, hybm_name]
     missing = [name for name in required if name not in ds]
     if missing:
         raise KeyError(f"Missing required variables in dataset: {missing}")
 
-    ds_zonal = ds.copy()
-    ds_zonal[var] = zonal
-
-    # 3. Interpolate to the requested pressure grid using vertical.to_plev
+    # 1. Interpolate to pressure grid at every lat/lon point.
+    #    PS, hyam, hybm all retain their lon dimension here so the interpolation
+    #    uses the correct surface pressure at each grid column.
     out_ds = vertical.to_plev(
-        ds_zonal,
+        ds,
         var,
         tables_path,
         target=target,
@@ -204,8 +200,9 @@ def zonal_mean_on_pressure_grid(
         hybm_name=hybm_name,
         p0_name=p0_name,
     )
-    # Output dims: (plev, lat, [time])
-    return out_ds[var]
+
+    # 2. Zonal mean over longitude → dims: (time, plev, lat)
+    return out_ds[var].mean(dim=lon_dim, keep_attrs=keep_attrs)
 
 
 # -------------------------
