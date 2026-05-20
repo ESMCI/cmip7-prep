@@ -61,11 +61,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def packaged_mapping_resource(filename: str = "cesm_to_cmip7.yaml"):
+def packaged_mapping_resource(filename: str):
     """Context manager yielding a real filesystem path to the packaged mapping file.
     Example:
-        >>> with packaged_mapping_resource("cesm_to_cmip7.yaml") as p:
-        ...     str(p).endswith("cesm_to_cmip7.yaml")
+        >>> with packaged_mapping_resource("noresm_to_cmip7_atmos.yaml") as p:
+        ...     str(p).endswith("noresm_to_cmip7_atmos.yaml")
         True
     """
 
@@ -294,8 +294,8 @@ class Mapping:
         self._vars, self._raw, self._variant_keys = self._load_yaml(self.path)
 
     @classmethod
-    def from_packaged_default(cls, filename: str = "cesm_to_cmip7.yaml") -> "Mapping":
-        """Construct a Mapping using the packaged default YAML."""
+    def from_packaged_default(cls, filename: str) -> "Mapping":
+        """Construct a Mapping from a packaged realm-specific YAML file."""
         logger.info("mapping file is %s", filename)
         with packaged_mapping_resource(filename) as p:
             return cls(p)

@@ -1,0 +1,156 @@
+dataset_overrides: {institution_id: NCAR, nominal_resolution: 100 km, source_id: CESM3}
+
+variables:
+
+  agessc_tavg-ol-hxy-sea:
+    dims: [time, olevel, latitude, longitude]
+    long_name: Ideal Age of Sea Water
+    sources: [model_var: agessc]
+    table: ocean
+    units: yr
+
+  deptho_ti-u-hxy-sea:
+    dims: [yh, xh]
+    long_name: Sea Floor Depth
+    regrid_method: conservative
+    sources: [model_var: deptho]
+    standard_name: depth_below_sea_level
+    table: fx
+    units: m
+
+  evspsbl_tavg-u-hxy-ifs:
+    dims: [time, latitude, longitude]
+    long_name: Evaporation over ice free ocean
+    regrid_method: conservative
+    sources: [model_var: evs]
+    table: ocean
+    units: kg m-2 s-1
+
+  ficeberg_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    long_name: Iceberg Freshwater Flux
+    regrid_method: conservative
+    sources: [model_var: ficeberg]
+    table: ocean
+    units: kg m-2 s-1
+
+  hfds_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    positive: down
+    sources: [model_var: hfds]
+    table: ocean
+    units: W m-2
+
+  hfsnthermds_tavg-u-hxy-sea:
+    dims: [time, olevel, latitude, longitude]
+    long_name: Latent Heat to melt frozen Precipitation
+    regrid_method: conservative
+    sources: [model_var: hfsnthermds]
+    table: ocean
+    units: W m-2
+
+  mlotst_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    long_name: Ocean Mixed Layer Thickness Defined by Sigma T
+    sources: [model_var: mlotst]
+    table: ocean
+    units: m
+
+  siareaacrossline_tavg-u-ht-u:
+    dims: [time, latitude]
+    long_name: Sea Ice Area Across Line
+    regrid_method: conservative
+    sources: [{freq: day, model_var: siareaacrossline_d}, {freq: mon, model_var: siareaacrossline}]
+    table: ocean
+    units: m
+
+  siflfwbot_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    long_name: Freshwater Flux from Sea Ice to Ocean
+    regrid_method: conservative
+    sources: [{freq: day, model_var: siflfwbot_d}, {freq: mon, model_var: siflfwbot}]
+    table: ocean
+    units: kg m-2 s-1
+
+  sig1_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    regrid_method: conservative
+    sources: [{freq: day, model_var: sigl_d}, {freq: mon, model_var: sigl}]
+    table: ocean
+    units: m s-1
+
+  sihc_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    long_name: Sea Ice Surface Freshwater Flux to Ocean
+    regrid_method: conservative
+    sources: [{freq: day, model_var: sihc_d}, {freq: mon, model_var: sihc}]
+    table: ocean
+    units: kg m-2 s-1
+
+  sos_tavg-u-hxy-sea:
+    dims: [[time, latitude, longitude], [time, lat, lon]]
+    regrid_method: conservative
+    sources: [model_var: sos]
+    table: ocean
+    units: 100E-03
+
+  tauuo_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    positive: down
+    sources: [model_var: tauuo]
+    table: ocean
+    units: N m-2
+
+  tauvo_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    positive: down
+    sources: [model_var: tauvo]
+    table: ocean
+    units: N m-2
+
+  thetao_tavg-ol-hxy-sea:
+    dims: [[time, z_l, latitude, longitude], [time, z_l, lat, lon]]
+    regrid_method: bilinear
+    sources: [model_var: thetao]
+    table: ocean
+    units: K
+
+  tos_tavg-u-hxy-sea:
+    dims: [[time, latitude, longitude], [time, lat, lon]]
+    regrid_method: bilinear
+    sources: [model_var: tos]
+    table: ocean
+    units: K
+
+  umo_tavg-ol-hxy-sea:
+    dims: [time, z_l, latitude, longitude]
+    sources: [model_var: umo]
+    table: ocean
+    units: kg s-1
+
+  vmo_tavg-ol-hxy-sea:
+    dims: [time, z_l, latitude, longitude]
+    sources: [model_var: vmo]
+    table: ocean
+    units: kg s-1
+
+  vo_tavg-ol-hxy-sea:
+    dims: [[time, z_l, latitude, longitude], [time, z_l, lat, lon]]
+    regrid_method: bilinear
+    sources: [model_var: vo]
+    table: ocean
+    units: m s-1
+
+  wo_tavg-ol-hxy-sea:
+    dims: [[time, z_l, latitude, longitude], [time, z_l, lat, lon]]
+    regrid_method: bilinear
+    sources: [model_var: wo]
+    table: ocean
+    units: m s-1
+
+  zos_tavg-u-hxy-sea:
+    dims: [time, latitude, longitude]
+    regrid_method: bilinear
+    sources: [model_var: zos]
+    table: ocean
+    units: m

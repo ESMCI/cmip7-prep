@@ -444,15 +444,16 @@ class TestYamlToCsv:
         cfg = MODEL_CONFIGS["cesm"]
         result = read_csv(cpath, cfg)
 
-        tas = result["variables"]["tas"]
+        atmos = result["atmos"]["variables"]
+        tas = atmos["tas"]
         assert tas["table"] == "atmos"
         assert tas["units"] == "K"
         assert tas["sources"] == [{"model_var": "TREFHT"}]
         assert "scale" not in tas["sources"][0]
 
-        cl = result["variables"]["cl"]
+        cl = atmos["cl"]
         assert cl["formula"] == "CLOUD * 100"
         assert "levels" in cl  # lev dim → levels block added
 
-        evspsbl = result["variables"]["evspsbl"]
+        evspsbl = atmos["evspsbl"]
         assert evspsbl["sources"] == [{"model_var": "QFLX"}]

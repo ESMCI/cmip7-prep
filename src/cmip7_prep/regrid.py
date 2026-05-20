@@ -176,25 +176,21 @@ def zonal_mean_on_pressure_grid(
     >>> # zonal_mean_on_pressure_grid(ds, 'ta',
     >>> #      tables_path='cmip7-cmor-tables/tables', target='plev39')
     """
-    # 1. Zonal mean (average over longitude)
+    # Validate inputs
     if lon_dim not in ds[var].dims:
         raise ValueError(
             f"Longitude dimension '{lon_dim}' not found in variable '{var}'"
         )
-    zonal = ds[var].mean(dim=lon_dim, keep_attrs=keep_attrs)
-
-    # 2. Build a new dataset for vertical interpolation
     required = [ps_name, hyam_name, hybm_name]
     missing = [name for name in required if name not in ds]
     if missing:
         raise KeyError(f"Missing required variables in dataset: {missing}")
 
-    ds_zonal = ds.copy()
-    ds_zonal[var] = zonal
-
-    # 3. Interpolate to the requested pressure grid using vertical.to_plev
+    # 1. Interpolate to pressure grid at every lat/lon point.
+    #    PS, hyam, hybm all retain their lon dimension here so the interpolation
+    #    uses the correct surface pressure at each grid column.
     out_ds = vertical.to_plev(
-        ds_zonal,
+        ds,
         var,
         tables_path,
         target=target,
@@ -204,8 +200,9 @@ def zonal_mean_on_pressure_grid(
         hybm_name=hybm_name,
         p0_name=p0_name,
     )
-    # Output dims: (plev, lat, [time])
-    return out_ds[var]
+
+    # 2. Zonal mean over longitude → dims: (time, plev, lat)
+    return out_ds[var].mean(dim=lon_dim, keep_attrs=keep_attrs)
 
 
 # -------------------------
@@ -347,7 +344,7 @@ def regrid_to_latlon_ds(
             dtype=dtype,
             output_time_chunk=output_time_chunk,
         )
-        logger.info("Finished regridding var %s", name)
+        logger.debug("Finished regridding var %s", name)
 
     # Create an xarray dataset with the output vars
     ds_out = xr.Dataset(out_vars)
@@ -469,7 +466,7 @@ def regrid_to_latlon(
         # --- OCEAN: Normalize by sftof (sea fraction) if present ---
         sftof = _sftof_from_native(ds_in)
         if sftof is not None:
-            logger.info("Normalizing ocean field by source sftof (sea fraction)")
+            logger.debug("Normalizing ocean field by source sftof (sea fraction)")
             frac = sftof / 100.0
             da2 = da2.fillna(0) * frac
     else:
@@ -542,7 +539,7 @@ def regrid_to_latlon(
 
     # Regrid the data
     out_norm = regridder(da2_2d, skipna=True, na_thres=1.0, **kwargs)
-    logger.info("Regridding complete. out_norms dims: %s", out_norm.dims)
+    logger.debug("Regridding complete - out_norms dims: %s", out_norm.dims)
 
     # Denormalize the data if appropriate
     if hdim == "lndgrid":
@@ -747,7 +744,7 @@ def _regrid_fx_once(
 
     out_vars = {}
     if sftlf_path:
-        logger.info("Getting sftlf from output path %s", sftlf_path)
+        logger.debug("Getting sftlf from output path %s", sftlf_path)
         out_vars["sftlf"] = xr.open_mfdataset(sftlf_path)["sftlf"]
 
     ds_fx_native = _build_fx_native(ds_native)
@@ -757,7 +754,7 @@ def _regrid_fx_once(
 
     # Regrid sftlf from source if present
     if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
-        logger.info("Computing regridded sftlf")
+        logger.debug("Computing regridded sftlf")
         da = ds_fx_native["sftlf"].fillna(0)
         da2 = (
             da.rename({"lndgrid": "lon"})
@@ -767,7 +764,7 @@ def _regrid_fx_once(
         lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
             dim=("lndgrid")
         )
-        logger.info("Total land area on source grid: %.3e m^2", lndarea.values)
+        logger.debug("Total land area on source grid: %.3e m^2", lndarea.values)
         out = regridder(da2, skipna=True, na_thres=1.0)  # Regrid
         spatial = [d for d in out.dims if d in ("lat", "lon")]
         out = out.transpose(*spatial)
@@ -779,7 +776,7 @@ def _regrid_fx_once(
     if "sftlf" in out_vars:
         logger.debug("Obtaining sftlf")
         sftlf = out_vars["sftlf"]
-        logger.info("Computing regridded sftof as 1 - sftlf")
+        logger.debug("Computing regridded sftof as 1 - sftlf")
         sftof = (1.0 - sftlf / 100.0) * 100.0
         sftof = sftof.clip(min=0.0, max=100.0)
         sftof.name = "sftof"

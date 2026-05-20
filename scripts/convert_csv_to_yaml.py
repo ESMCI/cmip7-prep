@@ -12,19 +12,21 @@ from typing import Optional
 NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     # "<branded_variable_name>": "up",
     # "<branded_variable_name>": "down",
-    "hfls_tavg-u-hxy-u": "down",
-    "hfss_tavg-u-hxy-u": "down",
-    "rlds_tavg-u-hxy-u": "down",
-    "rls_tavg-u-hxy-u": "down",
-    "rlut_tavg-u-hxy-u": "down",
-    "rlutcs_tavg-u-hxy-u": "down",
-    "rsds_tavg-u-hxy-u": "down",
-    "rsdscs_tavg-u-hxy-u": "down",
-    "rsdt_tavg-u-hxy-u": "down",
+    "hfls_tavg-u-hxy-u": "up",
+    "hfss_tavg-u-hxy-u": "up",
+    "rlds_tavg-u-hxy-u": "up",
+    "rls_tavg-u-hxy-u": "up",
+    "rlut_tavg-u-hxy-u": "up",
+    "rlutcs_tavg-u-hxy-u": "up",
+    "rsds_tavg-u-hxy-u": "up",
+    "rsdscs_tavg-u-hxy-u": "up",
+    "rsdt_tavg-u-hxy-u": "up",
     "rss_tavg-u-hxy-u": "down",
-    "rsuscs_tavg-u-hxy-u": "down",
-    "rsutcs_tavg-u-hxy-u": "down",
-    "rsut_tavg-u-hxy-u": "down",
+    "rsuscs_tavg-u-hxy-u": "up",
+    "rsutcs_tavg-u-hxy-u": "up",
+    "rsut_tavg-u-hxy-u": "up",
+    "rlus_tavg-u-hxy-u": "up",
+    "rsus_tavg-u-hxy-u": "up",
     "rtmt_tavg-u-hxy-u": "down",
     "tauu_tavg-u-hxy-u": "down",
     "tauv_tavg-u-hxy-u": "down",
@@ -37,12 +39,11 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
 #   column_map          : CSV column → YAML key; "_source_expr" is special-cased
 #                         (parsed as a variable name or math formula)
 #   realm_column        : CSV column containing the realm/table value
-#   keep_realms         : list of realms to keep; None means keep all
+#   realm_outputs       : maps realm name → output YAML path; only realms listed here are kept
 #   source_column       : CSV column containing the model variable expression
 #   source_skip_phrases : rows whose source column contains any of these are dropped
 #   dataset_overrides   : written verbatim as the top-level "dataset_overrides" block
 #   default_input       : default CSV path when --input is omitted
-#   default_output      : default YAML path when --output is omitted
 
 MODEL_CONFIGS = {
     "noresm": {
@@ -64,7 +65,10 @@ MODEL_CONFIGS = {
             "NorESM3 name (dependency)": "_source_expr",
         },
         "realm_column": "Modelling Realm - Primary",
-        "keep_realms": ["atmos", "land"],
+        "realm_outputs": {
+            "atmos": "noresm_to_cmip7_atmos.yaml",
+            "land": "noresm_to_cmip7_land.yaml",
+        },
         "source_column": "NorESM3 name (dependency)",
         "source_skip_phrases": [
             "?",
@@ -84,7 +88,6 @@ MODEL_CONFIGS = {
     },
     "cesm": {
         "default_input": "cesm_data.csv",
-        "default_output": "cesm_data.yaml",
         "normalize_dim_names": False,
         "dataset_overrides": {
             "institution_id": "NCAR",
@@ -114,7 +117,13 @@ MODEL_CONFIGS = {
             "Levels Src Axis Bnds": "_levels_src_axis_bnds",
         },
         "realm_column": "Table",
-        "keep_realms": None,  # keep all realms
+        "realm_outputs": {
+            "atmos": "cesm_to_cmip7_atmos.yaml",
+            "land": "cesm_to_cmip7_land.yaml",
+            "seaIce": "cesm_to_cmip7_seaice.yaml",
+            "ocean": "cesm_to_cmip7_ocean.yaml",
+            "fx": "cesm_to_cmip7_ocean.yaml",
+        },
         "source_column": "CESM Variable Name",
         "source_skip_phrases": [],
         "key_column_skip_phrases": [],
@@ -157,12 +166,10 @@ def should_keep(row, config):
     """
     realm_col = config["realm_column"]
     source_col = config["source_column"]
-    keep_realms = config.get("keep_realms")
     skip_phrases = config.get("source_skip_phrases", [])
 
-    if keep_realms is not None and row.get(realm_col) not in keep_realms:
+    if row.get(realm_col) not in config["realm_outputs"]:
         return False
-    print("Passed realm filter")
 
     source = row.get(source_col, "").strip()
     if not source:
@@ -508,7 +515,15 @@ def _build_entry(row, config):
             else:
                 dims = clean_strings(value.split(","), normalize)
             entry["dims"] = dims
-            plev_dim = next((d for d in entry["dims"] if re.match(r"^plev\d", d)), None)
+            # Only search for plev in flat string lists; nested lists are left intact.
+            plev_dim = next(
+                (
+                    d
+                    for d in entry["dims"]
+                    if isinstance(d, str) and re.match(r"^plev\d", d)
+                ),
+                None,
+            )
             if plev_dim:
                 _DIM_ORDER = ["time", "plev", "lat", "lon"]
                 entry["dims"] = ["plev" if d == plev_dim else d for d in entry["dims"]]
@@ -575,11 +590,7 @@ def _build_entry(row, config):
     # Merge Freq/Alias columns into the per-source dicts.
     freq_str = entry.pop("_freq", None)
     alias_str = entry.pop("_alias", None)
-    if (
-        "sources" in entry
-        and (freq_str or alias_str)
-        and entry.get("table") == "seaIce"
-    ):
+    if "sources" in entry and (freq_str or alias_str):
         sources = entry["sources"]
         n = len(sources)
         freqs = _split_positional(freq_str or "", n)
@@ -599,24 +610,23 @@ _VARIANT_FIELDS = ("long_name", "formula", "region")
 
 
 def read_csv(filepath, config):
-    """Read CSV and return a data dict ready for YAML output.
+    """Read CSV and return a dict mapping each realm to its own data dict::
 
-    The structure is::
+        { "atmos": {"dataset_overrides": {...}, "variables": {...}}, ... }
 
-        {
-            "dataset_overrides": {...},
-            "variables": {
-                "<cmip_name>": { ... },
-                ...
-            }
-        }
+    The realms included and their output filenames are defined by ``realm_outputs`` in *config*.
 
-    Variables with multiple CSV rows (same CMIP Variable Name, different Region)
-    are reconstructed into a ``variants`` list.
+    Variables with multiple CSV rows (same key, different Region) are
+    reconstructed into a ``variants`` list.
     """
     key_col = config["key_column"]
+    realm_col = config[
+        "realm_column"
+    ]  # required in all configs; KeyError is intentional if missing
+    realm_outputs = config.get(
+        "realm_outputs"
+    )  # optional; None means return a single combined dict
 
-    # First pass: collect all (name, entry) pairs, preserving order.
     all_entries = []
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -626,15 +636,33 @@ def read_csv(filepath, config):
             name = row[key_col].strip()
             if not name:
                 continue
+            realm = row[realm_col].strip()
             entry = _build_entry(row, config)
             positive = config.get("positive_overrides", {}).get(name)
             if positive:
                 entry["positive"] = positive
+            all_entries.append((name, entry, realm))
 
-            all_entries.append((name, entry))
+    if realm_outputs:
+        result = {}
+        for realm in realm_outputs:
+            realm_entries = [(n, e) for n, e, r in all_entries if r == realm]
+            result[realm] = {
+                "dataset_overrides": config["dataset_overrides"],
+                "variables": _group_entries(realm_entries),
+            }
+        return result
 
-    # Second pass: group by name and reconstruct variants where multiple rows
-    # share the same CMIP Variable Name.
+    entries = [(n, e) for n, e, _ in all_entries]
+    return {
+        "dataset_overrides": config["dataset_overrides"],
+        "variables": _group_entries(entries),
+    }
+
+
+# ── group entries ─────────────────────────────────────────────────────────────
+def _group_entries(all_entries):
+    """Group (name, entry) pairs by name, handling variants."""
     grouped = {}
     for name, entry in all_entries:
         grouped.setdefault(name, []).append(entry)
@@ -644,26 +672,17 @@ def read_csv(filepath, config):
         if len(entries) == 1:
             data[name] = entries[0]
         else:
-            # Multiple rows → variants variable.
-            # Base fields come from the first row (they are identical across rows).
-            base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
-            if entries[0]["table"] == "seaIce":
-                variants = []
-                for e in entries:
-
-                    variant = {k: e[k] for k in _VARIANT_FIELDS if k in e}
-                    variants.append(variant)
-
+            if entries[0].get("table") == "seaIce":
+                base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
+                variants = [
+                    {k: e[k] for k in _VARIANT_FIELDS if k in e} for e in entries
+                ]
                 base["variants"] = variants
                 data[name] = base
             else:
-                # For atmos/land: no variants, no freq — just use first entry's base fields.
-                data[name] = base
-
-    return {
-        "dataset_overrides": config["dataset_overrides"],
-        "variables": data,
-    }
+                # Multiple rows for non-seaIce variables are duplicates; use the first.
+                data[name] = entries[0]
+    return data
 
 
 # ── write yaml ────────────────────────────────────────────────────────────────
@@ -720,21 +739,28 @@ def main():
         default=None,
         help="Input CSV file (default: model-specific)",
     )
-    parser.add_argument(
-        "--output",
-        default=None,
-        help="Output YAML file (default: model-specific)",
-    )
     args = parser.parse_args()
 
     config = MODEL_CONFIGS[args.model]
     input_file = args.input or config["default_input"]
-    output_file = args.output or config["default_output"]
-
     data = read_csv(input_file, config)
-    print(data)
-    write_yaml(data, output_file)
-    print(f"wrote {len(data['variables'])} entries to {output_file}")
+
+    # Merge realms that share the same output file (e.g. ocean + fx → ocean yaml).
+    merged: dict = {}
+    for realm, realm_data in data.items():
+        output_file = config["realm_outputs"][realm]
+        if output_file not in merged:
+            merged[output_file] = realm_data
+        else:
+            merged[output_file]["variables"].update(realm_data["variables"])
+
+    total = 0
+    for output_file, file_data in merged.items():
+        write_yaml(file_data, output_file)
+        count = len(file_data["variables"])
+        total += count
+        print(f"wrote {count} entries to {output_file}")
+    print(f"total: {total} entries written across {len(merged)} files")
 
 
 if __name__ == "__main__":

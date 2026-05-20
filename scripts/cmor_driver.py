@@ -32,6 +32,7 @@ from cmip7_prep.cmor_utils import (
     packaged_dataset_json,
 )
 from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
     realize_regrid_prepare,
     open_native_for_cmip_vars,
@@ -67,6 +68,20 @@ TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
 TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+REALM_YAML_MAP = {
+    "noresm": {
+        "atmos": "noresm_to_cmip7_atmos.yaml",
+        "land": "noresm_to_cmip7_land.yaml",
+        "seaIce": "noresm_to_cmip7_seaice.yaml",
+    },
+    "cesm": {
+        "atmos": "cesm_to_cmip7_atmos.yaml",
+        "land": "cesm_to_cmip7_land.yaml",
+        "seaIce": "cesm_to_cmip7_seaice.yaml",
+        "ocean": "cesm_to_cmip7_ocean.yaml",
+    },
+}
 
 INCLUDE_PATTERN_MAP = {
     "cesm": {
@@ -278,7 +293,7 @@ def process_one_var(
 
     try:
         # This is what maps the CESM/NorESM history variable(s) to the cmor variable
-        # This is obtained from reading cesm_to_cmip7.yaml or noresm_to_cmip7.yaml
+        # This is obtained from reading the input yaml file
         cfg = mapping.get_cfg(varname)
     except KeyError:
         logger.warning(f"Skipping '{varname}': no entry found in mapping YAML")
@@ -314,7 +329,7 @@ def process_one_var(
             open_kwargs = None
             if realm in ("ocean", "seaIce"):
                 open_kwargs = {"decode_timedelta": False}
-            logger.info("Opening native data for variable %s", varname)
+            logger.debug("Opening native data for variable %s", varname)
 
             # ds_native is an xarray dataset for the CESM/NorESM time series files
             # open_native_for_cmip_vars is in pipeline.py
@@ -331,12 +346,12 @@ def process_one_var(
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
             if "TLAT" in ds_native:
-                logger.info("TLAT is present")
+                logger.debug("TLAT is present")
             if model == "cesm":
                 # Append ocn_fx_fields to ds_native if available
                 # fx - grid definition like topography, fraction
                 if realm == "ocean" and ocn_fx_fields is not None:
-                    logger.info("adding ocn_fx_fields to ds_native")
+                    logger.debug("adding ocn_fx_fields to ds_native")
                     ds_native = ds_native.merge(ocn_fx_fields)
 
             # Output ds_native keys
@@ -393,6 +408,56 @@ def process_one_var(
                         f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
                     )
                 )
+            elif cfg.get("levels", {}).get("name") == "plev39":
+                logger.info(
+                    "Processing plev39 variable %s: realize → regrid to lat/lon "
+                    "→ zonal_mean_on_pressure_grid",
+                    varname,
+                )
+                # Realize the variable — handles single-source and formula cases uniformly.
+                realized = mapping.realize(ds_native, varname)
+
+                # normalizes the result to always be a DataArray:
+                #   - If realize returned a DataArray directly → use it as-is
+                #   - If realize returned a Dataset → extract the named variable from it: realized[varname]
+                # After this line, da_realized is always an xr.DataArray containing the CMIP variable
+                # on the native SE/ncol grid — whether it came from a direct mapping or a formula evaluation.
+                da_realized = (
+                    realized
+                    if isinstance(realized, xr.DataArray)
+                    else realized[varname]
+                )
+
+                # Build a dataset with the realized variable plus PS for pressure
+                # computation.  The 1-D coefficients (hyam, hybm, P0, lev) are carried
+                # through unchanged by regrid_to_latlon_ds via _attach_vertical_metadata.
+                ds_to_regrid = xr.Dataset({varname: da_realized})
+                for aux in ("PS", "hyam", "hybm", "P0", "lev"):
+                    if aux in ds_native:
+                        ds_to_regrid[aux] = ds_native[aux]
+
+                # Regrid variable and PS from the native (SE/ncol) grid to lat/lon.
+                vars_to_regrid = [varname] + [v for v in ("PS",) if v in ds_to_regrid]
+                ds_latlon = regrid_to_latlon_ds(
+                    ds_to_regrid,
+                    vars_to_regrid,
+                    resolution,
+                    model,
+                    time_from=ds_native,
+                    dtype="float32",
+                )
+
+                # Zonal mean over lon then interpolate to plev39 pressure levels.
+                da = zonal_mean_on_pressure_grid(
+                    ds_latlon,
+                    varname,
+                    tables_path=tables_root / "tables",
+                    target="plev39",
+                )
+                ds_cmor = xr.Dataset({varname: da})
+                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+                cmor_items = [(ds_cmor, cfg)]
             else:
                 # For lnd/atm or any other dims, use existing logic
                 logger.debug(
@@ -457,11 +522,11 @@ def process_one_var(
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
                     region = write_cfg.get("region", "glb")
-                    logger.info("Setting region: %s", region)
+                    logger.debug("Setting region: %s", region)
                     set_cur_dataset_attribute("region", region)
 
                     logger.info(
-                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
+                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency} and dims {dims}"
                     )
                     vdef = type(
                         "VDef",
@@ -481,7 +546,6 @@ def process_one_var(
                     )()
 
                     # Now use CMOR utility to write out netcdf variable
-                    logger.info(f"Writing CMOR variable {varname} with dims {dims} ")
                     cm.write_variable(ds_cmor_write, cmip_var, vdef)
 
                 logger.info(f"Finished processing for {varname} with dims {dims}")
@@ -491,7 +555,7 @@ def process_one_var(
                     f"Exception while processing {varname} with dims {dims}: {e!r}"
                 )
                 results.append((str(varname), f"ERROR: {e!r}"))
-    logger.info(f"Completed all processing for variable: {varname}, results {results}")
+    logger.debug(f"Completed all processing for variable: {varname}, results {results}")
     return results
 
 
@@ -718,14 +782,24 @@ def main():
         else:
             glob_pattern = "*.nc"
 
-        # Load and evaluate the CMIP mapping YAML file (cesm_to_cmip7.yaml or noresm_to_cmip7.yaml)
+        # Load and evaluate the CMIP mapping YAML file for this model and realm
         if custom_yaml := args.custom_yaml:
             logger.info(f"Using custom YAML mapping file: {custom_yaml}")
             mapping = Mapping.from_yaml(custom_yaml)
-        elif model == "noresm":
-            mapping = Mapping.from_packaged_default(filename="noresm_to_cmip7.yaml")
         else:
-            mapping = Mapping.from_packaged_default()
+            if model not in REALM_YAML_MAP:
+                logger.error(
+                    f"Unknown model '{model}': must be one of {list(REALM_YAML_MAP)}"
+                )
+                sys.exit(1)
+            yaml_filename = REALM_YAML_MAP[model].get(realm)
+            if yaml_filename is None:
+                logger.error(
+                    f"No YAML mapping defined for model={model}, realm={realm}"
+                )
+                sys.exit(1)
+            logger.info(f"Loading mapping YAML: {yaml_filename}")
+            mapping = Mapping.from_packaged_default(filename=yaml_filename)
         mapping.default_freq = frequency
 
         # Determine TABLES directory
@@ -805,7 +879,7 @@ def main():
                     else:
                         results.append((str(result), "unknown"))
         for v, status in set(results):
-            logger.info(f"Variable {v} processed with status: {status}")
+            logger.debug(f"Variable {v} processed with status: {status}")
     else:
         logger.info("No results to process.")
     if client:

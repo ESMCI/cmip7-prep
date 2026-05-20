@@ -1,5 +1,6 @@
 """Basic tests for cmor_writer.py using FakeCMOR."""
 
+import json
 from pathlib import Path
 import numpy as np
 import xarray as xr
@@ -156,5 +157,78 @@ def test_cmor_session_multiple_timeseries(tmp_path):
         },
         log_dir=log_dir,
         log_name=log_name,
+    ) as session:
+        session.write_variable(ds, CMIPVar(), VDef())
+
+
+def test_cmor_session_zonal_mean_plev39(tmp_path):
+    """Test CmorSession with a zonal-mean variable (time, plev, lat) — no lon dimension."""
+    tables_root = Path(__file__).parent.parent / "cmip7-cmor-tables"
+    tables_root.mkdir(parents=True, exist_ok=True)
+
+    coord_json = tables_root / "tables" / "CMIP7_coordinate.json"
+    with open(coord_json, encoding="utf-8") as f:
+        coord_data = json.load(f)
+    plev39_vals = np.array(coord_data["axis_entry"]["plev39"]["requested"], dtype="f8")
+
+    lat = np.linspace(-90, 90, 8)
+    time = np.array([15, 45])
+    time_bnds = np.array([[0, 30], [30, 60]])
+    data = np.random.rand(2, 39, 8)
+
+    ds = xr.Dataset(
+        {
+            "ta_tavg-p39-hy-air": (("time", "plev", "lat"), data),
+            "lat": ("lat", lat),
+            "plev": ("plev", plev39_vals),
+            "time": ("time", time),
+            "time_bnds": (("time", "bnds"), time_bnds),
+        }
+    )
+    ds["lat"].attrs["units"] = "degrees_north"
+    ds["plev"].attrs.update(
+        {"units": "Pa", "standard_name": "air_pressure", "positive": "down"}
+    )
+    ds["time"].attrs["units"] = "days since 2000-01-01"
+    ds["time"].attrs["calendar"] = "noleap"
+    ds["time"].attrs["bounds"] = "time_bnds"
+
+    # pylint: disable=too-few-public-methods
+    class VDef:
+        """Minimal variable definition for zonal-mean plev39 testing."""
+
+        name = "ta"
+        branded_variable_name = "ta_tavg-p39-hy-air"
+        units = "K"
+        table = "atmos"
+        levels = {"name": "plev39", "units": "Pa"}
+
+    # pylint: disable=too-few-public-methods
+    class CMIPVar:
+        """Minimal CMIP variable wrapper for zonal-mean plev39 testing."""
+
+        # pylint: disable=too-few-public-methods
+        class BrandedName:
+            """Branded variable name wrapper."""
+
+            name = "ta_tavg-p39-hy-air"
+
+        branded_variable_name = BrandedName()
+
+    dataset_json_path = Path(__file__).parent.parent / "data" / "cmor_dataset.json"
+    with CmorSession(
+        tables_root=tables_root,
+        dataset_json=dataset_json_path,
+        dataset_attrs={
+            "institution_id": "NCAR",
+            "GLOBAL_IS_CMIP7": True,
+            "branded_variable": {
+                "variable_id": "ta",
+                "table_id": "atmos",
+                "description": "Air Temperature",
+            },
+        },
+        log_dir=tmp_path,
+        log_name="cmor_test_zonal_mean.log",
     ) as session:
         session.write_variable(ds, CMIPVar(), VDef())
