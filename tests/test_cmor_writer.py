@@ -1,5 +1,6 @@
 """Basic tests for cmor_writer.py using FakeCMOR."""
 
+import json
 from pathlib import Path
 import numpy as np
 import xarray as xr
@@ -162,13 +163,11 @@ def test_cmor_session_multiple_timeseries(tmp_path):
 
 def test_cmor_session_zonal_mean_plev39(tmp_path):
     """Test CmorSession with a zonal-mean variable (time, plev, lat) — no lon dimension."""
-    import json
-
     tables_root = Path(__file__).parent.parent / "cmip7-cmor-tables"
     tables_root.mkdir(parents=True, exist_ok=True)
 
     coord_json = tables_root / "tables" / "CMIP7_coordinate.json"
-    with open(coord_json) as f:
+    with open(coord_json, encoding="utf-8") as f:
         coord_data = json.load(f)
     plev39_vals = np.array(coord_data["axis_entry"]["plev39"]["requested"], dtype="f8")
 
@@ -194,15 +193,24 @@ def test_cmor_session_zonal_mean_plev39(tmp_path):
     ds["time"].attrs["calendar"] = "noleap"
     ds["time"].attrs["bounds"] = "time_bnds"
 
+    # pylint: disable=too-few-public-methods
     class VDef:
+        """Minimal variable definition for zonal-mean plev39 testing."""
+
         name = "ta"
         branded_variable_name = "ta_tavg-p39-hy-air"
         units = "K"
         table = "atmos"
         levels = {"name": "plev39", "units": "Pa"}
 
+    # pylint: disable=too-few-public-methods
     class CMIPVar:
+        """Minimal CMIP variable wrapper for zonal-mean plev39 testing."""
+
+        # pylint: disable=too-few-public-methods
         class BrandedName:
+            """Branded variable name wrapper."""
+
             name = "ta_tavg-p39-hy-air"
 
         branded_variable_name = BrandedName()
