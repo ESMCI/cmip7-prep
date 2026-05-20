@@ -138,23 +138,26 @@ def main():
 
     # Determine number of files used in time series creation
     cnt = 0
+    filtered = []
     for include_pattern in include_patterns:
         num = len(glob.glob(os.path.join(inputdir, include_pattern)))
+        logger.info(f"include pattern {include_pattern} has num {num}")
         if num == 0:
-            include_patterns.remove(include_pattern)
+            logger.info(f"removing {include_pattern}")
         else:
-            cnt = cnt + num
+            cnt += num
             logger.info(f"Processing {num} files with {include_pattern}")
+            filtered.append(include_pattern)
+    include_patterns = filtered
     if cnt == 0:
         logger.warning(
             f"No input files to process in {inputdir} with {include_patterns}"
         )
         sys.exit(0)
+    logger.info(f"include patterns are {include_patterns}")
 
     # Determine how time series will be created
     if not args.years_spec:
-
-        logger.info(f"Include patterns are {include_patterns}")
 
         # Create base HFCollection
         logger.info("Starting hf_collection")
