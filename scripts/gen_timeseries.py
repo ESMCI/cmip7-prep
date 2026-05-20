@@ -115,7 +115,7 @@ def main():
 
     # Determine include patterns
     if args.realm == "atmos":
-        include_patterns = ["*cam.h0a*", "*cam.h0i*", "*cam.h1a*"]
+        include_patterns = ["*cam.h0a*", "*cam.h1a*", "*cam.h2a*", "*cam.h3a*"]
     elif args.realm == "land":
         include_patterns = ["*clm2.h0a*", "*clm2.h0i*"]
 
