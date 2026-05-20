@@ -170,9 +170,7 @@ def test_cmor_session_zonal_mean_plev39(tmp_path):
     coord_json = tables_root / "tables" / "CMIP7_coordinate.json"
     with open(coord_json) as f:
         coord_data = json.load(f)
-    plev39_vals = np.array(
-        coord_data["axis_entry"]["plev39"]["requested"], dtype="f8"
-    )
+    plev39_vals = np.array(coord_data["axis_entry"]["plev39"]["requested"], dtype="f8")
 
     lat = np.linspace(-90, 90, 8)
     time = np.array([15, 45])
@@ -189,7 +187,9 @@ def test_cmor_session_zonal_mean_plev39(tmp_path):
         }
     )
     ds["lat"].attrs["units"] = "degrees_north"
-    ds["plev"].attrs.update({"units": "Pa", "standard_name": "air_pressure", "positive": "down"})
+    ds["plev"].attrs.update(
+        {"units": "Pa", "standard_name": "air_pressure", "positive": "down"}
+    )
     ds["time"].attrs["units"] = "days since 2000-01-01"
     ds["time"].attrs["calendar"] = "noleap"
     ds["time"].attrs["bounds"] = "time_bnds"
