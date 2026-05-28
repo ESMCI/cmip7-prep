@@ -292,7 +292,7 @@ variables:
       0 C, and with respect to ice for T<0 C.
     dims: [time, plev, lat, lon]
     levels: {name: plev19, units: Pa}
-    sources: [model_var: RELHUM]
+    sources: [model_var: RELHUM, model_var: RHW]
     table: atmos
     units: '%'
 
