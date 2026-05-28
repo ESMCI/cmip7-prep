@@ -52,7 +52,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--realm",
-        choices=["atmos", "land"],
+        choices=["atmos", "land", "seaIce"],
         help="Realm to process - sets include patterns for time series (required)",
         required=True,
     )
@@ -118,6 +118,8 @@ def main():
         include_patterns = ["*cam.h0a*", "*cam.h1a*", "*cam.h2a*", "*cam.h3a*"]
     elif args.realm == "land":
         include_patterns = ["*clm2.h0a*", "*clm2.h0i*"]
+    elif args.realm == "seaIce":
+        include_patterns = ["*.cice.h1.*"]
 
     # Determine input directory
     inputdir = Path(args.inputdir)

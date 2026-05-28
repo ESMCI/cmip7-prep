@@ -30,7 +30,7 @@ except ModuleNotFoundError as e:
 # Default weight maps; override via function args.
 # optional bilinear map
 
-INPUTDATA_DIR_noresm = Path("/datalake/NS9560K/diagnostics/land_xesmf_diag_data/")
+INPUTDATA_DIR_noresm = Path("/nird/datalake/NS9560K/diagnostics/land_xesmf_diag_data/")
 DEFAULT_BILIN_MAP_NE30_noresm = Path(
     INPUTDATA_DIR_noresm / "map_ne30pg3_to_0.5x0.5_nomask_aave_da_c180515.nc"
 )

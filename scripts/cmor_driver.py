@@ -64,7 +64,8 @@ _DATE_RE = re.compile(
 )
 
 # Path for cmor tables
-TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+#TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+TABLES_cesm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
 TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -641,9 +642,9 @@ def main():
         logger.info(f"latest monthly time series file is {timeseries}")
     elif model == "noresm":
         if realm == "atmos":
-            TSDIR = "/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
+            TSDIR = "/nird/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
         elif realm == "land":
-            TSDIR = "/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
+            TSDIR = "/nird/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
 
     # Setup input directory for cesm
     if model == "cesm":
