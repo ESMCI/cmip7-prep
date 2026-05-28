@@ -64,8 +64,7 @@ _DATE_RE = re.compile(
 )
 
 # Path for cmor tables
-#TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
-TABLES_cesm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
+TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
 TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -188,6 +187,7 @@ def parse_args():
             "ne16",
             "ne30",
             "tx2_3v2",
+            "regular",
         ],
         default="ne30",
         help="input_grid name (Default: ne30)",
