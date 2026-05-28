@@ -260,6 +260,12 @@ def parse_args():
         default=False,
         help="Path to custom YAML mapping file (optional, overrides default packaged YAML)",
     )
+    parser.add_argument(
+        "--tables-root",
+        type=str,
+        default=None,
+        help="Path to cmip7-cmor-tables directory (optional, overrides model-specific default)",
+    )
 
     args = parser.parse_args()
     return args
@@ -804,10 +810,16 @@ def main():
         mapping.default_freq = frequency
 
         # Determine TABLES directory
-        if model == "cesm":
+        _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
+        if args.tables_root:
+            tables_root = Path(args.tables_root)
+        elif model == "cesm" and Path(TABLES_cesm).exists():
             tables_root = Path(TABLES_cesm)
-        else:
+        elif model == "noresm" and Path(TABLES_noresm).exists():
             tables_root = Path(TABLES_noresm)
+        else:
+            tables_root = _default_tables
+        logger.info(f"Using CMOR tables from: {tables_root}")
 
         all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
         logger.info(
