@@ -30,6 +30,14 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "rtmt_tavg-u-hxy-u": "down",
     "tauu_tavg-u-hxy-u": "down",
     "tauv_tavg-u-hxy-u": "down",
+    "fFire_tavg-u-hxy-lnd": "up",
+    "npp_tavg-u-hxy-lnd": "up",
+    "rh_tavg-u-hxy-lnd": "up",
+    "rsds_tavg-u-hxy-lnd": "down",
+    "rsds_tavg-u-hxy-sn": "down",
+    "rsus_tavg-u-hxy-lnd": "up",
+    "rsus_tavg-u-hxy-sn": "up",
+    "tran_tavg-u-hxy-lnd": "up",
 }
 
 # ── model configurations ─────────────────────────────────────────────────────
@@ -421,7 +429,7 @@ def parse_level_sum_formulas(expr):
         else:
             start, end = level_sum.strip("()").split(":")
             sumlist = list(range(int(start.strip()), int(end.strip()) + 1))
-        sum_expr = f"sumoverpft({var_sum}, pftlist={sumlist}, dim='{sum_dim}')"
+        sum_expr = f"sumoverpft({var_sum}, pftlist={sumlist}, dimname='{sum_dim}')"
         expr_fix = expr_fix.replace(f"{var_sum}{level_sum}", sum_expr)
     return expr_fix
 
