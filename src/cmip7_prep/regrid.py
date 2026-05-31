@@ -458,6 +458,12 @@ def regrid_to_latlon(
         raise KeyError(f"{varname!r} not in dataset: variables {list(ds_in.variables)}")
 
     var_da = ds_in[varname]  # always a DataArray
+
+    # TODO: handle if the lat, lon coords are already present, but still on the wrong grid
+    # or other changes to the grid should be made.
+    if "lat" in var_da.dims and "lon" in var_da.dims:
+        logger.info("Variable already has 'lat' and 'lon' dims; skipping regridding.")
+        return var_da
     if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
         logger.info(
             "Variable has no 'ncol' or 'lndgrid' dim; assuming ocean or seaIce variable."
