@@ -496,14 +496,13 @@ def process_one_var(
             results.append((varname, f"ERROR {model} file not not found: {e}"))
             continue
         except Exception as e:
-            logger.warning(
+            logger.error(
                 "Exception during regridding of %s with dims %s: %r",
                 varname,
                 dims,
                 e,
             )
-            results.append((varname, f"ERROR during regridding: {e!r}"))
-            continue
+            raise
 
         # ---------------------------------------------
         # CMORize — loop over variants (usually just one)
