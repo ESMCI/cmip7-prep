@@ -625,7 +625,6 @@ def main():
     logger.debug(f"Parsed arguments: {args}")
 
     # Set variables used below
-    scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
     model = args.model
@@ -648,7 +647,7 @@ def main():
                     f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
                 )
 
-    # Use tsdir if it is an input argument
+    # Determine TSDIR
     TSDIR = None
     if args.tsdir:
         TSDIR = Path(args.tsdir)
@@ -661,64 +660,35 @@ def main():
         if model == "noresm":
             logger.error(f"must specify --tsdir as an input argument for noresm model")
             sys.exit(1)
-
-    # Setup input directory for cesm
-    if model == "cesm":
-        if args.caseroot and args.cimeroot:
-            caseroot = args.caseroot
-            cimeroot = args.cimeroot
-            sys.path.append(cimeroot)
-            _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
-            sys.path.append(_LIBDIR)
-            try:
-                from CIME.case import Case
-            except ImportError as e:
-                logger.error(f"Error importing CIME modules: {e}")
+        elif model == "cesm":
+            if args.caseroot and args.cimeroot:
+                caseroot = args.caseroot
+                cimeroot = args.cimeroot
+                sys.path.append(cimeroot)
+                _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
+                sys.path.append(_LIBDIR)
+                try:
+                    from CIME.case import Case
+                except ImportError as e:
+                    logger.error(f"Error importing CIME modules: {e}")
+                    sys.exit(1)
+                with Case(caseroot, read_only=True) as case:
+                    inputroot = case.get_value("DOUT_S_ROOT")
+                    casename = case.get_value("CASE")
+                if realm in ("atmos", "aerosol", "atmosChem"):
+                    TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
+                elif realm == "land":
+                    TSDIR = Path(inputroot) / "lnd" / "proc" / "tseries"
+                elif realm in ("ocean", "ocnBgchem"):
+                    TSDIR = Path(inputroot) / "ocn" / "proc" / "tseries"
+                elif realm == "seaIce":
+                    TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
+                elif realm == "landIce":
+                    TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
+                TSDIR = TSDIR / args.frequency
+            else:
+                logger.error(f"no TSDIR found for cesm model model")
                 sys.exit(1)
-            with Case(caseroot, read_only=True) as case:
-                inputroot = case.get_value("DOUT_S_ROOT")
-                casename = case.get_value("CASE")
-            if realm in ("atmos", "aerosol", "atmosChem"):
-                TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
-            elif realm == "land":
-                TSDIR = Path(inputroot) / "lnd" / "proc" / "tseries"
-            elif realm in ("ocean", "ocnBgchem"):
-                TSDIR = Path(inputroot) / "ocn" / "proc" / "tseries"
-            elif realm == "seaIce":
-                TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
-            elif realm == "landIce":
-                TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
-            TSDIR = TSDIR / args.frequency
-        elif not TSDIR or not os.path.exists(TSDIR):
-            # testing path
-            scratch = os.getenv("SCRATCH")
-            if realm == "atmos":
-                TSDIR = (
-                    Path(scratch)
-                    / "archive"
-                    / "timeseries"
-                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
-                    / "atm"
-                    / "hist"
-                )
-            elif realm == "land":
-                TSDIR = (
-                    Path(scratch)
-                    / "archive"
-                    / "timeseries"
-                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
-                    / "lnd"
-                    / "hist"
-                )
-            elif realm == "ocean":
-                TSDIR = (
-                    Path(scratch)
-                    / "archive"
-                    / "timeseries"
-                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
-                    / "ocn"
-                    / "hist"
-                )
 
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)
