@@ -624,6 +624,7 @@ def main():
     logger.setLevel(getattr(logging, args.log_level))
     logger.debug(f"Parsed arguments: {args}")
 
+    # Set variables used below
     scratch = os.getenv("SCRATCH")
     OUTDIR = args.outdir
     resolution = args.resolution
@@ -632,28 +633,11 @@ def main():
     realm = args.realm
     logger.debug("Realm is %s", realm)
 
-    mom6_grid = None
+    # Set ocn_grid and ocn_fx_fields
+    # TODO: it looks like ocn_grid is not used after this - so can it
+    # be removed from the input argument list and from cmor_driver.py
     ocn_grid = None
     ocn_fx_fields = None
-
-    # Determine include patterns and frequency
-    include_patterns = get_include_patterns(model, realm, frequency)
-    TSDIR = None
-    # Setup input directory for noresm
-    if args.tsdir:
-        TSDIR = Path(args.tsdir)
-        if not TSDIR.exists():
-            logger.info(f"Time series directory {str(TSDIR)} does not exist")
-            sys.exit(0)
-        timeseries = latest_monthly_file(TSDIR)
-        logger.info(f"latest monthly time series file is {timeseries}")
-    elif model == "noresm":
-        if realm == "atmos":
-            TSDIR = "/nird/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
-        elif realm == "land":
-            TSDIR = "/nird/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
-
-    # Setup input directory for cesm
     if model == "cesm":
         if realm in ["ocean", "seaIce"]:
             if args.ocn_grid_file:
@@ -663,6 +647,23 @@ def main():
                 logger.info(
                     f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
                 )
+
+    # Use tsdir if it is an input argument
+    TSDIR = None
+    if args.tsdir:
+        TSDIR = Path(args.tsdir)
+        if not os.path.exists(TSDIR):
+            logger.error(f"Time series directory {str(TSDIR)} does not exist")
+            sys.exit(1)
+        timeseries = latest_monthly_file(TSDIR)
+        logger.info(f"latest monthly time series file is {timeseries}")
+    else:
+        if model == "noresm":
+            logger.error(f"must specify --tsdir as an input argument for noresm model")
+            sys.exit(1)
+
+    # Setup input directory for cesm
+    if model == "cesm":
         if args.caseroot and args.cimeroot:
             caseroot = args.caseroot
             cimeroot = args.cimeroot
@@ -672,7 +673,7 @@ def main():
             try:
                 from CIME.case import Case
             except ImportError as e:
-                logger.warning(f"Error importing CIME modules: {e}")
+                logger.error(f"Error importing CIME modules: {e}")
                 sys.exit(1)
             with Case(caseroot, read_only=True) as case:
                 inputroot = case.get_value("DOUT_S_ROOT")
@@ -785,6 +786,7 @@ def main():
 
     # Load requested variables
     if len(cmip_vars) > 0:
+        include_patterns = get_include_patterns(model, realm, frequency)
         if len(include_patterns) == 1:
             glob_pattern = f"*{include_patterns[0]}*.nc"
         else:
@@ -814,14 +816,21 @@ def main():
         _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
         if args.tables_root:
             tables_root = Path(args.tables_root)
+            if not Path(tables_root).exists:
+                logger.error(f"input tables-root path {tables_root} does not exist")
+                sys.exit(1)
         elif model == "cesm" and Path(TABLES_cesm).exists():
             tables_root = Path(TABLES_cesm)
         elif model == "noresm" and Path(TABLES_noresm).exists():
             tables_root = Path(TABLES_noresm)
         else:
             tables_root = _default_tables
+            if not Path(tables_root).exists:
+                logger.error(f"default_tables path {tables_root} does not exist")
+                sys.exit(1)
         logger.info(f"Using CMOR tables from: {tables_root}")
 
+        # Determine time series files
         all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
         logger.info(
             f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'"

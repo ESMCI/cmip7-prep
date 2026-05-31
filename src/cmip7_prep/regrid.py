@@ -45,10 +45,10 @@ DEFAULT_BILIN_MAP_NE16_noresm = Path(
     INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_blin_c260531.nc"
 )
 DEFAULT_CONS_MAP_TNX1V4 = Path(
-    INPUTDATA_DIR_cesm / "map_tnx1v4_to_1x1_aave_c260531.nc"
+    INPUTDATA_DIR_noresm / "map_tnx1v4_to_1x1_aave_c260531.nc"
 )
 DEFAULT_BILIN_MAP_TNX1V4 = Path(
-    INPUTDATA_DIR_cesm / "map_tnx1v4_to_1x1_blin_c260531.nc"
+    INPUTDATA_DIR_noresm / "map_tnx1v4_to_1x1_blin_c260531.nc"
 )
 
 #---------------------------------------------------------
