@@ -187,6 +187,7 @@ def parse_args():
             "ne16",
             "ne30",
             "tx2_3v2",
+            "tnx1v4",
             "regular",
         ],
         default="ne30",

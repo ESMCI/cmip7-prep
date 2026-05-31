@@ -27,22 +27,33 @@ try:
 except ModuleNotFoundError as e:
     _HAS_DASK = False
 
-# Default weight maps; override via function args.
-# optional bilinear map
+#---------------------------------------------------------
+# Default NorESM weight maps; override via function args.
+#---------------------------------------------------------
 
 INPUTDATA_DIR_noresm = Path("/nird/datalake/NS9560K/diagnostics/land_xesmf_diag_data/")
-DEFAULT_BILIN_MAP_NE30_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne30pg3_to_0.5x0.5_nomask_aave_da_c180515.nc"
-)
 DEFAULT_CONS_MAP_NE30_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne30pg3_to_0.5x0.5_nomask_aave_da_c180515.nc"
+    INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1_aave.nc"
 )
-DEFAULT_BILIN_MAP_NE16_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
+DEFAULT_BILIN_MAP_NE30_noresm = Path(
+    INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1_bilin.nc"
 )
 DEFAULT_CONS_MAP_NE16_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
+    INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_aave_c260531.nc"
 )
+DEFAULT_BILIN_MAP_NE16_noresm = Path(
+    INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_blin_c260531.nc"
+)
+DEFAULT_CONS_MAP_TNX1V4 = Path(
+    INPUTDATA_DIR_cesm / "map_tnx1v4_to_1x1_aave_c260531.nc"
+)
+DEFAULT_BILIN_MAP_TNX1V4 = Path(
+    INPUTDATA_DIR_cesm / "map_tnx1v4_to_1x1_blin_c260531.nc"
+)
+
+#---------------------------------------------------------
+# Default CESM weight maps; override via function args.
+#---------------------------------------------------------
 
 INPUTDATA_DIR_cesm = Path("/glade/campaign/cesm/cesmdata/inputdata/")
 DEFAULT_CONS_MAP_NE30_cesm = Path(
@@ -57,6 +68,10 @@ DEFAULT_CONS_MAP_T232 = Path(
 DEFAULT_BILIN_MAP_T232 = Path(
     INPUTDATA_DIR_cesm / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc"
 )  # optional bilinear map
+
+#---------------------------------------------------------
+# Intensive variables
+#---------------------------------------------------------
 
 INTENSIVE_VARS = {
     "tas",
@@ -277,6 +292,9 @@ def _pick_maps(
             bilin = (
                 Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE16_noresm
             )
+        else:
+            cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_TNX1V4
+            bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_TNX1V4
 
     if force_method:
         if force_method not in {"conservative", "bilinear"}:
