@@ -490,8 +490,8 @@ def process_one_var(
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
                 cmor_items = [(ds_cmor, cfg)]
 
-        except AttributeError:
-            results.append((varname, f"ERROR {model} input variable not found."))
+        except (FileNotFoundError, KeyError) as e:
+            results.append((varname, f"ERROR {model} input variable not found: {e}"))
             continue
         except Exception as e:
             logger.warning(
