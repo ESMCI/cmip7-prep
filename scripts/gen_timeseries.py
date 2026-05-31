@@ -119,7 +119,7 @@ def main():
     elif args.realm == "land":
         include_patterns = ["*clm2.h0a*", "*clm2.h0i*"]
     elif args.realm == "seaIce":
-        include_patterns = ["*.cice.h1.*"]
+        include_patterns = ["*cice.h.*", "*.cice.h1.*"]
 
     # Determine input directory
     inputdir = Path(args.inputdir)
