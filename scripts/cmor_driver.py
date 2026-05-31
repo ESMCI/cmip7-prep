@@ -491,7 +491,7 @@ def process_one_var(
                 cmor_items = [(ds_cmor, cfg)]
 
         except (FileNotFoundError, KeyError) as e:
-            results.append((varname, f"ERROR {model} input variable not found: {e}"))
+            results.append((varname, f"ERROR {model} file not not found: {e}"))
             continue
         except Exception as e:
             logger.warning(
