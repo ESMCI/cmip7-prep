@@ -296,6 +296,12 @@ def _pick_maps(
             cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_TNX1V4
             bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_TNX1V4
 
+    if cons is None and bilin is None:
+        raise FileNotFoundError(
+            f"No regrid weight file defined for model={model!r}, resolution={resolution!r}. "
+            "Add an entry to _pick_maps in regrid.py or pass --conservative-map / --bilinear-map."
+        )
+
     if force_method:
         if force_method not in {"conservative", "bilinear"}:
             raise ValueError("force_method must be 'conservative' or 'bilinear'")
@@ -303,6 +309,10 @@ def _pick_maps(
             if not bilin or not str(bilin):
                 raise FileNotFoundError("Bilinear map requested but not provided.")
             return MapSpec("bilinear", bilin)
+        if cons is None:
+            raise FileNotFoundError(
+                f"Conservative map not defined for model={model!r}, resolution={resolution!r}."
+            )
         return MapSpec("conservative", cons)
 
     if varname in INTENSIVE_VARS and bilin and str(bilin):
