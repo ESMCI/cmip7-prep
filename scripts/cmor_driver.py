@@ -187,6 +187,8 @@ def parse_args():
             "ne16",
             "ne30",
             "tx2_3v2",
+            "tnx1v4",
+            "regular",
         ],
         default="ne30",
         help="input_grid name (Default: ne30)",
@@ -258,6 +260,12 @@ def parse_args():
         "--custom-yaml",
         default=False,
         help="Path to custom YAML mapping file (optional, overrides default packaged YAML)",
+    )
+    parser.add_argument(
+        "--tables-root",
+        type=str,
+        default=None,
+        help="Path to cmip7-cmor-tables directory (optional, overrides model-specific default)",
     )
 
     args = parser.parse_args()
@@ -484,18 +492,17 @@ def process_one_var(
                     ds_cmor = ds_cmor.merge(ocn_fx_fields)
                 cmor_items = [(ds_cmor, cfg)]
 
-        except AttributeError:
-            results.append((varname, f"ERROR {model} input variable not found."))
+        except (FileNotFoundError, KeyError) as e:
+            results.append((varname, f"ERROR {model} file not not found: {e}"))
             continue
         except Exception as e:
-            logger.warning(
+            logger.error(
                 "Exception during regridding of %s with dims %s: %r",
                 varname,
                 dims,
                 e,
             )
-            results.append((varname, f"ERROR during regridding: {e!r}"))
-            continue
+            raise
 
         # ---------------------------------------------
         # CMORize — loop over variants (usually just one)
@@ -616,7 +623,7 @@ def main():
     logger.setLevel(getattr(logging, args.log_level))
     logger.debug(f"Parsed arguments: {args}")
 
-    scratch = os.getenv("SCRATCH")
+    # Set variables used below
     OUTDIR = args.outdir
     resolution = args.resolution
     model = args.model
@@ -624,28 +631,11 @@ def main():
     realm = args.realm
     logger.debug("Realm is %s", realm)
 
-    mom6_grid = None
+    # Set ocn_grid and ocn_fx_fields
+    # TODO: it looks like ocn_grid is not used after this - so can it
+    # be removed from the input argument list and from cmor_driver.py
     ocn_grid = None
     ocn_fx_fields = None
-
-    # Determine include patterns and frequency
-    include_patterns = get_include_patterns(model, realm, frequency)
-    TSDIR = None
-    # Setup input directory for noresm
-    if args.tsdir:
-        TSDIR = Path(args.tsdir)
-        if not TSDIR.exists():
-            logger.info(f"Time series directory {str(TSDIR)} does not exist")
-            sys.exit(0)
-        timeseries = latest_monthly_file(TSDIR)
-        logger.info(f"latest monthly time series file is {timeseries}")
-    elif model == "noresm":
-        if realm == "atmos":
-            TSDIR = "/datalake/NS9560K/mvertens/test_regridder/atm/timeseries"
-        elif realm == "land":
-            TSDIR = "/datalake/NS9560K/mvertens/test_regridder/lnd/timeseries"
-
-    # Setup input directory for cesm
     if model == "cesm":
         if realm in ["ocean", "seaIce"]:
             if args.ocn_grid_file:
@@ -655,61 +645,49 @@ def main():
                 logger.info(
                     f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
                 )
-        if args.caseroot and args.cimeroot:
-            caseroot = args.caseroot
-            cimeroot = args.cimeroot
-            sys.path.append(cimeroot)
-            _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
-            sys.path.append(_LIBDIR)
-            try:
-                from CIME.case import Case
-            except ImportError as e:
-                logger.warning(f"Error importing CIME modules: {e}")
+
+    # Determine TSDIR
+    TSDIR = None
+    if args.tsdir:
+        TSDIR = Path(args.tsdir)
+        if not os.path.exists(TSDIR):
+            logger.error(f"Time series directory {str(TSDIR)} does not exist")
+            sys.exit(1)
+        timeseries = latest_monthly_file(TSDIR)
+        logger.info(f"latest monthly time series file is {timeseries}")
+    else:
+        if model == "noresm":
+            logger.error(f"must specify --tsdir as an input argument for noresm model")
+            sys.exit(1)
+        elif model == "cesm":
+            if args.caseroot and args.cimeroot:
+                caseroot = args.caseroot
+                cimeroot = args.cimeroot
+                sys.path.append(cimeroot)
+                _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
+                sys.path.append(_LIBDIR)
+                try:
+                    from CIME.case import Case
+                except ImportError as e:
+                    logger.error(f"Error importing CIME modules: {e}")
+                    sys.exit(1)
+                with Case(caseroot, read_only=True) as case:
+                    inputroot = case.get_value("DOUT_S_ROOT")
+                    casename = case.get_value("CASE")
+                if realm in ("atmos", "aerosol", "atmosChem"):
+                    TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
+                elif realm == "land":
+                    TSDIR = Path(inputroot) / "lnd" / "proc" / "tseries"
+                elif realm in ("ocean", "ocnBgchem"):
+                    TSDIR = Path(inputroot) / "ocn" / "proc" / "tseries"
+                elif realm == "seaIce":
+                    TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
+                elif realm == "landIce":
+                    TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
+                TSDIR = TSDIR / args.frequency
+            else:
+                logger.error(f"no TSDIR found for cesm model model")
                 sys.exit(1)
-            with Case(caseroot, read_only=True) as case:
-                inputroot = case.get_value("DOUT_S_ROOT")
-                casename = case.get_value("CASE")
-            if realm in ("atmos", "aerosol", "atmosChem"):
-                TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
-            elif realm == "land":
-                TSDIR = Path(inputroot) / "lnd" / "proc" / "tseries"
-            elif realm in ("ocean", "ocnBgchem"):
-                TSDIR = Path(inputroot) / "ocn" / "proc" / "tseries"
-            elif realm == "seaIce":
-                TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
-            elif realm == "landIce":
-                TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
-            TSDIR = TSDIR / args.frequency
-        elif not TSDIR or not os.path.exists(TSDIR):
-            # testing path
-            scratch = os.getenv("SCRATCH")
-            if realm == "atmos":
-                TSDIR = (
-                    Path(scratch)
-                    / "archive"
-                    / "timeseries"
-                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
-                    / "atm"
-                    / "hist"
-                )
-            elif realm == "land":
-                TSDIR = (
-                    Path(scratch)
-                    / "archive"
-                    / "timeseries"
-                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
-                    / "lnd"
-                    / "hist"
-                )
-            elif realm == "ocean":
-                TSDIR = (
-                    Path(scratch)
-                    / "archive"
-                    / "timeseries"
-                    / "b.e30_beta06.B1850C_LTso.ne30_t232_wgx3.192.wrkflw.1"
-                    / "ocn"
-                    / "hist"
-                )
 
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)
@@ -777,6 +755,7 @@ def main():
 
     # Load requested variables
     if len(cmip_vars) > 0:
+        include_patterns = get_include_patterns(model, realm, frequency)
         if len(include_patterns) == 1:
             glob_pattern = f"*{include_patterns[0]}*.nc"
         else:
@@ -803,11 +782,24 @@ def main():
         mapping.default_freq = frequency
 
         # Determine TABLES directory
-        if model == "cesm":
+        _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
+        if args.tables_root:
+            tables_root = Path(args.tables_root)
+            if not Path(tables_root).exists:
+                logger.error(f"input tables-root path {tables_root} does not exist")
+                sys.exit(1)
+        elif model == "cesm" and Path(TABLES_cesm).exists():
             tables_root = Path(TABLES_cesm)
-        else:
+        elif model == "noresm" and Path(TABLES_noresm).exists():
             tables_root = Path(TABLES_noresm)
+        else:
+            tables_root = _default_tables
+            if not Path(tables_root).exists:
+                logger.error(f"default_tables path {tables_root} does not exist")
+                sys.exit(1)
+        logger.info(f"Using CMOR tables from: {tables_root}")
 
+        # Determine time series files
         all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
         logger.info(
             f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'"
