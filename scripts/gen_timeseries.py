@@ -24,6 +24,8 @@ from pathlib import Path
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 
+from cmor_driver import INCLUDE_PATTERN_MAP
+
 # ++++++++++++++++++++++++++++++
 # Input argument parser function
 # ++++++++++++++++++++++++++++++
@@ -80,6 +82,12 @@ def parse_arguments():
         default=32,
         help="Number of workers (default: 32)",
     )
+    parser.add_argument(
+        "--model",
+        choices=["cesm", "noresm"],
+        default="cesm",
+        help="Model to use, default: cesm",
+    )
 
     # Parse Argument inputs
     args = parser.parse_args()
@@ -114,12 +122,10 @@ def main():
     debug = args.debug
 
     # Determine include patterns
-    if args.realm == "atmos":
-        include_patterns = ["*cam.h0a*", "*cam.h1a*", "*cam.h2a*", "*cam.h3a*"]
-    elif args.realm == "land":
-        include_patterns = ["*clm2.h0a*", "*clm2.h0i*"]
-    elif args.realm == "seaIce":
-        include_patterns = ["*cice.h.*", "*.cice.h1.*"]
+    include_patterns = []
+    for _, pattern_list in INCLUDE_PATTERN_MAP[args.model][args.realm].items():
+        for pattern in pattern_list:
+            include_patterns.append(f"*{pattern}*")
 
     # Determine input directory
     inputdir = Path(args.inputdir)
