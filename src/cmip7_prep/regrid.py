@@ -786,7 +786,6 @@ def _regrid_fx_once(
         out_vars["sftlf"] = xr.open_mfdataset(sftlf_path)["sftlf"]
 
     ds_fx_native = _build_fx_native(ds_native)
-
     # Determine regridder
     regridder = RegridderCache.get(mapfile, "conservative")
 
@@ -794,21 +793,31 @@ def _regrid_fx_once(
     if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
         logger.debug("Computing regridded sftlf")
         da = ds_fx_native["sftlf"].fillna(0)
-        da2 = (
-            da.rename({"lndgrid": "lon"})
-            .expand_dims({"lat": 1})
-            .transpose(..., "lat", "lon")
-        )
-        lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
-            dim=("lndgrid")
-        )
-        logger.debug("Total land area on source grid: %.3e m^2", lndarea.values)
-        out = regridder(da2, skipna=True, na_thres=1.0)  # Regrid
-        spatial = [d for d in out.dims if d in ("lat", "lon")]
-        out = out.transpose(*spatial)
-        out.name = "sftlf"
-        out.attrs.update(da.attrs)
-        out_vars["sftlf"] = out
+        if "lat" in da.dims and "lon" in da.dims:
+            logger.debug("sftlf already has lat/lon dims; skipping regridding")
+            out = da.rename({"lat": "lat", "lon": "lon"})
+            lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
+                dim=("lat", "lon")
+            )
+            out.name = "sftlf"
+            out.attrs.update(da.attrs)
+            out_vars["sftlf"] = out
+        else:
+            da2 = (
+                da.rename({"lndgrid": "lon"})
+                .expand_dims({"lat": 1})
+                .transpose(..., "lat", "lon")
+            )
+            lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
+                dim=("lndgrid")
+            )
+            logger.debug("Total land area on source grid: %.3e m^2", lndarea.values)
+            out = regridder(da2, skipna=True, na_thres=1.0)  # Regrid
+            spatial = [d for d in out.dims if d in ("lat", "lon")]
+            out = out.transpose(*spatial)
+            out.name = "sftlf"
+            out.attrs.update(da.attrs)
+            out_vars["sftlf"] = out
 
     # For regridded grid, set sftof = 1 - sftlf
     if "sftlf" in out_vars:

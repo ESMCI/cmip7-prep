@@ -72,6 +72,9 @@ def packaged_mapping_resource(filename: str):
     res = Path(__file__).parent.parent.parent / "data" / filename
     return as_file(res)
 
+def package_mapping_resource_from_full_path(path: str | Path) -> Mapping:
+    """Load a Mapping from a YAML file path."""
+    return as_file(Path(path))
 
 # pylint: disable=too-many-instance-attributes
 @dataclass(frozen=True)
@@ -300,6 +303,12 @@ class Mapping:
         with packaged_mapping_resource(filename) as p:
             return cls(p)
 
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "Mapping":
+        """Construct a Mapping from a YAML file path."""
+        logger.info("mapping file is %s", path)
+        with package_mapping_resource_from_full_path(path) as p:
+            return cls(p)
     # -----------------
     # Loading
     # -----------------
