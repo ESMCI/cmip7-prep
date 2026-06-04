@@ -738,7 +738,7 @@ variables:
 
   tas_tmaxavg-h2m-hxy-u:
     description: monthly mean of the daily-maximum near-surface air temperature.
-    dims: [lon, lat, height2m]
+    dims: [lon, lat, time, height2m]
     sources: [model_var: TREFMXAV]
     table: atmos
     units: K
