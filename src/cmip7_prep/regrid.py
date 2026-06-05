@@ -795,7 +795,6 @@ def _regrid_fx_once(
         da = ds_fx_native["sftlf"].fillna(0)
         if "lat" in da.dims and "lon" in da.dims:
             logger.debug("sftlf already has lat/lon dims; skipping regridding")
-            out = da.rename({"lat": "lat", "lon": "lon"})
             lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
                 dim=("lat", "lon")
             )
