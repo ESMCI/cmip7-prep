@@ -72,8 +72,8 @@ def packaged_mapping_resource(filename: str):
     res = Path(__file__).parent.parent.parent / "data" / filename
     return as_file(res)
 
-def package_mapping_resource_from_full_path(path: str | Path) -> Mapping:
-    """Load a Mapping from a YAML file path."""
+def package_mapping_resource_from_full_path(path: str | Path):
+    """Context manager yielding a real filesystem path to a mapping YAML file."""
     return as_file(Path(path))
 
 # pylint: disable=too-many-instance-attributes
