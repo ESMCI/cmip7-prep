@@ -56,11 +56,25 @@ DEFAULT_BILIN_MAP_TNX1V4 = Path(
 #---------------------------------------------------------
 
 INPUTDATA_DIR_cesm = Path("/glade/campaign/cesm/cesmdata/inputdata/")
-DEFAULT_CONS_MAP_NE30_cesm = Path(
-    INPUTDATA_DIR_cesm / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
+
+# Weight maps shipped under <repo>/data take precedence over the glade defaults so
+# the container/CI can regrid without access to the NCAR HPC filesystem.
+_PACKAGED_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+
+
+def _local_or_default(local_name: str, default: Path) -> Path:
+    """Prefer a packaged weight map under <repo>/data, else the HPC default."""
+    local = _PACKAGED_DATA_DIR / local_name
+    return local if local.exists() else default
+
+
+DEFAULT_CONS_MAP_NE30_cesm = _local_or_default(
+    "map_ne30pg3_to_1x1d_aave.nc",
+    INPUTDATA_DIR_cesm / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc",
 )
-DEFAULT_BILIN_MAP_NE30_cesm = Path(
-    INPUTDATA_DIR_cesm / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
+DEFAULT_BILIN_MAP_NE30_cesm = _local_or_default(
+    "map_ne30pg3_to_1x1d_bilin.nc",
+    INPUTDATA_DIR_cesm / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc",
 )
 DEFAULT_CONS_MAP_T232 = Path(
     INPUTDATA_DIR_cesm / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc"
@@ -381,33 +395,37 @@ def regrid_to_latlon_ds(
     if time_from is not None:
         ds_out = _attach_time_and_bounds(ds_out, time_from)
 
-    # Pick the mapfile you used for conservative/bilinear selection
-    spec = _pick_maps(
-        varnames[0] if isinstance(varnames, list) else varnames,
-        resolution=resolution,
-        model=model,
-        conservative_map=conservative_map,
-        bilinear_map=bilinear_map,
-        force_method="conservative",
-    )  # fx always conservative
+    # Regrid fx fields onto the destination grid. Skipped for already-regular
+    # input: the data is on the target grid, so there are no weights to apply
+    # (and none exist for a "regular" resolution).
+    if resolution != "regular":
+        # Pick the mapfile you used for conservative/bilinear selection
+        spec = _pick_maps(
+            varnames[0] if isinstance(varnames, list) else varnames,
+            resolution=resolution,
+            model=model,
+            conservative_map=conservative_map,
+            bilinear_map=bilinear_map,
+            force_method="conservative",
+        )  # fx always conservative
 
-    # Regrid the fx data
-    logger.debug("Regriding fx data using fx map: %s", spec.path)
-    ds_fx = _regrid_fx_once(spec.path, ds_in, sftlf_path)  # ← uses cache
-    if ds_fx is not None and len(ds_fx.data_vars) > 0:
-        # Don’t overwrite if user already computed and passed them in
-        for name in (
-            "sftlf",
-            "sftof",
-            "areacella",
-            "orog",
-            "lat",
-            "lon",
-            "lat_bnds",
-            "lon_bnds",
-        ):
-            if name in ds_fx and name not in ds_out:
-                ds_out[name] = ds_fx[name]
+        # Regrid the fx data
+        logger.debug("Regriding fx data using fx map: %s", spec.path)
+        ds_fx = _regrid_fx_once(spec.path, ds_in, sftlf_path)  # ← uses cache
+        if ds_fx is not None and len(ds_fx.data_vars) > 0:
+            # Don’t overwrite if user already computed and passed them in
+            for name in (
+                "sftlf",
+                "sftof",
+                "areacella",
+                "orog",
+                "lat",
+                "lon",
+                "lat_bnds",
+                "lon_bnds",
+            ):
+                if name in ds_fx and name not in ds_out:
+                    ds_out[name] = ds_fx[name]
 
     # Carry hybrid metadata (or any requested 1-D fields) unchanged ---
     ds_out = _attach_vertical_metadata(ds_out, ds_in)
