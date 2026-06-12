@@ -785,7 +785,7 @@ def main():
         _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
         if args.tables_root:
             tables_root = Path(args.tables_root)
-            if not Path(tables_root).exists:
+            if not Path(tables_root).exists():
                 logger.error(f"input tables-root path {tables_root} does not exist")
                 sys.exit(1)
         elif model == "cesm" and Path(TABLES_cesm).exists():
@@ -794,7 +794,7 @@ def main():
             tables_root = Path(TABLES_noresm)
         else:
             tables_root = _default_tables
-            if not Path(tables_root).exists:
+            if not Path(tables_root).exists():
                 logger.error(f"default_tables path {tables_root} does not exist")
                 sys.exit(1)
         logger.info(f"Using CMOR tables from: {tables_root}")
