@@ -217,6 +217,7 @@ variables:
   evspsblsoi_tavg-u-hxy-u:
     description: Water evaporation from soil
     dims: [lon, lat, time]
+    positive: up
     sources: [model_var: QSOIL]
     table: land
     units: kg m-2 s-1
@@ -231,6 +232,7 @@ variables:
   evspsblveg_tavg-u-hxy-u:
     description: Evaporation from canopy
     dims: [lon, lat, time]
+    positive: up
     sources: [model_var: QVEGE]
     table: land
     units: kg m-2 s-1
@@ -551,7 +553,7 @@ variables:
   grassFracC3_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C3 natural grass.
     dims: [lon, lat, time, typec3natg]
-    formula: (FATES_CROWNAREA_PF(12+13))*FATES_FRACTION
+    formula: (sumoverpft(FATES_CROWNAREA_PF, pftlist=[12, 13], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'

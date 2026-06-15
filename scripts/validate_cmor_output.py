@@ -23,6 +23,7 @@ import json
 import logging
 import re
 import sys
+import glob
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -33,23 +34,13 @@ import yaml
 
 from cmip7_prep.mapping_compat import packaged_mapping_resource
 
+from cmor_driver import REALM_YAML_MAP
 
 logger = logging.getLogger("cmip7_prep.validate_cmor_output")
 
-
-REALM_YAML_MAP = {
-    "noresm": {
-        "atmos": "noresm_to_cmip7_atmos.yaml",
-        "land": "noresm_to_cmip7_land.yaml",
-        "seaIce": "noresm_to_cmip7_seaice.yaml",
-    },
-    "cesm": {
-        "atmos": "cesm_to_cmip7_atmos.yaml",
-        "land": "cesm_to_cmip7_land.yaml",
-        "landIce": "cesm_to_cmip7_landice.yaml",
-        "seaIce": "cesm_to_cmip7_seaice.yaml",
-        "ocean": "cesm_to_cmip7_ocean.yaml",
-    },
+MODEL_NAMING_MAPS = {
+    "noresm": ["NCC", "NorESM3"],
+    "cesm": ["NCAR", "CESM3"],
 }
 
 CANONICAL_REALM_MAP = {
@@ -121,8 +112,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--experiment",
-        required=True,
-        help="Experiment name to validate",
+        type=str,
+        default="piControl",
+        help="Experiment name to validate (Default piControl)",
     )
     parser.add_argument(
         "--frequency",
@@ -144,11 +136,6 @@ def parse_args() -> argparse.Namespace:
         "--ensemble-member",
         default=None,
         help="Optional ensemble member filter",
-    )
-    parser.add_argument(
-        "--institution-id",
-        default=None,
-        help="Optional consortium/institution segment filter in the CMIP7 path",
     )
     parser.add_argument(
         "--custom-yaml",
@@ -258,7 +245,9 @@ def load_yaml_variables(yaml_path: Path) -> dict[str, dict[str, Any]]:
         payload = yaml.safe_load(handle) or {}
     variables = payload.get("variables")
     if not isinstance(variables, dict):
-        raise ValueError(f"Unsupported YAML structure in {yaml_path}: expected top-level variables dict")
+        raise ValueError(
+            f"Unsupported YAML structure in {yaml_path}: expected top-level variables dict"
+        )
     return variables
 
 
@@ -284,13 +273,14 @@ def get_requested_variables(
         frequency,
     )
     content_dic = dt.get_transformed_content()
+    print(content_dic)
     data_request = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = data_request.find_variables(
         skip_if_missing=False,
         operation="all",
         cmip7_frequency=frequency,
         modelling_realm=realm,
-        experiment=experiment,
+        # experiment=experiment,
     )
     return {var.branded_variable_name.name for var in cmip_vars}
 
@@ -336,7 +326,9 @@ def parse_log_file(log_path: Path) -> LogRecord | None:
     )
 
 
-def collect_log_records(log_dir: Path, expected_variables: set[str]) -> dict[str, list[LogRecord]]:
+def collect_log_records(
+    log_dir: Path, expected_variables: set[str]
+) -> dict[str, list[LogRecord]]:
     """Collect log records for variables that belong to the selected subset."""
     records: dict[str, list[LogRecord]] = defaultdict(list)
     if not log_dir.is_dir():
@@ -366,7 +358,9 @@ def path_matches_resolution(
     return any(target in candidate for candidate in candidates)
 
 
-def open_dataset_inventory(file_path: Path, variable: str) -> tuple[str, list[str], dict[str, int]]:
+def open_dataset_inventory(
+    file_path: Path, variable: str
+) -> tuple[str, list[str], dict[str, int]]:
     """Open a CMOR file and inspect the target data variable dimensions."""
     with xr.open_dataset(file_path, decode_times=False) as dataset:
         if variable in dataset.data_vars:
@@ -375,7 +369,8 @@ def open_dataset_inventory(file_path: Path, variable: str) -> tuple[str, list[st
             candidates = [
                 name
                 for name in dataset.data_vars
-                if not name.endswith("_bnds") and name not in {"time_bnds", "lat_bnds", "lon_bnds"}
+                if not name.endswith("_bnds")
+                and name not in {"time_bnds", "lat_bnds", "lon_bnds"}
             ]
             if not candidates:
                 raise ValueError(f"No data variables found in {file_path}")
@@ -394,42 +389,81 @@ def scan_output_tree(
     frequency: str,
     expected_variables: set[str],
     ensemble_member: str | None,
-    institution_id: str | None,
     resolution: str | None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
     """Scan the CMIP7 tree and inventory produced files for the selected subset."""
     produced: dict[str, list[Path]] = defaultdict(list)
     inventory: list[ProducedFileRecord] = []
     inspection_errors: list[dict[str, str]] = []
-
-    pattern = cmip_root.glob(f"CMIP/*/{model}/{experiment}/*/glb/{frequency}/*/*/*/*.nc")
+    print(cmip_root)
+    institution_id = MODEL_NAMING_MAPS[model][0]
+    print(
+        f"{cmip_root}/CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
+    )
+    print(
+        glob.glob(
+            f"{cmip_root}/CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
+        )
+    )
+    pattern = cmip_root.glob(
+        f"CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
+    )
+    # print(list(pattern))
+    # sys.exit(4)
+    print(expected_variables)
+    # sys.exit(4)
     for file_path in sorted(pattern):
         relative = file_path.relative_to(cmip_root)
+        print(relative)
+        # sys.exit(4)
         parts = relative.parts
         if len(parts) < 11:
             logger.debug("Skipping unexpected output path layout: %s", file_path)
             continue
 
-        _, consortium, path_model, path_experiment, path_ensemble, region, path_frequency, variable, dimension_folder, grid_type, _ = parts[:11]
+        (
+            _,
+            consortium,
+            path_model,
+            path_experiment,
+            path_ensemble,
+            region,
+            path_frequency,
+            variable,
+            dimension_folder,
+            grid_type,
+            _,
+        ) = parts[:11]
 
         if institution_id and consortium != institution_id:
+            print("Skipping due to institution_id filter: %s", institution_id)
             continue
         if ensemble_member and path_ensemble != ensemble_member:
+            print("Skipping due to ensemble filter: %s", ensemble_member)
             continue
-        if expected_variables and variable not in expected_variables:
+        if (
+            expected_variables
+            and f"{variable}_{dimension_folder}" not in expected_variables
+        ):
+            print("Skipping due to expected_variables filter: %s", variable)
             continue
-        if not path_matches_resolution(resolution, dimension_folder, grid_type, file_path.name):
+        if not path_matches_resolution(
+            resolution, dimension_folder, grid_type, file_path.name
+        ):
+            print("Skipping due to resolution filter: %s", resolution)
             continue
 
         produced[variable].append(file_path)
         try:
             data_var, dims, sizes = open_dataset_inventory(file_path, variable)
         except Exception as exc:  # pylint: disable=broad-except
-            inspection_errors.append({
-                "variable": variable,
-                "path": str(file_path),
-                "error": repr(exc),
-            })
+            inspection_errors.append(
+                {
+                    "variable": variable,
+                    "path": str(file_path),
+                    "error": repr(exc),
+                }
+            )
             continue
 
         inventory.append(
@@ -452,7 +486,9 @@ def scan_output_tree(
     return produced, inventory, inspection_errors
 
 
-def summarize_dimension_inventory(inventory: list[ProducedFileRecord]) -> list[dict[str, Any]]:
+def summarize_dimension_inventory(
+    inventory: list[ProducedFileRecord],
+) -> list[dict[str, Any]]:
     """Collapse file-level inventory into one summary row per variable."""
     grouped: dict[str, dict[str, set[str] | list[dict[str, Any]]]] = {}
     for record in inventory:
@@ -493,7 +529,9 @@ def summarize_dimension_inventory(inventory: list[ProducedFileRecord]) -> list[d
 
 def write_json_report(report: dict[str, Any], output_path: Path) -> None:
     """Write the main validation report as JSON."""
-    output_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 def write_csv_rows(rows: list[dict[str, Any]], output_path: Path) -> None:
@@ -538,16 +576,24 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _open_variable_timeseries(file_paths: list[Path], variable: str) -> xr.DataArray | None:
+def _open_variable_timeseries(
+    file_paths: list[Path], variable: str
+) -> xr.DataArray | None:
     """Open a variable across files and reduce it to a 1D time series if possible."""
     if not file_paths:
         return None
-    with xr.open_mfdataset(file_paths, combine="by_coords", decode_times=True) as dataset:
-        data_var = variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
+    with xr.open_mfdataset(
+        file_paths, combine="by_coords", decode_times=True
+    ) as dataset:
+        data_var = (
+            variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
+        )
         array = dataset[data_var]
         if "time" not in array.dims:
             return None
-        reduce_dims = [dim for dim in array.dims if dim != "time" and not dim.endswith("bnds")]
+        reduce_dims = [
+            dim for dim in array.dims if dim != "time" and not dim.endswith("bnds")
+        ]
         if reduce_dims:
             array = array.mean(dim=reduce_dims, skipna=True)
         return array.load()
@@ -557,15 +603,20 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
     """Open a variable across files and reduce it to a 2D spatial field if possible."""
     if not file_paths:
         return None
-    with xr.open_mfdataset(file_paths, combine="by_coords", decode_times=True) as dataset:
-        data_var = variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
+    with xr.open_mfdataset(
+        file_paths, combine="by_coords", decode_times=True
+    ) as dataset:
+        data_var = (
+            variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
+        )
         array = dataset[data_var]
         if "time" in array.dims:
             array = array.mean(dim="time", skipna=True)
         spatial_dims = [
             dim
             for dim in array.dims
-            if dim.lower() in {"lat", "lon", "latitude", "longitude", "xh", "yh", "i", "j"}
+            if dim.lower()
+            in {"lat", "lon", "latitude", "longitude", "xh", "yh", "i", "j"}
         ]
         if len(spatial_dims) != 2:
             return None
@@ -600,7 +651,9 @@ def create_timeseries_plots(
             series = _open_variable_timeseries(produced_files[variable], variable)
             if series is None:
                 axis.set_title(variable)
-                axis.text(0.5, 0.5, "No plottable time series", ha="center", va="center")
+                axis.text(
+                    0.5, 0.5, "No plottable time series", ha="center", va="center"
+                )
                 axis.set_axis_off()
                 continue
             axis.plot(series["time"].values, series.values, linewidth=1.0)
@@ -609,7 +662,9 @@ def create_timeseries_plots(
         for axis in axes.flat[len(page_variables) :]:
             axis.set_axis_off()
         fig.tight_layout()
-        output_path = plot_dir / f"timeseries_composite_{page_index // page_size + 1:02d}.png"
+        output_path = (
+            plot_dir / f"timeseries_composite_{page_index // page_size + 1:02d}.png"
+        )
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
         plotted.append(str(output_path))
@@ -660,8 +715,12 @@ def build_report(
         if any(record.has_error for record in records)
     )
     produced_variables = sorted(produced_files)
-    expected_but_not_produced = sorted(set(expected_variables) - set(produced_variables))
-    flattened_log_records = [asdict(record) for records in log_records.values() for record in records]
+    expected_but_not_produced = sorted(
+        set(expected_variables) - set(produced_variables)
+    )
+    flattened_log_records = [
+        asdict(record) for records in log_records.values() for record in records
+    ]
 
     return {
         "scope": {
@@ -671,7 +730,7 @@ def build_report(
             "frequency": args.frequency,
             "resolution": args.resolution,
             "ensemble_member": args.ensemble_member,
-            "institution_id": args.institution_id,
+            "institution_id": MODEL_NAMING_MAPS.get(args.model, [None, None])[0],
             "root_output_path": str(Path(args.root_output_path).expanduser().resolve()),
             "yaml_path": str(yaml_path),
         },
@@ -721,13 +780,21 @@ def main() -> int:
 
     cmip_root = resolve_cmip_root(args.root_output_path)
     logs_dir = resolve_logs_dir(args.root_output_path, cmip_root)
-    report_dir = Path(args.report_dir).expanduser().resolve() if args.report_dir else default_report_dir(args)
+    report_dir = (
+        Path(args.report_dir).expanduser().resolve()
+        if args.report_dir
+        else default_report_dir(args)
+    )
     report_dir.mkdir(parents=True, exist_ok=True)
 
     yaml_path = get_yaml_path(args.model, args.realm, args.custom_yaml)
     yaml_variables = load_yaml_variables(yaml_path)
-    requested_variables = get_requested_variables(args.realm, args.experiment, args.frequency)
-    expected_variables = filter_expected_variables(yaml_variables, requested_variables, args.variables)
+    requested_variables = get_requested_variables(
+        args.realm, args.experiment, args.frequency
+    )
+    expected_variables = filter_expected_variables(
+        yaml_variables, requested_variables, args.variables
+    )
     expected_variable_set = set(expected_variables)
 
     log_records = collect_log_records(logs_dir, expected_variable_set)
@@ -738,19 +805,26 @@ def main() -> int:
         frequency=args.frequency,
         expected_variables=expected_variable_set,
         ensemble_member=args.ensemble_member,
-        institution_id=args.institution_id,
         resolution=args.resolution,
     )
     dimension_inventory = summarize_dimension_inventory(inventory_records)
 
     plot_outputs = {"timeseries": [], "maps": []}
     if args.plot_timeseries or args.plot_maps:
-        plot_dir = Path(args.plot_dir).expanduser().resolve() if args.plot_dir else report_dir / "plots"
+        plot_dir = (
+            Path(args.plot_dir).expanduser().resolve()
+            if args.plot_dir
+            else report_dir / "plots"
+        )
         plot_dir.mkdir(parents=True, exist_ok=True)
         if args.plot_timeseries:
-            plot_outputs["timeseries"] = create_timeseries_plots(produced_files, plot_dir, args.max_plots)
+            plot_outputs["timeseries"] = create_timeseries_plots(
+                produced_files, plot_dir, args.max_plots
+            )
         if args.plot_maps:
-            plot_outputs["maps"] = create_map_plots(produced_files, plot_dir, args.max_plots)
+            plot_outputs["maps"] = create_map_plots(
+                produced_files, plot_dir, args.max_plots
+            )
 
     report = build_report(
         args,
@@ -769,7 +843,9 @@ def main() -> int:
         [{"variable": variable} for variable in report["expected_but_not_produced"]],
         report_dir / "missing_variables.csv",
     )
-    write_csv_rows(report["dimension_inventory"], report_dir / "dimension_inventory.csv")
+    write_csv_rows(
+        report["dimension_inventory"], report_dir / "dimension_inventory.csv"
+    )
     write_csv_rows(report["inspection_errors"], report_dir / "inspection_errors.csv")
     write_markdown_summary(report, report_dir / "validation_summary.md")
 

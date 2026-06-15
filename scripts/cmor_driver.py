@@ -236,8 +236,8 @@ def parse_args():
     parser.add_argument(
         "--experiment",
         type=str,
-        default="piControl",
-        help="Experiment name for data request. (Default piControl)",
+        default="picontrol",
+        help="Experiment name for data request. (Default picontrol)",
     )
     parser.add_argument(
         "--model",
@@ -703,6 +703,7 @@ def main():
     logger.info("Content dictionary obtained")
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = []
+    print(DR.get_experiments())
     cmip_vars = DR.find_variables(
         skip_if_missing=False,
         operation="all",
