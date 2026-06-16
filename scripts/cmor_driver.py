@@ -224,8 +224,8 @@ def parse_args():
         "--frequency",
         type=str,
         default="mon",
-        choices=["mon", "day", "6hr", "3hr"],
-        help="Frequency of data to be translated (mon, day, 6hr, 3hr), (Default: mon)",
+        choices=["mon", "day", "6hr", "3hr", "yr"],
+        help="Frequency of data to be translated (mon, day, 6hr, 3hr, yr), (Default: mon)",
     )
     parser.add_argument(
         "--outdir",
