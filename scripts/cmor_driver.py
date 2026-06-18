@@ -41,6 +41,7 @@ from cmip7_prep.pipeline import (
 )
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
+from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 
 from data_request_api.query import data_request as dr
 from data_request_api.content import dump_transformation as dt
@@ -267,6 +268,11 @@ def parse_args():
         default=None,
         help="Path to cmip7-cmor-tables directory (optional, overrides model-specific default)",
     )
+    parser.add_argument(
+        "--run-all-from-yaml",
+        default=False,
+        help="Override CMIP7 data request variable list and run all variables defined in the YAML mapping file",
+    )
 
     args = parser.parse_args()
     return args
@@ -277,6 +283,13 @@ def get_version():
     from cmip7_prep import __version__
 
     return __version__
+
+
+def _priority_for_logging(data_request, cmip_var) -> str:
+    """Return a stable priority label for logs, including synthetic variables."""
+    if getattr(cmip_var, "is_synthetic", False):
+        return "synthetic-from-yaml"
+    return str(data_request.find_priority_per_variable(variable=cmip_var))
 
 
 def process_one_var(
@@ -694,6 +707,27 @@ def main():
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
 
+
+    # Load and evaluate the CMIP mapping YAML file for this model and realm
+    if custom_yaml := args.custom_yaml:
+        logger.info(f"Using custom YAML mapping file: {custom_yaml}")
+        mapping = Mapping.from_yaml(custom_yaml)
+    else:
+        if model not in REALM_YAML_MAP:
+            logger.error(
+                f"Unknown model '{model}': must be one of {list(REALM_YAML_MAP)}"
+            )
+            sys.exit(1)
+        yaml_filename = REALM_YAML_MAP[model].get(realm)
+        if yaml_filename is None:
+            logger.error(
+                f"No YAML mapping defined for model={model}, realm={realm}"
+            )
+            sys.exit(1)
+        logger.info(f"Loading mapping YAML: {yaml_filename}")
+        mapping = Mapping.from_packaged_default(filename=yaml_filename)
+    mapping.default_freq = frequency
+
     # Load all possible cmip vars for this realm and this experiment
     # The data_request_api is a CMIP7-specific Python package that is
     # separate from CMOR itself but closely related to it.
@@ -703,7 +737,6 @@ def main():
     logger.info("Content dictionary obtained")
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = []
-    print(DR.get_experiments())
     cmip_vars = DR.find_variables(
         skip_if_missing=False,
         operation="all",
@@ -711,6 +744,29 @@ def main():
         modelling_realm=realm,
         experiment=args.experiment,
     )
+    cmip_vars_rich = DR.find_variables(
+        skip_if_missing=False,
+        operation="all",
+        cmip7_frequency=frequency,
+        modelling_realm=realm,
+    )
+    if args.run_all_from_yaml:
+        logger.info(
+            "Running with --run-all-from-yaml: assembling variables from the YAML mapping"
+        )
+        cmip_vars, synthesized_names = assemble_yaml_defined_cmip_vars(
+            mapping,
+            cmip_vars_rich,
+            freq=frequency,
+        )
+        logger.info(
+            "Resolved %s YAML variables: %s reused from data request, %s synthesized",
+            len(cmip_vars),
+            len(cmip_vars) - len(synthesized_names),
+            len(synthesized_names),
+        )
+        for varname in synthesized_names:
+            logger.info("Synthesized variable %s from YAML mapping", varname)
     # cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
 
     # Determine cmip variables that will process
@@ -729,7 +785,7 @@ def main():
                 logger.info(
                     "Adding variable %s with priority %s",
                     var.branded_variable_name.name,
-                    DR.find_priority_per_variable(variable=var),
+                    _priority_for_logging(DR, var),
                 )
                 if var.branded_variable_name.name not in [
                     v.branded_variable_name.name for v in cmip_vars
@@ -762,25 +818,6 @@ def main():
         else:
             glob_pattern = "*.nc"
 
-        # Load and evaluate the CMIP mapping YAML file for this model and realm
-        if custom_yaml := args.custom_yaml:
-            logger.info(f"Using custom YAML mapping file: {custom_yaml}")
-            mapping = Mapping.from_yaml(custom_yaml)
-        else:
-            if model not in REALM_YAML_MAP:
-                logger.error(
-                    f"Unknown model '{model}': must be one of {list(REALM_YAML_MAP)}"
-                )
-                sys.exit(1)
-            yaml_filename = REALM_YAML_MAP[model].get(realm)
-            if yaml_filename is None:
-                logger.error(
-                    f"No YAML mapping defined for model={model}, realm={realm}"
-                )
-                sys.exit(1)
-            logger.info(f"Loading mapping YAML: {yaml_filename}")
-            mapping = Mapping.from_packaged_default(filename=yaml_filename)
-        mapping.default_freq = frequency
 
         # Determine TABLES directory
         _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
@@ -879,6 +916,19 @@ def main():
         client.close()
     if cluster:
         cluster.close()
+
+def make_cmip_vars_from_full_yaml(mapping: Mapping) -> list[dr.Variable]:
+    """Utility function to create a list of dr.Variable objects for all variables defined in the YAML mapping."""
+    cmip_vars = []
+    for varname in mapping.mapping.keys():
+        print(varname)
+        sys.exit(4)
+        # cmip_var = dr.Variable(
+        #     branded_variable_name=varname,
+        #     dr="fix",
+        # )
+
+
 
 
 if __name__ == "__main__":
