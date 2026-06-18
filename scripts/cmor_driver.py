@@ -757,7 +757,9 @@ def main():
         cmip_vars, synthesized_names = assemble_yaml_defined_cmip_vars(
             mapping,
             cmip_vars_rich,
+            data_request=DR,
             freq=frequency,
+            realm=realm,
         )
         logger.info(
             "Resolved %s YAML variables: %s reused from data request, %s synthesized",
