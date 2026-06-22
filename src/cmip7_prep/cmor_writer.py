@@ -108,10 +108,11 @@ class CmorSession(
         try:
             if self._log_path is not None:
                 logger.info("CMOR logfile: %s", self._log_path)
+                print()
                 cmor.setup(
                     inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
-                        cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                        cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                     ),
                     set_verbosity=cmor.CMOR_NORMAL,
                     logfile=str(self._log_path),  # supported by newer CMOR builds
@@ -120,7 +121,7 @@ class CmorSession(
                 cmor.setup(
                     inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
-                        cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                        cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                     ),
                     set_verbosity=cmor.CMOR_NORMAL,
                 )
@@ -129,7 +130,7 @@ class CmorSession(
             cmor.setup(
                 inpath=str(self.tables_root / "tables"),
                 netcdf_file_action=getattr(
-                    cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                    cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                 ),
                 set_verbosity=cmor.CMOR_NORMAL,
             )

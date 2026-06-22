@@ -78,6 +78,8 @@ MODEL_CONFIGS = {
         "realm_outputs": {
             "atmos": "noresm_to_cmip7_atmos.yaml",
             "land": "noresm_to_cmip7_land.yaml",
+            "aerosol": "noresm_to_cmip7_aerosol.yaml",
+            "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
         },
         "source_column": "NorESM3 name (dependency)",
         "source_skip_phrases": [
@@ -129,6 +131,8 @@ MODEL_CONFIGS = {
         "realm_column": "Table",
         "realm_outputs": {
             "atmos": "cesm_to_cmip7_atmos.yaml",
+            "atmosChem": "cesm_to_cmip7_atmosChem.yaml",
+            "aerosol": "cesm_to_cmip7_aerosol.yaml",
             "land": "cesm_to_cmip7_land.yaml",
             "seaIce": "cesm_to_cmip7_seaice.yaml",
             "ocean": "cesm_to_cmip7_ocean.yaml",
@@ -528,6 +532,10 @@ def _build_entry(row, config):
                     dims = clean_strings(value.split(","), normalize)
             else:
                 dims = clean_strings(value.split(","), normalize)
+
+            if "pft" in dims:
+                pft_to_vegtype = True
+                dims = ["vegtype" if d == "pft" else d for d in dims]
             entry["dims"] = dims
             # Only search for plev in flat string lists; nested lists are left intact.
             plev_dim = next(
