@@ -738,6 +738,20 @@ class CmorSession(
                 coord_vals=np.arange(len(values))#np.asarray(values),
             )
 
+        # -------------------------
+        # --- functional dimension: fates_levfuel
+        # -------------------------
+        elif "fates_levfuel" in var_dims:
+            values = ds["fates_levfuel"].values
+            logger.debug("Defining functional pft axis for variable %s", var_name)
+            logger.debug("fates_levfuel values: %s", values)
+            logger.debug("Setting functional pft axis")
+            funcax_id = cmor.axis(
+                table_entry="fuelclass",
+                units="",
+                coord_vals=np.arange(len(values))#np.asarray(values),
+            )
+
 
         # -------------------------
         # Map dimension names to axis IDs
