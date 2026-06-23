@@ -297,6 +297,7 @@ class CmorSession(
         lon_id = None
         sdepth_id = None
         lev_id = None
+        funcax_id = None
 
         logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
         has_latlon_dims = "lat" in var_dims and "lon" in var_dims
@@ -650,6 +651,20 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+        # -------------------------
+        # --- functional dimension: fates_levpft
+        # -------------------------
+        elif "fates_levpft" in var_dims:
+            values = ds["fates_levpft"].values
+            logger.debug("Defining functional pft axis for variable %s", var_name)
+            logger.debug("fates_levpft values: %s", values)
+            logger.debug("Setting functional pft axis")
+            funcax_id = cmor.axis(
+                table_entry="pft",
+                units="",
+                coord_vals=np.arange(len(values))#np.asarray(values),
+            )
+
 
         # -------------------------
         # Map dimension names to axis IDs
@@ -670,6 +685,7 @@ class CmorSession(
             "yh": lat_id,  # MOM6
             "xq": lon_id,  # MOM6
             "yq": lat_id,  # MOM6
+            "fates_levpft": funcax_id,
         }
         axes_ids = []
         for d in var_dims:
