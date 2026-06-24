@@ -434,7 +434,7 @@ def scan_output_tree(
         if not path_matches_resolution(
             resolution, dimension_folder, grid_type, file_path.name
         ):
-            print("Skipping due to resolution filter: %s", resolution)
+            logger.debug("Skipping due to resolution filter: %s", resolution)
             continue
 
         produced[variable].append(file_path)
