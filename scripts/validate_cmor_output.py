@@ -272,7 +272,7 @@ def get_requested_variables(
         frequency,
     )
     content_dic = dt.get_transformed_content()
-    print(content_dic)
+    logger.debug(content_dic)
     data_request = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = data_request.find_variables(
         skip_if_missing=False,
@@ -420,16 +420,16 @@ def scan_output_tree(
             _,
         ) = parts[:11]
         if institution_id and consortium != institution_id:
-            print("Skipping due to institution_id filter: %s", institution_id)
+            logger.debug("Skipping due to institution_id filter: %s", institution_id)
             continue
         if ensemble_member and path_ensemble != ensemble_member:
-            print("Skipping due to ensemble filter: %s", ensemble_member)
+            logger.debug("Skipping due to ensemble filter: %s", ensemble_member)
             continue
         if (
             expected_variables
             and f"{variable}_{dimension_folder}" not in expected_variables
         ):
-            print("Skipping due to expected_variables filter: %s", variable)
+            logger.debug("Skipping due to expected_variables filter: %s", variable)
             continue
         if not path_matches_resolution(
             resolution, dimension_folder, grid_type, file_path.name
