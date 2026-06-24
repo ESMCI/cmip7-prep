@@ -23,7 +23,6 @@ import json
 import logging
 import re
 import sys
-import glob
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -395,26 +394,12 @@ def scan_output_tree(
     produced: dict[str, list[Path]] = defaultdict(list)
     inventory: list[ProducedFileRecord] = []
     inspection_errors: list[dict[str, str]] = []
-    print(cmip_root)
     institution_id = MODEL_NAMING_MAPS[model][0]
-    print(
-        f"{cmip_root}/CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
-    )
-    print(
-        glob.glob(
-            f"{cmip_root}/CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
-        )
-    )
     pattern = cmip_root.glob(
         f"CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
     )
-    # print(list(pattern))
-    # sys.exit(4)
-    print(expected_variables)
-    # sys.exit(4)
     for file_path in sorted(pattern):
         relative = file_path.relative_to(cmip_root)
-        print(relative)
         # sys.exit(4)
         parts = relative.parts
         if len(parts) < 11:

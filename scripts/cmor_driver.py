@@ -270,7 +270,7 @@ def parse_args():
     )
     parser.add_argument(
         "--run-all-from-yaml",
-        default=False,
+        action="store_true",
         help="Override CMIP7 data request variable list and run all variables defined in the YAML mapping file",
     )
 
