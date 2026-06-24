@@ -27,14 +27,12 @@ try:
 except ModuleNotFoundError as e:
     _HAS_DASK = False
 
-#---------------------------------------------------------
+# ---------------------------------------------------------
 # Default NorESM weight maps; override via function args.
-#---------------------------------------------------------
+# ---------------------------------------------------------
 
 INPUTDATA_DIR_noresm = Path("/nird/datalake/NS9560K/diagnostics/land_xesmf_diag_data/")
-DEFAULT_CONS_MAP_NE30_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1_aave.nc"
-)
+DEFAULT_CONS_MAP_NE30_noresm = Path(INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1_aave.nc")
 DEFAULT_BILIN_MAP_NE30_noresm = Path(
     INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1_bilin.nc"
 )
@@ -51,9 +49,9 @@ DEFAULT_BILIN_MAP_TNX1V4 = Path(
     INPUTDATA_DIR_noresm / "map_tnx1v4_to_1x1_blin_c260531.nc"
 )
 
-#---------------------------------------------------------
+# ---------------------------------------------------------
 # Default CESM weight maps; override via function args.
-#---------------------------------------------------------
+# ---------------------------------------------------------
 
 INPUTDATA_DIR_cesm = Path("/glade/campaign/cesm/cesmdata/inputdata/")
 DEFAULT_CONS_MAP_NE30_cesm = Path(
@@ -69,9 +67,9 @@ DEFAULT_BILIN_MAP_T232 = Path(
     INPUTDATA_DIR_cesm / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc"
 )  # optional bilinear map
 
-#---------------------------------------------------------
+# ---------------------------------------------------------
 # Intensive variables
-#---------------------------------------------------------
+# ---------------------------------------------------------
 
 INTENSIVE_VARS = {
     "tas",
@@ -293,7 +291,9 @@ def _pick_maps(
                 Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE16_noresm
             )
         else:
-            cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_TNX1V4
+            cons = (
+                Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_TNX1V4
+            )
             bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_TNX1V4
 
     if cons is None and bilin is None:
@@ -477,14 +477,17 @@ def regrid_to_latlon(
 
     var_da = ds_in[varname]  # always a DataArray
 
-    # TODO: handle if the lat, lon coords are already present, but still on the wrong grid
+    # In future: handle if the lat, lon coords are already present, but still on the wrong grid
     # or other changes to the grid should be made.
-    if resolution == 'regular':
+    if resolution == "regular":
         if "lat" in var_da.dims and "lon" in var_da.dims:
-            logger.info("Variable already has 'lat' and 'lon' dims; skipping regridding.")
+            logger.info(
+                "Variable already has 'lat' and 'lon' dims; skipping regridding."
+            )
             return var_da
-        else:
-            raise KeyError(f"regular grid is requested but variable does not have 'lat','lon' dims")
+        raise KeyError(
+            "regular grid is requested but variable does not have 'lat','lon' dims"
+        )
 
     if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:
         logger.info(
@@ -798,6 +801,8 @@ def _regrid_fx_once(
             lndarea = (ds_native["landfrac"] * ds_native["area"] * 1.0e6).sum(
                 dim=("lat", "lon")
             )
+            logger.debug("Total land area on source grid: %.3e m^2", lndarea.values)
+            out = da
             out.name = "sftlf"
             out.attrs.update(da.attrs)
             out_vars["sftlf"] = out

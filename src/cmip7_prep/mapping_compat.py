@@ -376,6 +376,23 @@ class Mapping:
             return _to_varconfig(cmip_name, raw, freq=effective_freq).as_cfg()
         return self._vars[cmip_name].as_cfg()
 
+    def iter_variable_names(self, freq: Optional[str] = None) -> List[str]:
+        """Return top-level mapping variable names in YAML order.
+
+        When ``freq`` is provided, variables whose sources are only tagged for
+        other frequencies are excluded. Untagged sources remain eligible for
+        all frequencies.
+        """
+        effective_freq = freq if freq is not None else self.default_freq
+        names = []
+        for cmip_name, internal_keys in self._variant_keys.items():
+            if any(
+                _mapping_entry_supports_frequency(self._raw.get(key), effective_freq)
+                for key in internal_keys
+            ):
+                names.append(cmip_name)
+        return names
+
     def realize(
         self, ds: xr.Dataset, cmip_name: str, freq: Optional[str] = None
     ) -> xr.DataArray:
@@ -494,6 +511,32 @@ def _filter_sources(sources: List[Any], freq: Optional[str]) -> List[Any]:
     if matched:
         return matched + untagged
     return untagged if untagged else sources
+
+
+def _mapping_entry_supports_frequency(
+    cfg: Optional[TMapping[str, Any]], freq: Optional[str]
+) -> bool:
+    """Return whether a raw mapping entry should be considered for *freq*.
+
+    Entries with untagged sources are always eligible. Entries with only
+    tagged sources are eligible only when at least one source matches *freq*.
+    """
+    if cfg is None or freq is None:
+        return True
+    sources = cfg.get("sources")
+    if not isinstance(sources, list) or not sources:
+        return True
+
+    has_tagged_sources = False
+    for item in sources:
+        if not isinstance(item, dict):
+            return True
+        if "freq" not in item:
+            return True
+        has_tagged_sources = True
+        if item.get("freq") == freq:
+            return True
+    return not has_tagged_sources
 
 
 def _to_varconfig(
