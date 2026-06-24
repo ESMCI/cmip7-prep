@@ -401,6 +401,8 @@ def sum_dim_detect(variable):
         return "fates_levelem"
     if variable == "PCT_LANDUNIT":
         return "ltype"
+    if variable.startswith("FATES") and variable.endswith("SZ"):
+        return "fates_levscls"
     return "lev"
 
 
