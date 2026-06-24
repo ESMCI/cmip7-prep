@@ -919,20 +919,6 @@ def main():
     if cluster:
         cluster.close()
 
-def make_cmip_vars_from_full_yaml(mapping: Mapping) -> list[dr.Variable]:
-    """Utility function to create a list of dr.Variable objects for all variables defined in the YAML mapping."""
-    cmip_vars = []
-    for varname in mapping.mapping.keys():
-        print(varname)
-        sys.exit(4)
-        # cmip_var = dr.Variable(
-        #     branded_variable_name=varname,
-        #     dr="fix",
-        # )
-
-
-
-
 if __name__ == "__main__":
     args = parse_args()
     if getattr(args, "version", False):

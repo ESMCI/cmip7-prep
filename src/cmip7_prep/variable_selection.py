@@ -1,4 +1,10 @@
-"""Helpers for assembling CMIP variable lists from mappings and data-request results."""
+"""Helpers for assembling CMIP variable lists from mappings and data-request results.
+
+Purpose mainly to be able to make cmorised variables that are not yet in the data-request, 
+but which are defined in the mapping YAML. cmor_driver.py can use this
+when the run-all-from-yaml argument is true. This expands the usability of cmip7-prep
+so it can be used to generate cmorised output for additional MIPs or project related runs
+"""
 
 from __future__ import annotations
 
