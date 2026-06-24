@@ -279,7 +279,7 @@ def get_requested_variables(
         operation="all",
         cmip7_frequency=frequency,
         modelling_realm=realm,
-        # experiment=experiment,
+        experiment=experiment,
     )
     return {var.branded_variable_name.name for var in cmip_vars}
 
@@ -387,8 +387,8 @@ def scan_output_tree(
     experiment: str,
     frequency: str,
     expected_variables: set[str],
-    ensemble_member: str | None,
-    resolution: str | None,
+    ensemble_member: str | None = None,
+    resolution: str | None = None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
     """Scan the CMIP7 tree and inventory produced files for the selected subset."""
     produced: dict[str, list[Path]] = defaultdict(list)
