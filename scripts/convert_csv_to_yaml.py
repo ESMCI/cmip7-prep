@@ -40,6 +40,8 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "tran_tavg-u-hxy-lnd": "up",
     "evspsblsoi_tavg-u-hxy-u": "up",
     "evspsblveg_tavg-u-hxy-u": "up",
+    "ra_tavg-u-hxy-lnd": "up",
+    "fN2O_tavg-u-hxy-lnd": "up",
 }
 
 # ── model configurations ─────────────────────────────────────────────────────
@@ -565,7 +567,7 @@ def _build_entry(row, config):
             entry["units"] = fix_number_norwegian_format(value)
         elif yaml_key == "_source_expr":
             names = _parse_csv_identifiers(value)
-            if names is not None:
+            if names is not None and "FATES" not in value:
                 # New format: comma-separated plain variable names.
                 # Freq/Alias will be merged in post-processing.
                 entry["sources"] = [{"model_var": n} for n in names]
