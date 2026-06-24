@@ -195,13 +195,13 @@ def canonical_realm(realm: str) -> str:
 def resolve_cmip_root(root_output_path: str | Path) -> Path:
     """Resolve the CMIP7 root directory from either a parent or direct path."""
     root = Path(root_output_path).expanduser().resolve()
-    if root.name == "CMIP7" and (root / "CMIP").is_dir():
+    if (root / "CMIP").is_dir():
         return root
     cmip_root = root / "CMIP7"
-    if cmip_root.is_dir() and (cmip_root / "CMIP").is_dir():
+    if (cmip_root / "CMIP").is_dir():
         return cmip_root
     raise FileNotFoundError(
-        f"Could not locate CMIP7/CMIP under {root}. Expected either {root / 'CMIP7'} or a direct CMIP7 path."
+        f"Could not locate CMIP output under {root}. Expected either {root / 'CMIP7' / 'CMIP'} or {root / 'CMIP'}."
     )
 
 
