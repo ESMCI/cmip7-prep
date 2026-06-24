@@ -700,6 +700,7 @@ class CmorSession(
             "xq": lon_id,  # MOM6
             "yq": lat_id,  # MOM6
             "fates_levpft": funcax_id,
+            "fates_levfuel": funcax_id,
         }
         axes_ids = []
         for d in var_dims:
