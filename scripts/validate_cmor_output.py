@@ -434,7 +434,6 @@ def scan_output_tree(
             grid_type,
             _,
         ) = parts[:11]
-
         if institution_id and consortium != institution_id:
             print("Skipping due to institution_id filter: %s", institution_id)
             continue
