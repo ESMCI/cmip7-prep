@@ -73,6 +73,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 REALM_YAML_MAP = {
     "noresm": {
         "atmos": "noresm_to_cmip7_atmos.yaml",
+        "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
+        "aerosol": "noresm_to_cmip7_aerosol.yaml",
         "land": "noresm_to_cmip7_land.yaml",
         "seaIce": "noresm_to_cmip7_seaice.yaml",
     },
@@ -127,11 +129,23 @@ INCLUDE_PATTERN_MAP = {
             "6hr": ["cam.h2a"],
             "3hr": ["cam.h4a"],
         },
+        "atmosChem": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h4a"],
+        },
+        "aerosol": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h4a"],
+        },
         "land": {
             "mon": ["clm2.h0a"],
             "day": ["clm2.h1a"],
             "3hr": ["clm2.h2a"],
-            "yr": ["clm2.h3a"],
+            "yr":  ["clm2.h2a"] # Temporary change for WIEMIP TODO to change back ["clm2.h3a"],
         },
         "seaIce": {
             "mon": ["cice.h."],
