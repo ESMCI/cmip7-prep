@@ -108,10 +108,11 @@ class CmorSession(
         try:
             if self._log_path is not None:
                 logger.info("CMOR logfile: %s", self._log_path)
+                print()
                 cmor.setup(
                     inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
-                        cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                        cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                     ),
                     set_verbosity=cmor.CMOR_NORMAL,
                     logfile=str(self._log_path),  # supported by newer CMOR builds
@@ -120,7 +121,7 @@ class CmorSession(
                 cmor.setup(
                     inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
-                        cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                        cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                     ),
                     set_verbosity=cmor.CMOR_NORMAL,
                 )
@@ -129,7 +130,7 @@ class CmorSession(
             cmor.setup(
                 inpath=str(self.tables_root / "tables"),
                 netcdf_file_action=getattr(
-                    cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                    cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                 ),
                 set_verbosity=cmor.CMOR_NORMAL,
             )
@@ -296,6 +297,7 @@ class CmorSession(
         lon_id = None
         sdepth_id = None
         lev_id = None
+        funcax_id = None
 
         logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
         has_latlon_dims = "lat" in var_dims and "lon" in var_dims
@@ -649,6 +651,48 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+        # -------------------------
+        # --- functional dimension: fates_levpft
+        # -------------------------
+        elif "fates_levpft" in var_dims:
+            values = ds["fates_levpft"].values
+            logger.debug("Defining functional pft axis for variable %s", var_name)
+            logger.debug("fates_levpft values: %s", values)
+            logger.debug("Setting functional pft axis")
+            funcax_id = cmor.axis(
+                table_entry="pft",
+                units="",
+                coord_vals=np.arange(len(values))#np.asarray(values),
+            )
+
+        # -------------------------
+        # --- functional dimension: fates_levfuel
+        # -------------------------
+        elif "fates_levfuel" in var_dims:
+            values = ds["fates_levfuel"].values
+            logger.debug("Defining functional pft axis for variable %s", var_name)
+            logger.debug("fates_levfuel values: %s", values)
+            logger.debug("Setting functional pft axis")
+            funcax_id = cmor.axis(
+                table_entry="fuelclass",
+                units="",
+                coord_vals=np.arange(len(values))#np.asarray(values),
+            )
+
+        # -------------------------
+        # --- functional dimension: soilpools
+        # -------------------------
+        elif "soilpools" in var_dims:
+            values = ds["soilpools"].values
+            logger.debug("Defining functional pft axis for variable %s", var_name)
+            logger.debug("fates_levfuel values: %s", values)
+            logger.debug("Setting functional pft axis")
+            funcax_id = cmor.axis(
+                table_entry="soilpools",
+                units="",
+                coord_vals=np.arange(len(values))#np.asarray(values),
+            )
+
 
         # -------------------------
         # Map dimension names to axis IDs
@@ -669,6 +713,9 @@ class CmorSession(
             "yh": lat_id,  # MOM6
             "xq": lon_id,  # MOM6
             "yq": lat_id,  # MOM6
+            "fates_levpft": funcax_id,
+            "fates_levfuel": funcax_id,
+            "soilpools": funcax_id,
         }
         axes_ids = []
         for d in var_dims:
