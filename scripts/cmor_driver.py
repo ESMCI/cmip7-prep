@@ -410,7 +410,10 @@ def process_one_var(
                 results.append(
                     (str(varname), "analyzed native mom6 grid (realize applied)")
                 )
-            elif realm == "seaIce" and len(dims) == 1:
+            elif realm == "seaIce" and (model == "noresm" or len(dims) == 1):
+                # NorESM seaIce is always kept on the native CICE (nj, ni) grid:
+                # no regridding, regardless of dims. CESM seaIce keeps the prior
+                # behavior (native only for scalar/integrated len(dims) == 1 vars).
                 logger.info(
                     f"Preparing seaIce field variants via realize_all for {varname}"
                 )
