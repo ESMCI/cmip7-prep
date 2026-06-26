@@ -679,6 +679,20 @@ class CmorSession(
                 coord_vals=np.arange(len(values))#np.asarray(values),
             )
 
+        # -------------------------
+        # --- functional dimension: soilpools
+        # -------------------------
+        elif "soilpools" in var_dims:
+            values = ds["soilpools"].values
+            logger.debug("Defining functional pft axis for variable %s", var_name)
+            logger.debug("fates_levfuel values: %s", values)
+            logger.debug("Setting functional pft axis")
+            funcax_id = cmor.axis(
+                table_entry="soilpools",
+                units="",
+                coord_vals=np.arange(len(values))#np.asarray(values),
+            )
+
 
         # -------------------------
         # Map dimension names to axis IDs
@@ -701,6 +715,7 @@ class CmorSession(
             "yq": lat_id,  # MOM6
             "fates_levpft": funcax_id,
             "fates_levfuel": funcax_id,
+            "soilpools": funcax_id,
         }
         axes_ids = []
         for d in var_dims:
