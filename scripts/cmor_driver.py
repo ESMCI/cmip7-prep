@@ -425,6 +425,15 @@ def process_one_var(
                     )
                     if "time_bounds" in ds_native and "time_bounds" not in ds_v:
                         ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
+                    # Carry the native CICE grid definition (cell centers + vertex
+                    # bounds) into the trimmed variant dataset, but only for 2D
+                    # (nj, ni) variants that are written on the native grid. TLAT/TLON
+                    # ride along as coords, but the *_bounds vars are data_vars and
+                    # would be dropped by the realize_all projection.
+                    if "nj" in da.dims and "ni" in da.dims:
+                        for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+                            if gname in ds_native and gname not in ds_v:
+                                ds_v = ds_v.assign({gname: ds_native[gname]})
                     cmor_items.append((ds_v, variant_cfg))
                 results.append(
                     (
