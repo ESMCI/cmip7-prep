@@ -65,8 +65,9 @@ _DATE_RE = re.compile(
 )
 
 # Path for cmor tables
-TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
-TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
+# TODO: the following TABLES_cesm is no longer valid - can the TABLES_noresm be used?
+#TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+TABLES_noresm = str(Path(__file__).parent.parent / "cmip7-cmor-tables")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
