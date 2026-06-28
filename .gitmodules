@@ -1,0 +1,4 @@
+[submodule "cmip7-cmor-tables"]
+	path = cmip7-cmor-tables
+	url = https://github.com/NorESMhub/cmip7-cmor-tables.git
+	branch = noresm-dev

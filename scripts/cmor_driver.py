@@ -65,14 +65,17 @@ _DATE_RE = re.compile(
 )
 
 # Path for cmor tables
-TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
-TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
+# TODO: the following TABLES_cesm is no longer valid - can the TABLES_noresm be used?
+#TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+TABLES_noresm = str(Path(__file__).parent.parent / "cmip7-cmor-tables")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 REALM_YAML_MAP = {
     "noresm": {
         "atmos": "noresm_to_cmip7_atmos.yaml",
+        "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
+        "aerosol": "noresm_to_cmip7_aerosol.yaml",
         "land": "noresm_to_cmip7_land.yaml",
         "seaIce": "noresm_to_cmip7_seaice.yaml",
     },
@@ -127,11 +130,23 @@ INCLUDE_PATTERN_MAP = {
             "6hr": ["cam.h2a"],
             "3hr": ["cam.h4a"],
         },
+        "atmosChem": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h4a"],
+        },
+        "aerosol": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h4a"],
+        },
         "land": {
             "mon": ["clm2.h0a"],
             "day": ["clm2.h1a"],
             "3hr": ["clm2.h2a"],
-            "yr": ["clm2.h3a"],
+            "yr":  ["clm2.h2a"] # Temporary change for WIEMIP TODO to change back ["clm2.h3a"],
         },
         "seaIce": {
             "mon": ["cice.h."],
@@ -410,7 +425,10 @@ def process_one_var(
                 results.append(
                     (str(varname), "analyzed native mom6 grid (realize applied)")
                 )
-            elif realm == "seaIce" and len(dims) == 1:
+            elif realm == "seaIce" and (model == "noresm" or len(dims) == 1):
+                # NorESM seaIce is always kept on the native CICE (nj, ni) grid:
+                # no regridding, regardless of dims. CESM seaIce keeps the prior
+                # behavior (native only for scalar/integrated len(dims) == 1 vars).
                 logger.info(
                     f"Preparing seaIce field variants via realize_all for {varname}"
                 )
@@ -422,6 +440,15 @@ def process_one_var(
                     )
                     if "time_bounds" in ds_native and "time_bounds" not in ds_v:
                         ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
+                    # Carry the native CICE grid definition (cell centers + vertex
+                    # bounds) into the trimmed variant dataset, but only for 2D
+                    # (nj, ni) variants that are written on the native grid. TLAT/TLON
+                    # ride along as coords, but the *_bounds vars are data_vars and
+                    # would be dropped by the realize_all projection.
+                    if "nj" in da.dims and "ni" in da.dims:
+                        for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+                            if gname in ds_native and gname not in ds_v:
+                                ds_v = ds_v.assign({gname: ds_native[gname]})
                     cmor_items.append((ds_v, variant_cfg))
                 results.append(
                     (

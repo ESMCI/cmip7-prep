@@ -108,10 +108,11 @@ class CmorSession(
         try:
             if self._log_path is not None:
                 logger.info("CMOR logfile: %s", self._log_path)
+                print()
                 cmor.setup(
                     inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
-                        cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                        cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                     ),
                     set_verbosity=cmor.CMOR_NORMAL,
                     logfile=str(self._log_path),  # supported by newer CMOR builds
@@ -120,7 +121,7 @@ class CmorSession(
                 cmor.setup(
                     inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
-                        cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                        cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                     ),
                     set_verbosity=cmor.CMOR_NORMAL,
                 )
@@ -129,7 +130,7 @@ class CmorSession(
             cmor.setup(
                 inpath=str(self.tables_root / "tables"),
                 netcdf_file_action=getattr(
-                    cmor, "CMOR_REPLACE_3", getattr(cmor, "CMOR_REPLACE", 3)
+                    cmor, "CMOR_REPLACE_4", getattr(cmor, "CMOR_REPLACE", 4)
                 ),
                 set_verbosity=cmor.CMOR_NORMAL,
             )
@@ -220,6 +221,143 @@ class CmorSession(
         logger.debug("Loading CMOR table for key '%s': %s", key, table_filename)
         return cmor.load_table(table_filename)
 
+    def _define_mom6_grid(self, ds, var_name, var_da, var_dims):
+        """Register a MOM6 (xh/yh) curvilinear grid as 1D latitude/longitude axes.
+
+        Reads cell centers from the packaged ocean_geometry.nc, rolls longitude for
+        monotonicity, renames the native xh/yh (or xq/yq) dims to longitude/latitude,
+        and returns (i_id, j_id, var_da, var_dims) with the updated DataArray/dims.
+        """
+        logger.debug(
+            "[CMOR axis debug] Defining unstructured grid for variable %s.",
+            var_name,
+        )
+        geo_path = Path(__file__).parent.parent.parent / "data" / "ocean_geometry.nc"
+        if not geo_path.exists():
+            raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
+        ds_geo = xr.open_dataset(geo_path)
+        if "xh" in var_dims:
+            lon_raw = np.mod(ds_geo["lonh"].values, 360.0)
+        else:
+            lon_raw = np.mod(ds_geo["lonq"].values, 360.0)
+        lon_bnds_raw = bounds_from_centers_1d(lon_raw, "lon")
+        lon_vals_1d, lon_bnds, shift = roll_for_monotonic_with_bounds(
+            lon_raw, lon_bnds_raw
+        )
+        if "yh" in var_dims:
+            lat_vals_1d = ds_geo["lath"].values
+        elif "yq" in var_dims:
+            lat_vals_1d = ds_geo["latq"].values
+        else:
+            raise KeyError("Expected 'yh' or 'yq' dimension for latitude not found.")
+        # Fix first and last bounds to wrap correctly at the dateline
+        if lon_bnds.shape[0] > 1:
+            if lon_bnds[0, 0] > 0.0:
+                lon_bnds[0, 0] = 0.0
+                lon_bnds[-1, 1] = 360.0
+            lon_bnds[0, 1] = lon_bnds[1, 0]
+        i_id = cmor.axis(
+            table_entry="latitude",
+            units="degrees_north",
+            coord_vals=lat_vals_1d,
+            cell_bounds=bounds_from_centers_1d(lat_vals_1d, "lat"),
+        )
+        j_id = cmor.axis(
+            table_entry="longitude",
+            units="degrees_east",
+            coord_vals=lon_vals_1d,
+            cell_bounds=lon_bnds,
+        )
+        for dim in ("xh", "xq", "yh", "yq"):
+            if dim in var_dims:
+                logger.debug("[CMOR axis debug] renaming dim %s", dim)
+                if dim in ["xh", "xq"]:
+                    if dim == "xh":
+                        ds[str(var_name)] = var_da.roll(xh=-shift, roll_coords=True)
+                    elif dim == "xq":
+                        ds[str(var_name)] = var_da.roll(xq=-shift, roll_coords=True)
+                    ds[str(var_name)] = ds[str(var_name)].rename({dim: "longitude"})
+                if dim in ["yh", "yq"]:
+                    ds[str(var_name)] = ds[str(var_name)].rename({dim: "latitude"})
+
+        var_da = ds[str(var_name)]
+        var_dims = list(var_da.dims)
+        return i_id, j_id, var_da, var_dims
+
+    def _define_cice_grid(self, ds, var_name, var_da):
+        """Register a native CICE (nj, ni) tripole grid via cmor.grid().
+
+        The CICE grid is logically-rectangular: it carries TLAT/TLON cell centers
+        and vertex bounds (latt_bounds/lont_bounds, shape (nj, ni, nvertices))
+        inline. Defines i_index/j_index axes from the CMIP7 grids table and returns
+        the resulting grid id, which stands in for both the nj and ni dimensions.
+        """
+        logger.debug(
+            "[CMOR axis debug] Defining native CICE (nj, ni) grid for %s.",
+            var_name,
+        )
+        nj = var_da.sizes["nj"]
+        ni = var_da.sizes["ni"]
+
+        def _coord(dsi, *names):
+            for nm in names:
+                if nm in dsi.coords:
+                    return dsi.coords[nm]
+                if nm in dsi:
+                    return dsi[nm]
+            return None
+
+        tlat = _coord(ds, "TLAT", "tlat", "lat", "latitude")
+        tlon = _coord(ds, "TLON", "tlon", "lon", "longitude")
+        if tlat is None or tlon is None:
+            raise KeyError(
+                "CICE native grid requires TLAT/TLON cell-center coordinates "
+                f"in the dataset for variable '{var_name}'."
+            )
+
+        lat_bnds_da = None
+        lon_bnds_da = None
+        bname = tlat.attrs.get("bounds")
+        if isinstance(bname, str) and bname in ds:
+            lat_bnds_da = ds[bname]
+        bname = tlon.attrs.get("bounds")
+        if isinstance(bname, str) and bname in ds:
+            lon_bnds_da = ds[bname]
+        if lat_bnds_da is None:
+            lat_bnds_da = _coord(ds, "latt_bounds", "lat_bounds", "TLAT_bnds")
+        if lon_bnds_da is None:
+            lon_bnds_da = _coord(ds, "lont_bounds", "lon_bounds", "TLON_bnds")
+        if lat_bnds_da is None or lon_bnds_da is None:
+            raise KeyError(
+                "CICE native grid requires latitude/longitude vertex bounds "
+                f"(e.g. latt_bounds/lont_bounds) for variable '{var_name}'."
+            )
+
+        lat_vals = np.asarray(tlat.values, dtype="f8")
+        lon_vals = np.mod(np.asarray(tlon.values, dtype="f8"), 360.0)
+        lat_vert = np.asarray(lat_bnds_da.values, dtype="f8")
+        lon_vert = np.mod(np.asarray(lon_bnds_da.values, dtype="f8"), 360.0)
+
+        # Define the index axes and the grid against the CMIP7 grids table.
+        self.load_table(self.tables_root, "grids")
+        j_id = cmor.axis(
+            table_entry="j_index",
+            units="1",
+            coord_vals=np.arange(nj, dtype="i4"),
+        )
+        i_id = cmor.axis(
+            table_entry="i_index",
+            units="1",
+            coord_vals=np.arange(ni, dtype="i4"),
+        )
+        return cmor.grid(
+            axis_ids=[j_id, i_id],
+            latitude=lat_vals,
+            longitude=lon_vals,
+            latitude_vertices=lat_vert,
+            longitude_vertices=lon_vert,
+        )
+
     def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
         """Define CMOR axis IDs for the variable in ds according to the CMOR tables.
 
@@ -296,6 +434,7 @@ class CmorSession(
         lon_id = None
         sdepth_id = None
         lev_id = None
+        funcax_id = None
 
         logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
         has_latlon_dims = "lat" in var_dims and "lon" in var_dims
@@ -309,80 +448,16 @@ class CmorSession(
             )
         i_id = None
         j_id = None
+        grid_id = None
         if ("xh" in var_dims or "xq" in var_dims) and (
             "yh" in var_dims or "yq" in var_dims
         ):
-            # MOM6/curvilinear grid: register xh/yh as generic axes (i/j), not as lat/lon
-            # Define the native grid using the coordinate arrays
-            logger.debug(
-                "[CMOR axis debug] Defining unstructured grid for variable %s.",
-                var_name,
+            i_id, j_id, var_da, var_dims = self._define_mom6_grid(
+                ds, var_name, var_da, var_dims
             )
-            logger.debug("[CMOR axis debug] write geolon axes")
 
-            geo_path = (
-                Path(__file__).parent.parent.parent / "data" / "ocean_geometry.nc"
-            )
-            if not geo_path.exists():
-                raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
-            ds_geo = xr.open_dataset(geo_path)
-            if "xh" in var_dims:
-                lon_raw = np.mod(ds_geo["lonh"].values, 360.0)
-            else:
-                lon_raw = np.mod(ds_geo["lonq"].values, 360.0)
-            lon_bnds_raw = bounds_from_centers_1d(lon_raw, "lon")
-            lon_vals_1d, lon_bnds, shift = roll_for_monotonic_with_bounds(
-                lon_raw, lon_bnds_raw
-            )
-            if "yh" in var_dims:
-                lat_vals_1d = ds_geo["lath"].values
-            elif "yq" in var_dims:
-                lat_vals_1d = ds_geo["latq"].values
-            else:
-                raise KeyError(
-                    "Expected 'yh' or 'yq' dimension for latitude not found."
-                )
-            # Fix first and last bounds to wrap correctly
-            if lon_bnds.shape[0] > 1:
-                # Ensure bounds are strictly increasing and wrap at dateline
-                if lon_bnds[0, 0] > 0.0:
-                    # Set first lower bound to 0, last upper bound to 360
-                    lon_bnds[0, 0] = 0.0
-                    lon_bnds[-1, 1] = 360.0
-                # Also correct first upper bound to match the first cell
-                lon_bnds[0, 1] = lon_bnds[1, 0]
-            logger.debug("[CMOR axis debug] corrected lon_bnds")
-            # Print lon_bnds for a range (debug)
-            i_id = cmor.axis(
-                table_entry="latitude",
-                units="degrees_north",
-                coord_vals=lat_vals_1d,
-                cell_bounds=bounds_from_centers_1d(lat_vals_1d, "lat"),
-            )
-            logger.debug("[CMOR axis debug] write geolat axes")
-            j_id = cmor.axis(
-                table_entry="longitude",
-                units="degrees_east",
-                coord_vals=lon_vals_1d,
-                cell_bounds=lon_bnds,
-            )
-            axes_ids.extend([j_id, i_id])
-            for dim in ("xh", "xq", "yh", "yq"):
-                if dim in var_dims:
-                    # rename dims xh and yh to longitude and latitude
-                    logger.debug("[CMOR axis debug] renaming dim %s", dim)
-
-                    if dim in ["xh", "xq"]:
-                        if dim == "xh":
-                            ds[str(var_name)] = var_da.roll(xh=-shift, roll_coords=True)
-                        elif dim == "xq":
-                            ds[str(var_name)] = var_da.roll(xq=-shift, roll_coords=True)
-                        ds[str(var_name)] = ds[str(var_name)].rename({dim: "longitude"})
-                    if dim in ["yh", "yq"]:
-                        ds[str(var_name)] = ds[str(var_name)].rename({dim: "latitude"})
-
-            var_da = ds[str(var_name)]
-            var_dims = list(var_da.dims)
+        elif "nj" in var_dims and "ni" in var_dims:
+            grid_id = self._define_cice_grid(ds, var_name, var_da)
 
         # -------------------------
         # --- horizontal axes (use CMOR names) ----
@@ -649,6 +724,34 @@ class CmorSession(
                 coord_vals=np.asarray(values),
                 cell_bounds=bnds,
             )
+        # -------------------------
+        # --- functional dimension: fates_levpft
+        # -------------------------
+        elif "fates_levpft" in var_dims:
+            values = ds["fates_levpft"].values
+            logger.debug("Defining functional pft axis for variable %s", var_name)
+            logger.debug("fates_levpft values: %s", values)
+            logger.debug("Setting functional pft axis")
+            funcax_id = cmor.axis(
+                table_entry="pft",
+                units="",
+                coord_vals=np.arange(len(values))#np.asarray(values),
+            )
+
+        # -------------------------
+        # --- functional dimension: fates_levfuel
+        # -------------------------
+        elif "fates_levfuel" in var_dims:
+            values = ds["fates_levfuel"].values
+            logger.debug("Defining functional pft axis for variable %s", var_name)
+            logger.debug("fates_levfuel values: %s", values)
+            logger.debug("Setting functional pft axis")
+            funcax_id = cmor.axis(
+                table_entry="fuelclass",
+                units="",
+                coord_vals=np.arange(len(values))#np.asarray(values),
+            )
+
 
         # -------------------------
         # Map dimension names to axis IDs
@@ -669,9 +772,18 @@ class CmorSession(
             "yh": lat_id,  # MOM6
             "xq": lon_id,  # MOM6
             "yq": lat_id,  # MOM6
+            "fates_levpft": funcax_id,
+            "fates_levfuel": funcax_id,
         }
         axes_ids = []
         for d in var_dims:
+            # For the CICE native grid, the 2D cmor.grid() id stands in for both
+            # the nj and ni dimensions: map nj -> grid_id and skip ni.
+            if grid_id is not None and d == "nj":
+                axes_ids.append(grid_id)
+                continue
+            if grid_id is not None and d == "ni":
+                continue
             axis_id = dim_to_axis.get(d)
             logger.debug("[CMOR axis debug] dim '%s' → axis_id: %s", d, axis_id)
             if axis_id is None:
