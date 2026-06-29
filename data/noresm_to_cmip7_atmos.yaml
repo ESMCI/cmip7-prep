@@ -317,7 +317,15 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
-    sources: [{model_var: 'X: RHREFHT'}]
+    sources: [{model_var: 'RHREFHT:X'}]
+    table: atmos
+    units: '%'
+
+  hurs_tmin-h2m-hxy-u:
+    description: This is the relative humidity with respect to liquid water for T>
+      0 C, and with respect to ice for T<0 C.
+    dims: [lon, lat, time, height2m]
+    sources: [{model_var: 'RHREFHT:M'}]
     table: atmos
     units: '%'
 
@@ -440,8 +448,7 @@ variables:
     units: kg m-2
 
   ps_tavg-u-hxy-u:
-    description: surface pressure (not mean sea-level pressure), 2-D field to calculate
-      the 3-D pressure field from hybrid coordinates
+    description: Surface pressure, not mean sea level pressure
     dims: [lon, lat, time]
     sources: [model_var: PS]
     table: atmos

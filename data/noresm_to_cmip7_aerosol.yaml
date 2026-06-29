@@ -96,10 +96,10 @@ variables:
   cdnc_tavg-al-hxy-u:
     description: Cloud Droplet Number Concentration in liquid water clouds.
     dims: [lon, lat, lev, time]
-    formula: AWNC,AWNC/FREQL
+    formula: AWNC/FREQL
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: AWNC, model_var: AWNC, model_var: FREQL]
+    sources: [model_var: AWNC, model_var: FREQL]
     table: aerosol
     units: m-3
 
@@ -539,31 +539,43 @@ variables:
     table: aerosol
     units: m
 
+  rluscsaf_tavg-u-hxy-u:
+    description: Flux corresponding to rluscs resulting from an aerosol-free call
+      to radiation
+    dims: [lon, lat, time]
+    formula: FLNSCAF-FLDSCAF
+    sources: [model_var: FLNSCAF, model_var: FLDSCAF]
+    table: aerosol
+    units: W m-2
+
   rlutaf_tavg-u-hxy-u:
     description: Flux corresponding to rlut resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
-    sources: [model_var: FLNT_DRF]
+    formula: FSNTOAAF-FSNTAF+FLNTAF
+    sources: [model_var: FSNTOAAF, model_var: FSNTAF, model_var: FLNTAF]
     table: aerosol
     units: W m-2
 
   rlutcsaf_tavg-u-hxy-u:
     description: Flux corresponding to rlutcs resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
-    sources: [model_var: FLNTCDRF]
+    formula: FSNTOACAF-FSNTCAF+FLNTCAF
+    sources: [model_var: FSNTOACAF, model_var: FSNTCAF, model_var: FLNTCAF]
     table: aerosol
     units: W m-2
 
   rsutaf_tavg-u-hxy-u:
     description: Flux corresponding to rsut resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
-    sources: [model_var: FSNT_DRF]
+    sources: [model_var: FSUTOAAF]
     table: aerosol
     units: W m-2
 
   rsutcsaf_tavg-u-hxy-u:
     description: Flux corresponding to rsutcs resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
-    sources: [model_var: FSNTCDRF]
+    formula: SOLIN-FSNTOACAF
+    sources: [model_var: SOLIN, model_var: FSNTOACAF]
     table: aerosol
     units: W m-2
 

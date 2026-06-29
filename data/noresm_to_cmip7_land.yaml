@@ -742,6 +742,7 @@ variables:
       fire, harvest, grazing  and land use change. Positive flux  is into the land.
     dims: [lon, lat, time]
     formula: FCO2 /1000 / conv
+    positive: down
     sources: [model_var: FCO2, model_var: conv]
     table: land
     units: kg m-2 s-1
@@ -1078,6 +1079,14 @@ variables:
     sources: [model_var: DZSOI]
     table: land
     units: m
+
+  srfrad_tavg-u-hxy-u:
+    description: Net radiative flux at surface
+    dims: [lon, lat, time]
+    formula: FSNS-FLNS
+    sources: [model_var: FSNS, model_var: FLNS]
+    table: land
+    units: W m-2
 
   sw_tavg-u-hxy-lnd:
     description: Total liquid water storage, other than soil, snow or interception

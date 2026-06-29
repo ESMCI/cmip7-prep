@@ -167,10 +167,11 @@ def open_native_for_cmip_vars(
         )
         return None, None
 
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=use_cftime)
     ds = xr.open_mfdataset(
         selected,
         combine="by_coords",
-        use_cftime=use_cftime,
+        decode_times=time_coder,
         parallel=parallel,
         data_vars="minimal",
         compat="equals",
