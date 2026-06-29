@@ -764,22 +764,38 @@ def main():
     logger.info("Content dictionary obtained")
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = []
-    cmip_vars = DR.find_variables(
-        skip_if_missing=False,
-        operation="all",
-        cmip7_frequency=frequency,
-        modelling_realm=realm,
-        experiment=args.experiment,
-    )
-    cmip_vars_rich = DR.find_variables(
-        skip_if_missing=False,
-        operation="all",
-        cmip7_frequency=frequency,
-        modelling_realm=realm,
-    )
+
+    if not args.run_all_from_yaml:
+        cmip_vars = DR.find_variables(
+            skip_if_missing=False,
+            operation="all",
+            cmip7_frequency=frequency,
+            modelling_realm=realm,
+            experiment=args.experiment,
+        )
+        # The data request sometimes returns an extra '30S-90S' regional copy of a
+        # variable in addition to the global one. We don't produce that regional
+        # output, so drop those entries. Everything else (global, and any other
+        # regions such as sea-ice hemispheres) is kept as-is.
+        filtered_vars = []
+        for v in cmip_vars:
+            region = getattr(v, "region", None)           # region object, or None if missing
+            region_value = getattr(region, "value", None) # the text, e.g. 'glb' or '30S-90S'
+            if region_value == "30S-90S":
+                logger.debug("Skipping regional duplicate: %s", v)
+                continue                                  # skip this entry, don't keep it
+            filtered_vars.append(v)
+        cmip_vars = filtered_vars
+
     if args.run_all_from_yaml:
         logger.info(
             "Running with --run-all-from-yaml: assembling variables from the YAML mapping"
+        )
+        cmip_vars_rich = DR.find_variables(
+            skip_if_missing=False,
+            operation="all",
+            cmip7_frequency=frequency,
+            modelling_realm=realm,
         )
         cmip_vars, synthesized_names = assemble_yaml_defined_cmip_vars(
             mapping,
@@ -796,8 +812,7 @@ def main():
         )
         for varname in synthesized_names:
             logger.info("Synthesized variable %s from YAML mapping", varname)
-    # cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
-
+     
     # Determine cmip variables that will process
     if args.cmip_vars:
         # Make a copy of the cmip_vars from the data request
@@ -902,19 +917,23 @@ def main():
                     f"(model vars: {model_vars})"
                 )
             if args.workers == 1:
-                res = process_one_var(
-                    v,
-                    mapping,
-                    ts_files,
-                    tables_root,
-                    OUTDIR,
-                    resolution,
-                    model,
-                    realm=realm,
-                    frequency=frequency,
-                    ocn_fx_fields=ocn_fx_fields,
-                )
-                results.extend(res)
+                try:
+                    res = process_one_var(
+                        v,
+                        mapping,
+                        ts_files,
+                        tables_root,
+                        OUTDIR,
+                        resolution,
+                        model,
+                        realm=realm,
+                        frequency=frequency,
+                        ocn_fx_fields=ocn_fx_fields,
+                    )
+                    results.extend(res)
+                except Exception as exc:
+                    logger.error("FAILED variable %s: %s", v, exc)
+                    continue
             else:
                 fut = process_one_var_delayed(
                     v,
