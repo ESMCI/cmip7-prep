@@ -43,8 +43,6 @@ from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 
-from dask.distributed import LocalCluster
-from dask.distributed import wait, as_completed
 from dask import delayed
 
 logging.basicConfig(
@@ -848,6 +846,8 @@ def main():
             ml = 1.0 - float(int(ncpus_env) - 1) / 128.0
         else:
             ml = "auto"  # Default memory limit if NCPUS is not set
+        from dask.distributed import LocalCluster
+
         cluster = LocalCluster(
             n_workers=min(args.workers, len(cmip_vars)),
             threads_per_worker=1,
@@ -948,6 +948,8 @@ def main():
                     ocn_fx_fields=ocn_fx_fields,
                 )
                 futures = client.compute([fut])
+                from dask.distributed import wait, as_completed
+
                 wait(futures, timeout="1200s")
                 for _, result in as_completed(futures, with_results=True):
                     if isinstance(result, list):
