@@ -544,6 +544,7 @@ variables:
       to radiation
     dims: [lon, lat, time]
     formula: FLNSCAF-FLDSCAF
+    positive: up
     sources: [model_var: FLNSCAF, model_var: FLDSCAF]
     table: aerosol
     units: W m-2
@@ -552,6 +553,7 @@ variables:
     description: Flux corresponding to rlut resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
     formula: FSNTOAAF-FSNTAF+FLNTAF
+    positive: up
     sources: [model_var: FSNTOAAF, model_var: FSNTAF, model_var: FLNTAF]
     table: aerosol
     units: W m-2
@@ -560,6 +562,7 @@ variables:
     description: Flux corresponding to rlutcs resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
     formula: FSNTOACAF-FSNTCAF+FLNTCAF
+    positive: up
     sources: [model_var: FSNTOACAF, model_var: FSNTCAF, model_var: FLNTCAF]
     table: aerosol
     units: W m-2
@@ -567,6 +570,7 @@ variables:
   rsutaf_tavg-u-hxy-u:
     description: Flux corresponding to rsut resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
+    positive: up
     sources: [model_var: FSUTOAAF]
     table: aerosol
     units: W m-2
@@ -575,6 +579,7 @@ variables:
     description: Flux corresponding to rsutcs resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
     formula: SOLIN-FSNTOACAF
+    positive: up
     sources: [model_var: SOLIN, model_var: FSNTOACAF]
     table: aerosol
     units: W m-2
