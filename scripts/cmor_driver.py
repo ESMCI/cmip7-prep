@@ -43,9 +43,6 @@ from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 
-from data_request_api.query import data_request as dr
-from data_request_api.content import dump_transformation as dt
-
 from dask.distributed import LocalCluster
 from dask.distributed import wait, as_completed
 from dask import delayed
@@ -759,6 +756,8 @@ def main():
     # The data_request_api is a CMIP7-specific Python package that is
     # separate from CMOR itself but closely related to it.
     # It produce lists of variables requested for each CMIP7 experiment
+    from data_request_api.query import data_request as dr
+    from data_request_api.content import dump_transformation as dt
     logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
     logger.info("Content dictionary obtained")
