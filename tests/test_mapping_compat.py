@@ -157,7 +157,9 @@ def test_get_cfg_no_freq_returns_both(
     assert set(cfg["raw_variables"]) == {"siu_d", "siu"}
 
 
-def test_iter_variable_names_respects_frequency(cice_mapping):  # pylint: disable=redefined-outer-name
+def test_iter_variable_names_respects_frequency(
+    cice_mapping,
+):  # pylint: disable=redefined-outer-name
     """iter_variable_names keeps entries that support the requested frequency."""
     assert cice_mapping.iter_variable_names(freq="mon") == ["siu_tavg-u-hxy-si"]
     assert cice_mapping.iter_variable_names(freq="day") == ["siu_tavg-u-hxy-si"]

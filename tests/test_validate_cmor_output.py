@@ -9,7 +9,6 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from validate_cmor_output import (  # pylint: disable=wrong-import-position

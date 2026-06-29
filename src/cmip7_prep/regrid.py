@@ -37,8 +37,9 @@ DEFAULT_BILIN_MAP_NE30_noresm = Path(
     INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1_bilin.nc"
 )
 DEFAULT_CONS_MAP_NE16_noresm = Path(
-    #INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_aave_c260531.nc"
-    INPUTDATA_DIR_noresm / "map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
+    # INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_aave_c260531.nc"
+    INPUTDATA_DIR_noresm
+    / "map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
 )
 DEFAULT_BILIN_MAP_NE16_noresm = Path(
     INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_blin_c260531.nc"

@@ -43,11 +43,6 @@ from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 
-from data_request_api.query import data_request as dr
-from data_request_api.content import dump_transformation as dt
-
-from dask.distributed import LocalCluster
-from dask.distributed import wait, as_completed
 from dask import delayed
 
 logging.basicConfig(
@@ -66,7 +61,7 @@ _DATE_RE = re.compile(
 
 # Path for cmor tables
 # TODO: the following TABLES_cesm is no longer valid - can the TABLES_noresm be used?
-#TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+# TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
 TABLES_noresm = str(Path(__file__).parent.parent / "cmip7-cmor-tables")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -146,7 +141,9 @@ INCLUDE_PATTERN_MAP = {
             "mon": ["clm2.h0a"],
             "day": ["clm2.h1a"],
             "3hr": ["clm2.h2a"],
-            "yr":  ["clm2.h2a"] # Temporary change for WIEMIP TODO to change back ["clm2.h3a"],
+            "yr": [
+                "clm2.h2a"
+            ],  # Temporary change for WIEMIP TODO to change back ["clm2.h3a"],
         },
         "seaIce": {
             "mon": ["cice.h."],
@@ -734,7 +731,6 @@ def main():
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
 
-
     # Load and evaluate the CMIP mapping YAML file for this model and realm
     if custom_yaml := args.custom_yaml:
         logger.info(f"Using custom YAML mapping file: {custom_yaml}")
@@ -747,9 +743,7 @@ def main():
             sys.exit(1)
         yaml_filename = REALM_YAML_MAP[model].get(realm)
         if yaml_filename is None:
-            logger.error(
-                f"No YAML mapping defined for model={model}, realm={realm}"
-            )
+            logger.error(f"No YAML mapping defined for model={model}, realm={realm}")
             sys.exit(1)
         logger.info(f"Loading mapping YAML: {yaml_filename}")
         mapping = Mapping.from_packaged_default(filename=yaml_filename)
@@ -759,6 +753,9 @@ def main():
     # The data_request_api is a CMIP7-specific Python package that is
     # separate from CMOR itself but closely related to it.
     # It produce lists of variables requested for each CMIP7 experiment
+    from data_request_api.query import data_request as dr
+    from data_request_api.content import dump_transformation as dt
+
     logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
     logger.info("Content dictionary obtained")
@@ -779,11 +776,13 @@ def main():
         # regions such as sea-ice hemispheres) is kept as-is.
         filtered_vars = []
         for v in cmip_vars:
-            region = getattr(v, "region", None)           # region object, or None if missing
-            region_value = getattr(region, "value", None) # the text, e.g. 'glb' or '30S-90S'
+            region = getattr(v, "region", None)  # region object, or None if missing
+            region_value = getattr(
+                region, "value", None
+            )  # the text, e.g. 'glb' or '30S-90S'
             if region_value == "30S-90S":
                 logger.debug("Skipping regional duplicate: %s", v)
-                continue                                  # skip this entry, don't keep it
+                continue  # skip this entry, don't keep it
             filtered_vars.append(v)
         cmip_vars = filtered_vars
 
@@ -812,7 +811,7 @@ def main():
         )
         for varname in synthesized_names:
             logger.info("Synthesized variable %s from YAML mapping", varname)
-     
+
     # Determine cmip variables that will process
     if args.cmip_vars:
         # Make a copy of the cmip_vars from the data request
@@ -847,6 +846,8 @@ def main():
             ml = 1.0 - float(int(ncpus_env) - 1) / 128.0
         else:
             ml = "auto"  # Default memory limit if NCPUS is not set
+        from dask.distributed import LocalCluster
+
         cluster = LocalCluster(
             n_workers=min(args.workers, len(cmip_vars)),
             threads_per_worker=1,
@@ -861,7 +862,6 @@ def main():
             glob_pattern = f"*{include_patterns[0]}*.nc"
         else:
             glob_pattern = "*.nc"
-
 
         # Determine TABLES directory
         _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
@@ -948,6 +948,8 @@ def main():
                     ocn_fx_fields=ocn_fx_fields,
                 )
                 futures = client.compute([fut])
+                from dask.distributed import wait, as_completed
+
                 wait(futures, timeout="1200s")
                 for _, result in as_completed(futures, with_results=True):
                     if isinstance(result, list):
@@ -964,6 +966,7 @@ def main():
         client.close()
     if cluster:
         cluster.close()
+
 
 if __name__ == "__main__":
     args = parse_args()

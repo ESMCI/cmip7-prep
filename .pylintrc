@@ -9,7 +9,9 @@ disable=
     too-many-locals,
     too-many-branches,
     too-many-statements,
-    invalid-name
+    invalid-name,
+    duplicate-code,
+    fixme
 
 [FORMAT]
 max-line-length=100
