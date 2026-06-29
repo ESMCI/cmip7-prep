@@ -60,7 +60,7 @@ pip install -e .
 
 **NIRD (NorESM):**
 ```bash
-conda activate /projects/NS9560K/diagnostics/cmordev_env/
+conda activate /projects/NS9560K/diagnostics/cmordev_env_312/
 pip install -e .
 ```
 
