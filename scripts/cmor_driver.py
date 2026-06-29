@@ -917,19 +917,23 @@ def main():
                     f"(model vars: {model_vars})"
                 )
             if args.workers == 1:
-                res = process_one_var(
-                    v,
-                    mapping,
-                    ts_files,
-                    tables_root,
-                    OUTDIR,
-                    resolution,
-                    model,
-                    realm=realm,
-                    frequency=frequency,
-                    ocn_fx_fields=ocn_fx_fields,
-                )
-                results.extend(res)
+                try:
+                    res = process_one_var(
+                        v,
+                        mapping,
+                        ts_files,
+                        tables_root,
+                        OUTDIR,
+                        resolution,
+                        model,
+                        realm=realm,
+                        frequency=frequency,
+                        ocn_fx_fields=ocn_fx_fields,
+                    )
+                    results.extend(res)
+                except Exception as exc:
+                    logger.error("FAILED variable %s: %s", v, exc)
+                    continue
             else:
                 fut = process_one_var_delayed(
                     v,
