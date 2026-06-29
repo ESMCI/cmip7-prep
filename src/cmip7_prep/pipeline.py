@@ -76,12 +76,13 @@ def _collect_required_model_vars(
 
     return sorted(needed)
 
-def _open_dataset_with_cftime(files, parallel, use_cftime=True,**open_kwargs):
+
+def _open_dataset_with_cftime(files, parallel, use_cftime=True, **open_kwargs):
     time_coder = xr.coders.CFDatetimeCoder(use_cftime=use_cftime)
     return xr.open_mfdataset(
         files,
         combine="nested",
-        #combine="by_coords",
+        # combine="by_coords",
         decode_times=time_coder,
         parallel=parallel,
         data_vars="minimal",
@@ -90,6 +91,7 @@ def _open_dataset_with_cftime(files, parallel, use_cftime=True,**open_kwargs):
         concat_dim="time",
         **open_kwargs,
     )
+
 
 def open_native_for_cmip_vars(
     cmip_vars: Sequence[str],
@@ -197,10 +199,8 @@ def open_native_for_cmip_vars(
             if not subset:
                 continue
             ds = _open_dataset_with_cftime(
-                subset, 
-                parallel, use_cftime=use_cftime, 
-                **open_kwargs
-                )
+                subset, parallel, use_cftime=use_cftime, **open_kwargs
+            )
             ds_list.append(ds)
         ds = xr.merge(ds_list, compat="override")
     else:

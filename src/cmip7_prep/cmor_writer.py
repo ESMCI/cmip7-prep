@@ -736,7 +736,7 @@ class CmorSession(
             funcax_id = cmor.axis(
                 table_entry="pft",
                 units="",
-                coord_vals=np.arange(len(values))#np.asarray(values),
+                coord_vals=np.arange(len(values)),  # np.asarray(values),
             )
 
         # -------------------------
@@ -750,9 +750,8 @@ class CmorSession(
             funcax_id = cmor.axis(
                 table_entry="fuelclass",
                 units="",
-                coord_vals=np.arange(len(values))#np.asarray(values),
+                coord_vals=np.arange(len(values)),  # np.asarray(values),
             )
-
 
         # -------------------------
         # Map dimension names to axis IDs

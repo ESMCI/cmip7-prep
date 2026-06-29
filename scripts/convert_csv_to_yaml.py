@@ -30,7 +30,7 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "rsutaf_tavg-u-hxy-u": "up",
     "rsutcsaf_tavg-u-hxy-u": "up",
     "rlus_tavg-u-hxy-u": "up",
-    "rluscsaf_tavg-u-hxy-u": "up", 
+    "rluscsaf_tavg-u-hxy-u": "up",
     "rsus_tavg-u-hxy-u": "up",
     "rtmt_tavg-u-hxy-u": "down",
     "tauu_tavg-u-hxy-u": "down",
@@ -47,7 +47,7 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "evspsblveg_tavg-u-hxy-u": "up",
     "ra_tavg-u-hxy-lnd": "up",
     "fN2O_tavg-u-hxy-lnd": "up",
-    "nbp_tavg-u-hxy-lnd": "down"
+    "nbp_tavg-u-hxy-lnd": "down",
 }
 
 # ── model configurations ─────────────────────────────────────────────────────

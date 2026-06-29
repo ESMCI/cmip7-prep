@@ -1,6 +1,6 @@
 """Helpers for assembling CMIP variable lists from mappings and data-request results.
 
-Purpose mainly to be able to make cmorised variables that are not yet in the data-request, 
+Purpose mainly to be able to make cmorised variables that are not yet in the data-request,
 but which are defined in the mapping YAML. cmor_driver.py can use this
 when the run-all-from-yaml argument is true. This expands the usability of cmip7-prep
 so it can be used to generate cmorised output for additional MIPs or project related runs
@@ -118,7 +118,9 @@ def assemble_yaml_defined_cmip_vars(
     vars_by_name = {}
     template_var = None
     for var in data_request_vars:
-        branded_name = getattr(getattr(var, "branded_variable_name", None), "name", None)
+        branded_name = getattr(
+            getattr(var, "branded_variable_name", None), "name", None
+        )
         if branded_name is not None and branded_name not in vars_by_name:
             vars_by_name[branded_name] = var
         if template_var is None and hasattr(var, "dr") and hasattr(var, "attributes"):
