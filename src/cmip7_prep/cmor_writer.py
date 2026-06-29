@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Thin CMOR wrapper used by cmip7_prep.
 
 This module centralizes CMOR session setup and writing so that the rest of the
