@@ -76,6 +76,20 @@ def _collect_required_model_vars(
 
     return sorted(needed)
 
+def _open_dataset_with_cftime(files, parallel, use_cftime=True,**open_kwargs):
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=use_cftime)
+    return xr.open_mfdataset(
+        files,
+        combine="nested",
+        #combine="by_coords",
+        decode_times=time_coder,
+        parallel=parallel,
+        data_vars="minimal",
+        compat="equals",
+        coords="all",
+        concat_dim="time",
+        **open_kwargs,
+    )
 
 def open_native_for_cmip_vars(
     cmip_vars: Sequence[str],
@@ -160,26 +174,40 @@ def open_native_for_cmip_vars(
     selected = sorted(
         {str(p) for p in files if any(_filename_contains_var(p, v) for v in required)}
     )
+    multivar_multitime = False
+    found_multi_one_var = False
+    for v in required:
+        if len([p for p in selected if _filename_contains_var(p, v)]) > 1:
+            if not found_multi_one_var:
+                found_multi_one_var = True
+            else:
+                multivar_multitime = True
+                break
 
     if not selected:
         logger.warning(
             "no native inputs found for requested CMIP variables: %s", cmip_vars
         )
         return None, None
+    logger.info(required)
+    if multivar_multitime:
+        ds_list = []
+        for v in required:
+            subset = [p for p in selected if _filename_contains_var(p, v)]
+            if not subset:
+                continue
+            ds = _open_dataset_with_cftime(
+                subset, 
+                parallel, use_cftime=use_cftime, 
+                **open_kwargs
+                )
+            ds_list.append(ds)
+        ds = xr.merge(ds_list, compat="override")
+    else:
+        ds = _open_dataset_with_cftime(
+            selected, parallel, use_cftime=use_cftime, **open_kwargs
+        )
 
-    time_coder = xr.coders.CFDatetimeCoder(use_cftime=use_cftime)
-    ds = xr.open_mfdataset(
-        selected,
-        combine="by_coords",
-        decode_times=time_coder,
-        parallel=parallel,
-        data_vars="minimal",
-        compat="equals",
-        coords="all",
-        **open_kwargs,
-    )
-
-    # Convert "lev" and "ilev" units from mb to Pa for downstream operations.
     if "lev" in ds:
         ds["lev"] = ds["lev"] / 1000
     if "ilev" in ds:
