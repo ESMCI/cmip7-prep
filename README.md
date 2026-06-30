@@ -13,6 +13,17 @@ A Python library and driver script for preparing CESM and NorESM native model ou
 5. **Regridding** — Regrids from native spectral element (SE) or tripolar ocean grids to 1° lat/lon using precomputed ESMF weight files via xESMF.
 6. **CMORization** — Writes CMOR-compliant output with correct metadata, bounds, and fill values using the CMOR library.
 
+## Generating the cmor output is accomplished in three steps:
+
+**Step 1**: The yaml mapping files for both CESM/NorESM are obtained from csv files that in turn are obtained from corresponding google-sheets that are filled in by the scientists.
+The step from google-sheet to yaml file is done using the script **convert_csv_to_yaml.py** and per-realm yaml files are created. Note that for NorESM, a filter is applied the file by whether the variables have a NorESM name dependency column is filled in or not. In addition to being in the sheet, to be produce each variable needs to have all of its dependent variables in the output.
+
+**Step 2**: Time series for each realm need to be generated from the time slice files. This is done using the script **gen_timeseries.py** which creates time series files per variable and per different time frequencies.
+
+**Step 3**: Cmorised output starting from the time series files is then created by **cmor_driver.py**.  Note that each output variable also has to be a requested cmorisation variable from the cmor7 table (https://github.com/WCRP-CMIP/cmip7-cmor-tables) for the experiment in question (e.g. piControl). If it is not requested it will not be produced.
+
+
+
 ## Supported models / grids
 
 | Model  | Atmosphere grid | Ocean grid |
@@ -49,7 +60,7 @@ pip install -e .
 
 **NIRD (NorESM):**
 ```bash
-conda activate /projects/NS9560K/diagnostics/cmordev_env/
+conda activate /projects/NS9560K/diagnostics/cmordev_env_312/
 pip install -e .
 ```
 

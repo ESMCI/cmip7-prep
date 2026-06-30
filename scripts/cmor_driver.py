@@ -41,12 +41,8 @@ from cmip7_prep.pipeline import (
 )
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
+from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 
-from data_request_api.query import data_request as dr
-from data_request_api.content import dump_transformation as dt
-
-from dask.distributed import LocalCluster
-from dask.distributed import wait, as_completed
 from dask import delayed
 
 logging.basicConfig(
@@ -64,14 +60,17 @@ _DATE_RE = re.compile(
 )
 
 # Path for cmor tables
-TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
-TABLES_noresm = "/nird/datalake/NS9560K/mvertens/packages/cmip7-prep/cmip7-cmor-tables/"
+# TODO: the following TABLES_cesm is no longer valid - can the TABLES_noresm be used?
+# TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+TABLES_noresm = str(Path(__file__).parent.parent / "cmip7-cmor-tables")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 REALM_YAML_MAP = {
     "noresm": {
         "atmos": "noresm_to_cmip7_atmos.yaml",
+        "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
+        "aerosol": "noresm_to_cmip7_aerosol.yaml",
         "land": "noresm_to_cmip7_land.yaml",
         "seaIce": "noresm_to_cmip7_seaice.yaml",
     },
@@ -126,11 +125,25 @@ INCLUDE_PATTERN_MAP = {
             "6hr": ["cam.h2a"],
             "3hr": ["cam.h4a"],
         },
+        "atmosChem": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h4a"],
+        },
+        "aerosol": {
+            "mon": ["cam.h0a"],
+            "day": ["cam.h1a"],
+            "6hr": ["cam.h2a"],
+            "3hr": ["cam.h4a"],
+        },
         "land": {
             "mon": ["clm2.h0a"],
             "day": ["clm2.h1a"],
             "3hr": ["clm2.h2a"],
-            "yr": ["clm2.h3a"],
+            "yr": [
+                "clm2.h2a"
+            ],  # Temporary change for WIEMIP TODO to change back ["clm2.h3a"],
         },
         "seaIce": {
             "mon": ["cice.h."],
@@ -267,6 +280,11 @@ def parse_args():
         default=None,
         help="Path to cmip7-cmor-tables directory (optional, overrides model-specific default)",
     )
+    parser.add_argument(
+        "--run-all-from-yaml",
+        action="store_true",
+        help="Override CMIP7 data request variable list and run all variables defined in the YAML mapping file",
+    )
 
     args = parser.parse_args()
     return args
@@ -277,6 +295,13 @@ def get_version():
     from cmip7_prep import __version__
 
     return __version__
+
+
+def _priority_for_logging(data_request, cmip_var) -> str:
+    """Return a stable priority label for logs, including synthetic variables."""
+    if getattr(cmip_var, "is_synthetic", False):
+        return "synthetic-from-yaml"
+    return str(data_request.find_priority_per_variable(variable=cmip_var))
 
 
 def process_one_var(
@@ -397,7 +422,10 @@ def process_one_var(
                 results.append(
                     (str(varname), "analyzed native mom6 grid (realize applied)")
                 )
-            elif realm == "seaIce" and len(dims) == 1:
+            elif realm == "seaIce" and (model == "noresm" or len(dims) == 1):
+                # NorESM seaIce is always kept on the native CICE (nj, ni) grid:
+                # no regridding, regardless of dims. CESM seaIce keeps the prior
+                # behavior (native only for scalar/integrated len(dims) == 1 vars).
                 logger.info(
                     f"Preparing seaIce field variants via realize_all for {varname}"
                 )
@@ -409,6 +437,15 @@ def process_one_var(
                     )
                     if "time_bounds" in ds_native and "time_bounds" not in ds_v:
                         ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
+                    # Carry the native CICE grid definition (cell centers + vertex
+                    # bounds) into the trimmed variant dataset, but only for 2D
+                    # (nj, ni) variants that are written on the native grid. TLAT/TLON
+                    # ride along as coords, but the *_bounds vars are data_vars and
+                    # would be dropped by the realize_all projection.
+                    if "nj" in da.dims and "ni" in da.dims:
+                        for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+                            if gname in ds_native and gname not in ds_v:
+                                ds_v = ds_v.assign({gname: ds_native[gname]})
                     cmor_items.append((ds_v, variant_cfg))
                 results.append(
                     (
@@ -694,24 +731,86 @@ def main():
     if not os.path.exists(str(OUTDIR)):
         os.makedirs(str(OUTDIR))
 
+    # Load and evaluate the CMIP mapping YAML file for this model and realm
+    if custom_yaml := args.custom_yaml:
+        logger.info(f"Using custom YAML mapping file: {custom_yaml}")
+        mapping = Mapping.from_yaml(custom_yaml)
+    else:
+        if model not in REALM_YAML_MAP:
+            logger.error(
+                f"Unknown model '{model}': must be one of {list(REALM_YAML_MAP)}"
+            )
+            sys.exit(1)
+        yaml_filename = REALM_YAML_MAP[model].get(realm)
+        if yaml_filename is None:
+            logger.error(f"No YAML mapping defined for model={model}, realm={realm}")
+            sys.exit(1)
+        logger.info(f"Loading mapping YAML: {yaml_filename}")
+        mapping = Mapping.from_packaged_default(filename=yaml_filename)
+    mapping.default_freq = frequency
+
     # Load all possible cmip vars for this realm and this experiment
     # The data_request_api is a CMIP7-specific Python package that is
     # separate from CMOR itself but closely related to it.
     # It produce lists of variables requested for each CMIP7 experiment
+    from data_request_api.query import data_request as dr
+    from data_request_api.content import dump_transformation as dt
+
     logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
     logger.info("Content dictionary obtained")
     DR = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = []
-    print(DR.get_experiments())
-    cmip_vars = DR.find_variables(
-        skip_if_missing=False,
-        operation="all",
-        cmip7_frequency=frequency,
-        modelling_realm=realm,
-        experiment=args.experiment,
-    )
-    # cmip_vars = [var for var in cmip_vars if getattr(var, "region", "") == "glb"]
+
+    if not args.run_all_from_yaml:
+        cmip_vars = DR.find_variables(
+            skip_if_missing=False,
+            operation="all",
+            cmip7_frequency=frequency,
+            modelling_realm=realm,
+            experiment=args.experiment,
+        )
+        # The data request sometimes returns an extra '30S-90S' regional copy of a
+        # variable in addition to the global one. We don't produce that regional
+        # output, so drop those entries. Everything else (global, and any other
+        # regions such as sea-ice hemispheres) is kept as-is.
+        filtered_vars = []
+        for v in cmip_vars:
+            region = getattr(v, "region", None)  # region object, or None if missing
+            region_value = getattr(
+                region, "value", None
+            )  # the text, e.g. 'glb' or '30S-90S'
+            if region_value == "30S-90S":
+                logger.debug("Skipping regional duplicate: %s", v)
+                continue  # skip this entry, don't keep it
+            filtered_vars.append(v)
+        cmip_vars = filtered_vars
+
+    if args.run_all_from_yaml:
+        logger.info(
+            "Running with --run-all-from-yaml: assembling variables from the YAML mapping"
+        )
+        cmip_vars_rich = DR.find_variables(
+            skip_if_missing=False,
+            operation="all",
+            cmip7_frequency=frequency,
+            modelling_realm=realm,
+        )
+        cmip_vars, synthesized_names = assemble_yaml_defined_cmip_vars(
+            mapping,
+            cmip_vars_rich,
+            data_request=DR,
+            freq=frequency,
+            realm=realm,
+        )
+        logger.info(
+            "Resolved %s YAML variables: %s reused from data request, %s synthesized",
+            len(cmip_vars),
+            len(cmip_vars) - len(synthesized_names),
+            len(synthesized_names),
+        )
+        for varname in synthesized_names:
+            logger.info("Synthesized variable %s from YAML mapping", varname)
 
     # Determine cmip variables that will process
     if args.cmip_vars:
@@ -729,7 +828,7 @@ def main():
                 logger.info(
                     "Adding variable %s with priority %s",
                     var.branded_variable_name.name,
-                    DR.find_priority_per_variable(variable=var),
+                    _priority_for_logging(DR, var),
                 )
                 if var.branded_variable_name.name not in [
                     v.branded_variable_name.name for v in cmip_vars
@@ -747,6 +846,8 @@ def main():
             ml = 1.0 - float(int(ncpus_env) - 1) / 128.0
         else:
             ml = "auto"  # Default memory limit if NCPUS is not set
+        from dask.distributed import LocalCluster
+
         cluster = LocalCluster(
             n_workers=min(args.workers, len(cmip_vars)),
             threads_per_worker=1,
@@ -761,26 +862,6 @@ def main():
             glob_pattern = f"*{include_patterns[0]}*.nc"
         else:
             glob_pattern = "*.nc"
-
-        # Load and evaluate the CMIP mapping YAML file for this model and realm
-        if custom_yaml := args.custom_yaml:
-            logger.info(f"Using custom YAML mapping file: {custom_yaml}")
-            mapping = Mapping.from_yaml(custom_yaml)
-        else:
-            if model not in REALM_YAML_MAP:
-                logger.error(
-                    f"Unknown model '{model}': must be one of {list(REALM_YAML_MAP)}"
-                )
-                sys.exit(1)
-            yaml_filename = REALM_YAML_MAP[model].get(realm)
-            if yaml_filename is None:
-                logger.error(
-                    f"No YAML mapping defined for model={model}, realm={realm}"
-                )
-                sys.exit(1)
-            logger.info(f"Loading mapping YAML: {yaml_filename}")
-            mapping = Mapping.from_packaged_default(filename=yaml_filename)
-        mapping.default_freq = frequency
 
         # Determine TABLES directory
         _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
@@ -836,19 +917,23 @@ def main():
                     f"(model vars: {model_vars})"
                 )
             if args.workers == 1:
-                res = process_one_var(
-                    v,
-                    mapping,
-                    ts_files,
-                    tables_root,
-                    OUTDIR,
-                    resolution,
-                    model,
-                    realm=realm,
-                    frequency=frequency,
-                    ocn_fx_fields=ocn_fx_fields,
-                )
-                results.extend(res)
+                try:
+                    res = process_one_var(
+                        v,
+                        mapping,
+                        ts_files,
+                        tables_root,
+                        OUTDIR,
+                        resolution,
+                        model,
+                        realm=realm,
+                        frequency=frequency,
+                        ocn_fx_fields=ocn_fx_fields,
+                    )
+                    results.extend(res)
+                except Exception as exc:
+                    logger.error("FAILED variable %s: %s", v, exc)
+                    continue
             else:
                 fut = process_one_var_delayed(
                     v,
@@ -863,6 +948,8 @@ def main():
                     ocn_fx_fields=ocn_fx_fields,
                 )
                 futures = client.compute([fut])
+                from dask.distributed import wait, as_completed
+
                 wait(futures, timeout="1200s")
                 for _, result in as_completed(futures, with_results=True):
                     if isinstance(result, list):

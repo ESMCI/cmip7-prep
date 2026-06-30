@@ -23,7 +23,6 @@ import json
 import logging
 import re
 import sys
-import glob
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -196,13 +195,13 @@ def canonical_realm(realm: str) -> str:
 def resolve_cmip_root(root_output_path: str | Path) -> Path:
     """Resolve the CMIP7 root directory from either a parent or direct path."""
     root = Path(root_output_path).expanduser().resolve()
-    if root.name == "CMIP7" and (root / "CMIP").is_dir():
+    if (root / "CMIP").is_dir():
         return root
     cmip_root = root / "CMIP7"
-    if cmip_root.is_dir() and (cmip_root / "CMIP").is_dir():
+    if (cmip_root / "CMIP").is_dir():
         return cmip_root
     raise FileNotFoundError(
-        f"Could not locate CMIP7/CMIP under {root}. Expected either {root / 'CMIP7'} or a direct CMIP7 path."
+        f"Could not locate CMIP output under {root}. Expected either {root / 'CMIP7' / 'CMIP'} or {root / 'CMIP'}."
     )
 
 
@@ -273,14 +272,14 @@ def get_requested_variables(
         frequency,
     )
     content_dic = dt.get_transformed_content()
-    print(content_dic)
+    logger.debug(content_dic)
     data_request = dr.DataRequest.from_separated_inputs(**content_dic)
     cmip_vars = data_request.find_variables(
         skip_if_missing=False,
         operation="all",
         cmip7_frequency=frequency,
         modelling_realm=realm,
-        # experiment=experiment,
+        experiment=experiment,
     )
     return {var.branded_variable_name.name for var in cmip_vars}
 
@@ -388,33 +387,19 @@ def scan_output_tree(
     experiment: str,
     frequency: str,
     expected_variables: set[str],
-    ensemble_member: str | None,
-    resolution: str | None,
+    ensemble_member: str | None = None,
+    resolution: str | None = None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
     """Scan the CMIP7 tree and inventory produced files for the selected subset."""
     produced: dict[str, list[Path]] = defaultdict(list)
     inventory: list[ProducedFileRecord] = []
     inspection_errors: list[dict[str, str]] = []
-    print(cmip_root)
     institution_id = MODEL_NAMING_MAPS[model][0]
-    print(
-        f"{cmip_root}/CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
-    )
-    print(
-        glob.glob(
-            f"{cmip_root}/CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
-        )
-    )
     pattern = cmip_root.glob(
         f"CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
     )
-    # print(list(pattern))
-    # sys.exit(4)
-    print(expected_variables)
-    # sys.exit(4)
     for file_path in sorted(pattern):
         relative = file_path.relative_to(cmip_root)
-        print(relative)
         # sys.exit(4)
         parts = relative.parts
         if len(parts) < 11:
@@ -434,23 +419,22 @@ def scan_output_tree(
             grid_type,
             _,
         ) = parts[:11]
-
         if institution_id and consortium != institution_id:
-            print("Skipping due to institution_id filter: %s", institution_id)
+            logger.debug("Skipping due to institution_id filter: %s", institution_id)
             continue
         if ensemble_member and path_ensemble != ensemble_member:
-            print("Skipping due to ensemble filter: %s", ensemble_member)
+            logger.debug("Skipping due to ensemble filter: %s", ensemble_member)
             continue
         if (
             expected_variables
             and f"{variable}_{dimension_folder}" not in expected_variables
         ):
-            print("Skipping due to expected_variables filter: %s", variable)
+            logger.debug("Skipping due to expected_variables filter: %s", variable)
             continue
         if not path_matches_resolution(
             resolution, dimension_folder, grid_type, file_path.name
         ):
-            print("Skipping due to resolution filter: %s", resolution)
+            logger.debug("Skipping due to resolution filter: %s", resolution)
             continue
 
         produced[variable].append(file_path)

@@ -9,7 +9,6 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from validate_cmor_output import (  # pylint: disable=wrong-import-position
@@ -30,9 +29,10 @@ def test_resolve_cmip_root_accepts_parent(tmp_path):
 
 def test_resolve_cmip_root_accepts_direct_cmip7(tmp_path):
     """A direct CMIP7 path resolves unchanged."""
-    cmip_root = tmp_path / "CMIP"
+    cmip_root = tmp_path / "CMIP7" / "CMIP"
     cmip_root.mkdir(parents=True)
-    assert resolve_cmip_root(tmp_path) == tmp_path
+    print(resolve_cmip_root(tmp_path))
+    assert resolve_cmip_root(tmp_path) == tmp_path / "CMIP7"
 
 
 def test_parse_log_variable_extracts_variable_name():
@@ -63,7 +63,7 @@ def test_scan_output_tree_inventories_dims(tmp_path):
         / "CMIP7"
         / "CMIP"
         / "NCC"
-        / "noresm"
+        / "NorESM3"
         / "piControl"
         / "r1i1p1f1"
         / "glb"
@@ -94,9 +94,8 @@ def test_scan_output_tree_inventories_dims(tmp_path):
         model="noresm",
         experiment="piControl",
         frequency="mon",
-        expected_variables={"tas"},
+        expected_variables={"tas_hxy"},
         ensemble_member=None,
-        institution_id=None,
         resolution=None,
     )
 

@@ -157,6 +157,41 @@ def test_get_cfg_no_freq_returns_both(
     assert set(cfg["raw_variables"]) == {"siu_d", "siu"}
 
 
+def test_iter_variable_names_respects_frequency(
+    cice_mapping,
+):  # pylint: disable=redefined-outer-name
+    """iter_variable_names keeps entries that support the requested frequency."""
+    assert cice_mapping.iter_variable_names(freq="mon") == ["siu_tavg-u-hxy-si"]
+    assert cice_mapping.iter_variable_names(freq="day") == ["siu_tavg-u-hxy-si"]
+
+
+def test_iter_variable_names_skips_incompatible_frequency(tmp_path):
+    """iter_variable_names excludes entries tagged only for other frequencies."""
+    yaml_str = """
+variables:
+  tas:
+    table: Amon
+    sources:
+      - model_var: T2M
+        freq: mon
+  pr:
+    table: Amon
+    sources:
+      - model_var: PRECT
+        freq: day
+  ps:
+    table: Amon
+    sources:
+      - model_var: PS
+"""
+    path = tmp_path / "freq_filter.yaml"
+    path.write_text(yaml_str)
+    mapping = Mapping(path)
+
+    assert mapping.iter_variable_names(freq="mon") == ["tas", "ps"]
+    assert mapping.iter_variable_names(freq="day") == ["pr", "ps"]
+
+
 def test_realize_mon_picks_correct_var(
     cice_mapping,
 ):  # pylint: disable=redefined-outer-name
@@ -360,3 +395,10 @@ def test_realize_all_non_variant_single_element(
     assert len(results) == 1
     da, _ = results[0]
     assert float(da.mean()) == pytest.approx(1.0)
+
+
+def test_iter_variable_names_variant_entry_stays_visible(
+    siarea_mapping,
+):  # pylint: disable=redefined-outer-name
+    """Variant-backed variables are returned once as their top-level YAML key."""
+    assert siarea_mapping.iter_variable_names(freq="mon") == ["siarea_tavg-u-hm-u"]

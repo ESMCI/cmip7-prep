@@ -18,6 +18,8 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "rls_tavg-u-hxy-u": "up",
     "rlut_tavg-u-hxy-u": "up",
     "rlutcs_tavg-u-hxy-u": "up",
+    "rlutaf_tavg-u-hxy-u": "up",
+    "rlutcsaf_tavg-u-hxy-u": "up",
     "rsds_tavg-u-hxy-u": "up",
     "rsdscs_tavg-u-hxy-u": "up",
     "rsdt_tavg-u-hxy-u": "up",
@@ -25,7 +27,10 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "rsuscs_tavg-u-hxy-u": "up",
     "rsutcs_tavg-u-hxy-u": "up",
     "rsut_tavg-u-hxy-u": "up",
+    "rsutaf_tavg-u-hxy-u": "up",
+    "rsutcsaf_tavg-u-hxy-u": "up",
     "rlus_tavg-u-hxy-u": "up",
+    "rluscsaf_tavg-u-hxy-u": "up",
     "rsus_tavg-u-hxy-u": "up",
     "rtmt_tavg-u-hxy-u": "down",
     "tauu_tavg-u-hxy-u": "down",
@@ -40,6 +45,9 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "tran_tavg-u-hxy-lnd": "up",
     "evspsblsoi_tavg-u-hxy-u": "up",
     "evspsblveg_tavg-u-hxy-u": "up",
+    "ra_tavg-u-hxy-lnd": "up",
+    "fN2O_tavg-u-hxy-lnd": "up",
+    "nbp_tavg-u-hxy-lnd": "down",
 }
 
 # ── model configurations ─────────────────────────────────────────────────────
@@ -78,6 +86,8 @@ MODEL_CONFIGS = {
         "realm_outputs": {
             "atmos": "noresm_to_cmip7_atmos.yaml",
             "land": "noresm_to_cmip7_land.yaml",
+            "aerosol": "noresm_to_cmip7_aerosol.yaml",
+            "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
         },
         "source_column": "NorESM3 name (dependency)",
         "source_skip_phrases": [
@@ -129,6 +139,8 @@ MODEL_CONFIGS = {
         "realm_column": "Table",
         "realm_outputs": {
             "atmos": "cesm_to_cmip7_atmos.yaml",
+            "atmosChem": "cesm_to_cmip7_atmosChem.yaml",
+            "aerosol": "cesm_to_cmip7_aerosol.yaml",
             "land": "cesm_to_cmip7_land.yaml",
             "seaIce": "cesm_to_cmip7_seaice.yaml",
             "ocean": "cesm_to_cmip7_ocean.yaml",
@@ -391,8 +403,14 @@ def sum_dim_detect(variable):
         return "fates_levpft"
     if variable.startswith("FATES") and variable.endswith("LU"):
         return "fates_levlanduse"
+    if variable.startswith("FATES") and variable.endswith("DC"):
+        return "fates_levcwdsc"
+    if variable.startswith("FATES") and variable.endswith("EL"):
+        return "fates_levelem"
     if variable == "PCT_LANDUNIT":
         return "ltype"
+    if variable.startswith("FATES") and variable.endswith("SZ"):
+        return "fates_levscls"
     return "lev"
 
 
@@ -528,6 +546,10 @@ def _build_entry(row, config):
                     dims = clean_strings(value.split(","), normalize)
             else:
                 dims = clean_strings(value.split(","), normalize)
+
+            if "pft" in dims:
+                pft_to_vegtype = True
+                dims = ["vegtype" if d == "pft" else d for d in dims]
             entry["dims"] = dims
             # Only search for plev in flat string lists; nested lists are left intact.
             plev_dim = next(
@@ -551,7 +573,7 @@ def _build_entry(row, config):
             entry["units"] = fix_number_norwegian_format(value)
         elif yaml_key == "_source_expr":
             names = _parse_csv_identifiers(value)
-            if names is not None:
+            if names is not None and "FATES" not in value:
                 # New format: comma-separated plain variable names.
                 # Freq/Alias will be merged in post-processing.
                 entry["sources"] = [{"model_var": n} for n in names]

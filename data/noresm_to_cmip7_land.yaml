@@ -51,7 +51,8 @@ variables:
   cLeaf_tavg-u-hxy-lnd:
     description: Carbon mass per unit area in leaves.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LEAFC]
+    formula: (FATES_LEAFC)*FATES_FRACTION
+    sources: [model_var: FATES_LEAFC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
@@ -60,7 +61,8 @@ variables:
       dead organic matter composed of coarse wood. It is distinct from fine litter.
       The precise distinction between "fine" and "coarse" is model dependent.'
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LITTER_BG_CWD_EL]
+    formula: (FATES_LITTER_BG_CWD_EL)*FATES_FRACTION
+    sources: [model_var: FATES_LITTER_BG_CWD_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
@@ -77,14 +79,16 @@ variables:
     description: Surface or near-surface litter pool fed by leaf and above-ground
       litterfall
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LITTER_AG_FINE_EL]
+    formula: (FATES_LITTER_AG_FINE_EL)*FATES_FRACTION
+    sources: [model_var: FATES_LITTER_AG_FINE_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
   cOther_tavg-u-hxy-lnd:
     description: E.g. fruits, seeds, etc.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_SEED_BANK]
+    formula: (FATES_SEED_BANK)*FATES_FRACTION
+    sources: [model_var: FATES_SEED_BANK, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
@@ -133,7 +137,8 @@ variables:
   cStem_tavg-u-hxy-lnd:
     description: including sapwood and hardwood.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_STRUCTC]
+    formula: (FATES_STRUCTC)*FATES_FRACTION
+    sources: [model_var: FATES_STRUCTC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
 
@@ -178,7 +183,8 @@ variables:
   cnc_tavg-u-hxy-u:
     description: Canopy covered fraction
     dims: [lon, lat, time]
-    sources: [model_var: FATES_AREA_PLANTS]
+    formula: (FATES_AREA_PLANTS)*FATES_FRACTION
+    sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -269,14 +275,16 @@ variables:
     description: From all sources,  Including natural, anthropogenic and Land-use
       change. Only total fire emissions can be compared to observations.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_FIRE_CLOSS]
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
   fFireNat_tavg-u-hxy-lnd:
     description: CO2 emissions from natural fires
     dims: [lon, lat, time]
-    sources: [model_var: FATES_FIRE_CLOSS]
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -286,8 +294,9 @@ variables:
       any CO2 flux from fire included in fLuc, defined below (CO2 Flux to Atmosphere
       from Land Use Change).
     dims: [lon, lat, time]
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
     positive: up
-    sources: [model_var: FATES_FIRE_CLOSS]
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -295,7 +304,8 @@ variables:
     description: Carbon mass flux per unit area into soil from litter (dead plant
       material in or above the soil).
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LITTER_OUT_EL]
+    formula: (FATES_LITTER_OUT_EL)*FATES_FRACTION
+    sources: [model_var: FATES_LITTER_OUT_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -322,6 +332,7 @@ variables:
       soil), soil.
     dims: [lon, lat, time]
     formula: F_N2O_DENIT+F_N2O_NIT
+    positive: up
     sources: [model_var: F_N2O_DENIT, model_var: F_N2O_NIT]
     table: land
     units: kg m-2 s-1
@@ -444,7 +455,8 @@ variables:
     description: Required for unambiguous separation of vegetation and soil + litter
       turnover times, since total fire flux draws from both sources
     dims: [lon, lat, time]
-    sources: [model_var: FATES_FIRE_CLOSS]
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -477,7 +489,8 @@ variables:
       standard names mass_flux_of_carbon_into_litter_from_vegetation_due_to_mortality
       and mass_flux_of_carbon_into_litter_from_vegetation_due_to_senescence is mass_flux_of_carbon_into_litter_from_vegetation.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LITTER_IN_EL]
+    formula: (FATES_LITTER_IN_EL)*FATES_FRACTION
+    sources: [model_var: FATES_LITTER_IN_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -494,14 +507,16 @@ variables:
     description: Cumulative percentage transitions over the year; note that percentage
       should be reported as a percentage of atmospheric grid cell
     dims: [lon, lat, landuse, time]
-    sources: [model_var: FATES_TRANSITION_MATRIX_LULU]
+    formula: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
+    sources: [model_var: FATES_TRANSITION_MATRIX_LULU, model_var: FATES_FRACTION]
     table: land
     units: '%'
   fracOutLut_tsum-u-hxy-lnd:
     description: Cumulative percentage transitions over the year; note that percentage
       should be reported as percentage of atmospheric grid cell
     dims: [lon, lat, landuse, time]
-    sources: [model_var: FATES_TRANSITION_MATRIX_LULU]
+    formula: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
+    sources: [model_var: FATES_TRANSITION_MATRIX_LULU, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -512,7 +527,8 @@ variables:
       this biomass and the difference is referred to as the net primary production.
       Reported on land-use tiles.
     dims: [lon, lat, landuse, time]
-    sources: [model_var: FATES_GPP_LU]
+    formula: (FATES_GPP_LU)*FATES_FRACTION
+    sources: [model_var: FATES_GPP_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -522,7 +538,8 @@ variables:
       photosynthesis in plants or phytoplankton. The producers also respire some of
       this biomass and the difference is referred to as the net primary production.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_GPP]
+    formula: (FATES_GPP)*FATES_FRACTION
+    sources: [model_var: FATES_GPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -553,7 +570,7 @@ variables:
   grassFracC3_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C3 natural grass.
     dims: [lon, lat, time, typec3natg]
-    formula: (sumoverpft(FATES_CROWNAREA_PF, pftlist=[12, 13], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (FATES_CROWNAREA_PF(12+13))*FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -586,7 +603,8 @@ variables:
     description: A ratio obtained by dividing the total upper leaf surface area of
       vegetation by the (horizontal) surface area of the land on which it grows.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LAI]
+    formula: (FATES_LAI)*FATES_FRACTION
+    sources: [model_var: FATES_LAI, model_var: FATES_FRACTION]
     table: land
     units: '1'
 
@@ -724,6 +742,7 @@ variables:
       fire, harvest, grazing  and land use change. Positive flux  is into the land.
     dims: [lon, lat, time]
     formula: FCO2 /1000 / conv
+    positive: down
     sources: [model_var: FCO2, model_var: conv]
     table: land
     units: kg m-2 s-1
@@ -738,7 +757,8 @@ variables:
   nppLeaf_tavg-u-hxy-lnd:
     description: This is the rate of carbon uptake by leaves due to NPP
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LEAF_ALLOC]
+    formula: (FATES_LEAF_ALLOC)*FATES_FRACTION
+    sources: [model_var: FATES_LEAF_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -754,7 +774,8 @@ variables:
       solely with respect to the B contained in A, neglecting all other chemical constituents
       of A.'
     dims: [lon, lat, landuse, time]
-    sources: [model_var: FATES_NPP_LU]
+    formula: (FATES_NPP_LU)*FATES_FRACTION
+    sources: [model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -777,7 +798,8 @@ variables:
   nppStem_tavg-u-hxy-lnd:
     description: added for completeness with npp_root
     dims: [lon, lat, time]
-    sources: [model_var: FATES_STEM_ALLOC]
+    formula: (FATES_STEM_ALLOC)*FATES_FRACTION
+    sources: [model_var: FATES_STEM_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -793,8 +815,9 @@ variables:
       solely with respect to the B contained in A, neglecting all other chemical constituents
       of A.'
     dims: [lon, lat, time]
+    formula: (FATES_NPP)*FATES_FRACTION
     positive: up
-    sources: [model_var: FATES_NPP]
+    sources: [model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -868,7 +891,8 @@ variables:
   raLeaf_tavg-u-hxy-lnd:
     description: added for completeness with Ra_root
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LEAFMAINTAR]
+    formula: (FATES_LEAFMAINTAR)*FATES_FRACTION
+    sources: [model_var: FATES_LEAFMAINTAR, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -895,7 +919,8 @@ variables:
   raStem_tavg-u-hxy-lnd:
     description: added for completeness with Ra_root
     dims: [lon, lat, time]
-    sources: [model_var: FATES_LSTEMMAINTAR]
+    formula: (FATES_LSTEMMAINTAR)*FATES_FRACTION
+    sources: [model_var: FATES_LSTEMMAINTAR, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -904,7 +929,8 @@ variables:
       respiration on land (respiration by producers) [see rh for heterotrophic production].
       Calculated on vegetation type.
     dims: [lon, lat, vegtype, time]
-    sources: [model_var: FATES_AUTORESP]
+    formula: (FATES_AUTORESP)*FATES_FRACTION
+    sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -913,6 +939,7 @@ variables:
       respiration on land (respiration by producers) [see rh for heterotrophic production]
     dims: [lon, lat, time]
     formula: FATES_AUTORESP*FATES_FRACTIONTION
+    positive: up
     sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTIONTION]
     table: land
     units: kg m-2 s-1
@@ -974,7 +1001,8 @@ variables:
     description: Carbon mass flux per unit area into atmosphere due to heterotrophic
       respiration on land (respiration by consumers), calculated on vegetation type.
     dims: [lon, lat, vegtype, time]
-    sources: [model_var: FATES_HET_RESP]
+    formula: (FATES_HET_RESP)*FATES_FRACTION
+    sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -1051,6 +1079,14 @@ variables:
     sources: [model_var: DZSOI]
     table: land
     units: m
+
+  srfrad_tavg-u-hxy-u:
+    description: Net radiative flux at surface
+    dims: [lon, lat, time]
+    formula: FSNS-FLNS
+    sources: [model_var: FSNS, model_var: FLNS]
+    table: land
+    units: W m-2
 
   sw_tavg-u-hxy-lnd:
     description: Total liquid water storage, other than soil, snow or interception
@@ -1176,14 +1212,16 @@ variables:
     description: Percentage of grid cell that is covered by vegetation.This SHOULD
       be the sum of tree, grass (natural and pasture), crop and shrub fractions.
     dims: [lon, lat, time, typeveg]
-    sources: [model_var: FATES_AREA_PLANTS]
+    formula: (FATES_AREA_PLANTS)*FATES_FRACTION
+    sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
   vegHeight_tavg-u-hxy-ng:
     description: Vegetation height averaged over the grass fraction of a grid cell.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT]
+    formula: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
+    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT, model_var: FATES_FRACTION]
     table: land
     units: m
 
@@ -1191,7 +1229,8 @@ variables:
     description: Vegetation height averaged over all vegetation types and over the
       vegetated fraction of a grid cell.
     dims: [lon, lat, time]
-    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT]
+    formula: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
+    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT, model_var: FATES_FRACTION]
     table: land
     units: m
 
