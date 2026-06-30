@@ -50,7 +50,7 @@ CANONICAL_REALM_MAP = {
 }
 
 LOG_NAME_RE = re.compile(r"^cmor_\d{8}T\d{6}Z_(?P<variable>.+)\.log$")
-LOG_ERROR_RE = re.compile(r"\b(error|exception|traceback|fatal)\b", re.IGNORECASE)
+LOG_ERROR_RE = re.compile(r"Error: ", re.IGNORECASE)
 LOG_SUCCESS_RE = re.compile(r"\b(success|complete(?:d)?|finished)\b", re.IGNORECASE)
 
 
@@ -340,6 +340,7 @@ def collect_log_records(
             continue
         if expected_variables and record.variable not in expected_variables:
             continue
+
         records[record.variable].append(record)
     return records
 
@@ -649,7 +650,7 @@ def create_timeseries_plots(
             axis.tick_params(axis="x", rotation=30)
             axis.set_xlabel("Time (years)")
             axis.set_ylabel(
-                f"{variable.split("_")[0]} ({series.attrs.get('units', 'unknown')})"
+                f"{variable.split('_')[0]} ({series.attrs.get('units', 'unknown')})"
             )
         for axis in axes.flat[len(page_variables) :]:
             axis.set_axis_off()

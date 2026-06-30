@@ -99,7 +99,7 @@ def test_scan_output_tree_inventories_dims(tmp_path):
         resolution=None,
     )
 
-    assert sorted(produced) == ["tas"]
+    assert sorted(produced) == ["tas_hxy"]
     assert not errors
     summary = summarize_dimension_inventory(inventory)
     assert summary[0]["variable"] == "tas"
