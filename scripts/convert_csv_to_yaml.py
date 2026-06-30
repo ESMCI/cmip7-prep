@@ -93,6 +93,7 @@ MODEL_CONFIGS = {
         "source_skip_phrases": [
             "?",
             "n/a",
+            "#N/A",
             "derived",
             "IN SURF DATASET",
             "can be derived",
