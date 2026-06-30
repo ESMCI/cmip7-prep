@@ -28,6 +28,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import xarray as xr
 import yaml
 
@@ -279,7 +280,7 @@ def get_requested_variables(
         operation="all",
         cmip7_frequency=frequency,
         modelling_realm=realm,
-        experiment=experiment,
+        experiment=experiment.lower(),
     )
     return {var.branded_variable_name.name for var in cmip_vars}
 
@@ -419,6 +420,7 @@ def scan_output_tree(
             grid_type,
             _,
         ) = parts[:11]
+
         if institution_id and consortium != institution_id:
             logger.debug("Skipping due to institution_id filter: %s", institution_id)
             continue
@@ -431,13 +433,13 @@ def scan_output_tree(
         ):
             logger.debug("Skipping due to expected_variables filter: %s", variable)
             continue
-        if not path_matches_resolution(
-            resolution, dimension_folder, grid_type, file_path.name
-        ):
-            logger.debug("Skipping due to resolution filter: %s", resolution)
-            continue
-
-        produced[variable].append(file_path)
+        # if not path_matches_resolution(
+        #     resolution, dimension_folder, grid_type, file_path.name
+        # ):
+        #     print("Skipping due to resolution filter: %s", resolution)
+        #     logger.debug("Skipping due to resolution filter: %s", resolution)
+        #     continue
+        produced[f"{variable}_{dimension_folder}"].append(file_path)
         try:
             data_var, dims, sizes = open_dataset_inventory(file_path, variable)
         except Exception as exc:  # pylint: disable=broad-except
@@ -632,7 +634,9 @@ def create_timeseries_plots(
         page_variables = variables[page_index : page_index + page_size]
         fig, axes = plt.subplots(3, 3, figsize=(15, 11), squeeze=False)
         for axis, variable in zip(axes.flat, page_variables):
-            series = _open_variable_timeseries(produced_files[variable], variable)
+            series = _open_variable_timeseries(
+                produced_files[variable], variable.split("_")[0]
+            )
             if series is None:
                 axis.set_title(variable)
                 axis.text(
@@ -640,11 +644,16 @@ def create_timeseries_plots(
                 )
                 axis.set_axis_off()
                 continue
-            axis.plot(series["time"].values, series.values, linewidth=1.0)
+            axis.plot(get_plottble_times(series), series.values, linewidth=1.0)
             axis.set_title(variable)
             axis.tick_params(axis="x", rotation=30)
+            axis.set_xlabel("Time (years)")
+            axis.set_ylabel(
+                f"{variable.split("_")[0]} ({series.attrs.get('units', 'unknown')})"
+            )
         for axis in axes.flat[len(page_variables) :]:
             axis.set_axis_off()
+
         fig.tight_layout()
         output_path = (
             plot_dir / f"timeseries_composite_{page_index // page_size + 1:02d}.png"
@@ -653,6 +662,20 @@ def create_timeseries_plots(
         plt.close(fig)
         plotted.append(str(output_path))
     return plotted
+
+
+def get_plottble_times(tseries: xr.DataArray) -> np.ndarray:
+    monlength = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31], dtype=int)
+    strings = [date.strftime("%Y-%m-%d") for date in tseries["time"].values]
+    numbers_lists = [strings.split("-") for strings in strings]
+    numbers = np.array(
+        [
+            (365 * int(val[0]) + monlength[: int(val[1])].sum() + int(val[2])) / 365.0
+            for val in numbers_lists
+        ],
+        dtype=float,
+    )
+    return numbers
 
 
 def create_map_plots(
@@ -669,7 +692,7 @@ def create_map_plots(
 
     plotted = []
     for variable in sorted(produced_files)[:max_plots]:
-        field = _open_variable_map(produced_files[variable], variable)
+        field = _open_variable_map(produced_files[variable], variable.split("_")[0])
         if field is None:
             continue
         fig, axis = plt.subplots(figsize=(8, 4.5))
