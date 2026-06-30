@@ -45,7 +45,7 @@ def test_collect_log_records_filters_to_expected_variables(tmp_path):
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
     (log_dir / "cmor_20260101T010203Z_tas.log").write_text(
-        "ERROR something failed\n", encoding="utf-8"
+        "ERROR: something failed\n", encoding="utf-8"
     )
     (log_dir / "cmor_20260101T010203Z_pr.log").write_text(
         "all good\n", encoding="utf-8"
