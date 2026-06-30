@@ -858,6 +858,11 @@ def main() -> int:
     write_markdown_summary(report, report_dir / "validation_summary.md")
 
     print_summary(report)
+    print(f"Validation report written to {report_dir / 'validation_summary.json'}")
+    if plot_outputs["timeseries"]:
+        print(f"Time-series plots written to {plot_dir}")
+    if plot_outputs["maps"]:
+        print(f"Map plots written to {plot_dir}")
 
     if args.strict and (
         report["variables_with_log_errors"] or report["expected_but_not_produced"]
