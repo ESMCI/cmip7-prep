@@ -768,7 +768,7 @@ def main():
             operation="all",
             cmip7_frequency=frequency,
             modelling_realm=realm,
-            experiment=args.experiment,
+            experiment=args.experiment.lower(),
         )
         # The data request sometimes returns an extra '30S-90S' regional copy of a
         # variable in addition to the global one. We don't produce that regional
