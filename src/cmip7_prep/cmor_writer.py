@@ -109,7 +109,6 @@ class CmorSession(
         try:
             if self._log_path is not None:
                 logger.info("CMOR logfile: %s", self._log_path)
-                print()
                 cmor.setup(
                     inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(
