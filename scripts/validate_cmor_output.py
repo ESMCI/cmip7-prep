@@ -123,11 +123,6 @@ def parse_args() -> argparse.Namespace:
         help="CMIP7 output frequency to validate",
     )
     parser.add_argument(
-        "--resolution",
-        default=None,
-        help="Optional best-effort filter applied to dimension folder, grid type and file name",
-    )
-    parser.add_argument(
         "--root-output-path",
         required=True,
         help="Root output directory containing CMIP7/ and logs/",
@@ -345,20 +340,6 @@ def collect_log_records(
     return records
 
 
-def path_matches_resolution(
-    resolution: str | None,
-    dimension_folder: str,
-    grid_type: str,
-    file_name: str,
-) -> bool:
-    """Apply a best-effort resolution filter to discovered output paths."""
-    if not resolution:
-        return True
-    target = resolution.lower()
-    candidates = (dimension_folder.lower(), grid_type.lower(), file_name.lower())
-    return any(target in candidate for candidate in candidates)
-
-
 def open_dataset_inventory(
     file_path: Path, variable: str
 ) -> tuple[str, list[str], dict[str, int]]:
@@ -390,7 +371,6 @@ def scan_output_tree(
     frequency: str,
     expected_variables: set[str],
     ensemble_member: str | None = None,
-    resolution: str | None = None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
     """Scan the CMIP7 tree and inventory produced files for the selected subset."""
     produced: dict[str, list[Path]] = defaultdict(list)
@@ -434,12 +414,6 @@ def scan_output_tree(
         ):
             logger.debug("Skipping due to expected_variables filter: %s", variable)
             continue
-        # if not path_matches_resolution(
-        #     resolution, dimension_folder, grid_type, file_path.name
-        # ):
-        #     print("Skipping due to resolution filter: %s", resolution)
-        #     logger.debug("Skipping due to resolution filter: %s", resolution)
-        #     continue
         produced[f"{variable}_{dimension_folder}"].append(file_path)
         try:
             data_var, dims, sizes = open_dataset_inventory(file_path, variable)
@@ -620,6 +594,9 @@ def create_timeseries_plots(
 ) -> list[str]:
     """Create paginated composite mean time-series plots."""
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping time-series plots")
@@ -686,6 +663,9 @@ def create_map_plots(
 ) -> list[str]:
     """Create per-variable time-mean map plots where the data shape allows it."""
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping map plots")
@@ -736,7 +716,6 @@ def build_report(
             "realm": args.realm,
             "experiment": args.experiment,
             "frequency": args.frequency,
-            "resolution": args.resolution,
             "ensemble_member": args.ensemble_member,
             "institution_id": MODEL_NAMING_MAPS.get(args.model, [None, None])[0],
             "root_output_path": str(Path(args.root_output_path).expanduser().resolve()),
@@ -813,7 +792,6 @@ def main() -> int:
         frequency=args.frequency,
         expected_variables=expected_variable_set,
         ensemble_member=args.ensemble_member,
-        resolution=args.resolution,
     )
     dimension_inventory = summarize_dimension_inventory(inventory_records)
 
