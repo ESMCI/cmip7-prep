@@ -70,7 +70,7 @@ Alternatively you can load up Miniforge yourself, load this conda environment an
 conda activate /projects/NS9560K/diagnostics/cmordev_env_312/
 export PYTHONPATH=pathtorepo/cmip7-prep/src:$PYTHONPATH
 ```
-swap `pathtopythonrepo` with the root path where this repository is cloned
+Swap `pathtorepo` with the root path where this repository is cloned
 
 ## Quickstart
 
