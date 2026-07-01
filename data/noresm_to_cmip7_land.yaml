@@ -61,11 +61,27 @@ variables:
     table: land
     units: kg m-2
 
+  cProduct_tavg-u-hxy-lnd:
+    description: Carbon mass per unit area in that has been removed from the environment
+      through  land use change.
+    dims: [lon, lat, time]
+    formula: CROPPROD1 + TOT_WOODPROD
+    sources: [model_var: CROPPROD1, model_var: TOT_WOODPROD]
+    table: land
+    units: kg m-2
+
   cSoil_tavg-d100cm-hxy-lnd:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     dims: [lon, lat, time, sdepth100cm]
     sources: [model_var: TOTSOMC_1m]
+    table: land
+    units: kg m-2
+
+  cSoil_tavg-u-hxy-lnd:
+    description: Carbon mass in the full depth of the soil model.
+    dims: [lon, lat, time]
+    sources: [model_var: TOTSOMC]
     table: land
     units: kg m-2
 
@@ -146,6 +162,13 @@ variables:
     formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
     positive: up
     sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  fLuc_tavg-u-hxy-lnd:
+    description: Net Carbon Mass Flux into Atmosphere due to Land Use Change
+    dims: [lon, lat, time]
+    sources: [model_var: LAND_USE_FLUX]
     table: land
     units: kg m-2 s-1
 
