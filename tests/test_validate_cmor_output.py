@@ -96,7 +96,6 @@ def test_scan_output_tree_inventories_dims(tmp_path):
         frequency="mon",
         expected_variables={"tas_hxy"},
         ensemble_member=None,
-        resolution=None,
     )
 
     assert sorted(produced) == ["tas_hxy"]
