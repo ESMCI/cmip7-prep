@@ -186,13 +186,6 @@ variables:
     table: aerosol
     units: kg m-2 s-1
 
-  emidms_tavg-u-hxy-u:
-    description: Integrate 3D emission field vertically to 2d field.
-    dims: [lon, lat, time]
-    sources: [model_var: emis_DMS]
-    table: aerosol
-    units: kg m-2 s-1
-
   emioa_tavg-u-hxy-u:
     description: This is the sum of total emission of POA and total production of
       SOA (emipoa+chepsoa). "Mass" refers to the mass of organic matter, not mass
@@ -279,15 +272,6 @@ variables:
     table: aerosol
     units: kg kg-1
 
-  mmrdust_tavg-al-hxy-u:
-    description: Dry mass fraction of dust aerosol particles in air.
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: mmr_DUST]
-    table: aerosol
-    units: kg kg-1
-
   mmrdust_tavg-h2m-hxy-u:
     description: Daily mean dust aerosol mass mixing ratio near surface.
     dims: [lon, lat, time, height2m]
@@ -309,16 +293,6 @@ variables:
     description: Daily mean total organic aerosol mass mixing ratio near surface.
     dims: [lon, lat, time, height2m]
     sources: [model_var: mmr_OM]
-    table: aerosol
-    units: kg kg-1
-
-  mmrpm2p5_tavg-al-hxy-u:
-    description: Mass fraction atmospheric particulate compounds with an aerodynamic
-      diameter of less than or equal to 2.5 micrometers
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: MMRPM2P5]
     table: aerosol
     units: kg kg-1
 

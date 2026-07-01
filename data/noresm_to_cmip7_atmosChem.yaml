@@ -58,16 +58,6 @@ variables:
     table: atmosChem
     units: '1.00E-09'
 
-  dms_tavg-al-hxy-u:
-    description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
-      where X is a material constituent of Y.
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: DMS]
-    table: atmosChem
-    units: mol mol-1
-
   n2o_tavg-al-hxy-u:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.   The chemical formula of  nitrous oxide

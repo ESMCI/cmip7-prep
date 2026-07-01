@@ -39,6 +39,22 @@ variables:
     table: atmos
     units: m
 
+  bldep_tmax-u-hxy-u:
+    description: 'maximum boundary layer height during the day (add cell_methods attribute:
+      "time: maximum")'
+    dims: [lon, lat, time]
+    sources: [model_var: PBLHMX]
+    table: atmos
+    units: m
+
+  bldep_tmin-u-hxy-u:
+    description: 'minimum boundary layer height during the day (add cell_methods attribute:
+      "time: minimum")'
+    dims: [lon, lat, time]
+    sources: [model_var: PBLHMN]
+    table: atmos
+    units: m
+
   cfadDbze94_tavg-h40-hxy-air:
     description: CloudSat Radar Reflectivity
     dims: [lon, lat, alt40, dbze, time]
@@ -60,20 +76,6 @@ variables:
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: CLOUD]
-    table: atmos
-    units: '%'
-
-  clcalipso_tavg-220hPa-hxy-air:
-    description: Percentage cloud cover in layer centred on 220hPa
-    dims: [lon, lat, time, p220]
-    sources: [model_var: CLDHGH_CAL]
-    table: atmos
-    units: '%'
-
-  clcalipso_tavg-560hPa-hxy-air:
-    description: Percentage cloud cover in layer centred on 560hPa
-    dims: [lon, lat, time, p560]
-    sources: [model_var: CLDMED_CAL]
     table: atmos
     units: '%'
 
@@ -162,31 +164,11 @@ variables:
     table: atmos
     units: kg m-2 s-1
 
-  hfls_tavg-u-hxy-is:
-    description: The surface called "surface" means the lower boundary of the atmosphere.
-      "Upward" indicates a vector component which is positive when directed upward
-      (negative downward). The surface latent heat flux is the exchange of heat between
-      the surface and the air on account of evaporation (including sublimation). In
-      accordance with common usage in geophysical disciplines, "flux" implies per
-      unit area, called "flux density" in physics.
-    dims: [lon, lat, time]
-    sources: [model_var: LHFLX]
-    table: atmos
-    units: W m-2
-
   hfls_tavg-u-hxy-u:
     description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
     positive: up
     sources: [model_var: LHFLX]
-    table: atmos
-    units: W m-2
-
-  hfss_tavg-u-hxy-is:
-    description: The surface sensible heat flux, also called turbulent heat flux,
-      is the exchange of heat between the surface and the air by motion of air.
-    dims: [lon, lat, time]
-    sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
 
@@ -198,16 +180,6 @@ variables:
     sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
-
-  hur_tavg-al-hxy-u:
-    description: The relative humidity with respect to liquid water for T> 0 C, and
-      with respect to ice for T<0 C.
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: RELHUM, model_var: RHW]
-    table: atmos
-    units: '%'
 
   hur_tavg-p19-hxy-air:
     description: This is the relative humidity with respect to liquid water for T>
@@ -239,7 +211,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
-    sources: [{model_var: 'RHREFHT:X'}]
+    sources: [model_var: RHREFHTMX]
     table: atmos
     units: '%'
 
@@ -247,7 +219,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
-    sources: [{model_var: 'RHREFHT:M'}]
+    sources: [model_var: RHREFHTMN]
     table: atmos
     units: '%'
 
@@ -312,36 +284,11 @@ variables:
     table: atmos
     units: kg m-2 s-1
 
-  prc_tavg-u-hxy-u:
-    description: at surface; includes both liquid and solid phases.
-    dims: [lon, lat, time]
-    sources: [model_var: PRECC]
-    table: atmos
-    units: kg m-2 s-1
-
   prra_tavg-u-hxy-lnd:
     description: rainfall_flux
     dims: [lon, lat, time]
     formula: PRECT-PRECSC-PRECSL
     sources: [model_var: PRECT, model_var: PRECSC, model_var: PRECSL]
-    table: atmos
-    units: kg m-2 s-1
-
-  prra_tavg-u-hxy-u:
-    description: 'Rainfall rate at surface: Includes precipitation of all forms of
-      water in the liquid phase'
-    dims: [lon, lat, time]
-    formula: PRECT-PRECSC-PRECSL
-    sources: [model_var: PRECT, model_var: PRECSC, model_var: PRECSL]
-    table: atmos
-    units: kg m-2 s-1
-
-  prsn_tavg-u-hxy-is:
-    description: quantity averaged over ice sheet (grounded ice sheet and floating
-      ice shelf) only. Needed to analyse the impact of downscaling methods
-    dims: [lon, lat, time]
-    formula: PRECSC+PRECSL
-    sources: [model_var: PRECSC, model_var: PRECSL]
     table: atmos
     units: kg m-2 s-1
 
@@ -460,32 +407,11 @@ variables:
     table: atmos
     units: W m-2
 
-  rsds_tavg-u-hxy-u:
-    description: Hourly downward solar radiation flux at the surface
-    dims: [lon, lat, time]
-    positive: up
-    sources: [model_var: FSDS]
-    table: atmos
-    units: W m-2
-
   rss_tavg-u-hxy-u:
     description: Net downward shortwave radiation at the surface
     dims: [lon, lat, time]
     positive: down
     sources: [model_var: FSNS]
-    table: atmos
-    units: W m-2
-
-  rsus_tavg-u-hxy-is:
-    description: The surface called "surface" means the lower boundary of the atmosphere.
-      "shortwave" means shortwave radiation. Upwelling radiation is radiation from
-      below. It does not mean "net upward". When thought of as being incident on a
-      surface, a radiative flux is sometimes called "irradiance". In addition, it
-      is identical with the quantity measured by a cosine-collector light-meter and
-      sometimes called "vector irradiance". In accordance with common usage in geophysical
-      disciplines, "flux" implies per unit area, called "flux density" in physics.
-    dims: [lon, lat, time]
-    sources: [model_var: FSR]
     table: atmos
     units: W m-2
 
@@ -592,14 +518,6 @@ variables:
     table: atmos
     units: K s-1
 
-  ts_tavg-u-hxy-is:
-    description: quantity averaged over ice sheet (grounded ice sheet and floating
-      ice shelf) only. Needed to analyse the impact of downscaling methods
-    dims: [lon, lat, time]
-    sources: [model_var: TS]
-    table: atmos
-    units: K
-
   ts_tavg-u-hxy-u:
     description: Surface temperature (skin for open ocean)
     dims: [lon, lat, time]
@@ -612,14 +530,6 @@ variables:
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: U]
-    table: atmos
-    units: m s-1
-
-  ua_tavg-p19-hxy-air:
-    description: Zonal wind (positive in a eastward direction).
-    dims: [time, plev, lat, lon]
-    levels: {name: plev19, units: Pa}
     sources: [model_var: U]
     table: atmos
     units: m s-1

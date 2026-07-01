@@ -5,6 +5,14 @@ dataset_overrides:
 
 variables:
 
+  baresoilFrac_tavg-u-hxy-u:
+    description: Percentage of entire grid cell  that is covered by bare soil.
+    dims: [lon, lat, time, typebare]
+    formula: (1-FATES_AREA_PLANTS)*FATES_FRACTION*100
+    sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
+    table: land
+    units: '%'
+
   burntFractionAll_tavg-u-hxy-u:
     description: Percentage of grid cell burned due to all fires including natural
       and anthropogenic fires and those associated with anthropogenic land use change
@@ -18,8 +26,10 @@ variables:
     description: Percentage of entire grid cell  that is covered by C3 PFTs (including
       grass, crops, and trees).
     dims: [lon, lat, time, typec3pft]
-    formula: (FATES_AREA_PLANTS-sumoverpft(FATES_CROWNAREA_PF, pftlist=[14], dimname='fates_levpft'))*FATES_FRACTION
-    sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: (FATES_AREA_PLANTS-sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[14],
+      dimname='fates_levpft'))*FATES_FRACTION*100
+    sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_CANOPYCROWNAREA_PF,
+      model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -27,8 +37,8 @@ variables:
     description: Percentage of entire grid cell  that is covered by C4 PFTs (including
       grass and crops).
     dims: [lon, lat, time, typec4pft]
-    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[14], dimname='fates_levpft')*FATES_FRACTION
-    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[14], dimname='fates_levpft')*FATES_FRACTION
+    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -286,8 +296,8 @@ variables:
   grassFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell that is covered by natural grass.
     dims: [lon, lat, time, typenatgr]
-    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[12, 13, 14], dimname='fates_levpft')*FATES_FRACTION
-    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[12, 13, 14], dimname='fates_levpft')*FATES_FRACTION*100
+    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -597,9 +607,9 @@ variables:
   shrubFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by shrub.
     dims: [lon, lat, time, typeshrub]
-    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft')
-      *FATES_FRACTION
-    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft')
+      *FATES_FRACTION*100
+    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -627,19 +637,6 @@ variables:
     table: land
     units: kg m-2
 
-  sweLut_tavg-u-hxy-multi:
-    description: The surface called "surface" means the lower boundary of the atmosphere.
-      "lwe" means liquid water equivalent. "Amount" means mass per unit area. The
-      construction lwe_thickness_of_X_amount or _content means the vertical extent
-      of a layer of liquid water having the same mass per unit area. Surface amount
-      refers to the amount on the ground, excluding that on the plant or vegetation
-      canopy.
-    dims: [lon, lat, landuse, time]
-    formula: SNOWICE+SNOWLIQ
-    sources: [model_var: SNOWICE, model_var: SNOWLIQ]
-    table: land
-    units: m
-
   tran_tavg-u-hxy-lnd:
     description: Transpiration (may include dew formation as a negative flux).
     dims: [lon, lat, time]
@@ -659,8 +656,8 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf deciduous trees.
     dims: [lon, lat, time, typetreebd]
-    formula: (FATES_CROWNAREA_PF(5:6)*FATES_FRACTION
-    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[5, 6], dimname='fates_levpft')*FATES_FRACTION*100
+    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -668,8 +665,8 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf deciduous trees.
     dims: [lon, lat, time, typetreend]
-    formula: (sumoverpft(FATES_CROWNAREA_PF, pftlist=[3], dimname='fates_levpft'))*FATES_FRACTION
-    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: (sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[3], dimname='fates_levpft')*100)*FATES_FRACTION
+    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -677,17 +674,17 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf evergreen trees.
     dims: [lon, lat, time, typetreene]
-    formula: (sumoverpft(FATES_CROWNAREA_PF, pftlist=[2], dimname='fates_levpft'))*FATES_FRACTION
-    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: (sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[2], dimname='fates_levpft')*100)*FATES_FRACTION
+    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
   treeFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by trees.
     dims: [lon, lat, time, typetree]
-    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')
-      *FATES_FRACTION
-    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')
+      *FATES_FRACTION*100
+    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
