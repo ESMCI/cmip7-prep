@@ -59,7 +59,7 @@ pip install -e .
 ```
 
 **NIRD (NorESM):**
-From inside your this clone of cmip7-prep
+From inside this clone of cmip7-prep
 ```bash
 cd scripts
 . setup_nird.sh
