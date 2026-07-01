@@ -28,6 +28,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import xarray as xr
 import yaml
 
@@ -49,7 +50,7 @@ CANONICAL_REALM_MAP = {
 }
 
 LOG_NAME_RE = re.compile(r"^cmor_\d{8}T\d{6}Z_(?P<variable>.+)\.log$")
-LOG_ERROR_RE = re.compile(r"\b(error|exception|traceback|fatal)\b", re.IGNORECASE)
+LOG_ERROR_RE = re.compile(r"Error: ", re.IGNORECASE)
 LOG_SUCCESS_RE = re.compile(r"\b(success|complete(?:d)?|finished)\b", re.IGNORECASE)
 
 
@@ -120,11 +121,6 @@ def parse_args() -> argparse.Namespace:
         choices=["mon", "day", "6hr", "3hr", "yr", "fx"],
         required=True,
         help="CMIP7 output frequency to validate",
-    )
-    parser.add_argument(
-        "--resolution",
-        default=None,
-        help="Optional best-effort filter applied to dimension folder, grid type and file name",
     )
     parser.add_argument(
         "--root-output-path",
@@ -279,7 +275,7 @@ def get_requested_variables(
         operation="all",
         cmip7_frequency=frequency,
         modelling_realm=realm,
-        experiment=experiment,
+        experiment=experiment.lower(),
     )
     return {var.branded_variable_name.name for var in cmip_vars}
 
@@ -339,22 +335,9 @@ def collect_log_records(
             continue
         if expected_variables and record.variable not in expected_variables:
             continue
+
         records[record.variable].append(record)
     return records
-
-
-def path_matches_resolution(
-    resolution: str | None,
-    dimension_folder: str,
-    grid_type: str,
-    file_name: str,
-) -> bool:
-    """Apply a best-effort resolution filter to discovered output paths."""
-    if not resolution:
-        return True
-    target = resolution.lower()
-    candidates = (dimension_folder.lower(), grid_type.lower(), file_name.lower())
-    return any(target in candidate for candidate in candidates)
 
 
 def open_dataset_inventory(
@@ -388,7 +371,6 @@ def scan_output_tree(
     frequency: str,
     expected_variables: set[str],
     ensemble_member: str | None = None,
-    resolution: str | None = None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
     """Scan the CMIP7 tree and inventory produced files for the selected subset."""
     produced: dict[str, list[Path]] = defaultdict(list)
@@ -419,6 +401,7 @@ def scan_output_tree(
             grid_type,
             _,
         ) = parts[:11]
+
         if institution_id and consortium != institution_id:
             logger.debug("Skipping due to institution_id filter: %s", institution_id)
             continue
@@ -431,13 +414,7 @@ def scan_output_tree(
         ):
             logger.debug("Skipping due to expected_variables filter: %s", variable)
             continue
-        if not path_matches_resolution(
-            resolution, dimension_folder, grid_type, file_path.name
-        ):
-            logger.debug("Skipping due to resolution filter: %s", resolution)
-            continue
-
-        produced[variable].append(file_path)
+        produced[f"{variable}_{dimension_folder}"].append(file_path)
         try:
             data_var, dims, sizes = open_dataset_inventory(file_path, variable)
         except Exception as exc:  # pylint: disable=broad-except
@@ -617,6 +594,9 @@ def create_timeseries_plots(
 ) -> list[str]:
     """Create paginated composite mean time-series plots."""
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping time-series plots")
@@ -632,7 +612,9 @@ def create_timeseries_plots(
         page_variables = variables[page_index : page_index + page_size]
         fig, axes = plt.subplots(3, 3, figsize=(15, 11), squeeze=False)
         for axis, variable in zip(axes.flat, page_variables):
-            series = _open_variable_timeseries(produced_files[variable], variable)
+            series = _open_variable_timeseries(
+                produced_files[variable], variable.split("_")[0]
+            )
             if series is None:
                 axis.set_title(variable)
                 axis.text(
@@ -640,11 +622,16 @@ def create_timeseries_plots(
                 )
                 axis.set_axis_off()
                 continue
-            axis.plot(series["time"].values, series.values, linewidth=1.0)
+            axis.plot(get_plottble_times(series), series.values, linewidth=1.0)
             axis.set_title(variable)
             axis.tick_params(axis="x", rotation=30)
+            axis.set_xlabel("Time (years)")
+            axis.set_ylabel(
+                f"{variable.split('_')[0]} ({series.attrs.get('units', 'unknown')})"
+            )
         for axis in axes.flat[len(page_variables) :]:
             axis.set_axis_off()
+
         fig.tight_layout()
         output_path = (
             plot_dir / f"timeseries_composite_{page_index // page_size + 1:02d}.png"
@@ -655,6 +642,20 @@ def create_timeseries_plots(
     return plotted
 
 
+def get_plottble_times(tseries: xr.DataArray) -> np.ndarray:
+    monlength = np.array([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31], dtype=int)
+    strings = [date.strftime("%Y-%m-%d") for date in tseries["time"].values]
+    numbers_lists = [strings.split("-") for strings in strings]
+    numbers = np.array(
+        [
+            (365 * int(val[0]) + monlength[: int(val[1])].sum() + int(val[2])) / 365.0
+            for val in numbers_lists
+        ],
+        dtype=float,
+    )
+    return numbers
+
+
 def create_map_plots(
     produced_files: dict[str, list[Path]],
     plot_dir: Path,
@@ -662,6 +663,9 @@ def create_map_plots(
 ) -> list[str]:
     """Create per-variable time-mean map plots where the data shape allows it."""
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping map plots")
@@ -669,7 +673,7 @@ def create_map_plots(
 
     plotted = []
     for variable in sorted(produced_files)[:max_plots]:
-        field = _open_variable_map(produced_files[variable], variable)
+        field = _open_variable_map(produced_files[variable], variable.split("_")[0])
         if field is None:
             continue
         fig, axis = plt.subplots(figsize=(8, 4.5))
@@ -712,7 +716,6 @@ def build_report(
             "realm": args.realm,
             "experiment": args.experiment,
             "frequency": args.frequency,
-            "resolution": args.resolution,
             "ensemble_member": args.ensemble_member,
             "institution_id": MODEL_NAMING_MAPS.get(args.model, [None, None])[0],
             "root_output_path": str(Path(args.root_output_path).expanduser().resolve()),
@@ -789,7 +792,6 @@ def main() -> int:
         frequency=args.frequency,
         expected_variables=expected_variable_set,
         ensemble_member=args.ensemble_member,
-        resolution=args.resolution,
     )
     dimension_inventory = summarize_dimension_inventory(inventory_records)
 
@@ -834,6 +836,11 @@ def main() -> int:
     write_markdown_summary(report, report_dir / "validation_summary.md")
 
     print_summary(report)
+    print(f"Validation report written to {report_dir / 'validation_summary.json'}")
+    if plot_outputs["timeseries"]:
+        print(f"Time-series plots written to {plot_dir}")
+    if plot_outputs["maps"]:
+        print(f"Map plots written to {plot_dir}")
 
     if args.strict and (
         report["variables_with_log_errors"] or report["expected_but_not_produced"]
