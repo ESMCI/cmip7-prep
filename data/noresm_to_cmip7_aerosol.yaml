@@ -93,16 +93,6 @@ variables:
     table: aerosol
     units: m-3
 
-  cdnc_tavg-al-hxy-u:
-    description: Cloud Droplet Number Concentration in liquid water clouds.
-    dims: [lon, lat, lev, time]
-    formula: AWNC/FREQL
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: AWNC, model_var: FREQL]
-    table: aerosol
-    units: m-3
-
   cheaqpso4_tavg-al-hxy-u:
     description: 'proposed name: tendency_of_atmosphere_mass_content_of_sulfate_dry_aerosol_due_to_aqueous_phase_net_chemical_production'
     dims: [lon, lat, lev, time]
@@ -119,16 +109,6 @@ variables:
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: GS_H2SO4]
-    table: aerosol
-    units: kg m-2 s-1
-
-  chepsoa_tavg-u-hxy-u:
-    description: If model lumps SOA emissions with POA, then the sum of POA and SOA
-      emissions is reported as OA emissions. "mass" refers to the mass of primary
-      organic matter, not mass of organic carbon alone.
-    dims: [lon, lat, time]
-    formula: GS_SOA_LV + GS_SOA_SV
-    sources: [model_var: GS_SOA_LV, model_var: GS_SOA_SV]
     table: aerosol
     units: kg m-2 s-1
 
@@ -150,27 +130,10 @@ variables:
     table: aerosol
     units: '1'
 
-  conccn_tavg-al-hxy-u:
-    description: This is the number concentration of air particles in air
-    dims: [lon, lat, lev, time]
-    formula: N_AER*1e6
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: N_AER, model_var: e6]
-    table: aerosol
-    units: m-3
-
-  do3chm_tavg-al-hxy-u:
+  drydust_tavg-u-hxy-u:
     description: Dry Deposition Rate of Dust
     dims: [lon, lat, time]
     sources: [model_var: dry_DUST]
-    table: aerosol
-    units: kg m-2 s-1
-
-  dryoa_tavg-u-hxy-u:
-    description: Dry Deposition Rate of Dry Aerosol Total Organic Matter
-    dims: [lon, lat, time]
-    sources: [model_var: dry_OM]
     table: aerosol
     units: kg m-2 s-1
 
@@ -195,6 +158,16 @@ variables:
     table: aerosol
     units: kg m-2 s-1
 
+  ec550aer_tavg-al-hxy-u:
+    description: Aerosol Extinction at 550nm
+    dims: [lon, lat, lev, time, lambda550nm]
+    formula: EC550AER/DAYFOC
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: EC550AER, model_var: DAYFOC]
+    table: aerosol
+    units: m-1
+
   emibc_tavg-u-hxy-u:
     description: Integrate 3D emission field vertically to 2d field.
     dims: [lon, lat, time]
@@ -210,27 +183,6 @@ variables:
     dims: [lon, lat, time]
     formula: emis_isoprene+emis_monoterp
     sources: [model_var: emis_isoprene, model_var: emis_monoterp]
-    table: aerosol
-    units: kg m-2 s-1
-
-  emidms_tavg-u-hxy-u:
-    description: Integrate 3D emission field vertically to 2d field.
-    dims: [lon, lat, time]
-    sources: [model_var: emis_DMS]
-    table: aerosol
-    units: kg m-2 s-1
-
-  emidust_tavg-u-hxy-u:
-    description: Integrate 3D emission field vertically to 2d field.
-    dims: [lon, lat, time]
-    sources: [model_var: emis_DUST]
-    table: aerosol
-    units: kg m-2 s-1
-
-  emiisop_tavg-u-hxy-u:
-    description: Integrate 3D emission field vertically to 2d field
-    dims: [lon, lat, time]
-    sources: [model_var: emis_isoprene]
     table: aerosol
     units: kg m-2 s-1
 
@@ -297,26 +249,9 @@ variables:
     table: aerosol
     units: mol mol-1
 
-  lwp_tavg-u-hxy-u:
-    description: The total mass of liquid water in cloud per unit area.
-    dims: [lon, lat, time]
-    sources: [model_var: TGCLDLWP]
-    table: aerosol
-    units: kg m-2
-
-  mmraerh2o_tavg-al-hxy-u:
-    description: Mass fraction is used in the construction mass_fraction_of_X_in_Y,
-      where X is a material constituent of Y. It means the ratio of the mass of X
-      to the mass of Y (including X). "Aerosol" means the system of suspended liquid
-      or solid particles in air (except cloud droplets) and their carrier gas, the
-      air itself. "Ambient_aerosol" means that the aerosol is measured or modelled
-      at the ambient state of pressure, temperature and relative humidity that exists
-      in its immediate environment. "Ambient aerosol particles" are aerosol particles
-      that have taken up ambient water through hygroscopic growth. The extent of hygroscopic
-      growth depends on the relative humidity and the composition of the particles.
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
+  mmraerh2o_tavg-h2m-hxy-u:
+    description: Daily mean Aerosol water mass mixing ratio near surface.
+    dims: [lon, lat, time, height2m]
     sources: [model_var: MMR_AH2O]
     table: aerosol
     units: kg kg-1
@@ -330,11 +265,16 @@ variables:
     table: aerosol
     units: kg kg-1
 
-  mmrdust_tavg-al-hxy-u:
-    description: Dry mass fraction of dust aerosol particles in air.
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
+  mmrbc_tavg-h2m-hxy-u:
+    description: Daily mean elemental carbon mass mixing ratio near surface.
+    dims: [lon, lat, time, height2m]
+    sources: [model_var: mmr_BC]
+    table: aerosol
+    units: kg kg-1
+
+  mmrdust_tavg-h2m-hxy-u:
+    description: Daily mean dust aerosol mass mixing ratio near surface.
+    dims: [lon, lat, time, height2m]
     sources: [model_var: mmr_DUST]
     table: aerosol
     units: kg kg-1
@@ -349,43 +289,24 @@ variables:
     table: aerosol
     units: kg kg-1
 
-  mmrpm1_tavg-al-hxy-u:
-    description: Mass fraction atmospheric particulate compounds with an aerodynamic
-      diameter of less than or equal to 1 micrometers
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: MMRPM1]
+  mmroa_tavg-h2m-hxy-u:
+    description: Daily mean total organic aerosol mass mixing ratio near surface.
+    dims: [lon, lat, time, height2m]
+    sources: [model_var: mmr_OM]
     table: aerosol
     units: kg kg-1
 
-  mmrpm2p5_tavg-al-hxy-u:
-    description: Mass fraction atmospheric particulate compounds with an aerodynamic
-      diameter of less than or equal to 2.5 micrometers
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: MMRPM2P5]
-    table: aerosol
-    units: kg kg-1
-
-  mmrso4_tavg-al-hxy-u:
-    description: Dry mass of sulfate (SO4) in aerosol particles as a fraction of air
-      mass.
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
+  mmrso4_tavg-h2m-hxy-u:
+    description: Daily mean sulfate aerosol mass mixing ratio near surface.
+    dims: [lon, lat, time, height2m]
     sources: [model_var: mmr_SULFATE]
     table: aerosol
     units: kg kg-1
 
-  mmrsoa_tavg-al-hxy-u:
-    description: Mass fraction in the atmosphere of secondary organic aerosols (particulate
-      organic matter formed within the atmosphere from gaseous precursors; dry mass).
-    dims: [lon, lat, lev, time]
+  mmrsoa_tavg-h2m-hxy-u:
+    description: Daily mean secondary organic aerosol mass mixing ratio near surface.
+    dims: [lon, lat, time, height2m]
     formula: SOA_NA+SOA_A1
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
     sources: [model_var: SOA_NA, model_var: SOA_A1]
     table: aerosol
     units: kg kg-1
@@ -399,19 +320,15 @@ variables:
     table: aerosol
     units: kg kg-1
 
-  od443aer_tavg-u-hxy-u:
-    description: 'This is the aerosol optical depth (AOD) from the ambient aerosls
-      (i.e., includes aerosol water).  Does not include AOD from stratospheric aerosols
-      if these are prescribed but includes other possible background aerosol types.
-      Needs a comment attribute "wavelength: 443 nm"'
-    dims: [lon, lat, time, lambda443nm]
-    formula: DOD440/DAYFOC
-    sources: [model_var: DOD440, model_var: DAYFOC]
+  mmrss_tavg-h2m-hxy-u:
+    description: Daily mean Sea Salt mass mixing ratio near surface.
+    dims: [lon, lat, time, height2m]
+    sources: [model_var: mmr_SALT]
     table: aerosol
-    units: '1'
+    units: kg kg-1
 
   od550aer_tavg-u-hxy-u:
-    description: 'AOD from the ambient aerosls (i.e., includes aerosol water).  Does
+    description: 'AOD from ambient aerosols (i.e., includes aerosol water).  Does
       not include AOD from stratospheric aerosols if these are prescribed but includes
       other possible background aerosol types. Needs a comment attribute "wavelength:
       550 nm"'
@@ -429,43 +346,11 @@ variables:
     table: aerosol
     units: '1'
 
-  od550bc_tavg-u-hxy-u:
-    description: Total aerosol AOD due to black carbon aerosol at a wavelength of
-      550 nanometres.
-    dims: [lon, lat, time, lambda550nm]
-    formula: D550_BC/DAYFOC
-    sources: [model_var: D550_BC, model_var: DAYFOC]
-    table: aerosol
-    units: '1'
-
-  od550csaer_tavg-u-hxy-u:
-    description: 'AOD from the ambient aerosols in clear skies if od550aer is for
-      all-sky (i.e., includes aerosol water).  Does not include AOD from stratospheric
-      aerosols if these are prescribed but includes other possible background aerosol
-      types. Needs a comment attribute "wavelength: 550 nm"'
-    dims: [lon, lat, time, lambda550nm]
-    formula: CDOD550/DAYFOC/CLDFREE
-    sources: [model_var: CDOD550, model_var: DAYFOC, model_var: CLDFREE]
-    table: aerosol
-    units: '1'
-
   od550dust_tavg-u-hxy-u:
     description: Total aerosol AOD due to dust aerosol at a wavelength of 550 nanometres.
     dims: [lon, lat, time, lambda550nm]
     formula: D550_DU/DAYFOC
     sources: [model_var: D550_DU, model_var: DAYFOC]
-    table: aerosol
-    units: '1'
-
-  od550lt1aer_tavg-u-hxy-u:
-    description: od550 due to particles with wet diameter less than 1 um  ("ambient"
-      means "wetted"). When models do not include explicit size information, it can
-      be assumed that all anthropogenic aerosols and natural secondary aerosols have
-      diameter less than 1 um.
-    dims: [lon, lat, time, lambda550nm]
-    formula: (DLT_SS+DLT_DUST+DLT_SO4+DLT_BC+DLT_POM)/DAYFOC
-    sources: [model_var: DLT_SS, model_var: DLT_DUST, model_var: DLT_SO4, {
-        model_var: DLT_BC}, model_var: DLT_POM, model_var: DAYFOC]
     table: aerosol
     units: '1'
 
@@ -478,14 +363,6 @@ variables:
     table: aerosol
     units: '1'
 
-  od550so4_tavg-u-hxy-u:
-    description: Total aerosol AOD due to sulfate aerosol at a wavelength of 550 nanometres.
-    dims: [lon, lat, time, lambda550nm]
-    formula: D550_SO4/DAYFOC
-    sources: [model_var: D550_SO4, model_var: DAYFOC]
-    table: aerosol
-    units: '1'
-
   od550ss_tavg-u-hxy-u:
     description: Total aerosol AOD due to sea salt aerosol at a wavelength of 550
       nanometres.
@@ -494,27 +371,6 @@ variables:
     sources: [model_var: D550_SS, model_var: DAYFOC]
     table: aerosol
     units: '1'
-
-  od865aer_tavg-u-hxy-u:
-    description: 'AOD from the ambient aerosols (i.e., includes aerosol water).  Does
-      not include AOD from stratospheric aerosols if these are prescribed but includes
-      other possible background aerosol types. Needs a comment attribute "wavelength:
-      865 nm"'
-    dims: [lon, lat, time, lambda865nm]
-    formula: DOD870/DAYFOC
-    sources: [model_var: DOD870, model_var: DAYFOC]
-    table: aerosol
-    units: '1'
-
-  oh_tavg-al-hxy-u:
-    description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
-      where X is a material constituent of Y.
-    dims: [lon, lat, lev, time]
-    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
-      units: '1'}
-    sources: [model_var: OH_aft]
-    table: aerosol
-    units: mol mol-1
 
   oh_tavg-p39-hy-air:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
@@ -539,48 +395,12 @@ variables:
     table: aerosol
     units: m
 
-  rluscsaf_tavg-u-hxy-u:
-    description: Flux corresponding to rluscs resulting from an aerosol-free call
-      to radiation
-    dims: [lon, lat, time]
-    formula: FLNSCAF-FLDSCAF
-    positive: up
-    sources: [model_var: FLNSCAF, model_var: FLDSCAF]
-    table: aerosol
-    units: W m-2
-
-  rlutaf_tavg-u-hxy-u:
-    description: Flux corresponding to rlut resulting fom aerosol-free call to radiation
-    dims: [lon, lat, time]
-    formula: FSNTOAAF-FSNTAF+FLNTAF
-    positive: up
-    sources: [model_var: FSNTOAAF, model_var: FSNTAF, model_var: FLNTAF]
-    table: aerosol
-    units: W m-2
-
   rlutcsaf_tavg-u-hxy-u:
     description: Flux corresponding to rlutcs resulting fom aerosol-free call to radiation
     dims: [lon, lat, time]
     formula: FSNTOACAF-FSNTCAF+FLNTCAF
     positive: up
     sources: [model_var: FSNTOACAF, model_var: FSNTCAF, model_var: FLNTCAF]
-    table: aerosol
-    units: W m-2
-
-  rsutaf_tavg-u-hxy-u:
-    description: Flux corresponding to rsut resulting fom aerosol-free call to radiation
-    dims: [lon, lat, time]
-    positive: up
-    sources: [model_var: FSUTOAAF]
-    table: aerosol
-    units: W m-2
-
-  rsutcsaf_tavg-u-hxy-u:
-    description: Flux corresponding to rsutcs resulting fom aerosol-free call to radiation
-    dims: [lon, lat, time]
-    formula: SOLIN-FSNTOACAF
-    positive: up
-    sources: [model_var: SOLIN, model_var: FSNTOACAF]
     table: aerosol
     units: W m-2
 
@@ -594,6 +414,13 @@ variables:
     table: aerosol
     units: mol mol-1
 
+  so2_tavg-h2m-hxy-u:
+    description: Daily mean SO2 volume mixing ratio near surface.
+    dims: [lon, lat, time, height2m]
+    sources: [model_var: SO2]
+    table: aerosol
+    units: mol mol-1
+
   tatp_tavg-u-hxy-u:
     description: 2D monthly mean thermal tropopause calculated using WMO tropopause
       definition on 3d temperature
@@ -603,7 +430,7 @@ variables:
     units: K
 
   toz_tavg-u-hxy-u:
-    description: total ozone column in DU
+    description: Total ozone column
     dims: [lon, lat, time]
     sources: [model_var: cb_ozone_c]
     table: aerosol
@@ -630,14 +457,6 @@ variables:
     table: aerosol
     units: kg m-2 s-1
 
-  wetoa_tavg-u-hxy-u:
-    description: Deposition rate of organic matter in aerosols (measured by the dry
-      mass) due to wet processes
-    dims: [lon, lat, time]
-    sources: [model_var: wet_OM]
-    table: aerosol
-    units: kg m-2 s-1
-
   wetso2_tavg-u-hxy-u:
     description: Deposition rate of sulfur dioxide due to wet processes
     dims: [lon, lat, time]
@@ -659,10 +478,3 @@ variables:
     sources: [model_var: wet_SALT]
     table: aerosol
     units: kg m-2 s-1
-
-  zg_tavg-10hPa-hxy-air:
-    description: Geopotential height on the 10 hPa surface
-    dims: [lon, lat, time, p10]
-    sources: [model_var: Z010]
-    table: aerosol
-    units: m

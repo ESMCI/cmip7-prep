@@ -14,7 +14,7 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     # "<branded_variable_name>": "down",
     "hfls_tavg-u-hxy-u": "up",
     "hfss_tavg-u-hxy-u": "up",
-    "rlds_tavg-u-hxy-u": "up",
+    "rlds_tavg-u-hxy-u": "down",
     "rls_tavg-u-hxy-u": "up",
     "rlut_tavg-u-hxy-u": "up",
     "rlutcs_tavg-u-hxy-u": "up",
@@ -36,7 +36,7 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "tauu_tavg-u-hxy-u": "down",
     "tauv_tavg-u-hxy-u": "down",
     "fFire_tavg-u-hxy-lnd": "up",
-    "npp_tavg-u-hxy-lnd": "up",
+    "npp_tavg-u-hxy-lnd": "down",
     "rh_tavg-u-hxy-lnd": "up",
     "rsds_tavg-u-hxy-lnd": "down",
     "rsds_tavg-u-hxy-sn": "down",
@@ -93,6 +93,7 @@ MODEL_CONFIGS = {
         "source_skip_phrases": [
             "?",
             "n/a",
+            "#N/A",
             "derived",
             "IN SURF DATASET",
             "can be derived",
@@ -735,6 +736,9 @@ def write_yaml(data, filepath):
             # Leave multi-key dicts (e.g. {model_var: VAR, freq: mon}) untouched.
             line = re.sub(r"\{model_var: (\w+)\}", r"model_var: \1", line)
         if "FATES_FRAC" in line:
+            # Make sure we don't get any FATES_FRACTIONTION
+            if "FATES_FRACTION" in line:
+                line = line.replace("FATES_FRACTION", "FATES_FRAC")
             line = line.replace("FATES_FRAC", "FATES_FRACTION")
         if "yaml_coax_dummy" in line:
             continue
