@@ -37,7 +37,7 @@ variables:
     description: Percentage of entire grid cell  that is covered by C4 PFTs (including
       grass and crops).
     dims: [lon, lat, time, typec4pft]
-    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[14], dimname='fates_levpft')*FATES_FRACTION
+    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[14], dimname='fates_levpft')*FATES_FRACTION*100
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -70,17 +70,36 @@ variables:
     table: land
     units: kg m-2
 
+  cRoot_tavg-u-hxy-lnd:
+    description: including fine and coarse roots.
+    dims: [lon, lat, time]
+    formula: (FATES_VEGC - FATES_VEGC_ABOVEGROUND)*FATES_FRACTION
+    sources: [model_var: FATES_VEGC, model_var: FATES_VEGC_ABOVEGROUND, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
   cSoil_tavg-d100cm-hxy-lnd:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     dims: [lon, lat, time, sdepth100cm]
+    formula: TOTSOMC_1m / 1000
     sources: [model_var: TOTSOMC_1m]
+    table: land
+    units: kg m-2
+
+  cSoil_tavg-sl-hxy-lnd:
+    description: for models with vertically discretised soil carbon, report total
+      soil carbon for each level
+    dims: [lon, lat, sdepth, time]
+    formula: SOILC_vr * DZSOI / 1000
+    sources: [model_var: SOILC_vr, model_var: DZSOI]
     table: land
     units: kg m-2
 
   cSoil_tavg-u-hxy-lnd:
     description: Carbon mass in the full depth of the soil model.
     dims: [lon, lat, time]
+    formula: TOTSOMC / 1000
     sources: [model_var: TOTSOMC]
     table: land
     units: kg m-2
@@ -129,6 +148,7 @@ variables:
     description: The fixation (uptake of nitrogen gas directly from the atmosphere)
       of nitrogen due to biological processes.
     dims: [lon, lat, time]
+    formula: NFIX_TO_SMINN / 1000
     sources: [model_var: NFIX_TO_SMINN]
     table: land
     units: kg m-2 s-1
@@ -172,6 +192,15 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  fNLandToOcean_tavg-u-hxy-lnd:
+    description: leached nitrogen etc that goes into run off or river routing and
+      finds its way into ocean should be reported here.
+    dims: [lon, lat, time]
+    formula: (SMIN_NO3_LEACHED+ SMIN_NO3_RUNOFF) / 1000
+    sources: [model_var: SMIN_NO3_LEACHED, model_var: SMIN_NO3_RUNOFF]
+    table: land
+    units: kg m-2 s-1
+
   fNOx_tavg-u-hxy-lnd:
     description: The surface called "surface" means the lower boundary of the atmosphere.
       "Upward" indicates a vector component which is positive when directed upward
@@ -193,6 +222,20 @@ variables:
     description: Flux of Nitrogen from the land into the atmosphere due to fire
     dims: [lon, lat, time]
     sources: [model_var: COL_FIRE_NLOSS]
+    table: land
+    units: kg m-2 s-1
+
+  fNleach_tavg-u-hxy-lnd:
+    description: In accordance with common usage in geophysical disciplines, "flux"
+      implies per unit area, called "flux density" in physics. The specification of
+      a physical process by the phrase "due_to_" process means that the quantity named
+      is a single term in a sum of terms which together compose the general quantity
+      named by omitting the phrase. "Leaching" means the loss of water soluble chemical
+      species from soil. Runoff is the liquid water which drains from land. If not
+      specified, "runoff" refers to the sum of surface runoff and subsurface drainage.
+    dims: [lon, lat, time]
+    formula: SMIN_NO3_LEACHED / 1000
+    sources: [model_var: SMIN_NO3_LEACHED]
     table: land
     units: kg m-2 s-1
 
@@ -399,9 +442,19 @@ variables:
     table: land
     units: kg m-2
 
+  nLand_tavg-u-hxy-lnd:
+    description: Report missing data over ocean grid cells. For fractional land report
+      value averaged over the land fraction.
+    dims: [lon, lat, time]
+    formula: TOTECOSYSN / 1000
+    sources: [model_var: TOTECOSYSN]
+    table: land
+    units: kg m-2
+
   nMineralNH4_tavg-u-hxy-lnd:
     description: SUM of ammonium over all soil layers
     dims: [lon, lat, time]
+    formula: SMIN_NH4 / 1000
     sources: [model_var: SMIN_NH4]
     table: land
     units: kg m-2
@@ -409,6 +462,7 @@ variables:
   nMineralNO3_tavg-u-hxy-lnd:
     description: SUM of nitrate over all soil layers
     dims: [lon, lat, time]
+    formula: SMIN_NO3 / 1000
     sources: [model_var: SMIN_NO3]
     table: land
     units: kg m-2
@@ -416,6 +470,7 @@ variables:
   nMineral_tavg-u-hxy-lnd:
     description: SUM of ammonium, nitrite, nitrate, etc over all soil layers
     dims: [lon, lat, time]
+    formula: SMINN / 1000
     sources: [model_var: SMINN]
     table: land
     units: kg m-2
@@ -424,8 +479,8 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     dims: [lon, lat, time]
-    formula: SOIL1N+SOIL2N+SOIL3N
-    sources: [model_var: SOIL1N, model_var: SOIL2N, model_var: SOIL3N]
+    formula: (TOTSOMN+SMINN) / 1000
+    sources: [model_var: TOTSOMN, model_var: SMINN]
     table: land
     units: kg m-2
 
@@ -434,9 +489,9 @@ variables:
       as photosynthesis MINUS the sum of  plant and soil respiration, carbonfluxes  from
       fire, harvest, grazing  and land use change. Positive flux  is into the land.
     dims: [lon, lat, time]
-    formula: FCO2 /1000 / conv
+    formula: -FCO2*(12.01/44.01)
     positive: down
-    sources: [model_var: FCO2, model_var: conv]
+    sources: [model_var: FCO2]
     table: land
     units: kg m-2 s-1
 
@@ -577,15 +632,6 @@ variables:
     dims: [lon, lat, time]
     formula: SOILC_HR /1000
     sources: [model_var: SOILC_HR]
-    table: land
-    units: kg m-2 s-1
-
-  rhVgt_tavg-u-hxy-multi:
-    description: Carbon mass flux per unit area into atmosphere due to heterotrophic
-      respiration on land (respiration by consumers), calculated on vegetation type.
-    dims: [lon, lat, vegtype, time]
-    formula: (FATES_HET_RESP)*FATES_FRACTION
-    sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 

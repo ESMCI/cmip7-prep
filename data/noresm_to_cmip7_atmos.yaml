@@ -279,8 +279,7 @@ variables:
     description: at surface; includes both liquid and solid phases from all types
       of clouds (both large-scale and convective)
     dims: [lon, lat, time]
-    formula: PRECT+PRECC
-    sources: [model_var: PRECT, model_var: PRECC]
+    sources: [model_var: PRECT]
     table: atmos
     units: kg m-2 s-1
 
@@ -341,7 +340,7 @@ variables:
   rlds_tavg-u-hxy-u:
     description: Surface downwelling longwave radiation
     dims: [lon, lat, time]
-    positive: up
+    positive: down
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -416,16 +415,11 @@ variables:
     units: W m-2
 
   rsus_tavg-u-hxy-u:
-    description: The surface called "surface" means the lower boundary of the atmosphere.
-      "shortwave" means shortwave radiation. Upwelling radiation is radiation from
-      below. It does not mean "net upward". When thought of as being incident on a
-      surface, a radiative flux is sometimes called "irradiance". In addition, it
-      is identical with the quantity measured by a cosine-collector light-meter and
-      sometimes called "vector irradiance". In accordance with common usage in geophysical
-      disciplines, "flux" implies per unit area, called "flux density" in physics.
+    description: This is the 3-hour mean flux.
     dims: [lon, lat, time]
+    formula: FSDS-FSNS
     positive: up
-    sources: [model_var: FSR]
+    sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
     units: W m-2
 
