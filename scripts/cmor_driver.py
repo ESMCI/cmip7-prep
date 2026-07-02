@@ -314,11 +314,11 @@ def parse_realization_initialization_physics_forcing(
     ripf_str: str,
 ) -> Tuple[str, str, str, str]:
     """Parse a string of the form rXiYpZfW into its components."""
-    match = re.match(r"r(\d+)i(\d+)p(\d+)f(\d+)", ripf_str)
-    if not match:
-        raise ValueError(
-            f"Invalid realization-initialization-physics-forcing string: {ripf_str}"
-        )
+match = re.fullmatch(r"r(\d+)i(\d+)p(\d+)f(\d+)", ripf_str.strip())
+if not match:
+    raise ValueError(
+        f"Invalid realization-initialization-physics-forcing string {ripf_str!r}; expected rXiYpZfW (e.g. r1i1p1f1)"
+    )
     realization_index, initialization_index, physics_index, forcing_index = (
         match.groups()
     )
