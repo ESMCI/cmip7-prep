@@ -68,9 +68,9 @@ cd scripts
 Alternatively you can load up Miniforge yourself, load this conda environment and then add the path to this repository to your python path
 ```bash
 conda activate /projects/NS9560K/diagnostics/cmordev_env_312/
-export PYTHONPATH=pathtorepo/cmip7-prep/src:$PYTHONPATH
+export PYTHONPATH=/path/to/repo/cmip7-prep/src:$PYTHONPATH
 ```
-Swap `pathtorepo` with the root path where this repository is cloned
+Swap `/path/to/repo` with the root path where this repository is cloned
 
 ## Quickstart
 
