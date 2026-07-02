@@ -312,7 +312,7 @@ def _priority_for_logging(data_request, cmip_var) -> str:
 
 def parse_realization_initialization_physics_forcing(
     ripf_str: str,
-    ) -> Tuple[str, str, str, str]:
+) -> Tuple[str, str, str, str]:
     """Parse a string of the form rXiYpZfW into its components."""
     match = re.fullmatch(r"r(\d+)i(\d+)p(\d+)f(\d+)", ripf_str.strip())
     if not match:
