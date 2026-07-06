@@ -91,8 +91,8 @@ variables:
     description: for models with vertically discretised soil carbon, report total
       soil carbon for each level
     dims: [lon, lat, sdepth, time]
-    formula: SOILC_vr * DZSOI / 1000
-    sources: [model_var: SOILC_vr, model_var: DZSOI]
+    formula: SOILC_vr * ZSOI / 1000
+    sources: [model_var: SOILC_vr, model_var: ZSOI]
     table: land
     units: kg m-2
 
@@ -157,7 +157,7 @@ variables:
     description: leached carbon etc that goes into run off or river routing and finds
       its way into ocean should be reported here.
     dims: [lon, lat, time]
-    formula: SOM_C_LEACHED *1000
+    formula: SOM_C_LEACHED /1000
     sources: [model_var: SOM_C_LEACHED]
     table: land
     units: kg m-2 s-1
@@ -526,6 +526,23 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  nppVgt_tavg-u-hxy-multi:
+    description: '"Production of carbon" means the production of biomass expressed
+      as the mass of carbon which it contains. Net primary production is the excess
+      of gross primary production (rate of synthesis of biomass from inorganic precursors)
+      by autotrophs ("producers"), for example, photosynthesis in plants or phytoplankton,
+      over the rate at which the autotrophs themselves respire some of this biomass.
+      "Productivity" means production per unit area. The phrase "expressed_as" is
+      used in the construction A_expressed_as_B, where B is a chemical constituent
+      of A. It means that the quantity indicated by the standard name is calculated
+      solely with respect to the B contained in A, neglecting all other chemical constituents
+      of A.'
+    dims: [lon, lat, vegtype, time]
+    formula: (FATES_NPP_PF)*FATES_FRACTION
+    sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
   npp_tavg-u-hxy-lnd:
     description: '"Production of carbon" means the production of biomass expressed
       as the mass of carbon which it contains. Net primary production is the excess
@@ -639,9 +656,9 @@ variables:
     description: Carbon mass flux per unit area into atmosphere due to heterotrophic
       respiration on land (respiration by consumers)
     dims: [lon, lat, time]
-    formula: FATES_HET_RESP*FATES_FRACTION
+    formula: HR / 1000
     positive: up
-    sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
+    sources: [model_var: HR]
     table: land
     units: kg m-2 s-1
 
@@ -685,7 +702,7 @@ variables:
   slthick_ti-sl-hxy-lnd:
     description: Thickness of Soil Layers
     dims: [lon, lat, sdepth]
-    sources: [model_var: DZSOI]
+    sources: [model_var: ZSOI]
     table: land
     units: m
 
@@ -772,6 +789,17 @@ variables:
     sources: [model_var: TSOI]
     table: land
     units: K
+
+  wetlandCH4_tavg-u-hxy-lnd:
+    description: Net upward flux of methane (NH4) from wetlands (areas where water
+      covers the soil, or is present either at or near the surface of the soil all
+      year or for varying periods of time during the year, including during the growing
+      season).
+    dims: [lon, lat, time]
+    formula: (CH4_SURF_DIFF_SAT+CH4_SURF_EBUL_SAT+CH4_SURF_AERE_SAT) * 0.016043
+    sources: [model_var: CH4_SURF_DIFF_SAT, model_var: CH4_SURF_EBUL_SAT, model_var: CH4_SURF_AERE_SAT]
+    table: land
+    units: kg m-2 s-1
 
   wetlandCH4prod_tavg-u-hxy-lnd:
     description: Biological emissions (methanogenesis) of methane (NH4) from wetlands
