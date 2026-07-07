@@ -36,7 +36,8 @@ from .cmor_utils import (
 
 # from .mom6_static import compute_cell_bounds_from_corners
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
