@@ -93,6 +93,16 @@ variables:
     table: aerosol
     units: m-3
 
+  cdnc_tavg-al-hxy-u:
+    description: Cloud Droplet Number Concentration in liquid water clouds.
+    dims: [lon, lat, lev, time]
+    formula: AWNC/FREQL
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: AWNC, model_var: FREQL]
+    table: aerosol
+    units: m-3
+
   cheaqpso4_tavg-al-hxy-u:
     description: 'proposed name: tendency_of_atmosphere_mass_content_of_sulfate_dry_aerosol_due_to_aqueous_phase_net_chemical_production'
     dims: [lon, lat, lev, time]
