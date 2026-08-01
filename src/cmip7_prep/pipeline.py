@@ -176,23 +176,27 @@ def open_native_for_cmip_vars(
     selected = sorted(
         {str(p) for p in files if any(_filename_contains_var(p, v) for v in required)}
     )
-    multivar_multitime = False
-    found_multi_one_var = False
-    for v in required:
-        if len([p for p in selected if _filename_contains_var(p, v)]) > 1:
-            if not found_multi_one_var:
-                found_multi_one_var = True
-            else:
-                multivar_multitime = True
-                break
+    # multivar_multitime = False
+    # found_multi_one_var = False
+    # for v in required:
+    #     if len([p for p in selected if _filename_contains_var(p, v)]) > 1:
+    #         if not found_multi_one_var:
+    #             found_multi_one_var = True
+    #         else:
+    #             multivar_multitime = True
+    #             break
 
-    if not selected:
-        logger.warning(
-            "no native inputs found for requested CMIP variables: %s", cmip_vars
-        )
-        return None, None
+    # if not selected:
+    #     logger.warning(
+    #         "no native inputs found for requested CMIP variables: %s", cmip_vars
+    #     )
+    #     return None, None
     logger.info(required)
-    if multivar_multitime:
+    # logger.info(multivar_multitime)
+    if len(required) > 1:
+        logger.info(
+            "Merging multiple time series files for each variable: %s", required
+        )
         ds_list = []
         for v in required:
             subset = [p for p in selected if _filename_contains_var(p, v)]

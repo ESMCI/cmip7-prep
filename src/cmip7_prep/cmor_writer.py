@@ -36,7 +36,8 @@ from .cmor_utils import (
 
 # from .mom6_static import compute_cell_bounds_from_corners
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -109,7 +110,6 @@ class CmorSession(
         try:
             if self._log_path is not None:
                 logger.info("CMOR logfile: %s", self._log_path)
-                print()
                 cmor.setup(
                     inpath=str(self.tables_root / "tables"),
                     netcdf_file_action=getattr(

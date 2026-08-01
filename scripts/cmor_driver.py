@@ -285,6 +285,12 @@ def parse_args():
         action="store_true",
         help="Override CMIP7 data request variable list and run all variables defined in the YAML mapping file",
     )
+    parser.add_argument(
+        "--realization-initialization-physics-forcing",
+        type=str,
+        default="r1i1p1f1",
+        help="Realization, initialization, physics, and forcing indices in the format rXiYpZfW (default: r1i1p1f1)",
+    )
 
     args = parser.parse_args()
     return args
@@ -304,6 +310,26 @@ def _priority_for_logging(data_request, cmip_var) -> str:
     return str(data_request.find_priority_per_variable(variable=cmip_var))
 
 
+def parse_realization_initialization_physics_forcing(
+    ripf_str: str,
+) -> Tuple[str, str, str, str]:
+    """Parse a string of the form rXiYpZfW into its components."""
+    match = re.fullmatch(r"r(\d+)i(\d+)p(\d+)f(\d+)", ripf_str.strip())
+    if not match:
+        raise ValueError(
+            f"Invalid realization-initialization-physics-forcing string {ripf_str!r}; expected rXiYpZfW (e.g. r1i1p1f1)"
+        )
+    realization_index, initialization_index, physics_index, forcing_index = (
+        match.groups()
+    )
+    return (
+        f"r{realization_index}",
+        f"i{initialization_index}",
+        f"p{physics_index}",
+        f"f{forcing_index}",
+    )
+
+
 def process_one_var(
     cmip_var,
     mapping,
@@ -314,11 +340,15 @@ def process_one_var(
     model,
     realm="atmos",
     frequency="mon",
+    ripf_index="r1i1p1f1",
     ocn_fx_fields=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.branded_variable_name.name
 
+    realization_index, initialization_index, physics_index, forcing_index = (
+        parse_realization_initialization_physics_forcing(ripf_index)
+    )
     # At this point you have a cmip_var (metadata from database query for the target variable)
     # queried a cmor database from the cloud
     logger.info(f"Starting processing for variable: {varname}")
@@ -565,8 +595,13 @@ def process_one_var(
                     outdir=outdir,
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
+                    set_cur_dataset_attribute("realization_index", realization_index)
+                    set_cur_dataset_attribute(
+                        "initialization_index", initialization_index
+                    )
+                    set_cur_dataset_attribute("physics_index", physics_index)
+                    set_cur_dataset_attribute("forcing_index", forcing_index)
                     region = write_cfg.get("region", "glb")
-                    logger.debug("Setting region: %s", region)
                     set_cur_dataset_attribute("region", region)
 
                     logger.info(
@@ -667,6 +702,7 @@ def main():
     frequency = args.frequency
     realm = args.realm
     logger.debug("Realm is %s", realm)
+    ripf_index = args.realization_initialization_physics_forcing
 
     # Set ocn_grid and ocn_fx_fields
     # TODO: it looks like ocn_grid is not used after this - so can it
@@ -929,6 +965,7 @@ def main():
                         realm=realm,
                         frequency=frequency,
                         ocn_fx_fields=ocn_fx_fields,
+                        ripf_index=ripf_index,
                     )
                     results.extend(res)
                 except Exception as exc:
@@ -946,6 +983,7 @@ def main():
                     realm=realm,
                     frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
+                    ripf_index=ripf_index,
                 )
                 futures = client.compute([fut])
                 from dask.distributed import wait, as_completed

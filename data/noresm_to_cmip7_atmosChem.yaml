@@ -5,7 +5,7 @@ dataset_overrides:
 
 variables:
 
-  cfc11_tavg-u-hm-u:
+  cfc11_tavg-u-hm-air:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.  The chemical formula of CFC11 is CFCl3.  The
       IUPAC name for CFC11 is trichloro-fluoro-methane.
@@ -14,7 +14,7 @@ variables:
     table: atmosChem
     units: '1.00E-12'
 
-  cfc12_tavg-u-hm-u:
+  cfc12_tavg-u-hm-air:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.  The chemical formula of CFC12 is CF2Cl2.  The
       IUPAC name for CFC12 is dichloro-difluoro-methane.
@@ -23,33 +23,73 @@ variables:
     table: atmosChem
     units: '1.00E-12'
 
+  ch4_tavg-al-hxy-u:
+    description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
+      where X is a material constituent of Y.
+    dims: [lon, lat, lev, time]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: ch4vmr]
+    table: atmosChem
+    units: mol mol-1
+
+  ch4_tavg-p19-hxy-air:
+    description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
+      where X is a material constituent of Y.
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    sources: [model_var: ch4vmr]
+    table: atmosChem
+    units: mol mol-1
+
   ch4_tavg-p39-hy-air:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
     dims: [time, plev, lat]
     levels: {name: plev39, units: Pa}
-    sources: [model_var: CH4]
+    sources: [model_var: ch4vmr]
     table: atmosChem
     units: mol mol-1
 
-  ch4_tavg-u-hm-u:
+  ch4_tavg-u-hm-air:
     description: Global Mean Mole Fraction of CH4
     dims: [time]
     sources: [model_var: ch4vmr]
     table: atmosChem
     units: '1.00E-09'
 
-  dms_tavg-al-hxy-u:
+  n2o_tavg-al-hxy-u:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
-      where X is a material constituent of Y.
+      where X is a material constituent of Y.   The chemical formula of  nitrous oxide
+      is N2O.
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: DMS]
+    sources: [model_var: n2ovmr]
     table: atmosChem
     units: mol mol-1
 
-  n2o_tavg-u-hm-u:
+  n2o_tavg-p19-hxy-air:
+    description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
+      where X is a material constituent of Y.   The chemical formula of  nitrous oxide
+      is N2O.
+    dims: [time, plev, lat, lon]
+    levels: {name: plev19, units: Pa}
+    sources: [model_var: n2ovmr]
+    table: atmosChem
+    units: mol mol-1
+
+  n2o_tavg-p39-hy-air:
+    description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
+      where X is a material constituent of Y.   The chemical formula of  nitrous oxide
+      is N2O.
+    dims: [time, plev, lat]
+    levels: {name: plev39, units: Pa}
+    sources: [model_var: n2ovmr]
+    table: atmosChem
+    units: mol mol-1
+
+  n2o_tavg-u-hm-air:
     description: Global mean Nitrous Oxide (N2O)
     dims: [time]
     sources: [model_var: n2ovmr]
@@ -62,24 +102,6 @@ variables:
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: ozone]
-    table: atmosChem
-    units: mol mol-1
-
-  o3_tavg-p19-hxy-air:
-    description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
-      where X is a material constituent of Y.
-    dims: [time, plev, lat, lon]
-    levels: {name: plev19, units: Pa}
-    sources: [model_var: ozone]
-    table: atmosChem
-    units: mol mol-1
-
-  o3_tavg-p39-hy-air:
-    description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
-      where X is a material constituent of Y.
-    dims: [time, plev, lat]
-    levels: {name: plev39, units: Pa}
     sources: [model_var: ozone]
     table: atmosChem
     units: mol mol-1
