@@ -39,6 +39,22 @@ variables:
     table: atmos
     units: m
 
+  bldep_tmax-u-hxy-u:
+    description: 'maximum boundary layer height during the day (add cell_methods attribute:
+      "time: maximum")'
+    dims: [lon, lat, time]
+    sources: [model_var: PBLHMX]
+    table: atmos
+    units: m
+
+  bldep_tmin-u-hxy-u:
+    description: 'minimum boundary layer height during the day (add cell_methods attribute:
+      "time: minimum")'
+    dims: [lon, lat, time]
+    sources: [model_var: PBLHMN]
+    table: atmos
+    units: m
+
   cfadDbze94_tavg-h40-hxy-air:
     description: CloudSat Radar Reflectivity
     dims: [lon, lat, alt40, dbze, time]
@@ -54,7 +70,8 @@ variables:
     units: '1'
 
   cl_tavg-al-hxy-u:
-    description: Includes both large-scale and convective cloud.
+    description: Percentage cloud cover, including both large-scale and convective
+      cloud.
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
@@ -126,10 +143,7 @@ variables:
     units: '%'
 
   clivi_tavg-u-hxy-u:
-    description: mass of ice water in the column divided by the area of the column
-      (not just the area of the cloudy portion of the column). Includes precipitating
-      frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
-      of radiative transfer in model.
+    description: Ice water path
     dims: [lon, lat, time]
     sources: [model_var: TGCLDIWP]
     table: atmos
@@ -144,9 +158,9 @@ variables:
 
   clt_tavg-u-hxy-u:
     description: for the whole atmospheric column, as seen from the surface or the
-      top of the atmosphere. Include both large-scale and convective cloud.  This
-      is a 3-hour mean.
+      top of the atmosphere. Include both large-scale and convective cloud.
     dims: [lon, lat, time]
+    formula: CLDTOT*100
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -262,7 +276,7 @@ variables:
     units: kg m-2 s-1
 
   hfls_tavg-u-hxy-u:
-    description: This is the 3-hour mean flux.
+    description: includes both evaporation and sublimation
     dims: [lon, lat, time]
     positive: up
     sources: [model_var: LHFLX]
@@ -301,7 +315,7 @@ variables:
       0 C, and with respect to ice for T<0 C.
     dims: [time, plev, lat, lon]
     levels: {name: plev19, units: Pa}
-    sources: [model_var: RELHUM]
+    sources: [model_var: RELHUM, model_var: RHW]
     table: atmos
     units: '%'
 
@@ -317,7 +331,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
-    sources: [{model_var: 'RHREFHT:X'}]
+    sources: [model_var: RHREFHTMX]
     table: atmos
     units: '%'
 
@@ -325,7 +339,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
-    sources: [{model_var: 'RHREFHT:M'}]
+    sources: [model_var: RHREFHTMN]
     table: atmos
     units: '%'
 
@@ -400,7 +414,7 @@ variables:
     units: kg m-2 s-1
 
   pctisccp_tavg-u-hxy-cl:
-    description: time-means are weighted by the ISCCP Total Cloud Fraction - see  https://www.cfmip.org/tools-and-data/cosp
+    description: time-means weighted by the ISCCP Total Cloud Fraction - see https://www.cfmip.org/tools-and-data/cosp
     dims: [lon, lat, time]
     formula: MEANPTOP_ISCCP/CLDTOT_ISCCP
     sources: [model_var: MEANPTOP_ISCCP, model_var: CLDTOT_ISCCP]
@@ -408,8 +422,7 @@ variables:
     units: Pa
 
   pr_tavg-u-hxy-u:
-    description: at surface; includes both liquid and solid phases.  This is the 3-hour
-      mean precipitation flux.
+    description: Total precipitation flux
     dims: [lon, lat, time]
     sources: [model_var: PRECT]
     table: atmos
@@ -431,8 +444,8 @@ variables:
     units: kg m-2 s-1
 
   prsn_tavg-u-hxy-u:
-    description: at surface.  Includes precipitation of all forms water in the solid
-      phase.  This is the 3-hour mean snowfall flux.
+    description: at surface; includes precipitation of all forms of water in the solid
+      phase
     dims: [lon, lat, time]
     formula: PRECSC+PRECSL
     sources: [model_var: PRECSC, model_var: PRECSL]
@@ -480,6 +493,13 @@ variables:
     sources: [model_var: REFFL]
     table: atmos
     units: m
+
+  rld_tavg-alh-hxy-u:
+    description: Includes also the fluxes at the surface and TOA.
+    dims: [lon, lat, alevhalf, time]
+    sources: [model_var: FDL]
+    table: atmos
+    units: W m-2
 
   rldcs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
@@ -542,7 +562,7 @@ variables:
     units: W m-2
 
   rlut_tavg-u-hxy-u:
-    description: at the top of the atmosphere (to be compared with satellite measurements)
+    description: at the top of the atmosphere.
     dims: [lon, lat, time]
     formula: FSNTOA-FSNT+FLNT
     positive: up
@@ -551,7 +571,7 @@ variables:
     units: W m-2
 
   rlutcs_tavg-u-hxy-u:
-    description: Upwelling clear-sky longwave radiation at top of atmosphere
+    description: TOA outgoing clear sky longwave
     dims: [lon, lat, time]
     formula: FSNTOAC-FSNTC+FLNTC
     positive: up
@@ -599,7 +619,7 @@ variables:
     units: W m-2
 
   rsdt_tavg-u-hxy-u:
-    description: at the top of the atmosphere
+    description: Shortwave radiation incident at the top of the atmosphere
     dims: [lon, lat, time]
     formula: FSNTOA+FSUTOA
     positive: up
@@ -648,7 +668,7 @@ variables:
     units: W m-2
 
   rsut_tavg-u-hxy-u:
-    description: at the top of the atmosphere
+    description: TOA outgoing shortwave radiation
     dims: [lon, lat, time]
     positive: up
     sources: [model_var: FSUTOA]
@@ -676,7 +696,7 @@ variables:
     units: W m-2
 
   sfcWind_tavg-h10m-hxy-u:
-    description: near-surface (usually, 10 meters) wind speed.
+    description: Near surface wind speed
     dims: [lon, lat, time, height10m]
     sources: [model_var: U10]
     table: atmos
@@ -721,7 +741,8 @@ variables:
     units: K
 
   ta_tavg-p39-hy-air:
-    description: Air Temperature
+    description: Zonal mean temperature of air with the extended number of vertical
+      levels.
     dims: [time, plev, lat]
     levels: {name: plev39, units: Pa}
     sources: [model_var: T]
@@ -729,7 +750,7 @@ variables:
     units: K
 
   tas_tavg-h2m-hxy-u:
-    description: near-surface (usually, 2 meter) air temperature
+    description: Temperature near surface.
     dims: [lon, lat, time, height2m]
     sources: [model_var: TREFHT]
     table: atmos
@@ -754,7 +775,7 @@ variables:
     description: 'minimum near-surface (usually, 2 meter) air temperature (add cell_method
       attribute "time: min")'
     dims: [lon, lat, time, height2m]
-    sources: [model_var: TREFHTMN]
+    sources: [model_var: TREFMNAV]
     table: atmos
     units: K
 
@@ -767,7 +788,7 @@ variables:
     units: Pa
 
   tauv_tavg-u-hxy-u:
-    description: Downward northward wind stress at the surface
+    description: surface, now requesting daily output.
     dims: [lon, lat, time]
     positive: down
     sources: [model_var: TAUY]
@@ -788,6 +809,14 @@ variables:
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    sources: [model_var: QRL]
+    table: atmos
+    units: K s-1
+
+  tntrl_tavg-p39-hy-air:
+    description: zonal mean; hence YZT
+    dims: [time, plev, lat]
+    levels: {name: plev39, units: Pa}
     sources: [model_var: QRL]
     table: atmos
     units: K s-1
@@ -826,7 +855,7 @@ variables:
     units: m s-1
 
   ua_tavg-p39-hy-air:
-    description: Zonal wind (positive in a eastward direction).
+    description: zonal mean; hence YZT
     dims: [time, plev, lat]
     levels: {name: plev39, units: Pa}
     sources: [model_var: U]
@@ -934,11 +963,7 @@ variables:
     units: m
 
   zg_tavg-p39-hy-air:
-    description: Geopotential is the sum of the specific gravitational potential energy
-      relative to the geoid and the specific centripetal potential energy. Geopotential
-      height is the geopotential divided by the standard acceleration due to gravity.
-      It is numerically similar to the altitude (or geometric height) and not to the
-      quantity with standard name height, which is relative to the surface.
+    description: zonal mean; hence YZT
     dims: [time, plev, lat]
     levels: {name: plev39, units: Pa}
     sources: [model_var: Z3]

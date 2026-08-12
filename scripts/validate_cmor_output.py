@@ -620,6 +620,8 @@ def create_timeseries_plots(
 ) -> list[str]:
     """Create paginated composite mean time-series plots."""
     try:
+        import matplotlib
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping time-series plots")
