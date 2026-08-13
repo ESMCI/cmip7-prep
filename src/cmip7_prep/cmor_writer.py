@@ -371,7 +371,6 @@ class CmorSession(
         """
 
         # ---- helpers ----
-
         def _get_time_and_bounds(dsi: xr.Dataset):
             logger.debug("Defining time axis")
             time_da = (
@@ -1074,7 +1073,9 @@ class CmorSession(
             slab = max(1, min(ntime, int((512 * 1024 * 1024) // max(rec_bytes, 1))))
             logger.debug(
                 "Slabbed CMOR write: ntime=%d, slab=%d (%.1f MB/record)",
-                ntime, slab, rec_bytes / (1024 * 1024),
+                ntime,
+                slab,
+                rec_bytes / (1024 * 1024),
             )
             for start in range(0, ntime, slab):
                 stop = min(start + slab, ntime)
