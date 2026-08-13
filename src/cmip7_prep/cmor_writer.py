@@ -371,7 +371,6 @@ class CmorSession(
         """
 
         # ---- helpers ----
-
         def _get_time_and_bounds(dsi: xr.Dataset):
             logger.debug("Defining time axis")
             time_da = (
@@ -1053,12 +1052,41 @@ class CmorSession(
         nt = 0
 
         # ---- Main variable write ----
+        # Write in time slabs so a large field is never fully materialized in
+        # memory at once.  np.asarray(data_filled) pulls the ENTIRE regridded
+        # variable into RAM; for high-frequency 3-D output that is tens to
+        # hundreds of GB and OOMs the process (monthly 3-D and high-frequency
+        # 2-D are small enough to fit, which is why only high-frequency 3-D
+        # crashes).  CMOR appends across successive writes via 'ntimes_passed',
+        # so slabbing bounds peak memory to a single slab.  Only applied when
+        # 'time' is the leading axis (matching the CMOR axis order); otherwise
+        # fall back to the original single write.
         logger.debug("Writing CMOR variable %s", var_id)  # debug
-        cmor.write(
-            var_id,
-            np.asarray(data_filled),
-            ntimes_passed=nt,
-        )
+        if data_filled.dims and data_filled.dims[0] == "time":
+            ntime = int(data_filled.sizes["time"])
+            # bytes for one time record (product of the non-time dim sizes)
+            rec_bytes = data_filled.dtype.itemsize
+            for d in data_filled.dims:
+                if d != "time":
+                    rec_bytes *= int(data_filled.sizes[d])
+            # target ~512 MB per slab (at least one time step)
+            slab = max(1, min(ntime, int((512 * 1024 * 1024) // max(rec_bytes, 1))))
+            logger.debug(
+                "Slabbed CMOR write: ntime=%d, slab=%d (%.1f MB/record)",
+                ntime,
+                slab,
+                rec_bytes / (1024 * 1024),
+            )
+            for start in range(0, ntime, slab):
+                stop = min(start + slab, ntime)
+                block = np.asarray(data_filled.isel(time=slice(start, stop)))
+                cmor.write(var_id, block, ntimes_passed=(stop - start))
+        else:
+            cmor.write(
+                var_id,
+                np.asarray(data_filled),
+                ntimes_passed=nt,
+            )
         logger.debug("Finished writing CMOR variable %s", var_id)  # debug
 
         # ---- Hybrid ps streaming (if present) ----
