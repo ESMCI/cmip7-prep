@@ -32,9 +32,11 @@ except ModuleNotFoundError as e:
 # ---------------------------------------------------------
 
 INPUTDATA_DIR_noresm = Path("/nird/datalake/NS9560K/diagnostics/land_xesmf_diag_data/")
-DEFAULT_CONS_MAP_NE30_noresm = Path(INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1_aave.nc")
+DEFAULT_CONS_MAP_NE30_noresm = Path(
+    INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1d_aave.nc"
+)
 DEFAULT_BILIN_MAP_NE30_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1_bilin.nc"
+    INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1d_bilin.nc"
 )
 DEFAULT_CONS_MAP_NE16_noresm = Path(
     # INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_aave_c260531.nc"
