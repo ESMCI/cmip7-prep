@@ -558,6 +558,18 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  gppVgt_tavg-u-hxy-multi:
+    description: The rate of synthesis of biomass from inorganic precursors by autotrophs
+      ("producers") expressed as the mass of carbon which it contains. For example,
+      photosynthesis in plants or phytoplankton. The producers also respire some of
+      this biomass and the difference is referred to as the net primary production.
+      Reported on land-use tiles.
+    dims: [lon, lat, vegtype, time]
+    formula: (FATES_GPP_PF)*FATES_FRACTION
+    sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
   gpp_tavg-u-hxy-lnd:
     description: The rate of synthesis of biomass from inorganic precursors by autotrophs
       ("producers") expressed as the mass of carbon which it contains. For example,
@@ -938,9 +950,9 @@ variables:
   raLeaf_tavg-u-hxy-lnd:
     description: added for completeness with Ra_root
     dims: [lon, lat, time]
-    formula: (FATES_LEAFMAINTAR + (FATES_GROWTH_RESP * FATES_LEAFC / FATES_VEGC))*FATES_FRACTION
-    sources: [model_var: FATES_LEAFMAINTAR, model_var: FATES_GROWTH_RESP, model_var: FATES_LEAFC,
-      model_var: FATES_VEGC, model_var: FATES_FRACTION]
+    formula: (FATES_LEAFMAINTAR + (FATES_GROWTH_RESP * FATES_LEAFC_ALLOC / FATES_NPP))*FATES_FRACTION
+    sources: [model_var: FATES_LEAFMAINTAR, model_var: FATES_GROWTH_RESP, model_var: FATES_LEAFC_ALLOC,
+      model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -959,11 +971,11 @@ variables:
       has benchmarking value because the sum of Rh and root respiration can be compared
       to observations of total soil respiration.
     dims: [lon, lat, time]
-    formula: ((FATES_FROOTMAINTAR+FATES_CROOTMAINTAR) + (FATES_GROWTH_RESP * (FATES_VEGC
-      - FATES_VEGC_ABOVEGROUND)/FATES_VEGC))*FATES_FRACTION
+    formula: ((FATES_FROOTMAINTAR+FATES_CROOTMAINTAR) + (FATES_GROWTH_RESP * (FATES_FROOT_ALLOC
+      + FATES_CROOT_ALLOC / FATES_NPP)))*FATES_FRACTION
     sources: [model_var: FATES_FROOTMAINTAR, model_var: FATES_CROOTMAINTAR, {
-        model_var: FATES_GROWTH_RESP}, model_var: FATES_VEGC, model_var: FATES_VEGC_ABOVEGROUND,
-      model_var: FATES_VEGC, model_var: FATES_FRACTION]
+        model_var: FATES_GROWTH_RESP}, model_var: FATES_FROOT_ALLOC, model_var: FATES_CROOT_ALLOC,
+      model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 

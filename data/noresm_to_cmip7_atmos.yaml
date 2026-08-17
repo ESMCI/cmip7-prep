@@ -522,6 +522,7 @@ variables:
   rldscs_tavg-u-hxy-u:
     description: Surface downwelling clear-sky longwave radiation
     dims: [lon, lat, time]
+    positive: down
     sources: [model_var: FLDSC]
     table: atmos
     units: W m-2
