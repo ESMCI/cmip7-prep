@@ -42,6 +42,22 @@ variables:
     table: land
     units: '%'
 
+  cLand_tavg-u-hxy-lnd:
+    description: Report missing data over ocean grid cells. For fractional land report
+      value averaged over the land fraction.
+    dims: [lon, lat, time]
+    sources: [model_var: TOTECOSYSC]
+    table: land
+    units: kg m-2
+
+  cLeaf_tavg-u-hxy-lnd:
+    description: Carbon mass per unit area in leaves.
+    dims: [lon, lat, time]
+    formula: (FATES_LEAFC)*FATES_FRACTION
+    sources: [model_var: FATES_LEAFC, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
   cLitterCwd_tavg-u-hxy-lnd:
     description: '"Content" indicates a quantity per unit area. "Wood debris" means
       dead organic matter composed of coarse wood. It is distinct from fine litter.
@@ -61,20 +77,46 @@ variables:
     table: land
     units: kg m-2
 
+  cLitterSurf_tavg-u-hxy-lnd:
+    description: Surface or near-surface litter pool fed by leaf and above-ground
+      litterfall
+    dims: [lon, lat, time]
+    formula: (FATES_LITTER_AG_FINE_EL)*FATES_FRACTION
+    sources: [model_var: FATES_LITTER_AG_FINE_EL, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
+  cOther_tavg-u-hxy-lnd:
+    description: E.g. fruits, seeds, etc.
+    dims: [lon, lat, time]
+    formula: (FATES_SEED_BANK + FATES_REPROC + FATES_STOREC)*FATES_FRACTION
+    sources: [model_var: FATES_SEED_BANK, model_var: FATES_REPROC, model_var: FATES_STOREC,
+      model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
   cProduct_tavg-u-hxy-lnd:
     description: Carbon mass per unit area in that has been removed from the environment
       through  land use change.
     dims: [lon, lat, time]
-    formula: CROPPROD1 + TOT_WOODPROD
-    sources: [model_var: CROPPROD1, model_var: TOT_WOODPROD]
+    formula: TOT_WOODPRODC / 1000
+    sources: [model_var: TOT_WOODPRODC]
     table: land
     units: kg m-2
 
   cRoot_tavg-u-hxy-lnd:
     description: including fine and coarse roots.
     dims: [lon, lat, time]
-    formula: (FATES_VEGC - FATES_VEGC_ABOVEGROUND)*FATES_FRACTION
+    formula: (FATES_VEGC - FATES_VEGC_ABOVEGROUND) * FATES_FRACTION
     sources: [model_var: FATES_VEGC, model_var: FATES_VEGC_ABOVEGROUND, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
+  cSoilPools_tavg-u-hxy-lnd:
+    description: For models with multiple soil carbon pools, report each pool here.
+      If models also have vertical discretisation these should be aggregated
+    dims: [lon, lat, soilpools, time]
+    sources: [model_var: SOIL1C, model_var: SOIL2C, model_var: SOIL3C, model_var: SOIL4C]
     table: land
     units: kg m-2
 
@@ -104,6 +146,15 @@ variables:
     table: land
     units: kg m-2
 
+  cStem_tavg-u-hxy-lnd:
+    description: including sapwood and hardwood.
+    dims: [lon, lat, time]
+    formula: (FATES_VEGC_ABOVEGROUND - FATES_LEAFC - FATES_REPROC - FATES_STOREC)*FATES_FRACTION
+    sources: [model_var: FATES_VEGC_ABOVEGROUND, model_var: FATES_LEAFC, model_var: FATES_REPROC,
+      model_var: FATES_STOREC, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
   cVeg_tavg-u-hxy-lnd:
     description: Carbon mass per unit area in vegetation.
     dims: [lon, lat, time]
@@ -112,13 +163,75 @@ variables:
     table: land
     units: kg m-2
 
+  cVeg_tavg-u-hxy-ng:
+    description: '"Content" indicates a quantity per unit area. "Vegetation" means
+      any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
+      of biomass using carbon obtained from carbon dioxide.'
+    dims: [lon, lat, time]
+    formula: (sumoverpft(FATES_VEGC_PF, pftlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
+  cVeg_tavg-u-hxy-shb:
+    description: '"Content" indicates a quantity per unit area. "Vegetation" means
+      any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
+      of biomass using carbon obtained from carbon dioxide.'
+    dims: [lon, lat, time]
+    formula: (sumoverpft(FATES_VEGC_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
+  cVeg_tavg-u-hxy-tree:
+    description: '"Content" indicates a quantity per unit area. "Vegetation" means
+      any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
+      of biomass using carbon obtained from carbon dioxide.'
+    dims: [lon, lat, time]
+    formula: (sumoverpft(FATES_VEGC_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2
+
   cnc_tavg-u-hxy-u:
     description: Canopy covered fraction
     dims: [lon, lat, time]
-    formula: (FATES_AREA_PLANTS)*FATES_FRACTION
+    formula: (FATES_AREA_PLANTS * 100)*FATES_FRACTION
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
+
+  cropFrac_tavg-u-hxy-u:
+    description: Percentage of entire grid cell  that is covered by crop.
+    dims: [lon, lat, time, typecrop]
+    formula: (sumoverpft(FATES_PATCHAREA_LU, pftlist=[5], dimname='fates_levlanduse'))*FATES_FRACTION
+    sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
+    table: land
+    units: '%'
+
+  depthsl_ti-u-hxy-u:
+    description: Total (cumulative) thickness of all soil layers. This is the sum
+      of individual thicknesses of all soil layers.
+    dims: [lon, lat]
+    formula: sum(DZSOI)
+    sources: [model_var: DZSOI]
+    table: land
+    units: m
+
+  esn_tavg-u-hxy-lnd:
+    description: The flux due to conversion of liquid or solid water into vapor at
+      the surface where there is snow on land
+    dims: [lon, lat, time]
+    sources: [model_var: QSNOEVAP]
+    table: land
+    units: kg m-2 s-1
+
+  evspsblsoi_tavg-u-hxy-lnd:
+    description: includes sublimation.
+    dims: [lon, lat, time]
+    sources: [model_var: QSOIL]
+    table: land
+    units: kg m-2 s-1
 
   evspsblsoi_tavg-u-hxy-u:
     description: Water evaporation flux from soil but for daily averages i.e., the
@@ -148,7 +261,6 @@ variables:
     description: The fixation (uptake of nitrogen gas directly from the atmosphere)
       of nitrogen due to biological processes.
     dims: [lon, lat, time]
-    formula: NFIX_TO_SMINN / 1000
     sources: [model_var: NFIX_TO_SMINN]
     table: land
     units: kg m-2 s-1
@@ -168,8 +280,26 @@ variables:
       biomass differs significantly across models, but it should be straight-forward
       to compare deforested biomass across models.
     dims: [lon, lat, time]
-    formula: DWT_CROPPROD1C_GAIN+DWT_WOODPRODC_GAIN
-    sources: [model_var: DWT_CROPPROD1C_GAIN, model_var: DWT_WOODPRODC_GAIN]
+    formula: (FATES_LUCHANGE_WOODPROD_C_FLUX / (365 * 86400))*FATES_FRACTION
+    sources: [model_var: FATES_LUCHANGE_WOODPROD_C_FLUX, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  fFireAll_tavg-u-hxy-lnd:
+    description: From all sources,  Including natural, anthropogenic and Land-use
+      change. Only total fire emissions can be compared to observations.
+    dims: [lon, lat, time]
+    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  fFireNat_tavg-u-hxy-lnd:
+    description: CO2 emissions from natural fires
+    dims: [lon, lat, time]
+    formula: (FATES_FIRE_CLOSS - FATES_FIRE_CLOSS_LANDUSECHANGE)*FATES_FRACTION
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FIRE_CLOSS_LANDUSECHANGE,
+      model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -179,9 +309,28 @@ variables:
       any CO2 flux from fire included in fLuc, defined below (CO2 Flux to Atmosphere
       from Land Use Change).
     dims: [lon, lat, time]
-    formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
+    formula: (FATES_FIRE_CLOSS - FATES_FIRE_CLOSS_LANDUSECHANGE)*FATES_FRACTION
     positive: up
-    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
+    sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FIRE_CLOSS_LANDUSECHANGE,
+      model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  fHarvestToProduct_tavg-u-hxy-lnd:
+    description: be it food or wood harvest, any carbon that is subsequently stored
+      is reported here
+    dims: [lon, lat, time]
+    formula: (FATES_HARVEST_WOODPROD_C_FLUX  / (365 * 86400))*FATES_FRACTION
+    sources: [model_var: FATES_HARVEST_WOODPROD_C_FLUX, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  fLitterSoil_tavg-u-hxy-lnd:
+    description: Carbon mass flux per unit area into soil from litter (dead plant
+      material in or above the soil).
+    dims: [lon, lat, time]
+    formula: (FATES_LITTER_OUT_EL)*FATES_FRACTION
+    sources: [model_var: FATES_LITTER_OUT_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -189,6 +338,27 @@ variables:
     description: Net Carbon Mass Flux into Atmosphere due to Land Use Change
     dims: [lon, lat, time]
     sources: [model_var: LAND_USE_FLUX]
+    table: land
+    units: kg m-2 s-1
+
+  fLulccAtmLut_tavg-u-hxy-multi:
+    description: This annual mean flux refers to the transfer of carbon directly to
+      the atmosphere due to any land-use or land-cover change activities.  Include
+      carbon transferred due to deforestation or agricultural directly into atmosphere,
+      and  emissions form anthropogenic pools into atmosphere
+    dims: [lon, lat, landuse, time]
+    sources: [model_var: DWT_CONV_CFLUX]
+    table: land
+    units: kg m-2 s-1
+
+  fN2O_tavg-u-hxy-lnd:
+    description: Surface upward flux of nitrous oxide (N2O) from vegetation (any living
+      plants e.g. trees, shrubs, grass), litter (dead plant material in or above the
+      soil), soil.
+    dims: [lon, lat, time]
+    formula: F_N2O_DENIT+F_N2O_NIT
+    positive: up
+    sources: [model_var: F_N2O_DENIT, model_var: F_N2O_NIT]
     table: land
     units: kg m-2 s-1
 
@@ -218,10 +388,45 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  fNProduct_tavg-u-hxy-lnd:
+    description: When land use change results in deforestation of natural vegetation
+      (trees or grasslands) then natural biomass is removed. The treatment of deforested
+      biomass differs significantly across models, but it should be straight-forward
+      to compare deforested biomass across models.
+    dims: [lon, lat, time]
+    formula: DWT_WOODPRODN_GAIN + DWT_CROPPROD1N_GAIN
+    sources: [model_var: DWT_WOODPRODN_GAIN, model_var: DWT_CROPPROD1N_GAIN]
+    table: land
+    units: kg m-2 s-1
+
+  fNdep_tavg-u-hxy-lnd:
+    description: Surface deposition rate of nitrogen.
+    dims: [lon, lat, time]
+    sources: [model_var: NDEP_TO_SMINN]
+    table: land
+    units: kg m-2 s-1
+
   fNgasFire_tavg-u-hxy-lnd:
     description: Flux of Nitrogen from the land into the atmosphere due to fire
     dims: [lon, lat, time]
     sources: [model_var: COL_FIRE_NLOSS]
+    table: land
+    units: kg m-2 s-1
+
+  fNgasNonFire_tavg-u-hxy-lnd:
+    description: Flux of Nitrogen from the land into the atmosphere due to all processes
+      other than fire
+    dims: [lon, lat, time]
+    formula: DENIT+F_N2O_NIT
+    sources: [model_var: DENIT, model_var: F_N2O_NIT]
+    table: land
+    units: kg m-2 s-1
+
+  fNgas_tavg-u-hxy-lnd:
+    description: Total flux of Nitrogen from the land into the atmosphere.
+    dims: [lon, lat, time]
+    formula: DENIT+F_N2O_NIT+COL_FIRE_NLOSS
+    sources: [model_var: DENIT, model_var: F_N2O_NIT, model_var: COL_FIRE_NLOSS]
     table: land
     units: kg m-2 s-1
 
@@ -248,6 +453,17 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  fNnetmin_tavg-u-hxy-lnd:
+    description: Loss of soil nitrogen through remineralization and immobilisation.
+      Remineralization is the degradation of organic matter into inorganic forms of
+      carbon, nitrogen, phosphorus and other micronutrients, which consumes oxygen
+      and releases energy. Immobilisation of nitrogen refers to retention of nitrogen
+      by micro-organisms under certain conditions, making it unavailable for plants.
+    dims: [lon, lat, time]
+    sources: [model_var: NET_NMIN]
+    table: land
+    units: kg m-2 s-1
+
   fProductDecomp_tavg-u-hxy-lnd:
     description: Flux of CO2 from product pools into the atmosphere. Examples of "forestry
       and agricultural products" are paper, cardboard, furniture, timber for construction,
@@ -256,8 +472,8 @@ variables:
       to conserve carbon and allow its eventual release into the atmosphere, for example,
       when the products decompose in landfill sites.
     dims: [lon, lat, time]
-    formula: TOT_WOODPRODC_LOSS+CROPPROD1C_LOSS
-    sources: [model_var: TOT_WOODPRODC_LOSS, model_var: CROPPROD1C_LOSS]
+    formula: TOT_WOODPRODC_LOSS  /1000
+    sources: [model_var: TOT_WOODPRODC_LOSS]
     table: land
     units: kg m-2 s-1
 
@@ -301,6 +517,16 @@ variables:
     dims: [lon, lat, time]
     formula: (FATES_LITTER_IN_EL)*FATES_FRACTION
     sources: [model_var: FATES_LITTER_IN_EL, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  fVegSoilMortality_tavg-u-hxy-lnd:
+    description: needed to separate changing vegetation C turnover times resulting
+      from changing allocation versus changing mortality
+    dims: [lon, lat, time]
+    formula: (FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
+    sources: [model_var: FATES_MORTALITY_CFLUX_CANOPY, model_var: FATES_MORTALITY_CFLUX_USTORY,
+      model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
   fracInLut_tsum-u-hxy-lnd:
@@ -359,6 +585,30 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  gpp_tavg-u-hxy-tree:
+    description: Total GPP of trees in the grid cell
+    dims: [lon, lat, time]
+    formula: (sumoverpft(FATES_GPP_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  grassFracC3_tavg-u-hxy-u:
+    description: Percentage of entire grid cell covered by C3 natural grass.
+    dims: [lon, lat, time, typec3natg]
+    formula: (FATES_CROWNAREA_PF(12+13))*FATES_FRACTION
+    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    table: land
+    units: '%'
+
+  grassFracC4_tavg-u-hxy-u:
+    description: Percentage of entire grid cell covered by C4 natural grass.
+    dims: [lon, lat, time, typec4natg]
+    formula: (sumoverpft(FATES_CROWNAREA_PF, pftlist=[14], dimname='fates_levpft'))*FATES_FRACTION
+    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    table: land
+    units: '%'
+
   grassFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell that is covered by natural grass.
     dims: [lon, lat, time, typenatgr]
@@ -366,6 +616,13 @@ variables:
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
+
+  hfdsl_tavg-u-hxy-lnd:
+    description: Ground heat flux at 3hr
+    dims: [lon, lat, time]
+    sources: [model_var: FGR]
+    table: land
+    units: W m-2
 
   lai_tavg-u-hxy-lnd:
     description: A ratio obtained by dividing the total upper leaf surface area of
@@ -386,12 +643,36 @@ variables:
     table: land
     units: '%'
 
+  mrro_tavg-u-hxy-lnd:
+    description: the total runoff (including "drainage" through the base of the soil
+      model) leaving the land portion of the grid cell divided by the land area in
+      the grid cell, averaged over the 3-hour interval.
+    dims: [lon, lat, time]
+    sources: [model_var: QRUNOFF]
+    table: land
+    units: kg m-2 s-1
+
+  mrrob_tavg-u-hxy-lnd:
+    description: subsurface_runoff_flux
+    dims: [lon, lat, time]
+    sources: [model_var: QDRAI]
+    table: land
+    units: kg m-2 s-1
+
   mrros_tavg-u-hxy-lnd:
     description: surface_runoff_flux
     dims: [lon, lat, time]
     sources: [model_var: QOVER]
     table: land
     units: kg m-2 s-1
+
+  mrsfl_tavg-sl-hxy-lnd:
+    description: in each soil layer, the mass of water in ice phase.  Reported as
+      "missing" for grid cells occupied entirely by "sea"
+    dims: [lon, lat, sdepth, time]
+    sources: [model_var: SOILICE]
+    table: land
+    units: kg m-2
 
   mrsll_tavg-sl-hxy-lnd:
     description: in each soil layer, the mass of water in liquid phase.  Reported
@@ -498,7 +779,8 @@ variables:
   nep_tavg-u-hxy-lnd:
     description: Net Ecosystem Exchange
     dims: [lon, lat, time]
-    sources: [model_var: NEP]
+    formula: (FATES_NEP)*FATES_FRACTION
+    sources: [model_var: FATES_NEP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -510,11 +792,36 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  nppLut_tavg-u-hxy-multi:
+    description: '"Production of carbon" means the production of biomass expressed
+      as the mass of carbon which it contains. Net primary production is the excess
+      of gross primary production (rate of synthesis of biomass from inorganic precursors)
+      by autotrophs ("producers"), for example, photosynthesis in plants or phytoplankton,
+      over the rate at which the autotrophs themselves respire some of this biomass.
+      "Productivity" means production per unit area. The phrase "expressed_as" is
+      used in the construction A_expressed_as_B, where B is a chemical constituent
+      of A. It means that the quantity indicated by the standard name is calculated
+      solely with respect to the B contained in A, neglecting all other chemical constituents
+      of A.'
+    dims: [lon, lat, landuse, time]
+    formula: (FATES_NPP_LU)*FATES_FRACTION
+    sources: [model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
   nppOther_tavg-u-hxy-lnd:
     description: added for completeness with npp_root
     dims: [lon, lat, time]
     formula: (FATES_SEED_ALLOC+FATES_STORE_ALLOC)*FATES_FRACTION
     sources: [model_var: FATES_SEED_ALLOC, model_var: FATES_STORE_ALLOC, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  nppRoot_tavg-u-hxy-lnd:
+    description: This is the rate of carbon uptake by roots due to NPP
+    dims: [lon, lat, time]
+    formula: (FATES_CROOT_ALLOC+FATES_FROOT_ALLOC)*FATES_FRACTION
+    sources: [model_var: FATES_CROOT_ALLOC, model_var: FATES_FROOT_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -586,8 +893,21 @@ variables:
     units: kg m-2 s-1
 
   orog_tavg-u-hxy-is:
-    description: This is needed in case the ice sheet elevation changes in time
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      Altitude is the (geometric) height above the geoid, which is the reference geopotential
+      surface. The geoid is similar to mean sea level.
     dims: [lon, lat, time]
+    sources: [model_var: PHIS]
+    table: land
+    units: m
+
+  orog_ti-u-hxy-u:
+    description: height above the geoid; as defined here, "the geoid" is a surface
+      of constant geopotential that, if the ocean were at rest, would coincide with
+      mean sea level. Under this definition, the geoid changes as the mean volume
+      of the ocean changes (e.g., due to glacial melt, or global warming of the ocean).  Reported
+      here is the height above the present-day geoid (0.0 over ocean).
+    dims: [lon, lat]
     sources: [model_var: PHIS]
     table: land
     units: m
@@ -600,6 +920,14 @@ variables:
     table: land
     units: '%'
 
+  prveg_tavg-u-hxy-lnd:
+    description: the precipitation flux that is intercepted by the vegetation canopy
+      (if present in model) before reaching the ground.
+    dims: [lon, lat, time]
+    sources: [model_var: QINTR]
+    table: land
+    units: kg m-2 s-1
+
   qgwr_tavg-u-hxy-lnd:
     description: water_flux_from_soil_layer_to_groundwater
     dims: [lon, lat, time]
@@ -610,8 +938,19 @@ variables:
   raLeaf_tavg-u-hxy-lnd:
     description: added for completeness with Ra_root
     dims: [lon, lat, time]
-    formula: (FATES_LEAFMAINTAR)*FATES_FRACTION
-    sources: [model_var: FATES_LEAFMAINTAR, model_var: FATES_FRACTION]
+    formula: (FATES_LEAFMAINTAR + (FATES_GROWTH_RESP * FATES_LEAFC / FATES_VEGC))*FATES_FRACTION
+    sources: [model_var: FATES_LEAFMAINTAR, model_var: FATES_GROWTH_RESP, model_var: FATES_LEAFC,
+      model_var: FATES_VEGC, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  raLut_tavg-u-hxy-multi:
+    description: Carbon mass flux per unit area into atmosphere due to autotrophic
+      respiration on land (respiration by producers) [see rh for heterotrophic production].
+      Calculated on land-use tiles.
+    dims: [lon, lat, landuse, time]
+    formula: (FATES_GPP_LU-FATES_NPP_LU)*FATES_FRACTION
+    sources: [model_var: FATES_GPP_LU, model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -620,8 +959,29 @@ variables:
       has benchmarking value because the sum of Rh and root respiration can be compared
       to observations of total soil respiration.
     dims: [lon, lat, time]
-    formula: FROOTMAINTAR+CROOTMAINTAR
-    sources: [model_var: FROOTMAINTAR, model_var: CROOTMAINTAR]
+    formula: ((FATES_FROOTMAINTAR+FATES_CROOTMAINTAR) + (FATES_GROWTH_RESP * (FATES_VEGC
+      - FATES_VEGC_ABOVEGROUND)/FATES_VEGC))*FATES_FRACTION
+    sources: [model_var: FATES_FROOTMAINTAR, model_var: FATES_CROOTMAINTAR, {
+        model_var: FATES_GROWTH_RESP}, model_var: FATES_VEGC, model_var: FATES_VEGC_ABOVEGROUND,
+      model_var: FATES_VEGC, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  raStem_tavg-u-hxy-lnd:
+    description: added for completeness with Ra_root
+    dims: [lon, lat, time]
+    formula: (FATES_LSTEMMAINTAR)*FATES_FRACTION
+    sources: [model_var: FATES_LSTEMMAINTAR, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  raVgt_tavg-u-hxy-multi:
+    description: Carbon mass flux per unit area into atmosphere due to autotrophic
+      respiration on land (respiration by producers) [see rh for heterotrophic production].
+      Calculated on vegetation type.
+    dims: [lon, lat, vegtype, time]
+    formula: (FATES_AUTORESP)*FATES_FRACTION
+    sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -635,6 +995,24 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  ra_tavg-u-hxy-ng:
+    description: Total RA of grass in the grid cell
+    dims: [lon, lat, time]
+    formula: (sumoverpft(FATES_GPP_PF, pftlist=[12, 13, 14], dimname='fates_levpft')-sumoverpft(FATES_NPP_PF,
+      pftlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
+  ra_tavg-u-hxy-shb:
+    description: Total RA of shrubs in the grid cell
+    dims: [lon, lat, time]
+    formula: (sumoverpft(FATES_GPP_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft')-sumoverpft(FATES_NPP_PF,
+      pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
+    table: land
+    units: kg m-2 s-1
+
   ra_tavg-u-hxy-tree:
     description: Total RA of trees in the grid cell
     dims: [lon, lat, time]
@@ -644,11 +1022,38 @@ variables:
     table: land
     units: kg m-2 s-1
 
+  residualFrac_tavg-u-hxy-u:
+    description: fraction of entire grid cell  that is land and is covered by "non-vegetation"
+      and "non-bare-soil" (e.g., urban, ice, lakes, etc.)
+    dims: [lon, lat, time, typeresidual]
+    formula: 1-FATES_FRACTION
+    sources: [model_var: FATES_FRACTION]
+    table: land
+    units: '%'
+
+  rhLitter_tavg-u-hxy-lnd:
+    description: Needed to calculate litter bulk turnover time. Includes respiration
+      from CWD as well.
+    dims: [lon, lat, time]
+    formula: LITTERC_HR /1000
+    sources: [model_var: LITTERC_HR]
+    table: land
+    units: kg m-2 s-1
+
   rhSoil_tavg-u-hxy-lnd:
     description: Needed to calculate soil bulk turnover time
     dims: [lon, lat, time]
     formula: SOILC_HR /1000
     sources: [model_var: SOILC_HR]
+    table: land
+    units: kg m-2 s-1
+
+  rhVgt_tavg-u-hxy-multi:
+    description: Carbon mass flux per unit area into atmosphere due to heterotrophic
+      respiration on land (respiration by consumers), calculated on vegetation type.
+    dims: [lon, lat, vegtype, time]
+    formula: (FATES_HET_RESP)*FATES_FRACTION
+    sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
@@ -661,6 +1066,34 @@ variables:
     sources: [model_var: HR]
     table: land
     units: kg m-2 s-1
+
+  rsds_tavg-u-hxy-lnd:
+    description: Surface Downwelling Shortwave Radiation over land. Can be used for
+      computation of surface albedo.
+    dims: [lon, lat, time]
+    positive: down
+    sources: [model_var: FSDS]
+    table: land
+    units: W m-2
+
+  rsds_tavg-u-hxy-sn:
+    description: Surface Downwelling Shortwave Radiation over the portion of a land
+      grid cell covered by snow but not by ice. Can be used for computation of surface
+      albedo.
+    dims: [lon, lat, time]
+    positive: down
+    sources: [model_var: FSDS]
+    table: land
+    units: W m-2
+
+  rsus_tavg-u-hxy-lnd:
+    description: Surface Upwelling Shortwave Radiation over land. Can be used for
+      computation of surface albedo.
+    dims: [lon, lat, time]
+    positive: up
+    sources: [model_var: FSR]
+    table: land
+    units: W m-2
 
   rsus_tavg-u-hxy-sn:
     description: Surface Upwelling Shortwave Radiation over the portion of a land
@@ -691,11 +1124,11 @@ variables:
     units: '%'
 
   shrubFrac_tavg-u-hxy-u:
-    description: Percentage of entire grid cell  that is covered by shrub.
+    description: fraction of entire grid cell  that is covered by shrub.
     dims: [lon, lat, time, typeshrub]
-    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft')
-      *FATES_FRACTION*100
-    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft')
+      *FATES_FRACTION
+    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -709,8 +1142,8 @@ variables:
   srfrad_tavg-u-hxy-u:
     description: Net radiative flux at surface
     dims: [lon, lat, time]
-    formula: FSNS-FLNS
-    sources: [model_var: FSNS, model_var: FLNS]
+    formula: FSA - FIRA
+    sources: [model_var: FSA, model_var: FIRA]
     table: land
     units: W m-2
 
@@ -722,6 +1155,27 @@ variables:
     sources: [model_var: H2OSFC, model_var: VOLR]
     table: land
     units: kg m-2
+
+  sweLut_tavg-u-hxy-multi:
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      "lwe" means liquid water equivalent. "Amount" means mass per unit area. The
+      construction lwe_thickness_of_X_amount or _content means the vertical extent
+      of a layer of liquid water having the same mass per unit area. Surface amount
+      refers to the amount on the ground, excluding that on the plant or vegetation
+      canopy.
+    dims: [lon, lat, landuse, time]
+    formula: SNOWICE+SNOWLIQ
+    sources: [model_var: SNOWICE, model_var: SNOWLIQ]
+    table: land
+    units: m
+
+  tasLut_tavg-h2m-hxy-multi:
+    description: Air temperature is the bulk temperature of the air, not the surface
+      (skin) temperature.
+    dims: [lon, lat, landuse, time, height2m]
+    sources: [model_var: TSA]
+    table: land
+    units: K
 
   tran_tavg-u-hxy-lnd:
     description: Transpiration (may include dew formation as a negative flux).
@@ -744,6 +1198,15 @@ variables:
     dims: [lon, lat, time, typetreebd]
     formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[5, 6], dimname='fates_levpft')*FATES_FRACTION*100
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
+    table: land
+    units: '%'
+
+  treeFracBdlEvg_tavg-u-hxy-u:
+    description: This is the percentage of the entire grid cell that is covered by
+      broadleaf evergreen trees.
+    dims: [lon, lat, time, typetreebe]
+    formula: (sumoverpft(FATES_CROWNAREA_PF, pftlist=[1, 4], dimname='fates_levpft'))*FATES_FRACTION
+    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -789,6 +1252,32 @@ variables:
     sources: [model_var: TSOI]
     table: land
     units: K
+
+  vegFrac_tavg-u-hxy-u:
+    description: Percentage of grid cell that is covered by vegetation.This SHOULD
+      be the sum of tree, grass (natural and pasture), crop and shrub fractions.
+    dims: [lon, lat, time, typeveg]
+    formula: (FATES_AREA_PLANTS)*FATES_FRACTION
+    sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
+    table: land
+    units: '%'
+
+  vegHeight_tavg-u-hxy-ng:
+    description: Vegetation height averaged over the grass fraction of a grid cell.
+    dims: [lon, lat, time]
+    formula: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
+    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT, model_var: FATES_FRACTION]
+    table: land
+    units: m
+
+  vegHeight_tavg-u-hxy-veg:
+    description: Vegetation height averaged over all vegetation types and over the
+      vegetated fraction of a grid cell.
+    dims: [lon, lat, time]
+    formula: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
+    sources: [model_var: FATES_CA_WEIGHTED_HEIGHT, model_var: FATES_FRACTION]
+    table: land
+    units: m
 
   wetlandCH4_tavg-u-hxy-lnd:
     description: Net upward flux of methane (NH4) from wetlands (areas where water

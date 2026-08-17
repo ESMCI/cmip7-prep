@@ -887,7 +887,9 @@ class CmorSession(
         logger.debug("Finished writing fx variable %s", name)
 
     def ensure_fx_written_and_cached(self, ds_regr: xr.Dataset) -> xr.Dataset:
-        """Ensure <fx variables> exist in ds_regr and are written once as fx.
+        """
+        Ensure <fx variables> exist in ds_regr and are written once as fx.
+
         If not present in ds_regr, try to read from existing CMOR fx files in outdir.
         If present in ds_regr but not yet written this run, write and cache them.
         Returns ds_regr augmented with any missing fx fields.
@@ -1080,7 +1082,7 @@ class CmorSession(
             for start in range(0, ntime, slab):
                 stop = min(start + slab, ntime)
                 block = np.asarray(data_filled.isel(time=slice(start, stop)))
-                cmor.write(var_id, block, ntimes_passed=(stop - start))
+                cmor.write(var_id, block, ntimes_passed=stop - start)
         else:
             cmor.write(
                 var_id,
