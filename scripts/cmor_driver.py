@@ -22,6 +22,7 @@ from typing import Optional, Tuple
 import sys
 from datetime import datetime, UTC
 import glob
+import json
 import numpy as np
 import xarray as xr
 from cmor import set_cur_dataset_attribute
@@ -249,7 +250,7 @@ def parse_args():
     parser.add_argument(
         "--experiment",
         type=str,
-        default="picontrol",
+        default="piControl",
         help="Experiment name for data request. (Default picontrol)",
     )
     parser.add_argument(
@@ -328,6 +329,27 @@ def parse_realization_initialization_physics_forcing(
         f"p{physics_index}",
         f"f{forcing_index}",
     )
+
+
+def get_experiment_info_from_tables(experiment_id: str, tables_root: Path) -> str:
+    """
+    Retrieve the experiment informations associated with a given experiment_id from the CMIP7 tables.
+    """
+    tables_path = Path(tables_root) / "tables-cvs/cmor-cvs.json"
+    if not tables_path.exists():
+        raise FileNotFoundError(f"Tables directory {tables_path} does not exist.")
+
+    # Iterate through all JSON files in the tables directory
+    try:
+        with open(tables_path, "r") as f:
+            data = json.load(f)
+            cv = data.get("CV")
+            if experiment_id in cv.get("experiment_id").keys():
+                return data.get("CV").get("experiment_id").get(experiment_id)
+    except Exception as e:
+        logger.warning(f"Failed to read {tables_path}: {e}")
+
+    raise ValueError(f"Experiment ID '{experiment_id}' not found in any CMIP7 table.")
 
 
 def process_one_var(
@@ -603,6 +625,14 @@ def process_one_var(
                     set_cur_dataset_attribute("forcing_index", forcing_index)
                     region = write_cfg.get("region", "glb")
                     set_cur_dataset_attribute("region", region)
+                    # Updating with correct experiment info from CMIP7 tables
+                    experiment_info = get_experiment_info_from_tables(
+                        args.experiment, tables_root
+                    )
+                    for key, value in experiment_info.items():
+                        if isinstance(value, list):
+                            value = value[0]
+                        set_cur_dataset_attribute(key, value)
 
                     logger.info(
                         f"Writing CMOR variable {cmip7name.name} with frequency {frequency} and dims {dims}"
