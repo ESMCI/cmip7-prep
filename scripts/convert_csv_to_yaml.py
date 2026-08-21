@@ -101,7 +101,7 @@ MODEL_CONFIGS = {
             "can be derived",
         ],
         "key_column_skip_phrases": [
-            #"_tpt-",
+            # "_tpt-",
             "_tclm-",
             "_tclmdc-",
             "_tminavg-",
@@ -278,7 +278,6 @@ def extract_variables(expr: str) -> list:
         "capped_at",
         "skipna",  # common keyword arguments
     }
-
     # find all words in the expression
     all_words = re.findall(r"[a-zA-Z_]\w*", expr)
 
