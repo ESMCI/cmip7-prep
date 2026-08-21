@@ -101,7 +101,7 @@ MODEL_CONFIGS = {
             "can be derived",
         ],
         "key_column_skip_phrases": [
-            "_tpt-",
+            #"_tpt-",
             "_tclm-",
             "_tclmdc-",
             "_tminavg-",
@@ -286,7 +286,7 @@ def extract_variables(expr: str) -> list:
     variables = []
     for word in all_words:
         word_dict = {}
-        if word not in ignore:
+        if word not in ignore and not re.match(r"e\d+", word):
             word_dict["model_var"] = word
             variables.append(word_dict)
     if "FATES" in expr and "FATES_FRAC" not in expr:
