@@ -251,7 +251,7 @@ def parse_args():
         "--experiment",
         type=str,
         default="piControl",
-        help="Experiment name for data request. (Default picontrol)",
+        help="Experiment name for data request. (Default piControl)",
     )
     parser.add_argument(
         "--model",
