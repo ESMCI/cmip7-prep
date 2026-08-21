@@ -234,8 +234,7 @@ variables:
     units: kg m-2 s-1
 
   evspsblsoi_tavg-u-hxy-u:
-    description: Water evaporation flux from soil but for daily averages i.e., the
-      evspsblsoi variable, which is only currently defined for monthly averages
+    description: Water evaporation from soil
     dims: [lon, lat, time]
     positive: up
     sources: [model_var: QSOIL]
@@ -624,8 +623,8 @@ variables:
   grassFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell that is covered by natural grass.
     dims: [lon, lat, time, typenatgr]
-    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[12, 13, 14], dimname='fates_levpft')*FATES_FRACTION*100
-    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[12, 13, 14], dimname='fates_levpft')*FATES_FRACTION
+    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -657,8 +656,7 @@ variables:
 
   mrro_tavg-u-hxy-lnd:
     description: the total runoff (including "drainage" through the base of the soil
-      model) leaving the land portion of the grid cell divided by the land area in
-      the grid cell, averaged over the 3-hour interval.
+      model) leaving the land portion of the grid cell.
     dims: [lon, lat, time]
     sources: [model_var: QRUNOFF]
     table: land
@@ -672,7 +670,7 @@ variables:
     units: kg m-2 s-1
 
   mrros_tavg-u-hxy-lnd:
-    description: surface_runoff_flux
+    description: the total surface runoff leaving the land portion of the grid cell.
     dims: [lon, lat, time]
     sources: [model_var: QOVER]
     table: land
@@ -905,11 +903,9 @@ variables:
     units: kg m-2 s-1
 
   orog_tavg-u-hxy-is:
-    description: The surface called "surface" means the lower boundary of the atmosphere.
-      Altitude is the (geometric) height above the geoid, which is the reference geopotential
-      surface. The geoid is similar to mean sea level.
+    description: This is needed in case the ice sheet elevation changes in time
     dims: [lon, lat, time]
-    sources: [model_var: PHIS]
+    sources: [model_var: usurf]
     table: land
     units: m
 
@@ -1035,8 +1031,8 @@ variables:
     units: kg m-2 s-1
 
   residualFrac_tavg-u-hxy-u:
-    description: fraction of entire grid cell  that is land and is covered by "non-vegetation"
-      and "non-bare-soil" (e.g., urban, ice, lakes, etc.)
+    description: Percentage of entire grid cell  that is land and is covered by  neither
+      vegetation nor bare-soil (e.g., urban, ice, lakes, etc.)
     dims: [lon, lat, time, typeresidual]
     formula: 1-FATES_FRACTION
     sources: [model_var: FATES_FRACTION]
@@ -1119,8 +1115,7 @@ variables:
     units: W m-2
 
   sftgif_tavg-u-hxy-u:
-    description: Percentage of grid cell covered by land ice (ice sheet, ice shelf,
-      ice cap, glacier)
+    description: This is needed in case the ice sheet area changes in time
     dims: [lon, lat, time]
     formula: sumoverpft(PCT_LANDUNIT, pftlist=[4], dimname='ltype')
     sources: [model_var: PCT_LANDUNIT]
@@ -1297,18 +1292,10 @@ variables:
       year or for varying periods of time during the year, including during the growing
       season).
     dims: [lon, lat, time]
-    formula: (CH4_SURF_DIFF_SAT+CH4_SURF_EBUL_SAT+CH4_SURF_AERE_SAT) * 0.016043
-    sources: [model_var: CH4_SURF_DIFF_SAT, model_var: CH4_SURF_EBUL_SAT, model_var: CH4_SURF_AERE_SAT]
-    table: land
-    units: kg m-2 s-1
-
-  wetlandCH4prod_tavg-u-hxy-lnd:
-    description: Biological emissions (methanogenesis) of methane (NH4) from wetlands
-      (areas where water covers the soil, or is present either at or near the surface
-      of the soil all year or for varying periods of time during the year, including
-      during the growing season).
-    dims: [lon, lat, time]
-    sources: [model_var: CH4PROD]
+    formula: (CH4_SURF_DIFF_SAT+CH4_SURF_EBUL_SAT+CH4_SURF_AERE_SAT) * 0.016043 *
+      FINUNDATED
+    sources: [model_var: CH4_SURF_DIFF_SAT, model_var: CH4_SURF_EBUL_SAT, model_var: CH4_SURF_AERE_SAT,
+      model_var: FINUNDATED]
     table: land
     units: kg m-2 s-1
 

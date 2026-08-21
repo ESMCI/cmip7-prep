@@ -677,7 +677,7 @@ variables:
     units: K
 
   toz_tavg-u-hxy-u:
-    description: total ozone column in DU
+    description: Total ozone column
     dims: [lon, lat, time]
     sources: [model_var: cb_ozone_c]
     table: aerosol
