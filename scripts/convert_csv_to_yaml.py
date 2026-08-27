@@ -15,6 +15,8 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "hfls_tavg-u-hxy-u": "up",
     "hfss_tavg-u-hxy-u": "up",
     "rlds_tavg-u-hxy-u": "down",
+    "rldscs_tavg-u-hxy-u": "down",
+    "rldsdiff_tavg-u-hxy-u": "down",
     "rls_tavg-u-hxy-u": "up",
     "rlut_tavg-u-hxy-u": "up",
     "rlutcs_tavg-u-hxy-u": "up",
@@ -99,7 +101,7 @@ MODEL_CONFIGS = {
             "can be derived",
         ],
         "key_column_skip_phrases": [
-            "_tpt-",
+            # "_tpt-",
             "_tclm-",
             "_tclmdc-",
             "_tminavg-",
@@ -276,7 +278,6 @@ def extract_variables(expr: str) -> list:
         "capped_at",
         "skipna",  # common keyword arguments
     }
-
     # find all words in the expression
     all_words = re.findall(r"[a-zA-Z_]\w*", expr)
 
@@ -285,6 +286,9 @@ def extract_variables(expr: str) -> list:
     for word in all_words:
         word_dict = {}
         if word not in ignore:
+            if word in ["e", "E"]:
+                if re.search(r"[0-9]+[eE][+\-]?[0-9]+", expr):
+                    continue  # skip scientific notation
             word_dict["model_var"] = word
             variables.append(word_dict)
     if "FATES" in expr and "FATES_FRAC" not in expr:

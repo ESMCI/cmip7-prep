@@ -55,6 +55,13 @@ variables:
     table: atmos
     units: m
 
+  bldep_tpt-u-hxy-u:
+    description: Boundary Layer Depth every 3 hours
+    dims: [lon, lat, time1]
+    sources: [model_var: PBLH]
+    table: atmos
+    units: m
+
   cfadDbze94_tavg-h40-hxy-air:
     description: CloudSat Radar Reflectivity
     dims: [lon, lat, alt40, dbze, time]
@@ -70,9 +77,19 @@ variables:
     units: '1'
 
   cl_tavg-al-hxy-u:
-    description: Percentage cloud cover, including both large-scale and convective
-      cloud.
+    description: Includes both large-scale and convective cloud.
     dims: [lon, lat, lev, time]
+    formula: 100*CLOUD
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: CLOUD]
+    table: atmos
+    units: '%'
+
+  cl_tpt-al-hs-u:
+    description: Includes both large-scale and convective cloud.
+    dims: [lev, site, time1]
+    formula: 100*CLOUD
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: CLOUD]
@@ -82,7 +99,7 @@ variables:
   clcalipso_tavg-220hPa-hxy-air:
     description: Percentage cloud cover in layer centred on 220hPa
     dims: [lon, lat, time, p220]
-    sources: [model_var: CLDGHG_CAL]
+    sources: [model_var: CLDHGH_CAL]
     table: atmos
     units: '%'
 
@@ -127,6 +144,19 @@ variables:
     table: atmos
     units: kg kg-1
 
+  cli_tpt-al-hs-u:
+    description: Includes both large-scale and convective cloud. This is the mass
+      of  cloud ice  in the grid cell divided by the mass of air (including the water
+      in all phases) in the grid cell.  This includes precipitating hydrometeors ONLY
+      if the precipitating hydrometeors affect the calculation of radiative transfer
+      in model.
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: CLDICE]
+    table: atmos
+    units: kg kg-1
+
   climodis_tavg-u-hxy-u:
     description: MODIS Ice Cloud Fraction
     dims: [lon, lat, time]
@@ -143,8 +173,31 @@ variables:
     units: '%'
 
   clivi_tavg-u-hxy-u:
-    description: Ice water path
+    description: mass of ice water in the column divided by the area of the column
+      (not just the area of the cloudy portion of the column). Includes precipitating
+      frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
+      of radiative transfer in model.
     dims: [lon, lat, time]
+    sources: [model_var: TGCLDIWP]
+    table: atmos
+    units: kg m-2
+
+  clivi_tpt-u-hs-u:
+    description: mass of ice water in the column divided by the area of the column
+      (not just the area of the cloudy portion of the column). Includes precipitating
+      frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
+      of radiative transfer in model.
+    dims: [site, time1]
+    sources: [model_var: TGCLDIWP]
+    table: atmos
+    units: kg m-2
+
+  clivi_tpt-u-hxy-u:
+    description: mass of ice water in the column divided by the area of the column
+      (not just the area of the cloudy portion of the column). Includes precipitating
+      frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
+      of radiative transfer in model.
+    dims: [lon, lat, time1]
     sources: [model_var: TGCLDIWP]
     table: atmos
     units: kg m-2
@@ -158,8 +211,26 @@ variables:
 
   clt_tavg-u-hxy-u:
     description: for the whole atmospheric column, as seen from the surface or the
-      top of the atmosphere. Include both large-scale and convective cloud.
+      top of the atmosphere. Includes both large-scale and convective cloud.
     dims: [lon, lat, time]
+    formula: 100*CLDTOT
+    sources: [model_var: CLDTOT]
+    table: atmos
+    units: '%'
+
+  clt_tpt-u-hs-u:
+    description: for the whole atmospheric column, as seen from the surface or the
+      top of the atmosphere. Include both large-scale and convective cloud.
+    dims: [site, time1]
+    formula: 100*CLDTOT
+    sources: [model_var: CLDTOT]
+    table: atmos
+    units: '%'
+
+  clt_tpt-u-hxy-u:
+    description: for the whole atmospheric column, as seen from the surface or the
+      top of the atmosphere. Include both large-scale and convective cloud.
+    dims: [lon, lat, time1]
     formula: CLDTOT*100
     sources: [model_var: CLDTOT]
     table: atmos
@@ -179,6 +250,13 @@ variables:
       Satellite Observation (CALIPSO) instrument. Includes both large-scale and convective
       cloud.
     dims: [lon, lat, time]
+    sources: [model_var: CLDTOT_CAL]
+    table: atmos
+    units: '%'
+
+  cltcalipso_tpt-u-hxy-u:
+    description: CALIPSO Total Cloud Fraction
+    dims: [lon, lat, time1]
     sources: [model_var: CLDTOT_CAL]
     table: atmos
     units: '%'
@@ -213,6 +291,19 @@ variables:
     table: atmos
     units: kg kg-1
 
+  clw_tpt-al-hs-u:
+    description: Includes both large-scale and convective cloud.  This is the mass
+      of  cloud liquid water in the grid cell divided by the mass of air (including
+      the water in all phases) in the grid cell.  This includes precipitating hydrometeors
+      ONLY if the precipitating hydrometeors affect the calculation of radiative transfer
+      in model.
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: CLDLIQ]
+    table: atmos
+    units: kg kg-1
+
   clwmodis_tavg-u-hxy-u:
     description: MODIS Liquid Cloud Fraction
     dims: [lon, lat, time]
@@ -226,6 +317,26 @@ variables:
       Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
       the calculation of radiative transfer in model.
     dims: [lon, lat, time]
+    sources: [model_var: TGCLDCWP]
+    table: atmos
+    units: kg m-2
+
+  clwvi_tpt-u-hs-u:
+    description: mass of condensed (liquid + ice) water in the column divided by the
+      area of the column (not just the area of the cloudy portion of the column).
+      Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
+      the calculation of radiative transfer in model.
+    dims: [site, time1]
+    sources: [model_var: TGCLDCWP]
+    table: atmos
+    units: kg m-2
+
+  clwvi_tpt-u-hxy-u:
+    description: mass of condensed (liquid + ice) water in the column divided by the
+      area of the column (not just the area of the cloudy portion of the column).
+      Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
+      the calculation of radiative transfer in model.
+    dims: [lon, lat, time1]
     sources: [model_var: TGCLDCWP]
     table: atmos
     units: kg m-2
@@ -275,6 +386,14 @@ variables:
     table: atmos
     units: kg m-2 s-1
 
+  evspsbl_tpt-u-hs-u:
+    description: at surface; flux of water into the atmosphere due to conversion of
+      both liquid and solid phases to vapor (from underlying surface and vegetation)
+    dims: [site, time1]
+    sources: [model_var: QFLX]
+    table: atmos
+    units: kg m-2 s-1
+
   hfls_tavg-u-hxy-u:
     description: includes both evaporation and sublimation
     dims: [lon, lat, time]
@@ -283,17 +402,33 @@ variables:
     table: atmos
     units: W m-2
 
+  hfls_tpt-u-hs-u:
+    description: includes both evaporation and sublimation
+    dims: [site, time1]
+    sources: [model_var: LHFLX]
+    table: atmos
+    units: W m-2
+
   hfss_tavg-u-hxy-u:
-    description: This is the 3-hour mean flux.
+    description: The surface sensible heat flux, also called turbulent heat flux,
+      is the exchange of heat between the surface and the air by motion of air.
     dims: [lon, lat, time]
     positive: up
     sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
 
+  hfss_tpt-u-hs-u:
+    description: The surface sensible heat flux, also called turbulent heat flux,
+      is the exchange of heat between the surface and the air by motion of air.
+    dims: [site, time1]
+    sources: [model_var: SHFLX]
+    table: atmos
+    units: W m-2
+
   hur_tavg-al-hxy-u:
-    description: This is the relative humidity with respect to liquid water for T>
-      0 C, and with respect to ice for T<0 C.
+    description: The relative humidity with respect to liquid water for T> 0 C, and
+      with respect to ice for T<0 C.
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
@@ -306,7 +441,7 @@ variables:
       0 C, and with respect to ice for T<0 C.
     dims: [time, plev, lat, lon]
     levels: {name: plev19, units: Pa}
-    sources: [model_var: RELHUM, model_var: RHW]
+    sources: [model_var: RELHUM]
     table: atmos
     units: '%'
 
@@ -315,13 +450,44 @@ variables:
       0 C, and with respect to ice for T<0 C.
     dims: [time, plev, lat, lon]
     levels: {name: plev19, units: Pa}
+    sources: [model_var: RELHUM]
+    table: atmos
+    units: '%'
+
+  hur_tpt-100hPa-hxy-u:
+    description: Relative humidity at 100 hPa
+    dims: [lon, lat, time1, p100]
+    sources: [model_var: RELHUM100]
+    table: atmos
+    units: '%'
+
+  hur_tpt-500hPa-hxy-air:
+    description: Relative humidity at 500 hPa, 6 hourly instantaneous
+    dims: [lon, lat, time1, p500]
+    sources: [model_var: RELHUM500]
+    table: atmos
+    units: '%'
+
+  hur_tpt-850hPa-hxy-air:
+    description: Relative humidity at 850 hPa
+    dims: [lon, lat, time1, p850]
+    sources: [model_var: RELHUM850]
+    table: atmos
+    units: '%'
+
+  hur_tpt-al-hs-u:
+    description: This is the relative humidity with respect to liquid water for T>
+      0 C, and with respect to ice for T<0 C.
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
     sources: [model_var: RELHUM, model_var: RHW]
     table: atmos
     units: '%'
 
   hurs_tavg-h2m-hxy-u:
-    description: The relative humidity with respect to liquid water for T> 0 C, and
-      with respect to ice for T<0 C.
+    description: This is the relative humidity with respect to liquid water for T>
+      0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
     sources: [model_var: RHREFHT]
     table: atmos
@@ -340,6 +506,22 @@ variables:
       0 C, and with respect to ice for T<0 C.
     dims: [lon, lat, time, height2m]
     sources: [model_var: RHREFHTMN]
+    table: atmos
+    units: '%'
+
+  hurs_tpt-h2m-hs-u:
+    description: This is the relative humidity with respect to liquid water for T>
+      0 C, and with respect to ice for T<0 C.
+    dims: [site, time1, height2m]
+    sources: [model_var: RHREFHT]
+    table: atmos
+    units: '%'
+
+  hurs_tpt-h2m-hxy-u:
+    description: This is the relative humidity with respect to liquid water for T>
+      0 C, and with respect to ice for T<0 C.
+    dims: [lon, lat, time1, height2m]
+    sources: [model_var: RHREFHT]
     table: atmos
     units: '%'
 
@@ -362,12 +544,87 @@ variables:
     table: atmos
     units: '1'
 
+  hus_tpt-al-hs-u:
+    description: Specific humidity is the mass fraction of water vapor in (moist)
+      air.
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: Q]
+    table: atmos
+    units: '1'
+
+  hus_tpt-al-hxy-u:
+    description: Specific Humidity
+    dims: [lon, lat, lev, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: Q]
+    table: atmos
+    units: '1'
+
+  hus_tpt-p7h-hxy-air:
+    description: Extra levels - 925, 700, 600, 300, 50
+    dims: [plev, lat, lon, time1]
+    levels: {name: plev7h, units: Pa}
+    sources: [model_var: Q]
+    table: atmos
+    units: '1'
+
   huss_tavg-h2m-hxy-u:
     description: Near-surface (usually, 2 meter) specific humidity.
     dims: [lon, lat, time, height2m]
     sources: [model_var: QREFHT]
     table: atmos
     units: '1'
+
+  huss_tpt-h2m-hs-u:
+    description: Near-surface (usually, 2 meter) specific humidity.
+    dims: [site, time1, height2m]
+    sources: [model_var: QREFHT]
+    table: atmos
+    units: '1'
+
+  huss_tpt-h2m-hxy-u:
+    description: This is sampled synoptically.
+    dims: [lon, lat, time1, height2m]
+    sources: [model_var: QREFHT]
+    table: atmos
+    units: '1'
+
+  intuaw_tavg-u-hxy-u:
+    description: Vertically integrated eastward moisture transport (Mass weighted
+      vertical integral of the product of eastward wind by total water mass per unit
+      mass)
+    dims: [lon, lat, time]
+    sources: [model_var: uIVT]
+    table: atmos
+    units: kg m-1 s-1
+
+  intuaw_tpt-u-hxy-u:
+    description: Vertically integrated eastward moisture transport (Mass weighted
+      vertical integral of the product of eastward wind by total water mass per unit
+      mass)
+    dims: [lon, lat, time1]
+    sources: [model_var: uIVT]
+    table: atmos
+    units: kg m-1 s-1
+
+  intvaw_tavg-u-hxy-u:
+    description: Vertically integrated northward moisture transport (Mass_weighted_vertical
+      integral of the product of northward wind by total water mass per unit mass)
+    dims: [lon, lat, time]
+    sources: [model_var: vIVT]
+    table: atmos
+    units: kg m-1 s-1
+
+  intvaw_tpt-u-hxy-u:
+    description: Vertically integrated northward moisture transport (Mass_weighted_vertical
+      integral of the product of northward wind by total water mass per unit mass)
+    dims: [lon, lat, time1]
+    sources: [model_var: vIVT]
+    table: atmos
+    units: kg m-1 s-1
 
   loadbc_tavg-u-hxy-u:
     description: The total dry mass of black carbon aerosol particles per unit area.
@@ -408,25 +665,60 @@ variables:
 
   mc_tavg-alh-hxy-u:
     description: The net mass flux should represent the difference between the updraft
-      and downdraft components.  The flux is computed as the mass divided by the area
-      of the grid cell.
+      and downdraft components.  This is calculated as the convective mass flux divided
+      by the area of the whole grid cell (not just the area of the cloud).
     dims: [lon, lat, alevhalf, time]
     formula: CMFMC+CMFMCDZM
     sources: [model_var: CMFMC, model_var: CMFMCDZM]
     table: atmos
     units: kg m-2 s-1
 
+  mc_tpt-alh-hs-u:
+    description: The net mass flux should represent the difference between the updraft
+      and downdraft components.  This is calculated as the convective mass flux divided
+      by the area of the whole grid cell (not just the area of the updrafts).
+    dims: [alevhalf, site, time1]
+    formula: CMFMC+CMFMCDZM
+    sources: [model_var: CMFMC, model_var: CMFMCDZM]
+    table: atmos
+    units: kg m-2 s-1
+
   pctisccp_tavg-u-hxy-cl:
-    description: time-means weighted by the ISCCP Total Cloud Fraction - see https://www.cfmip.org/tools-and-data/cosp
+    description: time-means are weighted by the ISCCP Total Cloud Fraction - see  https://www.cfmip.org/tools-and-data/cosp
     dims: [lon, lat, time]
     formula: MEANPTOP_ISCCP/CLDTOT_ISCCP
     sources: [model_var: MEANPTOP_ISCCP, model_var: CLDTOT_ISCCP]
     table: atmos
     units: Pa
 
+  pfull_tpt-al-hxy-u:
+    description: Air pressure on model levels
+    dims: [lon, lat, lev, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: PMID]
+    table: atmos
+    units: Pa
+
   pr_tavg-u-hxy-u:
-    description: Total precipitation flux
+    description: at surface; includes both liquid and solid phases from all types
+      of clouds (both large-scale and convective)
     dims: [lon, lat, time]
+    sources: [model_var: PRECT]
+    table: atmos
+    units: kg m-2 s-1
+
+  pr_tpt-u-hs-u:
+    description: at surface; includes both liquid and solid phases from all types
+      of clouds (both large-scale and convective)
+    dims: [site, time1]
+    sources: [model_var: PRECT]
+    table: atmos
+    units: kg m-2 s-1
+
+  pr_tpt-u-hxy-u:
+    description: Total precipitation rate at the surface
+    dims: [lon, lat, time1]
     sources: [model_var: PRECT]
     table: atmos
     units: kg m-2 s-1
@@ -434,6 +726,13 @@ variables:
   prc_tavg-u-hxy-u:
     description: at surface; includes both liquid and solid phases.
     dims: [lon, lat, time]
+    sources: [model_var: PRECC]
+    table: atmos
+    units: kg m-2 s-1
+
+  prc_tpt-u-hs-u:
+    description: at surface; includes both liquid and solid phases.
+    dims: [site, time1]
     sources: [model_var: PRECC]
     table: atmos
     units: kg m-2 s-1
@@ -455,17 +754,57 @@ variables:
     table: atmos
     units: kg m-2 s-1
 
+  prsn_tpt-u-hs-u:
+    description: at surface; includes precipitation of all forms of water in the solid
+      phase
+    dims: [site, time1]
+    formula: PRECSC+PRECSL
+    sources: [model_var: PRECSC, model_var: PRECSL]
+    table: atmos
+    units: kg m-2 s-1
+
   prw_tavg-u-hxy-u:
     description: Vertically integrated mass of water vapour through the atmospheric
       column
     dims: [lon, lat, time]
+    sources: [model_var: TMQ]
+    table: atmos
+    units: kg m-2
+
+  prw_tpt-u-hs-u:
+    description: Vertically integrated mass of water vapour through the atmospheric
+      column
+    dims: [site, time1]
+    sources: [model_var: Q]
+    table: atmos
+    units: kg m-2
+
+  prw_tpt-u-hxy-u:
+    description: Vertically integrated mass of water vapour through the atmospheric
+      column
+    dims: [lon, lat, time1]
     sources: [model_var: Q]
     table: atmos
     units: kg m-2
 
   ps_tavg-u-hxy-u:
-    description: Surface pressure, not mean sea level pressure
+    description: surface pressure (not mean sea-level pressure), 2-D field to calculate
+      the 3-D pressure field from hybrid coordinates
     dims: [lon, lat, time]
+    sources: [model_var: PS]
+    table: atmos
+    units: Pa
+
+  ps_tpt-u-hs-u:
+    description: not, in general, the same as mean sea-level pressure
+    dims: [site, time1]
+    sources: [model_var: PS]
+    table: atmos
+    units: Pa
+
+  ps_tpt-u-hxy-u:
+    description: surface pressure, not mean sea level pressure
+    dims: [lon, lat, time1]
     sources: [model_var: PS]
     table: atmos
     units: Pa
@@ -473,6 +812,20 @@ variables:
   psl_tavg-u-hxy-u:
     description: Sea Level Pressure
     dims: [lon, lat, time]
+    sources: [model_var: PSL]
+    table: atmos
+    units: Pa
+
+  psl_tpt-u-hs-u:
+    description: not, in general, the same as surface pressure
+    dims: [site, time1]
+    sources: [model_var: PSL]
+    table: atmos
+    units: Pa
+
+  psl_tpt-u-hxy-u:
+    description: Sea Level Pressure
+    dims: [lon, lat, time1]
     sources: [model_var: PSL]
     table: atmos
     units: Pa
@@ -485,21 +838,64 @@ variables:
     table: atmos
     units: Pa
 
+  reffclis_tavg-al-hxy-scl:
+    description: This is defined as the in-cloud ratio of the third moment over the
+      second moment of the particle size distribution (obtained by considering only
+      the cloudy portion of the grid cell).
+    dims: [lon, lat, lev, time]
+    formula: 1E-6*AREI/FREQI
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: AREI, model_var: FREQI]
+    table: atmos
+    units: m
+
   reffclws_tavg-al-hxy-scl:
     description: Droplets are liquid.  The effective radius is defined as the ratio
       of the third moment over the second moment of the particle size distribution
       and the time-mean should be calculated, weighting the individual samples by
       the cloudy fraction of the grid cell.
     dims: [lon, lat, lev, time]
+    formula: 1E-6* AREL/FREQL
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: REFFL]
+    sources: [model_var: AREL, model_var: FREQL]
+    table: atmos
+    units: m
+
+  reffclws_tpt-al-hs-scl:
+    description: alevel site time1
+    dims: [lev, site, time1]
+    formula: 1E-6* AREL/FREQL
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: AREL, model_var: FREQL]
+    table: atmos
+    units: m
+
+  reffclws_tpt-al-hxy-scl:
+    description: This is defined as the in-cloud ratio of the third moment over the
+      second moment of the particle size distribution (obtained by considering only
+      the cloudy portion of the grid cell).
+    dims: [lon, lat, lev, time1]
+    formula: 1E-6* AREL/FREQL
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
 
   rld_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
+    sources: [model_var: FDL]
+    table: atmos
+    units: W m-2
+
+  rld_tpt-alh-hs-u:
+    description: Downwelling Longwave Radiation (includes the fluxes at the surface
+      and TOA)
+    dims: [alevhalf, site, time1]
     sources: [model_var: FDL]
     table: atmos
     units: W m-2
@@ -511,10 +907,50 @@ variables:
     table: atmos
     units: W m-2
 
+  rldcs_tpt-alh-hs-u:
+    description: Downwelling clear-sky longwave radiation (includes the fluxes at
+      the surface and TOA)
+    dims: [alevhalf, site, time1]
+    sources: [model_var: FDLC]
+    table: atmos
+    units: W m-2
+
   rlds_tavg-u-hxy-u:
-    description: This is the 3-hour mean flux.
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      "longwave" means longwave radiation. Downwelling radiation is radiation from
+      above. It does not mean "net downward". When thought of as being incident on
+      a surface, a radiative flux is sometimes called "irradiance". In addition, it
+      is identical with the quantity measured by a cosine-collector light-meter and
+      sometimes called "vector irradiance". In accordance with common usage in geophysical
+      disciplines, "flux" implies per unit area, called "flux density" in physics.
     dims: [lon, lat, time]
     positive: down
+    sources: [model_var: FLDS]
+    table: atmos
+    units: W m-2
+
+  rlds_tpt-u-hs-u:
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      "longwave" means longwave radiation. Downwelling radiation is radiation from
+      above. It does not mean "net downward". When thought of as being incident on
+      a surface, a radiative flux is sometimes called "irradiance". In addition, it
+      is identical with the quantity measured by a cosine-collector light-meter and
+      sometimes called "vector irradiance". In accordance with common usage in geophysical
+      disciplines, "flux" implies per unit area, called "flux density" in physics.
+    dims: [site, time1]
+    sources: [model_var: FLDS]
+    table: atmos
+    units: W m-2
+
+  rlds_tpt-u-hxy-u:
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      "longwave" means longwave radiation. Downwelling radiation is radiation from
+      above. It does not mean "net downward". When thought of as being incident on
+      a surface, a radiative flux is sometimes called "irradiance". In addition, it
+      is identical with the quantity measured by a cosine-collector light-meter and
+      sometimes called "vector irradiance". In accordance with common usage in geophysical
+      disciplines, "flux" implies per unit area, called "flux density" in physics.
+    dims: [lon, lat, time1]
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -522,6 +958,21 @@ variables:
   rldscs_tavg-u-hxy-u:
     description: Surface downwelling clear-sky longwave radiation
     dims: [lon, lat, time]
+    positive: down
+    sources: [model_var: FLDSC]
+    table: atmos
+    units: W m-2
+
+  rldscs_tpt-u-hs-u:
+    description: Surface downwelling clear-sky longwave radiation
+    dims: [site, time1]
+    sources: [model_var: FLDSC]
+    table: atmos
+    units: W m-2
+
+  rldscs_tpt-u-hxy-u:
+    description: Surface downwelling clear-sky longwave radiation
+    dims: [lon, lat, time1]
     sources: [model_var: FLDSC]
     table: atmos
     units: W m-2
@@ -541,6 +992,14 @@ variables:
     table: atmos
     units: W m-2
 
+  rlu_tpt-alh-hs-u:
+    description: Upwelling longwave radiation (includes the fluxes at the surface
+      and TOA)
+    dims: [alevhalf, site, time1]
+    sources: [model_var: FULC]
+    table: atmos
+    units: W m-2
+
   rlucs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
@@ -548,8 +1007,22 @@ variables:
     table: atmos
     units: W m-2
 
+  rlucs_tpt-alh-hs-u:
+    description: Upwelling clear-sky longwave radiation  (includes the fluxes at the
+      surface and TOA)
+    dims: [alevhalf, site, time1]
+    sources: [model_var: FULC]
+    table: atmos
+    units: W m-2
+
   rlus_tavg-u-hxy-u:
-    description: This is the 3-hour mean flux.
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      "longwave" means longwave radiation. Upwelling radiation is radiation from below.
+      It does not mean "net upward". When thought of as being incident on a surface,
+      a radiative flux is sometimes called "irradiance". In addition, it is identical
+      with the quantity measured by a cosine-collector light-meter and sometimes called
+      "vector irradiance". In accordance with common usage in geophysical disciplines,
+      "flux" implies per unit area, called "flux density" in physics.
     dims: [lon, lat, time]
     formula: FLDS+FLNS
     positive: up
@@ -557,15 +1030,30 @@ variables:
     table: atmos
     units: W m-2
 
+  rlus_tpt-u-hs-u:
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      "longwave" means longwave radiation. Upwelling radiation is radiation from below.
+      It does not mean "net upward". When thought of as being incident on a surface,
+      a radiative flux is sometimes called "irradiance". In addition, it is identical
+      with the quantity measured by a cosine-collector light-meter and sometimes called
+      "vector irradiance". In accordance with common usage in geophysical disciplines,
+      "flux" implies per unit area, called "flux density" in physics.
+    dims: [site, time1]
+    formula: FLDS+FLNS
+    sources: [model_var: FLDS, model_var: FLNS]
+    table: atmos
+    units: W m-2
+
   rluscs_tavg-u-hxy-u:
     description: Surface Upwelling Clear-sky Longwave Radiation
     dims: [lon, lat, time]
-    sources: [model_var: FULC]
+    formula: FLNSC+FLDSC
+    sources: [model_var: FLNSC, model_var: FLDSC]
     table: atmos
     units: W m-2
 
   rlut_tavg-u-hxy-u:
-    description: at the top of the atmosphere.
+    description: at the top of the atmosphere (to be compared with satellite measurements)
     dims: [lon, lat, time]
     formula: FSNTOA-FSNT+FLNT
     positive: up
@@ -573,11 +1061,43 @@ variables:
     table: atmos
     units: W m-2
 
+  rlut_tpt-u-hs-u:
+    description: at the top of the atmosphere (to be compared with satellite measurements)
+    dims: [site, time1]
+    formula: FSNTOA-FSNT+FLNT
+    sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
+    table: atmos
+    units: W m-2
+
+  rlut_tpt-u-hxy-u:
+    description: at the top of the atmosphere (to be compared with satellite measurements)
+    dims: [lon, lat, time1]
+    formula: FSNTOA-FSNT+FLNT
+    sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
+    table: atmos
+    units: W m-2
+
   rlutcs_tavg-u-hxy-u:
-    description: TOA outgoing clear sky longwave
+    description: Upwelling clear-sky longwave radiation at top of atmosphere
     dims: [lon, lat, time]
     formula: FSNTOAC-FSNTC+FLNTC
     positive: up
+    sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
+    table: atmos
+    units: W m-2
+
+  rlutcs_tpt-u-hs-u:
+    description: Upwelling clear-sky longwave radiation at top of atmosphere
+    dims: [site, time1]
+    formula: FSNTOAC-FSNTC+FLNTC
+    sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
+    table: atmos
+    units: W m-2
+
+  rlutcs_tpt-u-hxy-u:
+    description: Upwelling clear-sky longwave radiation at top of atmosphere
+    dims: [lon, lat, time1]
+    formula: FSNTOAC-FSNTC+FLNTC
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
     units: W m-2
@@ -589,6 +1109,14 @@ variables:
     table: atmos
     units: W m-2
 
+  rsd_tpt-alh-hs-u:
+    description: Downwelling shortwave radiation (includes the fluxes at the surface
+      and top-of-atmosphere)
+    dims: [alevhalf, site, time1]
+    sources: [model_var: FDS]
+    table: atmos
+    units: W m-2
+
   rsdcs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
@@ -596,10 +1124,32 @@ variables:
     table: atmos
     units: W m-2
 
+  rsdcs_tpt-alh-hs-u:
+    description: Downwelling clear-sky shortwave radiation (includes the fluxes at
+      the surface and top-of-atmosphere)
+    dims: [alevhalf, site, time1]
+    sources: [model_var: FDSC]
+    table: atmos
+    units: W m-2
+
   rsds_tavg-u-hxy-u:
-    description: This is the 3-hour mean flux.
+    description: Surface solar irradiance for UV calculations.
     dims: [lon, lat, time]
     positive: up
+    sources: [model_var: FSDS]
+    table: atmos
+    units: W m-2
+
+  rsds_tpt-u-hs-u:
+    description: Surface solar irradiance for UV calculations.
+    dims: [site, time1]
+    sources: [model_var: FSDS]
+    table: atmos
+    units: W m-2
+
+  rsds_tpt-u-hxy-u:
+    description: Surface solar irradiance for UV calculations.
+    dims: [lon, lat, time1]
     sources: [model_var: FSDS]
     table: atmos
     units: W m-2
@@ -608,6 +1158,20 @@ variables:
     description: Surface solar irradiance clear sky for UV calculations
     dims: [lon, lat, time]
     positive: up
+    sources: [model_var: FSDSC]
+    table: atmos
+    units: W m-2
+
+  rsdscs_tpt-u-hs-u:
+    description: Surface solar irradiance clear sky for UV calculations
+    dims: [site, time1]
+    sources: [model_var: FSDSC]
+    table: atmos
+    units: W m-2
+
+  rsdscs_tpt-u-hxy-u:
+    description: Surface solar irradiance clear sky for UV calculations
+    dims: [lon, lat, time1]
     sources: [model_var: FSDSC]
     table: atmos
     units: W m-2
@@ -622,10 +1186,18 @@ variables:
     units: W m-2
 
   rsdt_tavg-u-hxy-u:
-    description: Shortwave radiation incident at the top of the atmosphere
+    description: at the top of the atmosphere
     dims: [lon, lat, time]
     formula: FSNTOA+FSUTOA
     positive: up
+    sources: [model_var: FSNTOA, model_var: FSUTOA]
+    table: atmos
+    units: W m-2
+
+  rsdt_tpt-u-hs-u:
+    description: at the top of the atmosphere
+    dims: [site, time1]
+    formula: FSNTOA+FSUTOA
     sources: [model_var: FSNTOA, model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -645,6 +1217,14 @@ variables:
     table: atmos
     units: W m-2
 
+  rsu_tpt-alh-hs-u:
+    description: Upwelling shortwave radiation  (includes also the fluxes at the surface
+      and top of atmosphere)
+    dims: [alevhalf, site, time1]
+    sources: [model_var: FUS]
+    table: atmos
+    units: W m-2
+
   rsucs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     dims: [lon, lat, alevhalf, time]
@@ -652,11 +1232,39 @@ variables:
     table: atmos
     units: W m-2
 
+  rsucs_tpt-alh-hs-u:
+    description: Upwelling clear-sky shortwave radiation  (includes the fluxes at
+      the surface and TOA)
+    dims: [alevhalf, site, time1]
+    sources: [model_var: FUSC]
+    table: atmos
+    units: W m-2
+
   rsus_tavg-u-hxy-u:
-    description: This is the 3-hour mean flux.
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      "shortwave" means shortwave radiation. Upwelling radiation is radiation from
+      below. It does not mean "net upward". When thought of as being incident on a
+      surface, a radiative flux is sometimes called "irradiance". In addition, it
+      is identical with the quantity measured by a cosine-collector light-meter and
+      sometimes called "vector irradiance". In accordance with common usage in geophysical
+      disciplines, "flux" implies per unit area, called "flux density" in physics.
     dims: [lon, lat, time]
     formula: FSDS-FSNS
     positive: up
+    sources: [model_var: FSDS, model_var: FSNS]
+    table: atmos
+    units: W m-2
+
+  rsus_tpt-u-hs-u:
+    description: The surface called "surface" means the lower boundary of the atmosphere.
+      "shortwave" means shortwave radiation. Upwelling radiation is radiation from
+      below. It does not mean "net upward". When thought of as being incident on a
+      surface, a radiative flux is sometimes called "irradiance". In addition, it
+      is identical with the quantity measured by a cosine-collector light-meter and
+      sometimes called "vector irradiance". In accordance with common usage in geophysical
+      disciplines, "flux" implies per unit area, called "flux density" in physics.
+    dims: [site, time1]
+    formula: FSDS-FSNS
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
     units: W m-2
@@ -670,10 +1278,32 @@ variables:
     table: atmos
     units: W m-2
 
+  rsuscs_tpt-u-hs-u:
+    description: Surface Upwelling Clear-sky Shortwave Radiation
+    dims: [site, time1]
+    formula: FSDSC-FSNSC
+    sources: [model_var: FSDSC, model_var: FSNSC]
+    table: atmos
+    units: W m-2
+
   rsut_tavg-u-hxy-u:
-    description: TOA outgoing shortwave radiation
+    description: at the top of the atmosphere
     dims: [lon, lat, time]
     positive: up
+    sources: [model_var: FSUTOA]
+    table: atmos
+    units: W m-2
+
+  rsut_tpt-u-hs-u:
+    description: at the top of the atmosphere
+    dims: [site, time1]
+    sources: [model_var: FSUTOA]
+    table: atmos
+    units: W m-2
+
+  rsut_tpt-u-hxy-u:
+    description: at the top of the atmosphere
+    dims: [lon, lat, time1]
     sources: [model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -683,6 +1313,22 @@ variables:
     dims: [lon, lat, time]
     formula: SOLIN-FSNTOAC
     positive: up
+    sources: [model_var: SOLIN, model_var: FSNTOAC]
+    table: atmos
+    units: W m-2
+
+  rsutcs_tpt-u-hs-u:
+    description: Calculated in the absence of clouds.
+    dims: [site, time1]
+    formula: SOLIN-FSNTOAC
+    sources: [model_var: SOLIN, model_var: FSNTOAC]
+    table: atmos
+    units: W m-2
+
+  rsutcs_tpt-u-hxy-u:
+    description: Calculated in the absence of clouds.
+    dims: [lon, lat, time1]
+    formula: SOLIN-FSNTOAC
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
     units: W m-2
@@ -698,9 +1344,27 @@ variables:
     table: atmos
     units: W m-2
 
+  rtmt_tpt-u-hs-u:
+    description: i.e., at the top of that portion of the atmosphere where dynamics
+      are explicitly treated by the model. This is reported only if it differs from
+      the net downward radiative flux at the top of the atmosphere.
+    dims: [site, time1]
+    formula: FSNT-FLNT
+    sources: [model_var: FSNT, model_var: FLNT]
+    table: atmos
+    units: W m-2
+
   sfcWind_tavg-h10m-hxy-u:
-    description: Near surface wind speed
+    description: near-surface (usually, 10 meters) wind speed.
     dims: [lon, lat, time, height10m]
+    sources: [model_var: U10]
+    table: atmos
+    units: m s-1
+
+  sfcWind_tpt-h10m-hs-u:
+    description: This is the mean of the speed, not the speed computed from the mean
+      u and v components of wind
+    dims: [site, time1, height10m]
     sources: [model_var: U10]
     table: atmos
     units: m s-1
@@ -744,10 +1408,35 @@ variables:
     units: K
 
   ta_tavg-p39-hy-air:
-    description: Zonal mean temperature of air with the extended number of vertical
-      levels.
+    description: Air Temperature
     dims: [time, plev, lat]
     levels: {name: plev39, units: Pa}
+    sources: [model_var: T]
+    table: atmos
+    units: K
+
+  ta_tpt-al-hs-u:
+    description: Air Temperature
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: T]
+    table: atmos
+    units: K
+
+  ta_tpt-al-hxy-u:
+    description: Air Temperature
+    dims: [lon, lat, lev, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: T]
+    table: atmos
+    units: K
+
+  ta_tpt-p3-hxy-air:
+    description: Air Temperature
+    dims: [plev, lat, lon, time1]
+    levels: {name: plev3, units: Pa}
     sources: [model_var: T]
     table: atmos
     units: K
@@ -782,6 +1471,20 @@ variables:
     table: atmos
     units: K
 
+  tas_tpt-h2m-hs-u:
+    description: near-surface (usually, 2 meter) air temperature
+    dims: [site, time1, height2m]
+    sources: [model_var: TREFHT]
+    table: atmos
+    units: K
+
+  tas_tpt-h2m-hxy-u:
+    description: This is sampled synoptically.
+    dims: [lon, lat, time1, height2m]
+    sources: [model_var: TREFHT]
+    table: atmos
+    units: K
+
   tauu_tavg-u-hxy-u:
     description: Downward eastward wind stress at the surface
     dims: [lon, lat, time]
@@ -790,10 +1493,24 @@ variables:
     table: atmos
     units: Pa
 
+  tauu_tpt-u-hs-u:
+    description: Downward eastward wind stress at the surface
+    dims: [site, time1]
+    sources: [model_var: TAUX]
+    table: atmos
+    units: Pa
+
   tauv_tavg-u-hxy-u:
-    description: surface, now requesting daily output.
+    description: Downward northward wind stress at the surface
     dims: [lon, lat, time]
     positive: down
+    sources: [model_var: TAUY]
+    table: atmos
+    units: Pa
+
+  tauv_tpt-u-hs-u:
+    description: Downward northward wind stress at the surface
+    dims: [site, time1]
     sources: [model_var: TAUY]
     table: atmos
     units: Pa
@@ -840,6 +1557,20 @@ variables:
     table: atmos
     units: K
 
+  ts_tpt-u-hs-u:
+    description: Surface temperature (skin for open ocean)
+    dims: [site, time1]
+    sources: [model_var: TS]
+    table: atmos
+    units: K
+
+  ts_tpt-u-hxy-u:
+    description: Temperature of the lower boundary of the atmosphere
+    dims: [lon, lat, time1]
+    sources: [model_var: TS]
+    table: atmos
+    units: K
+
   ua_tavg-al-hxy-u:
     description: Zonal wind (positive in a eastward direction).
     dims: [lon, lat, lev, time]
@@ -858,9 +1589,43 @@ variables:
     units: m s-1
 
   ua_tavg-p39-hy-air:
-    description: zonal mean; hence YZT
+    description: Zonal wind (positive in a eastward direction).
     dims: [time, plev, lat]
     levels: {name: plev39, units: Pa}
+    sources: [model_var: U]
+    table: atmos
+    units: m s-1
+
+  ua_tpt-200hPa-hxy-u:
+    description: Zonal wind (positive in a eastward direction) at 200 hPa, 6hourly
+      instantaneous
+    dims: [lon, lat, time1, p200]
+    sources: [model_var: U200]
+    table: atmos
+    units: m s-1
+
+  ua_tpt-al-hs-u:
+    description: Zonal wind (positive in a eastward direction).
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: U]
+    table: atmos
+    units: m s-1
+
+  ua_tpt-al-hxy-u:
+    description: Zonal wind (positive in a eastward direction).
+    dims: [lon, lat, lev, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: U]
+    table: atmos
+    units: m s-1
+
+  ua_tpt-p3-hxy-air:
+    description: Zonal wind (positive in a eastward direction).
+    dims: [plev, lat, lon, time1]
+    levels: {name: plev3, units: Pa}
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -886,6 +1651,40 @@ variables:
     description: Meridional wind (positive in a northward direction).
     dims: [time, plev, lat]
     levels: {name: plev39, units: Pa}
+    sources: [model_var: V]
+    table: atmos
+    units: m s-1
+
+  va_tpt-200hPa-hxy-u:
+    description: Meridional wind (positive in a northward direction) at 200 hPa, 6
+      hourly instantaneous
+    dims: [lon, lat, time1, p200]
+    sources: [model_var: V200]
+    table: atmos
+    units: m s-1
+
+  va_tpt-al-hs-u:
+    description: Meridional wind (positive in a northward direction).
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: V]
+    table: atmos
+    units: m s-1
+
+  va_tpt-al-hxy-u:
+    description: Meridional wind (positive in a northward direction).
+    dims: [lon, lat, lev, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: V]
+    table: atmos
+    units: m s-1
+
+  va_tpt-p3-hxy-air:
+    description: Meridional wind (positive in a northward direction).
+    dims: [plev, lat, lon, time1]
+    levels: {name: plev3, units: Pa}
     sources: [model_var: V]
     table: atmos
     units: m s-1
@@ -925,6 +1724,23 @@ variables:
     sources: [model_var: OMEGA]
     table: atmos
     units: Pa s-1
+
+  wap_tpt-al-hs-u:
+    description: commonly referred to as "omega", this represents the vertical component
+      of velocity in pressure coordinates (positive down)
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: OMEGA]
+    table: atmos
+    units: Pa s-1
+
+  wsg_tmax-h10m-hxy-u:
+    description: Wind speed gust maximum at 10m above surface
+    dims: [lon, lat, time, height10m]
+    sources: [model_var: U10WITHGUSTS]
+    table: atmos
+    units: m s-1
 
   zg_tavg-1000hPa-hxy-air:
     description: Geopotential height on the 1000 hPa surface
@@ -966,9 +1782,73 @@ variables:
     units: m
 
   zg_tavg-p39-hy-air:
-    description: zonal mean; hence YZT
+    description: Geopotential is the sum of the specific gravitational potential energy
+      relative to the geoid and the specific centripetal potential energy. Geopotential
+      height is the geopotential divided by the standard acceleration due to gravity.
+      It is numerically similar to the altitude (or geometric height) and not to the
+      quantity with standard name height, which is relative to the surface.
     dims: [time, plev, lat]
     levels: {name: plev39, units: Pa}
+    sources: [model_var: Z3]
+    table: atmos
+    units: m
+
+  zg_tpt-500hPa-hxy-air:
+    description: geopotential height on the 500 hPa surface
+    dims: [lon, lat, time1, p500]
+    sources: [model_var: Z500]
+    table: atmos
+    units: m
+
+  zg_tpt-700hPa-hxy-u:
+    description: 700 hPa geopotential height at 6 hourly instantaneous frequency
+    dims: [lon, lat, time1, p700]
+    sources: [model_var: Z700]
+    table: atmos
+    units: m
+
+  zg_tpt-al-hs-u:
+    description: Geopotential is the sum of the specific gravitational potential energy
+      relative to the geoid and the specific centripetal potential energy. Geopotential
+      height is the geopotential divided by the standard acceleration due to gravity.
+      It is numerically similar to the altitude (or geometric height) and not to the
+      quantity with standard name height, which is relative to the surface.
+    dims: [lev, site, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: Z3]
+    table: atmos
+    units: m
+
+  zg_tpt-al-hxy-u:
+    description: Geopotential height
+    dims: [lon, lat, lev, time1]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: Z3]
+    table: atmos
+    units: m
+
+  zg_tpt-p3-hxy-air:
+    description: Geopotential is the sum of the specific gravitational potential energy
+      relative to the geoid and the specific centripetal potential energy. Geopotential
+      height is the geopotential divided by the standard acceleration due to gravity.
+      It is numerically similar to the altitude (or geometric height) and not to the
+      quantity with standard name height, which is relative to the surface.
+    dims: [plev, lat, lon, time1]
+    levels: {name: plev3, units: Pa}
+    sources: [model_var: Z3]
+    table: atmos
+    units: m
+
+  zg_tpt-p7h-hxy-air:
+    description: Geopotential is the sum of the specific gravitational potential energy
+      relative to the geoid and the specific centripetal potential energy. Geopotential
+      height is the geopotential divided by the standard acceleration due to gravity.
+      It is numerically similar to the altitude (or geometric height) and not to the
+      quantity with standard name height, which is relative to the surface.
+    dims: [plev, lat, lon, time1]
+    levels: {name: plev7h, units: Pa}
     sources: [model_var: Z3]
     table: atmos
     units: m

@@ -63,6 +63,17 @@ variables:
     table: aerosol
     units: kg m-2
 
+  bs550aer_tpt-al-hxy-u:
+    description: Aerosol  Backscatter at wavelength 550nm and scattering angle 180
+      degrees, computed from extinction and lidar ratio
+    dims: [lon, lat, lev, time1, lambda550nm]
+    formula: BS550AER/DAYFOC
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: BS550AER, model_var: DAYFOC]
+    table: aerosol
+    units: m-1 sr-1
+
   ccn1_tavg-al-hxy-u:
     description: This is the concentration of cloud condensation nuclei (CCN) at 1.0
       percent supersaturation, based on aerosol chemical composition and size
@@ -106,10 +117,10 @@ variables:
   cheaqpso4_tavg-al-hxy-u:
     description: 'proposed name: tendency_of_atmosphere_mass_content_of_sulfate_dry_aerosol_due_to_aqueous_phase_net_chemical_production'
     dims: [lon, lat, lev, time]
-    formula: AQSO4_H2O2+AQSO4_O3
+    formula: AQSO4_H2O2_3D+AQSO4_O3_3D
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: AQSO4_H2O2, model_var: AQSO4_O3]
+    sources: [model_var: AQSO4_H2O2_3D, model_var: AQSO4_O3_3D]
     table: aerosol
     units: kg m-2 s-1
 
@@ -118,7 +129,7 @@ variables:
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: GS_H2SO4]
+    sources: [model_var: GSSO4_3D]
     table: aerosol
     units: kg m-2 s-1
 
@@ -205,6 +216,16 @@ variables:
   ec550aer_tavg-al-hxy-u:
     description: Aerosol Extinction at 550nm
     dims: [lon, lat, lev, time, lambda550nm]
+    formula: EC550AER/DAYFOC
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: EC550AER, model_var: DAYFOC]
+    table: aerosol
+    units: m-1
+
+  ec550aer_tpt-al-hxy-u:
+    description: Aerosol Extinction @550nm
+    dims: [lon, lat, lev, time1, lambda550nm]
     formula: EC550AER/DAYFOC
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
@@ -345,6 +366,14 @@ variables:
     table: aerosol
     units: kg kg-1
 
+  mmraerh2o_tpt-h2m-hs-u:
+    description: "This variable represents the instantaneous near surface aerosol\
+      \ water\_Mass Mixing Ratio at CF sites, sampled every 3 hours"
+    dims: [site, time1, height2m]
+    sources: [model_var: MMR_AH2O]
+    table: aerosol
+    units: kg kg-1
+
   mmrbc_tavg-al-hxy-u:
     description: Dry mass fraction of black carbon aerosol particles in air.
     dims: [lon, lat, lev, time]
@@ -377,6 +406,14 @@ variables:
     table: aerosol
     units: kg kg-1
 
+  mmrdust_tpt-h2m-hs-u:
+    description: This variable represents the instantaneous near surface Dust Aerosol
+      Mass Mixing Ratio at CF sites, sampled every 3 hours
+    dims: [site, time1, height2m]
+    sources: [model_var: mmr_DUST]
+    table: aerosol
+    units: kg kg-1
+
   mmroa_tavg-al-hxy-u:
     description: We recommend a scale factor of POM=1.4*OC, unless your model has
       more detailed info available.
@@ -390,6 +427,14 @@ variables:
   mmroa_tavg-h2m-hxy-u:
     description: Daily mean total organic aerosol mass mixing ratio near surface.
     dims: [lon, lat, time, height2m]
+    sources: [model_var: mmr_OM]
+    table: aerosol
+    units: kg kg-1
+
+  mmroa_tpt-h2m-hs-u:
+    description: "This variable represents the instantaneous near surface organic\
+      \ aerosol\_Mass Mixing Ratio at CF sites, sampled every 3 hours."
+    dims: [site, time1, height2m]
     sources: [model_var: mmr_OM]
     table: aerosol
     units: kg kg-1
@@ -427,6 +472,14 @@ variables:
   mmrso4_tavg-h2m-hxy-u:
     description: Daily mean sulfate aerosol mass mixing ratio near surface.
     dims: [lon, lat, time, height2m]
+    sources: [model_var: mmr_SULFATE]
+    table: aerosol
+    units: kg kg-1
+
+  mmrso4_tpt-h2m-hs-u:
+    description: This variable is for instantaneous near surface mass mixing ratio
+      of sulfate aerosol at CF sites, sampled every 3 hours
+    dims: [site, time1, height2m]
     sources: [model_var: mmr_SULFATE]
     table: aerosol
     units: kg kg-1
@@ -668,6 +721,14 @@ variables:
     table: aerosol
     units: mol mol-1
 
+  so2_tpt-h2m-hs-u:
+    description: This variable represents the instantaneous near surface so2 volume
+      mixing ration at CF sites, sampled every 3 hours
+    dims: [site, time1, height2m]
+    sources: [model_var: SO2]
+    table: aerosol
+    units: mol mol-1
+
   tatp_tavg-u-hxy-u:
     description: 2D monthly mean thermal tropopause calculated using WMO tropopause
       definition on 3d temperature
@@ -677,7 +738,7 @@ variables:
     units: K
 
   toz_tavg-u-hxy-u:
-    description: total ozone column in DU
+    description: Total ozone column
     dims: [lon, lat, time]
     sources: [model_var: cb_ozone_c]
     table: aerosol
