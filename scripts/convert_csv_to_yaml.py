@@ -285,7 +285,10 @@ def extract_variables(expr: str) -> list:
     variables = []
     for word in all_words:
         word_dict = {}
-        if word not in ignore and not re.match(r"e\d+", word):
+        if word not in ignore:
+            if word in ["e", "E"]:
+                if re.search(r"[0-9]+[eE][+\-]?[0-9]+", expr):
+                    continue  # skip scientific notation
             word_dict["model_var"] = word
             variables.append(word_dict)
     if "FATES" in expr and "FATES_FRAC" not in expr:

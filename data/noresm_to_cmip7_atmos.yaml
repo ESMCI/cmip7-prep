@@ -846,7 +846,7 @@ variables:
     formula: 1E-6*AREI/FREQI
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: E, model_var: AREI, model_var: FREQI]
+    sources: [model_var: AREI, model_var: FREQI]
     table: atmos
     units: m
 
@@ -859,7 +859,7 @@ variables:
     formula: 1E-6* AREL/FREQL
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: E, model_var: AREL, model_var: FREQL]
+    sources: [model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
 
@@ -869,7 +869,7 @@ variables:
     formula: 1E-6* AREL/FREQL
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: E, model_var: AREL, model_var: FREQL]
+    sources: [model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
 
@@ -881,7 +881,7 @@ variables:
     formula: 1E-6* AREL/FREQL
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: E, model_var: AREL, model_var: FREQL]
+    sources: [model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
 
