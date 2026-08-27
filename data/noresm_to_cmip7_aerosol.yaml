@@ -117,10 +117,10 @@ variables:
   cheaqpso4_tavg-al-hxy-u:
     description: 'proposed name: tendency_of_atmosphere_mass_content_of_sulfate_dry_aerosol_due_to_aqueous_phase_net_chemical_production'
     dims: [lon, lat, lev, time]
-    formula: AQSO4_H2O2+AQSO4_O3
+    formula: AQSO4_H2O2_3D+AQSO4_O3_3D
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: AQSO4_H2O2, model_var: AQSO4_O3]
+    sources: [model_var: AQSO4_H2O2_3D, model_var: AQSO4_O3_3D]
     table: aerosol
     units: kg m-2 s-1
 
@@ -129,7 +129,7 @@ variables:
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: GS_H2SO4]
+    sources: [model_var: GSSO4_3D]
     table: aerosol
     units: kg m-2 s-1
 

@@ -79,6 +79,7 @@ variables:
   cl_tavg-al-hxy-u:
     description: Includes both large-scale and convective cloud.
     dims: [lon, lat, lev, time]
+    formula: 100*CLOUD
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: CLOUD]
@@ -88,6 +89,7 @@ variables:
   cl_tpt-al-hs-u:
     description: Includes both large-scale and convective cloud.
     dims: [lev, site, time1]
+    formula: 100*CLOUD
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: CLOUD]
@@ -211,6 +213,7 @@ variables:
     description: for the whole atmospheric column, as seen from the surface or the
       top of the atmosphere. Includes both large-scale and convective cloud.
     dims: [lon, lat, time]
+    formula: 100*CLDTOT
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -219,6 +222,7 @@ variables:
     description: for the whole atmospheric column, as seen from the surface or the
       top of the atmosphere. Include both large-scale and convective cloud.
     dims: [site, time1]
+    formula: 100*CLDTOT
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -227,6 +231,7 @@ variables:
     description: for the whole atmospheric column, as seen from the surface or the
       top of the atmosphere. Include both large-scale and convective cloud.
     dims: [lon, lat, time1]
+    formula: CLDTOT*100
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -322,6 +327,16 @@ variables:
       Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
       the calculation of radiative transfer in model.
     dims: [site, time1]
+    sources: [model_var: TGCLDCWP]
+    table: atmos
+    units: kg m-2
+
+  clwvi_tpt-u-hxy-u:
+    description: mass of condensed (liquid + ice) water in the column divided by the
+      area of the column (not just the area of the cloudy portion of the column).
+      Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
+      the calculation of radiative transfer in model.
+    dims: [lon, lat, time1]
     sources: [model_var: TGCLDCWP]
     table: atmos
     units: kg m-2
@@ -439,6 +454,27 @@ variables:
     table: atmos
     units: '%'
 
+  hur_tpt-100hPa-hxy-u:
+    description: Relative humidity at 100 hPa
+    dims: [lon, lat, time1, p100]
+    sources: [model_var: RELHUM100]
+    table: atmos
+    units: '%'
+
+  hur_tpt-500hPa-hxy-air:
+    description: Relative humidity at 500 hPa, 6 hourly instantaneous
+    dims: [lon, lat, time1, p500]
+    sources: [model_var: RELHUM500]
+    table: atmos
+    units: '%'
+
+  hur_tpt-850hPa-hxy-air:
+    description: Relative humidity at 850 hPa
+    dims: [lon, lat, time1, p850]
+    sources: [model_var: RELHUM850]
+    table: atmos
+    units: '%'
+
   hur_tpt-al-hs-u:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
@@ -530,10 +566,8 @@ variables:
   hus_tpt-p7h-hxy-air:
     description: Extra levels - 925, 700, 600, 300, 50
     dims: [plev, lat, lon, time1]
-
-    formula: loadso4_tavg-u-hxy-u
     levels: {name: plev7h, units: Pa}
-    sources: [model_var: loadso4_tavg, model_var: u, model_var: hxy, model_var: u]
+    sources: [model_var: Q]
     table: atmos
     units: '1'
 
@@ -557,6 +591,40 @@ variables:
     sources: [model_var: QREFHT]
     table: atmos
     units: '1'
+
+  intuaw_tavg-u-hxy-u:
+    description: Vertically integrated eastward moisture transport (Mass weighted
+      vertical integral of the product of eastward wind by total water mass per unit
+      mass)
+    dims: [lon, lat, time]
+    sources: [model_var: uIVT]
+    table: atmos
+    units: kg m-1 s-1
+
+  intuaw_tpt-u-hxy-u:
+    description: Vertically integrated eastward moisture transport (Mass weighted
+      vertical integral of the product of eastward wind by total water mass per unit
+      mass)
+    dims: [lon, lat, time1]
+    sources: [model_var: uIVT]
+    table: atmos
+    units: kg m-1 s-1
+
+  intvaw_tavg-u-hxy-u:
+    description: Vertically integrated northward moisture transport (Mass_weighted_vertical
+      integral of the product of northward wind by total water mass per unit mass)
+    dims: [lon, lat, time]
+    sources: [model_var: vIVT]
+    table: atmos
+    units: kg m-1 s-1
+
+  intvaw_tpt-u-hxy-u:
+    description: Vertically integrated northward moisture transport (Mass_weighted_vertical
+      integral of the product of northward wind by total water mass per unit mass)
+    dims: [lon, lat, time1]
+    sources: [model_var: vIVT]
+    table: atmos
+    units: kg m-1 s-1
 
   loadbc_tavg-u-hxy-u:
     description: The total dry mass of black carbon aerosol particles per unit area.
@@ -649,8 +717,7 @@ variables:
     units: kg m-2 s-1
 
   pr_tpt-u-hxy-u:
-    description: at surface; includes both liquid and solid phases from all types
-      of clouds (both large-scale and convective)
+    description: Total precipitation rate at the surface
     dims: [lon, lat, time1]
     sources: [model_var: PRECT]
     table: atmos
@@ -799,9 +866,10 @@ variables:
   reffclws_tpt-al-hs-scl:
     description: alevel site time1
     dims: [lev, site, time1]
+    formula: 1E-6* AREL/FREQL
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: REFFL]
+    sources: [model_var: E, model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
 
@@ -810,9 +878,10 @@ variables:
       second moment of the particle size distribution (obtained by considering only
       the cloudy portion of the grid cell).
     dims: [lon, lat, lev, time1]
+    formula: 1E-6* AREL/FREQL
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
-    sources: [model_var: REFFL]
+    sources: [model_var: E, model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
 
@@ -1195,7 +1264,8 @@ variables:
       sometimes called "vector irradiance". In accordance with common usage in geophysical
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     dims: [site, time1]
-    sources: [model_var: FSR]
+    formula: FSDS-FSNS
+    sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
     units: W m-2
 
@@ -1664,6 +1734,13 @@ variables:
     sources: [model_var: OMEGA]
     table: atmos
     units: Pa s-1
+
+  wsg_tmax-h10m-hxy-u:
+    description: Wind speed gust maximum at 10m above surface
+    dims: [lon, lat, time, height10m]
+    sources: [model_var: U10WITHGUSTS]
+    table: atmos
+    units: m s-1
 
   zg_tavg-1000hPa-hxy-air:
     description: Geopotential height on the 1000 hPa surface
