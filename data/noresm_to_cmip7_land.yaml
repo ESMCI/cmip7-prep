@@ -1007,7 +1007,7 @@ variables:
       to observations of total soil respiration.
     dims: [lon, lat, time]
     formula: ((FATES_FROOTMAINTAR+FATES_CROOTMAINTAR) + (FATES_GROWTH_RESP * (FATES_FROOT_ALLOC
-      + FATES_CROOT_ALLOC / FATES_NPP)))*FATES_FRACTION
+      + FATES_CROOT_ALLOC) / FATES_NPP))*FATES_FRACTION
     sources: [model_var: FATES_FROOTMAINTAR, model_var: FATES_CROOTMAINTAR, {
         model_var: FATES_GROWTH_RESP}, model_var: FATES_FROOT_ALLOC, model_var: FATES_CROOT_ALLOC,
       model_var: FATES_NPP, model_var: FATES_FRACTION]
