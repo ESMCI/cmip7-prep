@@ -1,11 +1,27 @@
+# pip-installable dependencies.
+#
+# Two imports are NOT here because they are not on PyPI and must come from
+# conda-forge (see INSTALL.md) or a source build (see Dockerfile):
+#   cmor   - imported by cmor_utils.py, cmor_writer.py, cmor_driver.py
+#   esmpy  - ESMF binding that xesmf loads at import time
+
+# core
+numpy
 xarray
 netCDF4
 h5netcdf
+cftime
 dask
 pyyaml
 click
-esmpy
-pytest
-pytest-cov
 xesmf
 geocat-comp
+
+# scripts/
+gents                    # gen_timeseries.py
+cmip7-data-request-api   # cmor_driver.py, query_missing_vars.py, validate_cmor_output.py
+matplotlib               # validate_cmor_output.py plots (optional; import is guarded)
+
+# tests
+pytest
+pytest-cov
