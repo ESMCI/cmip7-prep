@@ -4,7 +4,7 @@
 #
 FROM condaforge/miniforge3:26.5.3-0
 
-RUN conda create -y -p /opt/env -c conda-forge \
+RUN conda install -y -n base -c conda-forge \
         python=3.12 \
         cmor=3.15 \
         esmpy \
@@ -24,8 +24,6 @@ RUN conda create -y -p /opt/env -c conda-forge \
         pytest-cov \
         git \
     && conda clean --all --force-pkgs-dirs --yes
-
-ENV PATH=/opt/env/bin:$PATH
 
 RUN pip install --no-cache-dir \
         gents \
