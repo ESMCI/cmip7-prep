@@ -285,6 +285,12 @@ class CmorSession(
         var_dims = list(var_da.dims)
         return i_id, j_id, var_da, var_dims
 
+    def _horizontal_only(da_coord, keep):
+        extra = [d for d in da_coord.dims if d not in keep]
+        if extra:
+            da_coord = da_coord.isel({d: 0 for d in extra})
+        return da_coord
+
     def _define_cice_grid(self, ds, var_name, var_da):
         """Register a native CICE (nj, ni) tripole grid via cmor.grid().
 
@@ -342,12 +348,6 @@ class CmorSession(
         # rank does not match number of axes passed via axis_ids".  Collapse any
         # non-horizontal dimension (e.g. time) by taking the first index, since
         # the grid geometry does not vary in time.
-        def _horizontal_only(da_coord, keep):
-            extra = [d for d in da_coord.dims if d not in keep]
-            if extra:
-                da_coord = da_coord.isel({d: 0 for d in extra})
-            return da_coord
-
         tlat = _horizontal_only(tlat, ("nj", "ni"))
         tlon = _horizontal_only(tlon, ("nj", "ni"))
         # vertex bounds keep their trailing vertices dim in addition to nj, ni
