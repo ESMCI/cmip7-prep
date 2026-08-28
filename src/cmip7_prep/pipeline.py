@@ -24,11 +24,27 @@ _VAR_TOKEN = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z0-9_]+)(?![A-Za-z0-9_])")
 # 'tarea' (used by siarea = sum(siconc*tarea)) therefore never has a matching
 # '*.tarea.*.nc' file, so it must be excluded from the standalone-file existence
 # check -- it is read from whichever data file is opened.
-STATIC_MODEL_VARS = frozenset({
-    "tarea", "uarea", "narea", "earea",
-    "TLAT", "TLON", "ULAT", "ULON", "NLAT", "NLON", "ELAT", "ELON",
-    "area", "landfrac", "landmask", "tmask", "wet",
-})
+STATIC_MODEL_VARS = frozenset(
+    {
+        "tarea",
+        "uarea",
+        "narea",
+        "earea",
+        "TLAT",
+        "TLON",
+        "ULAT",
+        "ULON",
+        "NLAT",
+        "NLON",
+        "ELAT",
+        "ELON",
+        "area",
+        "landfrac",
+        "landmask",
+        "tmask",
+        "wet",
+    }
+)
 
 
 def _filename_contains_var(

@@ -351,8 +351,12 @@ class CmorSession(
         tlat = _horizontal_only(tlat, ("nj", "ni"))
         tlon = _horizontal_only(tlon, ("nj", "ni"))
         # vertex bounds keep their trailing vertices dim in addition to nj, ni
-        lat_bnds_da = _horizontal_only(lat_bnds_da, ("nj", "ni") + lat_bnds_da.dims[-1:])
-        lon_bnds_da = _horizontal_only(lon_bnds_da, ("nj", "ni") + lon_bnds_da.dims[-1:])
+        lat_bnds_da = _horizontal_only(
+            lat_bnds_da, ("nj", "ni") + lat_bnds_da.dims[-1:]
+        )
+        lon_bnds_da = _horizontal_only(
+            lon_bnds_da, ("nj", "ni") + lon_bnds_da.dims[-1:]
+        )
 
         lat_vals = np.asarray(tlat.values, dtype="f8")
         lon_vals = np.mod(np.asarray(tlon.values, dtype="f8"), 360.0)
