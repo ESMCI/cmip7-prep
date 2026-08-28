@@ -339,6 +339,18 @@ class CmorSession(
         lat_vert = np.asarray(lat_bnds_da.values, dtype="f8")
         lon_vert = np.mod(np.asarray(lon_bnds_da.values, dtype="f8"), 360.0)
 
+        # TEMP DEBUG: dump the exact shapes CMOR will see, to diagnose the
+        # "latitude's rank does not match number of axes" error.
+        logger.info(
+            "[CICE grid DEBUG] tlat.name=%s tlat.dims=%s | nj=%d ni=%d | "
+            "lat_vals.shape=%s (ndim=%d) lon_vals.shape=%s | "
+            "lat_vert.shape=%s lon_vert.shape=%s",
+            getattr(tlat, "name", "?"), tuple(getattr(tlat, "dims", ())),
+            nj, ni,
+            lat_vals.shape, lat_vals.ndim, lon_vals.shape,
+            lat_vert.shape, lon_vert.shape,
+        )
+
         # Define the index axes and the grid against the CMIP7 grids table.
         self.load_table(self.tables_root, "grids")
         j_id = cmor.axis(
@@ -350,6 +362,10 @@ class CmorSession(
             table_entry="i_index",
             units="1",
             coord_vals=np.arange(ni, dtype="i4"),
+        )
+        logger.info(
+            "[CICE grid DEBUG] j_id=%s i_id=%s axis_ids=%s (len=%d)",
+            j_id, i_id, [j_id, i_id], len([j_id, i_id]),
         )
         return cmor.grid(
             axis_ids=[j_id, i_id],

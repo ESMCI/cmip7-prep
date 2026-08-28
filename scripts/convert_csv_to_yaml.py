@@ -88,6 +88,7 @@ MODEL_CONFIGS = {
         "realm_outputs": {
             "atmos": "noresm_to_cmip7_atmos.yaml",
             "land": "noresm_to_cmip7_land.yaml",
+            "landice": "noresm_to_cmip7_landice.yaml",
             "aerosol": "noresm_to_cmip7_aerosol.yaml",
             "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
         },
