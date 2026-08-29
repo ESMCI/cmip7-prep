@@ -18,34 +18,6 @@ logger = logging.getLogger(__name__)
 
 _VAR_TOKEN = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z0-9_]+)(?![A-Za-z0-9_])")
 
-# Static grid / cell-measure fields that live INSIDE the model output files
-# (e.g. the CICE cell area 'tarea', or the T/U grid lat/lon), rather than being
-# written as their own per-variable timeseries files.  A formula source such as
-# 'tarea' (used by siarea = sum(siconc*tarea)) therefore never has a matching
-# '*.tarea.*.nc' file, so it must be excluded from the standalone-file existence
-# check -- it is read from whichever data file is opened.
-STATIC_MODEL_VARS = frozenset(
-    {
-        "tarea",
-        "uarea",
-        "narea",
-        "earea",
-        "TLAT",
-        "TLON",
-        "ULAT",
-        "ULON",
-        "NLAT",
-        "NLON",
-        "ELAT",
-        "ELON",
-        "area",
-        "landfrac",
-        "landmask",
-        "tmask",
-        "wet",
-    }
-)
-
 
 def _filename_contains_var(
     path: Union[str, Path], var: str, fname_pattern: Optional[str] = None
@@ -155,22 +127,11 @@ def open_native_for_cmip_vars(
 
     for var in cmip_vars:
         logger.debug("Processing CMIP var; collecting model vars '%s'", var)
-        # Get the source variables explicitly listed in the YAML 'sources' entry
-        # and check they all have matching time series files before doing anything else
-        try:
-            cfg = mapping.get_cfg(var) or {}
-        except KeyError:
-            cfg = {}
-        source_vars = []
-        if cfg.get("source"):
-            source_vars = [cfg["source"]]
-        elif cfg.get("raw_variables"):
-            source_vars = list(cfg["raw_variables"])
-
-        # Static grid/cell-measure fields (e.g. 'tarea') live inside the data
-        # files, not as their own timeseries files, so they must not be required
-        # to have a standalone '*.<name>.*.nc' file here.
-        check_vars = [v for v in source_vars if v not in STATIC_MODEL_VARS]
+        # Check that the time-varying source variables all have matching time
+        # series files before doing anything else.  Static grid/cell-measure
+        # fields (e.g. 'tarea') are excluded by the mapping since they live
+        # inside the data files rather than as their own '*.<name>.*.nc' files.
+        check_vars = mapping.timeseries_source_vars(var)
         missing = [
             v
             for v in check_vars
