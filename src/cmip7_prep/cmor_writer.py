@@ -539,6 +539,27 @@ class CmorSession(
                 )
             )
             tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
+
+            # Some model output (e.g. CISM land-ice) carries no time bounds, but
+            # CMOR requires them for time-averaged variables.  When absent,
+            # synthesize bounds from the numeric time centers using the midpoints
+            # between consecutive steps (edges extrapolated).  For evenly-spaced
+            # data this reproduces the averaging period (e.g. the calendar year
+            # for annual means).
+            if tbnum is None and tvals is not None and np.size(tvals) >= 2:
+                t = np.asarray(tvals, dtype="f8").reshape(-1)
+                mids = 0.5 * (t[:-1] + t[1:])
+                tbnum = np.empty((t.size, 2), dtype="f8")
+                tbnum[1:, 0] = mids
+                tbnum[:-1, 1] = mids
+                tbnum[0, 0] = t[0] - (mids[0] - t[0])
+                tbnum[-1, 1] = t[-1] + (t[-1] - mids[-1])
+                logger.info(
+                    "time coordinate had no bounds; synthesized %d bounds from "
+                    "centers",
+                    tbnum.shape[0],
+                )
+
             return tvals, tbnum, str(units)
 
         def _get_1d_with_bounds(dsi: xr.Dataset, name: str, units_default: str):
