@@ -74,7 +74,7 @@ REALM_YAML_MAP = {
         "aerosol": "noresm_to_cmip7_aerosol.yaml",
         "land": "noresm_to_cmip7_land.yaml",
         "seaIce": "noresm_to_cmip7_seaice.yaml",
-        "landIce": "noresm_to_cmip7_landice.yaml",
+        "landIce": "noresm_to_cmip7_landIce.yaml",
     },
     "cesm": {
         "atmos": "cesm_to_cmip7_atmos.yaml",
@@ -154,7 +154,7 @@ INCLUDE_PATTERN_MAP = {
         # landIce is per ice-sheet: the '{ice_sheet}' placeholder is filled in
         # from --ice-sheet (gris/ais) so each run targets a single CISM domain.
         "landIce": {
-            "mon": ["cism.{ice_sheet}.h"],
+            "yr": ["cism.{ice_sheet}.h"],
         },
     },
 }
