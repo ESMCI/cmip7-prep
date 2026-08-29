@@ -54,7 +54,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--realm",
-        choices=["atmos", "land", "seaIce"],
+        choices=["atmos", "land", "seaIce", "landIce"],
         help="Realm to process - sets include patterns for time series (required)",
         required=True,
     )

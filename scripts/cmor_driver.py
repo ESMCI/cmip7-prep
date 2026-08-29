@@ -74,6 +74,7 @@ REALM_YAML_MAP = {
         "aerosol": "noresm_to_cmip7_aerosol.yaml",
         "land": "noresm_to_cmip7_land.yaml",
         "seaIce": "noresm_to_cmip7_seaice.yaml",
+        "landIce": "noresm_to_cmip7_landice.yaml",
     },
     "cesm": {
         "atmos": "cesm_to_cmip7_atmos.yaml",
@@ -150,6 +151,11 @@ INCLUDE_PATTERN_MAP = {
             "mon": ["cice.h."],
             "day": ["cice.h1."],
         },
+        # landIce is per ice-sheet: the '{ice_sheet}' placeholder is filled in
+        # from --ice-sheet (gris/ais) so each run targets a single CISM domain.
+        "landIce": {
+            "mon": ["cism.{ice_sheet}.h"],
+        },
     },
 }
 
@@ -193,6 +199,15 @@ def parse_args():
         ],
         default="atmos",
         help="Realm to process. (Default: atmos)",
+    )
+    parser.add_argument(
+        "--ice-sheet",
+        choices=["gris", "ais"],
+        default=None,
+        help=(
+            "Ice sheet to process for the landIce realm: 'gris' (Greenland) or "
+            "'ais' (Antarctica). Required when --realm landIce; ignored otherwise."
+        ),
     )
     parser.add_argument(
         "--resolution",
@@ -705,17 +720,23 @@ def latest_monthly_file(
     return path, year, month
 
 
-def get_include_patterns(model: str, realm: str, frequency: str) -> list[str]:
+def get_include_patterns(
+    model: str, realm: str, frequency: str, ice_sheet: str | None = None
+) -> list[str]:
     try:
-        logger.info(
-            "Looking for pattern: %s", INCLUDE_PATTERN_MAP[model][realm][frequency]
-        )
-        return INCLUDE_PATTERN_MAP[model][realm][frequency]
+        patterns = INCLUDE_PATTERN_MAP[model][realm][frequency]
     except KeyError:
         raise ValueError(
             f"No include_patterns defined for model={model}, "
             f"realm={realm}, frequency={frequency}"
         )
+    # landIce patterns are per ice-sheet; fill in the selected one (gris/ais).
+    if realm == "landIce":
+        if ice_sheet is None:
+            raise ValueError("realm 'landIce' requires --ice-sheet (gris or ais)")
+        patterns = [p.format(ice_sheet=ice_sheet) for p in patterns]
+    logger.info("Looking for pattern: %s", patterns)
+    return patterns
 
 
 def main():
@@ -923,7 +944,9 @@ def main():
 
     # Load requested variables
     if len(cmip_vars) > 0:
-        include_patterns = get_include_patterns(model, realm, frequency)
+        include_patterns = get_include_patterns(
+            model, realm, frequency, ice_sheet=args.ice_sheet
+        )
         if len(include_patterns) == 1:
             glob_pattern = f"*{include_patterns[0]}*.nc"
         else:
