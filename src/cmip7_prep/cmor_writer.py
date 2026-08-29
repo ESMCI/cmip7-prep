@@ -44,6 +44,21 @@ logger = logging.getLogger(__name__)
 DatasetJsonLike = Union[str, Path, AbstractContextManager]
 
 
+def _horizontal_only(da_coord: xr.DataArray, keep) -> xr.DataArray:
+    """Reduce a grid coordinate to only the dimensions in ``keep``.
+
+    Any other dimension (e.g. a stray ``time`` that rode along when coordinate
+    variables were concatenated during a multi-file merge) is collapsed by
+    taking its first index.  Used to keep the static CICE grid coordinates
+    (TLAT/TLON and their vertex bounds) at their expected 2-D/3-D shape before
+    ``cmor.grid``.  A no-op when no extra dimensions are present.
+    """
+    extra = [d for d in da_coord.dims if d not in keep]
+    if extra:
+        da_coord = da_coord.isel({d: 0 for d in extra})
+    return da_coord
+
+
 # ---------------------------------------------------------------------
 # CMOR session
 # ---------------------------------------------------------------------
@@ -284,12 +299,6 @@ class CmorSession(
         var_da = ds[str(var_name)]
         var_dims = list(var_da.dims)
         return i_id, j_id, var_da, var_dims
-
-    def _horizontal_only(da_coord, keep):
-        extra = [d for d in da_coord.dims if d not in keep]
-        if extra:
-            da_coord = da_coord.isel({d: 0 for d in extra})
-        return da_coord
 
     def _define_cice_grid(self, ds, var_name, var_da):
         """Register a native CICE (nj, ni) tripole grid via cmor.grid().
