@@ -44,6 +44,21 @@ logger = logging.getLogger(__name__)
 DatasetJsonLike = Union[str, Path, AbstractContextManager]
 
 
+def _horizontal_only(da_coord: xr.DataArray, keep) -> xr.DataArray:
+    """Reduce a grid coordinate to only the dimensions in ``keep``.
+
+    Any other dimension (e.g. a stray ``time`` that rode along when coordinate
+    variables were concatenated during a multi-file merge) is collapsed by
+    taking its first index.  Used to keep the static CICE grid coordinates
+    (TLAT/TLON and their vertex bounds) at their expected 2-D/3-D shape before
+    ``cmor.grid``.  A no-op when no extra dimensions are present.
+    """
+    extra = [d for d in da_coord.dims if d not in keep]
+    if extra:
+        da_coord = da_coord.isel({d: 0 for d in extra})
+    return da_coord
+
+
 # ---------------------------------------------------------------------
 # CMOR session
 # ---------------------------------------------------------------------
@@ -333,6 +348,24 @@ class CmorSession(
                 "CICE native grid requires latitude/longitude vertex bounds "
                 f"(e.g. latt_bounds/lont_bounds) for variable '{var_name}'."
             )
+
+        # The horizontal grid is static.  During the multi-file merge, xarray
+        # (opened with coords="all") concatenates coordinate variables along
+        # 'time', so TLAT/TLON -- which are coordinates via the field's
+        # 'coordinates' attribute -- can arrive as (time, nj, ni) instead of
+        # (nj, ni).  cmor.grid then rejects the 3-D latitude with "latitude's
+        # rank does not match number of axes passed via axis_ids".  Collapse any
+        # non-horizontal dimension (e.g. time) by taking the first index, since
+        # the grid geometry does not vary in time.
+        tlat = _horizontal_only(tlat, ("nj", "ni"))
+        tlon = _horizontal_only(tlon, ("nj", "ni"))
+        # vertex bounds keep their trailing vertices dim in addition to nj, ni
+        lat_bnds_da = _horizontal_only(
+            lat_bnds_da, ("nj", "ni") + lat_bnds_da.dims[-1:]
+        )
+        lon_bnds_da = _horizontal_only(
+            lon_bnds_da, ("nj", "ni") + lon_bnds_da.dims[-1:]
+        )
 
         lat_vals = np.asarray(tlat.values, dtype="f8")
         lon_vals = np.mod(np.asarray(tlon.values, dtype="f8"), 360.0)

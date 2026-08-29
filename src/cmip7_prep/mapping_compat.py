@@ -61,6 +61,37 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# Static grid / cell-measure fields that live INSIDE the model output files
+# (e.g. the CICE cell area 'tarea', or the T/U grid lat/lon), rather than being
+# written as their own per-variable timeseries files.  When such a field appears
+# as a formula source (e.g. siarea = sum(siconc * tarea)), it never has a
+# matching '*.<name>.*.nc' file, so it must not be required by the standalone
+# file-existence check -- it is read from whichever data file is opened.  This
+# is the single home for that knowledge (see also the sftlf->landfrac /
+# areacella->area special cases in _realize_core).
+STATIC_MODEL_VARS = frozenset(
+    {
+        "tarea",
+        "uarea",
+        "narea",
+        "earea",
+        "TLAT",
+        "TLON",
+        "ULAT",
+        "ULON",
+        "NLAT",
+        "NLON",
+        "ELAT",
+        "ELON",
+        "area",
+        "landfrac",
+        "landmask",
+        "tmask",
+        "wet",
+    }
+)
+
+
 def packaged_mapping_resource(filename: str):
     """Context manager yielding a real filesystem path to the packaged mapping file.
     Example:
@@ -378,6 +409,28 @@ class Mapping:
         if effective_freq is not None and raw is not None:
             return _to_varconfig(cmip_name, raw, freq=effective_freq).as_cfg()
         return self._vars[cmip_name].as_cfg()
+
+    def timeseries_source_vars(
+        self, cmip_name: str, freq: Optional[str] = None
+    ) -> List[str]:
+        """Source model vars that must exist as their own timeseries files.
+
+        Excludes static grid / cell-measure fields (see
+        :data:`STATIC_MODEL_VARS`) that are read from inside the data files
+        rather than written as standalone ``*.<name>.*.nc`` timeseries.  Used by
+        the pipeline's source-file existence check so that a formula source such
+        as ``tarea`` (in ``siarea = sum(siconc * tarea)``) does not cause the
+        variable to be skipped for want of a nonexistent ``*.tarea.*.nc`` file.
+        """
+        try:
+            cfg = self.get_cfg(cmip_name, freq) or {}
+        except KeyError:
+            return []
+        if cfg.get("source"):
+            src_vars = [cfg["source"]]
+        else:
+            src_vars = list(cfg.get("raw_variables") or [])
+        return [v for v in src_vars if v not in STATIC_MODEL_VARS]
 
     def iter_variable_names(self, freq: Optional[str] = None) -> List[str]:
         """Return top-level mapping variable names in YAML order.
