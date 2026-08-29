@@ -498,6 +498,32 @@ class CmorSession(
             cal = time_da.attrs.get(
                 "calendar", time_da.encoding.get("calendar", "noleap")
             )
+            # CMOR's CDMS/cdtime cannot parse some UDUNITS time periods -- e.g.
+            # CISM's yearly output uses 'common_years'/'common_year', which
+            # raises "invalid units = common_year".  When the period is not one
+            # CDMS accepts, re-express the axis as 'days since <ref>'.  The time
+            # values are decoded (cftime), so re-encoding to days is exact; the
+            # reference date is preserved from the original units.
+            _cdms_periods = (
+                "day",
+                "days",
+                "hour",
+                "hours",
+                "minute",
+                "minutes",
+                "second",
+                "seconds",
+            )
+            if " since " in units:
+                _period, _ref = units.split(" since ", 1)
+            else:
+                _period, _ref = units, "1850-01-01"
+            if _period.strip().lower() not in _cdms_periods:
+                new_units = f"days since {_ref.strip()}"
+                logger.info(
+                    "Re-expressing time units %r as %r for CMOR", units, new_units
+                )
+                units = new_units
             logger.debug("Time units: %s calendar: %s", units, cal)
             tvals = encode_time_to_num(time_da, units, cal)
             bname = time_da.attrs.get("bounds")
