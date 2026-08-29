@@ -427,7 +427,7 @@ def process_one_var(
         cmor_items = []
         try:
             open_kwargs = None
-            if realm in ("ocean", "seaIce"):
+            if realm in ("ocean", "seaIce", "landIce"):
                 open_kwargs = {"decode_timedelta": False}
             logger.debug("Opening native data for variable %s", varname)
 
@@ -519,6 +519,37 @@ def process_one_var(
                         str(varname),
                         f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
                     )
+                )
+            elif realm == "landIce":
+                # CISM land-ice is kept on its native projected (x, y) grid: no
+                # regridding, and no NH/SH variants -- a variable is realized once
+                # and simply appears across the different frequency files.  The
+                # projected x/y coordinate axes ride along (dimension coordinates)
+                # so the writer can georeference them via the ice-sheet projection
+                # in _define_cism_grid.
+                logger.info(
+                    f"Preparing native landIce variable {varname}, applying realize"
+                )
+                realized = mapping.realize(ds_native, varname)
+                ds_cmor = (
+                    realized
+                    if isinstance(realized, xr.Dataset)
+                    else xr.Dataset({varname: realized})
+                )
+                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+                # Carry the projected coordinate axes if not already present
+                # (defensive; dimension coordinates normally ride along).
+                for gname in ("x0", "y0", "x1", "y1"):
+                    if (
+                        gname in ds_native
+                        and gname not in ds_cmor.coords
+                        and gname not in ds_cmor
+                    ):
+                        ds_cmor = ds_cmor.assign({gname: ds_native[gname]})
+                cmor_items = [(ds_cmor, cfg)]
+                results.append(
+                    (str(varname), "landIce field (native, realize applied)")
                 )
             elif cfg.get("levels", {}).get("name") == "plev39":
                 logger.info(
@@ -630,6 +661,7 @@ def process_one_var(
                     dataset_json=metadata_json,
                     dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
                     outdir=outdir,
+                    ice_sheet=args.ice_sheet,
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
                     set_cur_dataset_attribute("realization_index", realization_index)

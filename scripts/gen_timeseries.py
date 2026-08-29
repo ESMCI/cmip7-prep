@@ -59,6 +59,15 @@ def parse_arguments():
         required=True,
     )
     parser.add_argument(
+        "--ice-sheet",
+        choices=["gris", "ais"],
+        default=None,
+        help=(
+            "Ice sheet for the landIce realm: 'gris' (Greenland) or 'ais' "
+            "(Antarctica). Required when --realm landIce; ignored otherwise."
+        ),
+    )
+    parser.add_argument(
         "--outputdir",
         type=str,
         help="Full path to directory where output time series data will be placed (optional) "
@@ -121,10 +130,18 @@ def main():
     # For each file in list of files - regrid data
     debug = args.debug
 
-    # Determine include patterns
+    # Determine include patterns.  Patterns may contain a '{ice_sheet}'
+    # placeholder (landIce), filled in from --ice-sheet at run time.
     include_patterns = []
     for _, pattern_list in INCLUDE_PATTERN_MAP[args.model][args.realm].items():
         for pattern in pattern_list:
+            if "{ice_sheet}" in pattern:
+                if args.ice_sheet is None:
+                    logger.error(
+                        "realm '%s' requires --ice-sheet (gris or ais)", args.realm
+                    )
+                    sys.exit(1)
+                pattern = pattern.format(ice_sheet=args.ice_sheet)
             include_patterns.append(f"*{pattern}*")
 
     # Determine input directory

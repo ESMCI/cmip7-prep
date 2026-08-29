@@ -89,12 +89,16 @@ class CmorSession(
         log_dir: Path | str | None = None,
         log_name: str | None = None,
         outdir: Path | str | None = None,
+        ice_sheet: str | None = None,
     ) -> None:
         self.tables_root = tables_root
         self.dataset_attrs = dict(dataset_attrs or {})
         self.dataset_json = dataset_json
         self._dataset_json_cm = None
         self.tracking_prefix = tracking_prefix
+        # Ice sheet ('gris'/'ais') selecting the CISM map projection; only used
+        # for the native land-ice grid (see _define_cism_grid).
+        self._ice_sheet = ice_sheet
         # logging config
         self._log_dir = Path(log_dir) if log_dir is not None else None
         self._log_name = log_name
@@ -392,6 +396,78 @@ class CmorSession(
             longitude_vertices=lon_vert,
         )
 
+    def _define_cism_grid(self, ds, var_name, var_da):
+        """Register a native CISM (land-ice) projected grid via cmor.grid().
+
+        CISM history files carry only Cartesian x/y coordinates in metres
+        (``x1``/``y1`` scalar grid or ``x0``/``y0`` velocity grid) and no
+        latitude/longitude.  The x/y are georeferenced to lat/lon (plus corner
+        vertices) with the ice sheet's map projection (see
+        ``cism_grid.project_xy_to_latlon``), then the grid is defined against the
+        CMIP7 grids table's ``x``/``y`` projection axes.  The returned grid id
+        stands in for both horizontal dimensions.
+
+        NOTE: the polar-stereographic ``grid_mapping`` is not attached yet -- that
+        requires a ``polar_stereographic`` mapping_entry in CMIP7_grids.json
+        (tracked separately).
+        """
+        # Local import: only the land-ice realm needs the projection helper.
+        from cmip7_prep.cism_grid import (  # pylint: disable=import-outside-toplevel
+            project_xy_to_latlon,
+        )
+
+        if "x1" in var_da.dims and "y1" in var_da.dims:
+            xname, yname = "x1", "y1"
+        elif "x0" in var_da.dims and "y0" in var_da.dims:
+            xname, yname = "x0", "y0"
+        else:
+            raise KeyError(
+                f"CISM native grid: variable '{var_name}' has neither x1/y1 nor "
+                f"x0/y0 dims; got {tuple(var_da.dims)}."
+            )
+
+        if self._ice_sheet is None:
+            raise ValueError(
+                "CISM native grid requires an ice sheet to select the projection; "
+                "pass ice_sheet='gris' or 'ais' to CmorSession."
+            )
+
+        def _coord(dsi, nm):
+            if nm in dsi.coords:
+                return dsi.coords[nm]
+            if nm in dsi:
+                return dsi[nm]
+            raise KeyError(
+                f"CISM native grid: missing projected coordinate '{nm}' for "
+                f"variable '{var_name}'."
+            )
+
+        x = np.asarray(_coord(ds, xname).values, dtype="f8")
+        y = np.asarray(_coord(ds, yname).values, dtype="f8")
+        grid = project_xy_to_latlon(x, y, self._ice_sheet)
+
+        logger.debug(
+            "[CMOR axis debug] Defining native CISM grid for %s on (%s=%d, %s=%d), "
+            "ice_sheet=%s",
+            var_name,
+            yname,
+            y.size,
+            xname,
+            x.size,
+            self._ice_sheet,
+        )
+
+        self.load_table(self.tables_root, "grids")
+        x_id = cmor.axis(table_entry="x", units="m", coord_vals=x)
+        y_id = cmor.axis(table_entry="y", units="m", coord_vals=y)
+        return cmor.grid(
+            axis_ids=[y_id, x_id],
+            latitude=grid.lat,
+            longitude=grid.lon,
+            latitude_vertices=grid.lat_vertices,
+            longitude_vertices=grid.lon_vertices,
+        )
+
     def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
         """Define CMOR axis IDs for the variable in ds according to the CMOR tables.
 
@@ -491,6 +567,11 @@ class CmorSession(
 
         elif "nj" in var_dims and "ni" in var_dims:
             grid_id = self._define_cice_grid(ds, var_name, var_da)
+
+        elif ("x1" in var_dims and "y1" in var_dims) or (
+            "x0" in var_dims and "y0" in var_dims
+        ):
+            grid_id = self._define_cism_grid(ds, var_name, var_da)
 
         # -------------------------
         # --- horizontal axes (use CMOR names) ----
@@ -809,12 +890,13 @@ class CmorSession(
         }
         axes_ids = []
         for d in var_dims:
-            # For the CICE native grid, the 2D cmor.grid() id stands in for both
-            # the nj and ni dimensions: map nj -> grid_id and skip ni.
-            if grid_id is not None and d == "nj":
+            # For a 2-D native grid, the single cmor.grid() id stands in for both
+            # horizontal dimensions: map the y dimension -> grid_id and skip the
+            # x dimension.  CICE uses (nj, ni); CISM uses (y1, x1) or (y0, x0).
+            if grid_id is not None and d in ("nj", "y1", "y0"):
                 axes_ids.append(grid_id)
                 continue
-            if grid_id is not None and d == "ni":
+            if grid_id is not None and d in ("ni", "x1", "x0"):
                 continue
             axis_id = dim_to_axis.get(d)
             logger.debug("[CMOR axis debug] dim '%s' → axis_id: %s", d, axis_id)
