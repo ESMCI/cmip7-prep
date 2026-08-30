@@ -1,0 +1,169 @@
+dataset_overrides:
+  institution_id: NCC
+  nominal_resolution: 200 km
+  source_id: NorESM3
+
+variables:
+
+  acabf_tavg-u-hxy-is:
+    description: 'quantity averaged over ice sheet only, to avoid contamination from
+      other surfaces (eg: permafrost)'
+    dims: [x1, y1, time]
+    formula: acab_applied/31556926*917
+    sources: [model_var: acab_applied]
+    table: landIce
+    units: kg m-2 s-1
+
+  libmassbf_tavg-u-hxy-fis:
+    description: quantity averaged over floating land ice
+    dims: [x1, y1, time]
+    formula: bmlt_applied*floating_mask/31556926*917
+    sources: [model_var: bmlt_applied, model_var: floating_mask]
+    table: landIce
+    units: kg m-2 s-1
+
+  libmassbf_tavg-u-hxy-gis:
+    description: quantity averaged over grounded ice sheet
+    dims: [x1, y1, time]
+    formula: bmlt_applied*grounded_mask/31556926*917
+    sources: [model_var: bmlt_applied, model_var: grounded_mask]
+    table: landIce
+    units: kg m-2 s-1
+
+  licalvf_tavg-u-hxy-is:
+    description: Loss of ice mass resulting from iceberg calving. Computed as the
+      rate of mass loss by the ice shelf (in kg s-1) divided by the horizontal area
+      of the ice sheet (m2) in the grid box.
+    dims: [x1, y1, time]
+    formula: calving_rate/31556926*917
+    sources: [model_var: calving_rate]
+    table: landIce
+    units: kg m-2 s-1
+
+  lifmassbf_tavg-u-hxy-is:
+    description: Total mass balance at the ice front (or vertical margin). It includes
+      both iceberg calving and melt on vertical ice front
+    dims: [x1, y1, time]
+    formula: (melt_rate + calving_rate)/31556926*917
+    sources: [model_var: melt_rate, model_var: calving_rate]
+    table: landIce
+    units: kg m-2 s-1
+
+  litempbot_tavg-u-hxy-fis:
+    description: quantity averaged over floating land ice
+    dims: [x1, y1, time]
+    formula: btemp*floating_mask
+    sources: [model_var: btemp, model_var: floating_mask]
+    table: landIce
+    units: K
+
+  litempbot_tavg-u-hxy-gis:
+    description: quantity averaged over grounded land ice
+    dims: [x1, y1, time]
+    formula: btemp*grounded_mask
+    sources: [model_var: btemp, model_var: grounded_mask]
+    table: landIce
+    units: K
+
+  litemptop_tavg-u-hxy-is:
+    description: 'quantity averaged over ice sheet only, to avoid contamination from
+      other surfaces (eg: permafrost)'
+    dims: [x1, y1, time]
+    formula: artm, and convert from C to K
+    sources: [model_var: artm, model_var: and, model_var: convert, model_var: from,
+      model_var: C, model_var: to, model_var: K]
+    table: landIce
+    units: K
+
+  lithk_tavg-u-hxy-is:
+    description: This is needed in case ice sheet thickness changes in time
+    dims: [x1, y1, time]
+    sources: [model_var: thk]
+    table: landIce
+    units: m
+
+  sftflf_tavg-u-hxy-u:
+    description: This is needed in case the floating ice sheet area changes in time
+      (NO grounded ice sheet)
+    dims: [x1, y1, time]
+    sources: [model_var: floating_mask]
+    table: landIce
+    units: '%'
+
+  sftgrf_tavg-u-hxy-u:
+    description: This is needed in case the grounded ice sheet area changes in time
+      (NO floating ice shelf)
+    dims: [x1, y1, time]
+    sources: [model_var: grounded_mask]
+    table: landIce
+    units: '%'
+
+  topg_tavg-u-hxy-gis:
+    description: This is needed in case bed rock elevation changes in time
+    dims: [x1, y1, time]
+    sources: [model_var: topg]
+    table: landIce
+    units: m
+
+  xvelbase_tavg-u-hxy-is:
+    description: A velocity is a vector quantity. "x" indicates a vector component
+      along the grid x-axis, positive with increasing x. "Land ice" means glaciers,
+      ice-caps and ice-sheets resting on bedrock and also includes ice-shelves. "basal"
+      means the lower boundary of the land ice.
+    dims: [x0, y0, time]
+    formula: selectlevel(uvel, 11, levelname='level')/31556926
+    sources: [model_var: uvel]
+    table: landIce
+    units: m s-1
+
+  xvelmean_tavg-u-hxy-is:
+    description: The vertical mean land ice velocity is the average from the bedrock
+      to the surface of the ice
+    dims: [x0, y0, time]
+    formula: verticalmean(uvel, levelname='level')/31556926 
+    sources: [model_var: uvel]
+    table: landIce
+    units: m s-1
+
+  xvelsurf_tavg-u-hxy-is:
+    description: A velocity is a vector quantity. "x" indicates a vector component
+      along the grid x-axis, positive with increasing x. "Land ice" means glaciers,
+      ice-caps and ice-sheets resting on bedrock and also includes ice-shelves. The
+      surface called "surface" means the lower boundary of the atmosphere.
+    dims: [x0, y0, time]
+    formula: selectlevel(uvel, 1, levelname='level')/31556926
+    formula: uvel/31556926
+    sources: [model_var: uvel]
+    table: landIce
+    units: m s-1
+
+  yvelbase_tavg-u-hxy-is:
+    description: A velocity is a vector quantity. "y" indicates a vector component
+      along the grid y-axis, positive with increasing y. "Land ice" means glaciers,
+      ice-caps and ice-sheets resting on bedrock and also includes ice-shelves. "basal"
+      means the lower boundary of the land ice.
+    dims: [x0, y0, time]
+    formula: selectlevel(vvel, 11, levelname='level')/31556926
+    sources: [model_var: vvel]
+    table: landIce
+    units: m s-1
+
+  yvelmean_tavg-u-hxy-is:
+    description: The vertical mean land ice velocity is the average from the bedrock
+      to the surface of the ice.
+    dims: [x0, y0, time]
+    formula: verticalmean(vvel, levelname='level')/31556926, 
+    sources: [model_var: vvel]
+    table: landIce
+    units: m s-1
+
+  yvelsurf_tavg-u-hxy-is:
+    description: A velocity is a vector quantity. "y" indicates a vector component
+      along the grid y-axis, positive with increasing y. "Land ice" means glaciers,
+      ice-caps and ice-sheets resting on bedrock and also includes ice-shelves. The
+      surface called "surface" means the lower boundary of the atmosphere.'
+    dims: [x0, y0, time]
+    formula: selectlevel(vvel, 1, levelname='level')/31556926
+    sources: [model_var: vvel]
+    table: landIce
+    units: m s-1
