@@ -224,6 +224,8 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
       of PFT indices along a named dimension.
     * ``selectlevel(arr, index, levelname="level")`` – select a single level
       from a vertical dimension by 1-based index.
+    * ``verticalmean(arr, levelname="level")`` – sigma-weighted vertical mean
+      over a non-uniformly spaced vertical dimension.
 
     Parameters
     ----------
@@ -308,6 +310,56 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             )
         return arr.isel({levelname: index - 1}, drop=True)
 
+    def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
+        """
+        Sigma-weighted vertical mean over a non-uniformly spaced dimension.
+
+        Reproduces the weighting CISM uses for its own ``uvel_mean`` (see
+        glissade.F90): values sit on level interfaces, with sigma running 0 at
+        the upper surface to 1 at the bed, and each interface is weighted by the
+        fraction of the column it represents.  The interior weights are the gaps
+        between layer midpoints; the two end levels get the outer half-layers.
+
+        A plain ``arr.mean(dim=...)`` is NOT equivalent: CISM's sigma levels are
+        refined towards the bed by default, so an unweighted mean over-weights
+        the closely spaced basal levels.
+
+        Parameters
+        ----------
+        arr       : xr.DataArray whose vertical coordinate holds sigma values
+        levelname : name of the vertical dimension
+        """
+        if not isinstance(arr, xr.DataArray):
+            raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
+        if levelname not in arr.dims:
+            raise ValueError(
+                f"Dimension '{levelname}' not found in array dimensions "
+                f"{list(arr.dims)}"
+            )
+        if levelname not in arr.coords:
+            raise ValueError(
+                f"Dimension '{levelname}' has no coordinate values; "
+                f"verticalmean needs the sigma levels to weight by."
+            )
+
+        sigma = np.asarray(arr[levelname].values, dtype="f8")
+        if sigma.size < 2:
+            raise ValueError(
+                f"verticalmean needs at least 2 levels, got {sigma.size}"
+            )
+
+        stag = 0.5 * (sigma[:-1] + sigma[1:])  # layer midpoints
+        w = np.empty(sigma.size, dtype="f8")
+        w[0] = stag[0] - sigma[0]  # top half-layer
+        w[1:-1] = stag[1:] - stag[:-1]
+        w[-1] = sigma[-1] - stag[-1]  # bottom half-layer
+        w /= w.sum()  # guard against a sigma range other than [0, 1]
+
+        weights = xr.DataArray(
+            w, dims=(levelname,), coords={levelname: arr[levelname]}
+        )
+        return (arr * weights).sum(dim=levelname)
+
     safe_locals = local_names.copy()
     safe_locals.update(
         {
@@ -316,6 +368,7 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             "verticalsum": verticalsum,
             "sumoverpft": sumoverpft,
             "selectlevel": selectlevel,
+            "verticalmean": verticalmean,
         }
     )
     # pylint: disable=eval-used

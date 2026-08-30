@@ -467,3 +467,77 @@ def test_selectlevel_rejects_a_non_dataarray():
     """Guard against a formula handing it a bare scalar."""
     with pytest.raises(TypeError, match="Expected xr.DataArray"):
         _safe_eval("selectlevel(5, 1)", {})
+
+
+# ---------------------------------------------------------------------------
+# verticalmean: sigma-weighted column average
+# ---------------------------------------------------------------------------
+# The 11 sigma levels a CISM Greenland run actually uses: 0 at the upper
+# surface, 1 at the bed, refined towards the bed.
+CISM_SIGMA = [
+    0.0,
+    0.231404958677686,
+    0.407407407407407,
+    0.544378698224852,
+    0.653061224489796,
+    0.740740740740741,
+    0.8125,
+    0.8719723183391,
+    0.921810699588477,
+    0.96398891966759,
+    1.0,
+]
+
+
+@pytest.fixture(name="uvel_sigma")
+def uvel_sigma_fixture():
+    """A velocity profile falling linearly from 100 m/yr at the surface to 40 at the bed."""
+    sigma = np.array(CISM_SIGMA)
+    profile = 100.0 - 60.0 * sigma
+    data = np.broadcast_to(profile[:, None, None], (sigma.size, 3, 2)).copy()
+    return xr.DataArray(
+        data, dims=("level", "y0", "x0"), coords={"level": sigma}, name="uvel"
+    )
+
+
+def test_verticalmean_matches_the_analytic_answer(uvel_sigma):  # pylint: disable=redefined-outer-name
+    """For a linear profile the column mean is exact: 100 - 60/2 = 70 m/yr."""
+    out = _safe_eval("verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma})
+    assert out.dims == ("y0", "x0")
+    np.testing.assert_allclose(out.values, 70.0, rtol=1e-12)
+
+
+def test_verticalmean_differs_from_a_plain_mean(uvel_sigma):  # pylint: disable=redefined-outer-name
+    """An unweighted mean is biased towards the bed, where levels bunch up."""
+    weighted = _safe_eval(
+        "verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma}
+    )
+    plain = uvel_sigma.mean(dim="level")
+    assert float(plain.values[0, 0]) < float(weighted.values[0, 0])
+    assert abs(float(plain.values[0, 0]) - 70.0) > 5.0
+
+
+def test_verticalmean_reproduces_the_cism_weighting(uvel_sigma):  # pylint: disable=redefined-outer-name
+    """Weights must match glissade.F90's uvel_mean accumulation exactly."""
+    sigma = np.array(CISM_SIGMA)
+    stag = 0.5 * (sigma[:-1] + sigma[1:])
+    expected = np.empty(sigma.size)
+    expected[0] = stag[0]
+    expected[1:-1] = stag[1:] - stag[:-1]
+    expected[-1] = 1.0 - stag[-1]
+    profile = 100.0 - 60.0 * sigma
+    out = _safe_eval("verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma})
+    np.testing.assert_allclose(out.values[0, 0], float((profile * expected).sum()))
+
+
+def test_verticalmean_requires_coordinate_values():
+    """Without sigma values on the dimension there is nothing to weight by."""
+    arr = xr.DataArray(np.ones((4, 2)), dims=("level", "x"), name="arr")
+    with pytest.raises(ValueError, match="no coordinate values"):
+        _safe_eval("verticalmean(arr)", {"arr": arr})
+
+
+def test_verticalmean_rejects_an_unknown_dimension(uvel_sigma):  # pylint: disable=redefined-outer-name
+    """A wrong dimension name is reported before anything else is attempted."""
+    with pytest.raises(ValueError, match="Dimension 'lev' not found"):
+        _safe_eval("verticalmean(uvel, levelname='lev')", {"uvel": uvel_sigma})
