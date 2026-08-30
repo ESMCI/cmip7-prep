@@ -73,13 +73,13 @@ REALM_YAML_MAP = {
         "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
         "aerosol": "noresm_to_cmip7_aerosol.yaml",
         "land": "noresm_to_cmip7_land.yaml",
-        "seaIce": "noresm_to_cmip7_seaice.yaml",
+        "seaIce": "noresm_to_cmip7_seaIce.yaml",
         "landIce": "noresm_to_cmip7_landIce.yaml",
     },
     "cesm": {
         "atmos": "cesm_to_cmip7_atmos.yaml",
         "land": "cesm_to_cmip7_land.yaml",
-        "seaIce": "cesm_to_cmip7_seaice.yaml",
+        "seaIce": "cesm_to_cmip7_seaIce.yaml",
         "ocean": "cesm_to_cmip7_ocean.yaml",
     },
 }
