@@ -52,7 +52,7 @@ variables:
   litempbot_tavg-u-hxy-fis:
     description: quantity averaged over floating land ice
     dims: [x1, y1, time]
-    formula: btemp*floating_mask
+    formula: btemp*floating_mask + 273.15
     sources: [model_var: btemp, model_var: floating_mask]
     table: landIce
     units: K
@@ -60,7 +60,7 @@ variables:
   litempbot_tavg-u-hxy-gis:
     description: quantity averaged over grounded land ice
     dims: [x1, y1, time]
-    formula: btemp*grounded_mask
+    formula: btemp*grounded_mask + 273.15
     sources: [model_var: btemp, model_var: grounded_mask]
     table: landIce
     units: K
@@ -69,9 +69,8 @@ variables:
     description: 'quantity averaged over ice sheet only, to avoid contamination from
       other surfaces (eg: permafrost)'
     dims: [x1, y1, time]
-    formula: artm, and convert from C to K
-    sources: [model_var: artm, model_var: and, model_var: convert, model_var: from,
-      model_var: C, model_var: to, model_var: K]
+    formula: artm + 273.15
+    sources: [model_var: artm]
     table: landIce
     units: K
 
@@ -120,7 +119,7 @@ variables:
     description: The vertical mean land ice velocity is the average from the bedrock
       to the surface of the ice
     dims: [x0, y0, time]
-    formula: verticalmean(uvel, levelname='level')/31556926 
+    formula: verticalmean(uvel, levelname='level')/31556926
     sources: [model_var: uvel]
     table: landIce
     units: m s-1
@@ -132,7 +131,6 @@ variables:
       surface called "surface" means the lower boundary of the atmosphere.
     dims: [x0, y0, time]
     formula: selectlevel(uvel, 1, levelname='level')/31556926
-    formula: uvel/31556926
     sources: [model_var: uvel]
     table: landIce
     units: m s-1
@@ -152,7 +150,7 @@ variables:
     description: The vertical mean land ice velocity is the average from the bedrock
       to the surface of the ice.
     dims: [x0, y0, time]
-    formula: verticalmean(vvel, levelname='level')/31556926, 
+    formula: verticalmean(vvel, levelname='level')/31556926
     sources: [model_var: vvel]
     table: landIce
     units: m s-1
