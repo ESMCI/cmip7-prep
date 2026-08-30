@@ -54,7 +54,9 @@ ICE_SHEET_CENTER = {
 }
 
 
-def _median_distance_to(lat: np.ndarray, lon: np.ndarray, lat0: float, lon0: float) -> float:
+def _median_distance_to(
+    lat: np.ndarray, lon: np.ndarray, lat0: float, lon0: float
+) -> float:
     """Median great-circle distance (m) from the cells to a reference point."""
     r = 6371000.0
     la, lo = np.radians(lat), np.radians(lon)

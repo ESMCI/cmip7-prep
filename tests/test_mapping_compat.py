@@ -431,7 +431,7 @@ def test_selectlevel_is_one_based(uvel):  # pylint: disable=redefined-outer-name
     assert (last == uvel.isel(level=2)).all()
 
 
-def test_selectlevel_drops_the_level_dimension(uvel):  # pylint: disable=redefined-outer-name
+def test_selectlevel_drops_the_level(uvel):  # pylint: disable=redefined-outer-name
     """The vertical dimension and its scalar coordinate both disappear."""
     out = _safe_eval("selectlevel(uvel, 2, levelname='level')", {"uvel": uvel})
     assert out.dims == ("time", "y0", "x0")
@@ -457,7 +457,7 @@ def test_selectlevel_honours_a_different_dimension_name():
     assert (out == arr.isel(levsoi=2)).all()
 
 
-def test_selectlevel_rejects_an_unknown_dimension(uvel):  # pylint: disable=redefined-outer-name
+def test_selectlevel_rejects_bad_dim(uvel):  # pylint: disable=redefined-outer-name
     """A wrong dimension name names the dimensions that do exist."""
     with pytest.raises(ValueError, match="Dimension 'lev' not found"):
         _safe_eval("selectlevel(uvel, 1, levelname='lev')", {"uvel": uvel})
@@ -500,24 +500,26 @@ def uvel_sigma_fixture():
     )
 
 
-def test_verticalmean_matches_the_analytic_answer(uvel_sigma):  # pylint: disable=redefined-outer-name
+def test_verticalmean_matches_analytic(
+    uvel_sigma,
+):  # pylint: disable=redefined-outer-name
     """For a linear profile the column mean is exact: 100 - 60/2 = 70 m/yr."""
     out = _safe_eval("verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma})
     assert out.dims == ("y0", "x0")
     np.testing.assert_allclose(out.values, 70.0, rtol=1e-12)
 
 
-def test_verticalmean_differs_from_a_plain_mean(uvel_sigma):  # pylint: disable=redefined-outer-name
+def test_verticalmean_beats_plain_mean(
+    uvel_sigma,
+):  # pylint: disable=redefined-outer-name
     """An unweighted mean is biased towards the bed, where levels bunch up."""
-    weighted = _safe_eval(
-        "verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma}
-    )
+    weighted = _safe_eval("verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma})
     plain = uvel_sigma.mean(dim="level")
     assert float(plain.values[0, 0]) < float(weighted.values[0, 0])
     assert abs(float(plain.values[0, 0]) - 70.0) > 5.0
 
 
-def test_verticalmean_reproduces_the_cism_weighting(uvel_sigma):  # pylint: disable=redefined-outer-name
+def test_verticalmean_matches_cism(uvel_sigma):  # pylint: disable=redefined-outer-name
     """Weights must match glissade.F90's uvel_mean accumulation exactly."""
     sigma = np.array(CISM_SIGMA)
     stag = 0.5 * (sigma[:-1] + sigma[1:])
@@ -537,7 +539,9 @@ def test_verticalmean_requires_coordinate_values():
         _safe_eval("verticalmean(arr)", {"arr": arr})
 
 
-def test_verticalmean_rejects_an_unknown_dimension(uvel_sigma):  # pylint: disable=redefined-outer-name
+def test_verticalmean_rejects_bad_dim(
+    uvel_sigma,
+):  # pylint: disable=redefined-outer-name
     """A wrong dimension name is reported before anything else is attempted."""
     with pytest.raises(ValueError, match="Dimension 'lev' not found"):
         _safe_eval("verticalmean(uvel, levelname='lev')", {"uvel": uvel_sigma})

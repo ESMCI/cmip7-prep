@@ -344,9 +344,7 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
 
         sigma = np.asarray(arr[levelname].values, dtype="f8")
         if sigma.size < 2:
-            raise ValueError(
-                f"verticalmean needs at least 2 levels, got {sigma.size}"
-            )
+            raise ValueError(f"verticalmean needs at least 2 levels, got {sigma.size}")
 
         stag = 0.5 * (sigma[:-1] + sigma[1:])  # layer midpoints
         w = np.empty(sigma.size, dtype="f8")
@@ -355,9 +353,7 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
         w[-1] = sigma[-1] - stag[-1]  # bottom half-layer
         w /= w.sum()  # guard against a sigma range other than [0, 1]
 
-        weights = xr.DataArray(
-            w, dims=(levelname,), coords={levelname: arr[levelname]}
-        )
+        weights = xr.DataArray(w, dims=(levelname,), coords={levelname: arr[levelname]})
         return (arr * weights).sum(dim=levelname)
 
     safe_locals = local_names.copy()
