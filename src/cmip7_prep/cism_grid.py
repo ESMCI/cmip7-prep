@@ -15,11 +15,14 @@ reader is kept below only as an optional cross-check.)
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import xarray as xr
+
+logger = logging.getLogger(__name__)
 
 # Map projection for each CISM ice-sheet grid (polar stereographic, WGS84).
 #   gris -> EPSG:3413  (NSIDC Sea Ice Polar Stereographic North: lat_ts=70,
@@ -31,6 +34,36 @@ ICE_SHEET_PROJ = {
     "gris": "EPSG:3413",
     "ais": "EPSG:3031",
 }
+
+# Nominal centre of each ice sheet and the radius within which most of its grid
+# cells must fall, used as a backstop against a wrong projection (see
+# _check_plausible).  Deliberately generous -- this only needs to catch a grid
+# landing on the wrong part of the planet.
+#
+# A distance test is used rather than a lat/lon box because longitudes converge
+# at the pole: a perfectly correct Greenland grid reaches high enough latitudes
+# that its corners span a wide longitude range, including the 0/360 seam, so a
+# longitude interval produces false alarms.  Latitude alone is not sufficient
+# either -- the 20 km SeaRISE grid (standard_parallel 71, central_meridian -39)
+# projected with EPSG:3413 yields latitudes of 65-80N, entirely plausible, while
+# sitting near 108E in Siberia.  Distance from the ice sheet catches both.
+ICE_SHEET_CENTER = {
+    # ice_sheet: (lat, lon_east, max_median_distance_m)
+    "gris": (72.0, -40.0, 2.0e6),
+    "ais": (-90.0, 0.0, 3.0e6),
+}
+
+
+def _median_distance_to(lat: np.ndarray, lon: np.ndarray, lat0: float, lon0: float) -> float:
+    """Median great-circle distance (m) from the cells to a reference point."""
+    r = 6371000.0
+    la, lo = np.radians(lat), np.radians(lon)
+    la0, lo0 = np.radians(lat0), np.radians(lon0)
+    sin_half = (
+        np.sin((la - la0) / 2.0) ** 2
+        + np.cos(la0) * np.cos(la) * np.sin((lo - lo0) / 2.0) ** 2
+    )
+    return float(np.median(2.0 * r * np.arcsin(np.sqrt(np.clip(sin_half, 0.0, 1.0)))))
 
 
 def proj_for_ice_sheet(ice_sheet: str) -> str:
@@ -75,7 +108,15 @@ def project_xy_to_latlon(x: np.ndarray, y: np.ndarray, ice_sheet: str) -> CismGr
     -------
     CismGrid
         Cell-center ``lon``/``lat`` ``(ny, nx)`` and corner ``lon_vertices``/
-        ``lat_vertices`` ``(ny, nx, 4)``.  Longitudes are in [0, 360).
+        ``lat_vertices`` ``(ny, nx, 4)``.  Center longitudes are in [0, 360);
+        corner longitudes are contiguous with their own center and may fall
+        just outside that interval near the 0/360 seam.
+
+    Raises
+    ------
+    ValueError
+        If the projected coordinates fall outside the plausible envelope for
+        this ice sheet (see :data:`ICE_SHEET_BOUNDS`).
 
     Notes
     -----
@@ -115,12 +156,89 @@ def project_xy_to_latlon(x: np.ndarray, y: np.ndarray, ice_sheet: str) -> CismGr
         lon_v[..., k] = lo
         lat_v[..., k] = la
 
-    # Normalize longitudes to [0, 360).
+    # Normalize cell-center longitudes to [0, 360), then bring each cell's four
+    # corners into the same 360-degree branch as its own center.  Wrapping the
+    # corners independently splits any cell straddling the 0/360 seam: an 8 km
+    # Antarctic cell centred on longitude 0 comes back with corners at 359.94
+    # and 0.06 and appears to span the whole globe.  Corners may therefore fall
+    # slightly outside [0, 360) -- CF requires them contiguous with the center,
+    # not confined to a particular interval.
     lon = np.mod(lon, 360.0)
-    lon_v = np.mod(lon_v, 360.0)
+    lon_v = lon_v - 360.0 * np.round((lon_v - lon[..., None]) / 360.0)
 
-    return CismGrid(
+    grid = CismGrid(
         lon=lon, lat=lat, lon_vertices=lon_v, lat_vertices=lat_v, nx=nx, ny=ny
+    )
+    _warn_degenerate_cells(grid)
+    _check_plausible(grid, ice_sheet)
+    return grid
+
+
+def _warn_degenerate_cells(grid: CismGrid, spread_deg: float = 90.0) -> int:
+    """Log a warning for cells whose corners still span a huge longitude range.
+
+    After the branch correction above, a large residual spread means the cell is
+    genuinely degenerate rather than merely seam-crossing -- in practice the
+    cells at or adjacent to the pole, where longitude is undefined.  The
+    Antarctic domain contains the South Pole, so this is expected there; it is a
+    red flag anywhere else.  Returns the number of such cells.
+    """
+    spread = grid.lon_vertices.max(axis=-1) - grid.lon_vertices.min(axis=-1)
+    n_bad = int((spread > spread_deg).sum())
+    if n_bad:
+        logger.warning(
+            "%d of %d cells have corner longitudes spanning more than %.0f deg; "
+            "these are at or near the pole, where longitude is undefined. "
+            "Their cell areas and bounds should not be trusted.",
+            n_bad,
+            grid.lon.size,
+            spread_deg,
+        )
+    return n_bad
+
+
+def _check_plausible(grid: CismGrid, ice_sheet: str) -> None:
+    """Fail loudly if the projected coordinates do not land on the ice sheet.
+
+    A wrong projection produces perfectly well-formed output in the wrong place,
+    which is far more damaging than a crash.  Compares the median cell against
+    the nominal ice-sheet centre in :data:`ICE_SHEET_CENTER`.
+    """
+    ref = ICE_SHEET_CENTER.get(ice_sheet)
+    if ref is None:
+        logger.warning(
+            "No plausibility reference for ice_sheet=%r; "
+            "skipping the projection sanity check.",
+            ice_sheet,
+        )
+        return
+
+    lat0, lon0, max_dist = ref
+    dist = _median_distance_to(grid.lat, grid.lon, lat0, lon0)
+    if dist > max_dist:
+        raise ValueError(
+            f"projected grid for ice_sheet={ice_sheet!r} has a median cell "
+            f"{dist / 1000:.0f} km from the expected centre "
+            f"({lat0:.1f}N, {lon0:.1f}E), exceeding the {max_dist / 1000:.0f} km "
+            f"limit.  The projection ({proj_for_ice_sheet(ice_sheet)}) is "
+            f"probably wrong for this grid -- e.g. the 20 km SeaRISE Greenland "
+            f"grid projected as EPSG:3413 lands near 108E, in Siberia.  "
+            f"Grid spans lat {grid.lat.min():.2f}..{grid.lat.max():.2f}, "
+            f"lon {grid.lon.min():.2f}..{grid.lon.max():.2f}."
+        )
+
+    logger.info(
+        "CISM %s grid projected with %s: lat %.2f..%.2f, lon %.2f..%.2f, "
+        "median cell %.0f km from (%.1fN, %.1fE)",
+        ice_sheet,
+        proj_for_ice_sheet(ice_sheet),
+        grid.lat.min(),
+        grid.lat.max(),
+        grid.lon.min(),
+        grid.lon.max(),
+        dist / 1000,
+        lat0,
+        lon0,
     )
 
 

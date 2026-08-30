@@ -406,10 +406,6 @@ class CmorSession(
         ``cism_grid.project_xy_to_latlon``), then the grid is defined against the
         CMIP7 grids table's ``x``/``y`` projection axes.  The returned grid id
         stands in for both horizontal dimensions.
-
-        NOTE: the polar-stereographic ``grid_mapping`` is not attached yet -- that
-        requires a ``polar_stereographic`` mapping_entry in CMIP7_grids.json
-        (tracked separately).
         """
         # Local import: only the land-ice realm needs the projection helper.
         from cmip7_prep.cism_grid import (  # pylint: disable=import-outside-toplevel
