@@ -222,6 +222,8 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
       along a soil/vertical dimension, optionally capping the result.
     * ``sumoverpft(arr, pftlist, dimname)`` – sum a DataArray over a subset
       of PFT indices along a named dimension.
+    * ``selectlevel(arr, index, levelname="level")`` – select a single level
+      from a vertical dimension by 1-based index.
 
     Parameters
     ----------
@@ -282,6 +284,30 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
         # this ensures indices not in pftlist are excluded from the sum entirely.
         return arr.isel({dimname: pftlist}).sum(dim=dimname)
 
+    def selectlevel(
+        arr: xr.DataArray, index: int, levelname: str = "level"
+    ) -> xr.DataArray:
+        """
+        Select a single level from a vertical dimension by index.
+
+        Parameters
+        ----------
+        arr       : xr.DataArray with a vertical dimension
+        index     : 1-based position along that dimension (1 is the first
+                    level), matching the convention used by sumoverpft
+        levelname : name of the vertical dimension
+
+        The scalar level coordinate is dropped, leaving a plain lat/lon field.
+        """
+        if not isinstance(arr, xr.DataArray):
+            raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
+        if levelname not in arr.dims:
+            raise ValueError(
+                f"Dimension '{levelname}' not found in array dimensions "
+                f"{list(arr.dims)}"
+            )
+        return arr.isel({levelname: index - 1}, drop=True)
+
     safe_locals = local_names.copy()
     safe_locals.update(
         {
@@ -289,6 +315,7 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             "xr": xr,
             "verticalsum": verticalsum,
             "sumoverpft": sumoverpft,
+            "selectlevel": selectlevel,
         }
     )
     # pylint: disable=eval-used
