@@ -410,63 +410,57 @@ def test_iter_variable_names_variant_entry_stays_visible(
 
 
 # ---------------------------------------------------------------------------
-# selectlevel: pick one level out of a vertical dimension from a YAML formula
+# sumover_index: a single index collapses the dimension, selecting one level
 # ---------------------------------------------------------------------------
 @pytest.fixture(name="uvel")
 def uvel_fixture():
     """A (time, level, y0, x0) field with distinguishable values per level."""
     return xr.DataArray(
-        np.arange(2 * 3 * 4 * 5, dtype="f8").reshape(2, 3, 4, 5),
+        np.arange(2 * 11 * 4 * 5, dtype="f8").reshape(2, 11, 4, 5),
         dims=("time", "level", "y0", "x0"),
-        coords={"level": [10.0, 20.0, 30.0]},
+        coords={"level": np.linspace(0.0, 1.0, 11)},
         name="uvel",
     )
 
 
-def test_selectlevel_is_one_based(uvel):  # pylint: disable=redefined-outer-name
-    """Index 1 is the first level, matching the sumoverpft convention."""
-    first = _safe_eval("selectlevel(uvel, 1, levelname='level')", {"uvel": uvel})
-    last = _safe_eval("selectlevel(uvel, 3, levelname='level')", {"uvel": uvel})
-    assert (first == uvel.isel(level=0)).all()
-    assert (last == uvel.isel(level=2)).all()
+def test_sumover_index_single_is_isel(uvel):  # pylint: disable=redefined-outer-name
+    """One index reproduces isel and drops the dimension.
+
+    This is what the landIce surface and basal velocity formulas rely on:
+    sumover_index(uvel, indexlist=[1]) is the top of the ice column and
+    indexlist=[11] is the bed.
+    """
+    for index in (1, 11):
+        out = _safe_eval(
+            f"sumover_index(uvel, indexlist=[{index}], dimname='level')",
+            {"uvel": uvel},
+        )
+        assert out.dims == ("time", "y0", "x0")
+        assert "level" not in out.coords
+        assert (out == uvel.isel(level=index - 1)).all()
 
 
-def test_selectlevel_drops_the_level(uvel):  # pylint: disable=redefined-outer-name
-    """The vertical dimension and its scalar coordinate both disappear."""
-    out = _safe_eval("selectlevel(uvel, 2, levelname='level')", {"uvel": uvel})
-    assert out.dims == ("time", "y0", "x0")
-    assert out.shape == (2, 4, 5)
-    assert "level" not in out.coords
-
-
-def test_selectlevel_defaults_to_level(uvel):  # pylint: disable=redefined-outer-name
-    """levelname defaults to 'level' but is never hardwired in the body."""
-    assert (
-        _safe_eval("selectlevel(uvel, 2)", {"uvel": uvel})
-        == _safe_eval("selectlevel(uvel, 2, levelname='level')", {"uvel": uvel})
-    ).all()
-
-
-def test_selectlevel_honours_a_different_dimension_name():
-    """A grid whose vertical dimension is not called 'level' still works."""
-    arr = xr.DataArray(
-        np.arange(6, dtype="f8").reshape(3, 2), dims=("levsoi", "x"), name="arr"
+def test_sumover_index_is_one_based(uvel):  # pylint: disable=redefined-outer-name
+    """Index 1 is the first element, not the second."""
+    out = _safe_eval(
+        "sumover_index(uvel, indexlist=[1], dimname='level')", {"uvel": uvel}
     )
-    out = _safe_eval("selectlevel(arr, 3, levelname='levsoi')", {"arr": arr})
-    assert out.dims == ("x",)
-    assert (out == arr.isel(levsoi=2)).all()
+    assert (out == uvel.isel(level=0)).all()
+    assert not (out == uvel.isel(level=1)).all()
 
 
-def test_selectlevel_rejects_bad_dim(uvel):  # pylint: disable=redefined-outer-name
-    """A wrong dimension name names the dimensions that do exist."""
-    with pytest.raises(ValueError, match="Dimension 'lev' not found"):
-        _safe_eval("selectlevel(uvel, 1, levelname='lev')", {"uvel": uvel})
+def test_sumover_index_multiple_sums(uvel):  # pylint: disable=redefined-outer-name
+    """Several indices sum, and indices outside the list are excluded."""
+    out = _safe_eval(
+        "sumover_index(uvel, indexlist=[1, 2, 3], dimname='level')", {"uvel": uvel}
+    )
+    assert (out == uvel.isel(level=[0, 1, 2]).sum(dim="level")).all()
 
 
-def test_selectlevel_rejects_a_non_dataarray():
-    """Guard against a formula handing it a bare scalar."""
-    with pytest.raises(TypeError, match="Expected xr.DataArray"):
-        _safe_eval("selectlevel(5, 1)", {})
+def test_sumover_index_rejects_empty_list(uvel):  # pylint: disable=redefined-outer-name
+    """An empty index list is a formula bug, not a no-op."""
+    with pytest.raises(ValueError, match="indexlist must not be empty"):
+        _safe_eval("sumover_index(uvel, indexlist=[], dimname='level')", {"uvel": uvel})
 
 
 # ---------------------------------------------------------------------------

@@ -220,10 +220,9 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     * ``xr`` – xarray
     * ``verticalsum(arr, capped_at=None, dim="levsoi")`` – sum a DataArray
       along a soil/vertical dimension, optionally capping the result.
-    * ``sumoverpft(arr, pftlist, dimname)`` – sum a DataArray over a subset
-      of PFT indices along a named dimension.
-    * ``selectlevel(arr, index, levelname="level")`` – select a single level
-      from a vertical dimension by 1-based index.
+    * ``sumover_index(arr, indexlist, dimname)`` – sum a DataArray over a
+      subset of 1-based indices along a named dimension.  A single index
+      collapses that dimension, which is how a single level is selected.
     * ``verticalmean(arr, levelname="level")`` – sigma-weighted vertical mean
       over a non-uniformly spaced vertical dimension.
 
@@ -260,15 +259,19 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             summed = xr.where(summed > capped_at, capped_at, summed)
         return summed
 
-    def sumoverpft(arr: xr.DataArray, pftlist: list, dimname: str) -> xr.DataArray:
+    def sumover_index(arr: xr.DataArray, indexlist: list, dimname: str) -> xr.DataArray:
         """
-        Sum a DataArray over a subset of PFT indices along a named dimension.
+        Sum a DataArray over a subset of indices along a named dimension.
+
+        Indices are 1-based.  Passing a single index collapses the dimension,
+        which is how a single level (e.g. surface or basal velocity) is picked
+        out of a vertical coordinate.
 
         Parameters
         ----------
-        arr     : xr.DataArray with a PFT dimension
-        pftlist : list of integer PFT indices to sum over
-        dimname : name of the PFT dimension to select/squeeze
+        arr       : xr.DataArray with the dimension to reduce over
+        indexlist : list of 1-based integer indices to sum over
+        dimname   : name of the dimension to select/squeeze
         """
         if not isinstance(arr, xr.DataArray):
             raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
@@ -276,39 +279,15 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             raise ValueError(
                 f"Dimension '{dimname}' not found in array dimensions {list(arr.dims)}"
             )
-        if not pftlist:
-            raise ValueError("pftlist must not be empty")
+        if not indexlist:
+            raise ValueError("indexlist must not be empty")
 
         # Account for zero-based indexing
-        pftlist = [x - 1 for x in pftlist]
+        indexlist = [x - 1 for x in indexlist]
 
-        # Select only the specified PFT indices before summing —
-        # this ensures indices not in pftlist are excluded from the sum entirely.
-        return arr.isel({dimname: pftlist}).sum(dim=dimname)
-
-    def selectlevel(
-        arr: xr.DataArray, index: int, levelname: str = "level"
-    ) -> xr.DataArray:
-        """
-        Select a single level from a vertical dimension by index.
-
-        Parameters
-        ----------
-        arr       : xr.DataArray with a vertical dimension
-        index     : 1-based position along that dimension (1 is the first
-                    level), matching the convention used by sumoverpft
-        levelname : name of the vertical dimension
-
-        The scalar level coordinate is dropped, leaving a plain lat/lon field.
-        """
-        if not isinstance(arr, xr.DataArray):
-            raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
-        if levelname not in arr.dims:
-            raise ValueError(
-                f"Dimension '{levelname}' not found in array dimensions "
-                f"{list(arr.dims)}"
-            )
-        return arr.isel({levelname: index - 1}, drop=True)
+        # Select only the specified indices before summing — this ensures
+        # indices not in indexlist are excluded from the sum entirely.
+        return arr.isel({dimname: indexlist}).sum(dim=dimname)
 
     def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
         """
@@ -362,8 +341,7 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
             "np": np,
             "xr": xr,
             "verticalsum": verticalsum,
-            "sumoverpft": sumoverpft,
-            "selectlevel": selectlevel,
+            "sumover_index": sumover_index,
             "verticalmean": verticalmean,
         }
     )

@@ -110,7 +110,7 @@ variables:
       ice-caps and ice-sheets resting on bedrock and also includes ice-shelves. "basal"
       means the lower boundary of the land ice.
     dims: [x0, y0, time]
-    formula: selectlevel(uvel, 11, levelname='level')/31556926
+    formula: sumover_index(uvel, indexlist=[11], dimname='level')/31556926
     sources: [model_var: uvel]
     table: landIce
     units: m s-1
@@ -130,7 +130,7 @@ variables:
       ice-caps and ice-sheets resting on bedrock and also includes ice-shelves. The
       surface called "surface" means the lower boundary of the atmosphere.
     dims: [x0, y0, time]
-    formula: selectlevel(uvel, 1, levelname='level')/31556926
+    formula: sumover_index(uvel, indexlist=[1], dimname='level')/31556926
     sources: [model_var: uvel]
     table: landIce
     units: m s-1
@@ -141,7 +141,7 @@ variables:
       ice-caps and ice-sheets resting on bedrock and also includes ice-shelves. "basal"
       means the lower boundary of the land ice.
     dims: [x0, y0, time]
-    formula: selectlevel(vvel, 11, levelname='level')/31556926
+    formula: sumover_index(vvel, indexlist=[11], dimname='level')/31556926
     sources: [model_var: vvel]
     table: landIce
     units: m s-1
@@ -161,7 +161,7 @@ variables:
       ice-caps and ice-sheets resting on bedrock and also includes ice-shelves. The
       surface called "surface" means the lower boundary of the atmosphere.'
     dims: [x0, y0, time]
-    formula: selectlevel(vvel, 1, levelname='level')/31556926
+    formula: sumover_index(vvel, indexlist=[1], dimname='level')/31556926
     sources: [model_var: vvel]
     table: landIce
     units: m s-1
