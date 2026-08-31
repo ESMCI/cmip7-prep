@@ -68,6 +68,16 @@ def parse_arguments():
         ),
     )
     parser.add_argument(
+        "--sampling",
+        choices=["tavg", "tpt"],
+        default=None,
+        help=(
+            "Restrict to time-averaged ('tavg') or instantaneous ('tpt') history "
+            "files. Default: collect both, since which is needed depends on the "
+            "CMIP7 variable being produced later."
+        ),
+    )
+    parser.add_argument(
         "--outputdir",
         type=str,
         help="Full path to directory where output time series data will be placed (optional) "
@@ -133,7 +143,9 @@ def main():
     # Determine include patterns.  Patterns may contain a '{ice_sheet}'
     # placeholder (landIce), filled in from --ice-sheet at run time.
     try:
-        patterns = all_include_patterns(args.model, args.realm, args.ice_sheet)
+        patterns = all_include_patterns(
+            args.model, args.realm, args.ice_sheet, args.sampling
+        )
     except ValueError as exc:
         logger.error("%s", exc)
         sys.exit(1)
