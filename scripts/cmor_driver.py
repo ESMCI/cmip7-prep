@@ -73,12 +73,13 @@ REALM_YAML_MAP = {
         "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
         "aerosol": "noresm_to_cmip7_aerosol.yaml",
         "land": "noresm_to_cmip7_land.yaml",
-        "seaIce": "noresm_to_cmip7_seaice.yaml",
+        "seaIce": "noresm_to_cmip7_seaIce.yaml",
+        "landIce": "noresm_to_cmip7_landIce.yaml",
     },
     "cesm": {
         "atmos": "cesm_to_cmip7_atmos.yaml",
         "land": "cesm_to_cmip7_land.yaml",
-        "seaIce": "cesm_to_cmip7_seaice.yaml",
+        "seaIce": "cesm_to_cmip7_seaIce.yaml",
         "ocean": "cesm_to_cmip7_ocean.yaml",
     },
 }
@@ -150,6 +151,11 @@ INCLUDE_PATTERN_MAP = {
             "mon": ["cice.h."],
             "day": ["cice.h1."],
         },
+        # landIce is per ice-sheet: the '{ice_sheet}' placeholder is filled in
+        # from --ice-sheet (gris/ais) so each run targets a single CISM domain.
+        "landIce": {
+            "yr": ["cism.{ice_sheet}.h"],
+        },
     },
 }
 
@@ -193,6 +199,15 @@ def parse_args():
         ],
         default="atmos",
         help="Realm to process. (Default: atmos)",
+    )
+    parser.add_argument(
+        "--ice-sheet",
+        choices=["gris", "ais"],
+        default=None,
+        help=(
+            "Ice sheet to process for the landIce realm: 'gris' (Greenland) or "
+            "'ais' (Antarctica). Required when --realm landIce; ignored otherwise."
+        ),
     )
     parser.add_argument(
         "--resolution",
@@ -412,7 +427,7 @@ def process_one_var(
         cmor_items = []
         try:
             open_kwargs = None
-            if realm in ("ocean", "seaIce"):
+            if realm in ("ocean", "seaIce", "landIce"):
                 open_kwargs = {"decode_timedelta": False}
             logger.debug("Opening native data for variable %s", varname)
 
@@ -504,6 +519,37 @@ def process_one_var(
                         str(varname),
                         f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
                     )
+                )
+            elif realm == "landIce":
+                # CISM land-ice is kept on its native projected (x, y) grid: no
+                # regridding, and no NH/SH variants -- a variable is realized once
+                # and simply appears across the different frequency files.  The
+                # projected x/y coordinate axes ride along (dimension coordinates)
+                # so the writer can georeference them via the ice-sheet projection
+                # in _define_cism_grid.
+                logger.info(
+                    f"Preparing native landIce variable {varname}, applying realize"
+                )
+                realized = mapping.realize(ds_native, varname)
+                ds_cmor = (
+                    realized
+                    if isinstance(realized, xr.Dataset)
+                    else xr.Dataset({varname: realized})
+                )
+                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+                # Carry the projected coordinate axes if not already present
+                # (defensive; dimension coordinates normally ride along).
+                for gname in ("x0", "y0", "x1", "y1"):
+                    if (
+                        gname in ds_native
+                        and gname not in ds_cmor.coords
+                        and gname not in ds_cmor
+                    ):
+                        ds_cmor = ds_cmor.assign({gname: ds_native[gname]})
+                cmor_items = [(ds_cmor, cfg)]
+                results.append(
+                    (str(varname), "landIce field (native, realize applied)")
                 )
             elif cfg.get("levels", {}).get("name") == "plev39":
                 logger.info(
@@ -615,6 +661,7 @@ def process_one_var(
                     dataset_json=metadata_json,
                     dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
                     outdir=outdir,
+                    ice_sheet=args.ice_sheet,
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
                     set_cur_dataset_attribute("realization_index", realization_index)
@@ -705,17 +752,23 @@ def latest_monthly_file(
     return path, year, month
 
 
-def get_include_patterns(model: str, realm: str, frequency: str) -> list[str]:
+def get_include_patterns(
+    model: str, realm: str, frequency: str, ice_sheet: str | None = None
+) -> list[str]:
     try:
-        logger.info(
-            "Looking for pattern: %s", INCLUDE_PATTERN_MAP[model][realm][frequency]
-        )
-        return INCLUDE_PATTERN_MAP[model][realm][frequency]
+        patterns = INCLUDE_PATTERN_MAP[model][realm][frequency]
     except KeyError:
         raise ValueError(
             f"No include_patterns defined for model={model}, "
             f"realm={realm}, frequency={frequency}"
         )
+    # landIce patterns are per ice-sheet; fill in the selected one (gris/ais).
+    if realm == "landIce":
+        if ice_sheet is None:
+            raise ValueError("realm 'landIce' requires --ice-sheet (gris or ais)")
+        patterns = [p.format(ice_sheet=ice_sheet) for p in patterns]
+    logger.info("Looking for pattern: %s", patterns)
+    return patterns
 
 
 def main():
@@ -923,7 +976,9 @@ def main():
 
     # Load requested variables
     if len(cmip_vars) > 0:
-        include_patterns = get_include_patterns(model, realm, frequency)
+        include_patterns = get_include_patterns(
+            model, realm, frequency, ice_sheet=args.ice_sheet
+        )
         if len(include_patterns) == 1:
             glob_pattern = f"*{include_patterns[0]}*.nc"
         else:
