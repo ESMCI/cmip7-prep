@@ -32,6 +32,7 @@ from cmip7_prep.cmor_utils import (
     roll_for_monotonic_with_bounds,
     packaged_dataset_json,
 )
+from cmip7_prep.include_patterns import get_include_patterns
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
@@ -81,81 +82,6 @@ REALM_YAML_MAP = {
         "land": "cesm_to_cmip7_land.yaml",
         "seaIce": "cesm_to_cmip7_seaIce.yaml",
         "ocean": "cesm_to_cmip7_ocean.yaml",
-    },
-}
-
-INCLUDE_PATTERN_MAP = {
-    "cesm": {
-        "aerosol": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "atmosChem": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "atmos": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "land": {
-            "mon": ["clm2.h0a"],
-        },
-        "ocnBgchem": {
-            "mon": ["mom6.h.z", "mom6.h.native."],
-            "day": ["mom6.h.sfc"],
-        },
-        "ocean": {
-            "mon": ["mom6.h.z", "mom6.h.native."],
-            "day": ["mom6.h.sfc"],
-        },
-        "seaIce": {
-            "mon": ["cice.h."],
-            "day": ["cice.h1."],
-        },
-    },
-    "noresm": {
-        "atmos": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "atmosChem": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "aerosol": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "land": {
-            "mon": ["clm2.h0a"],
-            "day": ["clm2.h1a"],
-            "3hr": ["clm2.h2a"],
-            "yr": [
-                "clm2.h2a"
-            ],  # Temporary change for WIEMIP TODO to change back ["clm2.h3a"],
-        },
-        "seaIce": {
-            "mon": ["cice.h."],
-            "day": ["cice.h1."],
-        },
-        # landIce is per ice-sheet: the '{ice_sheet}' placeholder is filled in
-        # from --ice-sheet (gris/ais) so each run targets a single CISM domain.
-        "landIce": {
-            "yr": ["cism.{ice_sheet}.h"],
-        },
     },
 }
 
@@ -750,25 +676,6 @@ def latest_monthly_file(
     found.sort(key=lambda t: (t[0], t[1], t[2].name))
     year, month, path = found[-1]
     return path, year, month
-
-
-def get_include_patterns(
-    model: str, realm: str, frequency: str, ice_sheet: str | None = None
-) -> list[str]:
-    try:
-        patterns = INCLUDE_PATTERN_MAP[model][realm][frequency]
-    except KeyError:
-        raise ValueError(
-            f"No include_patterns defined for model={model}, "
-            f"realm={realm}, frequency={frequency}"
-        )
-    # landIce patterns are per ice-sheet; fill in the selected one (gris/ais).
-    if realm == "landIce":
-        if ice_sheet is None:
-            raise ValueError("realm 'landIce' requires --ice-sheet (gris or ais)")
-        patterns = [p.format(ice_sheet=ice_sheet) for p in patterns]
-    logger.info("Looking for pattern: %s", patterns)
-    return patterns
 
 
 def main():

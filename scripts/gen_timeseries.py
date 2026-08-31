@@ -24,7 +24,7 @@ from pathlib import Path
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 
-from cmor_driver import INCLUDE_PATTERN_MAP
+from cmip7_prep.include_patterns import all_include_patterns
 
 # ++++++++++++++++++++++++++++++
 # Input argument parser function
@@ -132,17 +132,12 @@ def main():
 
     # Determine include patterns.  Patterns may contain a '{ice_sheet}'
     # placeholder (landIce), filled in from --ice-sheet at run time.
-    include_patterns = []
-    for _, pattern_list in INCLUDE_PATTERN_MAP[args.model][args.realm].items():
-        for pattern in pattern_list:
-            if "{ice_sheet}" in pattern:
-                if args.ice_sheet is None:
-                    logger.error(
-                        "realm '%s' requires --ice-sheet (gris or ais)", args.realm
-                    )
-                    sys.exit(1)
-                pattern = pattern.format(ice_sheet=args.ice_sheet)
-            include_patterns.append(f"*{pattern}*")
+    try:
+        patterns = all_include_patterns(args.model, args.realm, args.ice_sheet)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    include_patterns = [f"*{pattern}*" for pattern in patterns]
 
     # Determine input directory
     inputdir = Path(args.inputdir)
