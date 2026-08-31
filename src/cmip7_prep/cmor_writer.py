@@ -961,7 +961,11 @@ class CmorSession(
         logger.debug("Setting FX variable %s dims: %s", name, da.dims)
         if set(da.dims) == {"xh", "yh"}:
             self.load_table(self.tables_root, "ocean")
-            geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
+            geo_path = (
+                Path(__file__).parent.parent.parent / "data" / "ocean_geometry.nc"
+            )
+            if not geo_path.exists():
+                raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
             ds_geo = xr.open_dataset(geo_path)
             lat = ds_geo["lath"].values
             lon_raw = np.mod(ds_geo["lonh"].values, 360.0)
