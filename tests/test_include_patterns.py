@@ -119,7 +119,7 @@ def test_instantaneous_output_is_declared(model, realm, averaged, instantaneous)
 def test_all_include_patterns_spans_frequencies_without_duplicates():
     """NorESM land shares clm2.h2a between 3hr and yr; it appears once."""
     patterns = all_include_patterns("noresm", "land")
-    assert patterns == ["clm2.h0a", "clm2.h1a", "clm2.h2a"]
+    assert patterns == ["clm2.h0a", "clm2.h0i", "clm2.h1a", "clm2.h2a"]
     assert len(patterns) == len(set(patterns))
 
 
