@@ -32,7 +32,10 @@ from cmip7_prep.cmor_utils import (
     roll_for_monotonic_with_bounds,
     packaged_dataset_json,
 )
-from cmip7_prep.include_patterns import get_include_patterns
+from cmip7_prep.include_patterns import (
+    get_include_patterns,
+    patterns_for_variable,
+)
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
@@ -883,13 +886,13 @@ def main():
 
     # Load requested variables
     if len(cmip_vars) > 0:
+        # Glob the union of every time sampling for this realm and frequency.
+        # Each variable is narrowed to its own sampling inside the loop below,
+        # using the signifier in its branded name -- CMIP7 frequency alone
+        # cannot tell a time-averaged variable from an instantaneous one.
         include_patterns = get_include_patterns(
-            model, realm, frequency, ice_sheet=args.ice_sheet
+            model, realm, frequency, ice_sheet=args.ice_sheet, sampling=None
         )
-        if len(include_patterns) == 1:
-            glob_pattern = f"*{include_patterns[0]}*.nc"
-        else:
-            glob_pattern = "*.nc"
 
         # Determine TABLES directory
         _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
@@ -910,13 +913,20 @@ def main():
         logger.info(f"Using CMOR tables from: {tables_root}")
 
         # Determine time series files
-        all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
+        all_ts_files = sorted(
+            {
+                path
+                for pattern in include_patterns
+                for path in Path(TSDIR).glob(f"*{pattern}*.nc")
+            }
+        )
         logger.info(
-            f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'"
+            f"Found {len(all_ts_files)} candidate timeseries files "
+            f"matching {include_patterns}"
         )
         if not all_ts_files:
             logger.error(
-                f"No timeseries files found in {TSDIR} matching '{glob_pattern}'"
+                f"No timeseries files found in {TSDIR} matching {include_patterns}"
             )
             sys.exit(1)
 
@@ -928,11 +938,22 @@ def main():
                 model_vars = _collect_required_model_vars(mapping, [varname])
             except Exception:
                 model_vars = []
+            # Narrow to the history files this variable's sampling lives in.
+            # Without this an instantaneous variable would be built from
+            # time-averaged input: well-formed output, silently wrong values.
+            try:
+                var_patterns = patterns_for_variable(
+                    model, realm, frequency, varname, ice_sheet=args.ice_sheet
+                )
+            except ValueError as exc:
+                logger.warning("Skipping %s: %s", varname, exc)
+                continue
             ts_files = sorted(
                 {
                     p
                     for p in all_ts_files
-                    if any(_filename_contains_var(p, mv) for mv in model_vars)
+                    if any(pattern in p.name for pattern in var_patterns)
+                    and any(_filename_contains_var(p, mv) for mv in model_vars)
                 }
             )
             logger.info("=" * 60)

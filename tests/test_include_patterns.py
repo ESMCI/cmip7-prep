@@ -9,10 +9,15 @@ from cmip7_prep.include_patterns import (
     all_include_patterns,
     get_include_patterns,
     load_include_patterns,
+    patterns_for_variable,
+    sampling_from_branded_name,
 )
 
 MODELS = ["cesm", "noresm"]
-SAMPLINGS = {"tavg", "tpt"}
+# Time signifiers that appear in CMIP7 branded variable names.  Only the ones a
+# model writes to its own history tape need an include-pattern entry; the rest
+# fall back to time-averaged files (see patterns_for_variable).
+SAMPLINGS = {"tavg", "tpt", "ti", "tsum", "tmin", "tmax", "tminavg", "tmaxavg"}
 
 
 @pytest.mark.parametrize("model", MODELS)
@@ -181,3 +186,57 @@ def test_bulk_collection_can_be_narrowed(mixed_model):
     ]
     # day has no instantaneous output, so only mon contributes.
     assert all_include_patterns(mixed_model, "atmos", sampling="tpt") == ["cam.h0i"]
+
+
+# ---------------------------------------------------------------------------
+# Routing a CMIP7 variable to the right history files
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "branded,expected",
+    [
+        ("tas_tavg-u-hxy-u", "tavg"),
+        ("ps_tpt-u-hxy-u", "tpt"),
+        ("acabf_tavg-u-hxy-is", "tavg"),
+        ("areacella_ti-u-hxy-u", "ti"),
+        ("tasmax_tmax-u-hxy-u", "tmax"),
+    ],
+)
+def test_sampling_is_read_from_the_branded_name(branded, expected):
+    """The signifier sits between the first underscore and the first dash."""
+    assert sampling_from_branded_name(branded) == expected
+
+
+def test_sampling_rejects_a_bare_variable_name():
+    """A plain name has no compound part to read a signifier from."""
+    with pytest.raises(ValueError, match="not a branded variable name"):
+        sampling_from_branded_name("tas")
+
+
+def test_instantaneous_variable_routes_to_the_i_tape():
+    """The point of the exercise: _tpt must not be built from averaged files."""
+    assert patterns_for_variable("noresm", "atmos", "mon", "ps_tpt-u-hxy-u") == [
+        "cam.h0i"
+    ]
+    assert patterns_for_variable("noresm", "atmos", "mon", "tas_tavg-u-hxy-u") == [
+        "cam.h0a"
+    ]
+
+
+def test_undeclared_signifier_falls_back_and_warns(caplog):
+    """ti/tsum/tmin/tmax keep reading averaged files, but say so.
+
+    Failing outright would regress variables that work today; falling back
+    silently would hide a real question about which tape they belong in.
+    """
+    with caplog.at_level("WARNING"):
+        patterns = patterns_for_variable(
+            "noresm", "atmos", "mon", "areacella_ti-u-hxy-u"
+        )
+    assert patterns == ["cam.h0a"]
+    assert "falling back to time-averaged files" in caplog.text
+
+
+def test_missing_time_average_still_raises():
+    """The fallback must not paper over a genuinely absent realm/frequency."""
+    with pytest.raises(ValueError, match="No include_patterns defined"):
+        patterns_for_variable("cesm", "land", "6hr", "mrsos_tavg-u-hxy-u")

@@ -169,3 +169,64 @@ def all_include_patterns(
             f"this realm"
         )
     return patterns
+
+
+def sampling_from_branded_name(branded_name: str) -> str:
+    """Return the time signifier from a CMIP7 branded variable name.
+
+    Branded names are ``<root>_<temporal>-<vertical>-<horizontal>-<area>``, so
+    ``tas_tavg-u-hxy-u`` gives 'tavg' and ``ps_tpt-u-hxy-u`` gives 'tpt'.
+
+    >>> sampling_from_branded_name("tas_tavg-u-hxy-u")
+    'tavg'
+    >>> sampling_from_branded_name("acabf_tpt-u-hxy-is")
+    'tpt'
+    """
+    if "_" not in branded_name:
+        raise ValueError(
+            f"{branded_name!r} is not a branded variable name "
+            f"(expected <root>_<temporal>-<vertical>-<horizontal>-<area>)"
+        )
+    _root, compound = branded_name.rsplit("_", 1)
+    return compound.split("-")[0]
+
+
+def patterns_for_variable(
+    model: str,
+    realm: str,
+    frequency: str,
+    branded_name: str,
+    ice_sheet: str | None = None,
+) -> list[str]:
+    """Return the include patterns for one CMIP7 variable.
+
+    The sampling comes from the variable's own branded name, because CMIP7
+    frequency does not distinguish time-averaged from instantaneous output.
+
+    Signifiers the table does not declare (``ti``, ``tsum``, ``tmin``, ``tmax``
+    and friends) fall back to the time-averaged patterns, which is where they
+    have always been read from, but log a warning: whether they need their own
+    history tape is a per-model question that has not been answered here.
+    """
+    sampling = sampling_from_branded_name(branded_name)
+    try:
+        return get_include_patterns(
+            model, realm, frequency, ice_sheet=ice_sheet, sampling=sampling
+        )
+    except ValueError:
+        if sampling == "tavg":
+            raise
+        logger.warning(
+            "No %r include patterns for model=%s realm=%s frequency=%s; "
+            "falling back to time-averaged files for %s. If %s output lives in "
+            "its own history tape, add it to the include-pattern table.",
+            sampling,
+            model,
+            realm,
+            frequency,
+            branded_name,
+            sampling,
+        )
+        return get_include_patterns(
+            model, realm, frequency, ice_sheet=ice_sheet, sampling="tavg"
+        )
