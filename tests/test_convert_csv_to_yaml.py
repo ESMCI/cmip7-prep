@@ -631,7 +631,7 @@ class TestReadCsvCESM:
     """Integration tests for read_csv() with the CESM model config."""
 
     FIELDNAMES = [
-        "CMIP Variable Name",
+        "CMIP Branded Variable Name",
         "Table",
         "Long Name",
         "Standard Name",
@@ -657,7 +657,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "tas",
+                    "CMIP Branded Variable Name": "tas",
                     "Table": "atmos",
                     "Long Name": "Near-Surface Air Temperature",
                     "Units": "K",
@@ -678,7 +678,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "tos",
+                    "CMIP Branded Variable Name": "tos",
                     "Table": "ocean",
                     "CESM Variable Name": "SST",
                 }
@@ -692,7 +692,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "siconc",
+                    "CMIP Branded Variable Name": "siconc",
                     "Table": "seaIce",
                     "CESM Variable Name": "siconc",
                 }
@@ -706,7 +706,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "pr",
+                    "CMIP Branded Variable Name": "pr",
                     "Table": "atmos",
                     "Standard Name": "precipitation_flux",
                     "Units": "kg m-2 s-1",
@@ -723,7 +723,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "cl",
+                    "CMIP Branded Variable Name": "cl",
                     "Table": "atmos",
                     "Units": "%",
                     "Dimensions": "time, lev, lat, lon",
@@ -741,7 +741,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "pr",
+                    "CMIP Branded Variable Name": "pr",
                     "Table": "atmos",
                     "Units": "kg m-2 s-1",
                     "Dimensions": "time, lat, lon",
@@ -758,7 +758,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "cl",
+                    "CMIP Branded Variable Name": "cl",
                     "Table": "atmos",
                     "Units": "%",
                     "Dimensions": "time, lev, lat, lon",
@@ -776,7 +776,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "tas",
+                    "CMIP Branded Variable Name": "tas",
                     "Table": "atmos",
                     "CESM Variable Name": "TREFHT",
                 }
@@ -791,7 +791,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "tas",
+                    "CMIP Branded Variable Name": "tas",
                     "Table": "atmos",
                     "CESM Variable Name": "",
                 }
@@ -805,7 +805,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "clt",
+                    "CMIP Branded Variable Name": "clt",
                     "Table": "atmos",
                     "Units": "%",
                     "Dimensions": "time, lat, lon",
@@ -824,7 +824,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "evspsbl",
+                    "CMIP Branded Variable Name": "evspsbl",
                     "Table": "atmos",
                     "Units": "kg m-2 s-1",
                     "Dimensions": "time, lat, lon",
@@ -842,7 +842,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "siarea",
+                    "CMIP Branded Variable Name": "siarea",
                     "Table": "seaIce",
                     "Units": "m2",
                     "Dimensions": "time",
@@ -863,7 +863,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "siarea",
+                    "CMIP Branded Variable Name": "siarea",
                     "Table": "seaIce",
                     "Units": "m2",
                     "Dimensions": "time",
@@ -884,7 +884,7 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Variable Name": "pr",
+                    "CMIP Branded Variable Name": "pr",
                     "Table": "atmos",
                     "Units": "kg m-2 s-1",
                     "Dimensions": "time, lat, lon",

@@ -95,7 +95,7 @@ class TestVariableToRow:
         )
         assert len(row) == 1
         row = row[0]
-        assert row["CMIP Variable Name"] == "tas"
+        assert row["CMIP Branded Variable Name"] == "tas"
         assert row["Table"] == "atmos"
         assert row["Long Name"] == "Near-Surface Air Temperature"
         assert row["Units"] == "K"
@@ -328,7 +328,7 @@ class TestYamlToCsv:
         rows = _read_csv(cpath)
         assert len(rows) == 1
         r = rows[0]
-        assert r["CMIP Variable Name"] == "tas"
+        assert r["CMIP Branded Variable Name"] == "tas"
         assert r["Table"] == "atmos"
         assert r["Long Name"] == "Near-Surface Air Temperature"
         assert r["Units"] == "K"

@@ -119,7 +119,7 @@ MODEL_CONFIGS = {
             "source_id": "CESM3",
             "nominal_resolution": "100 km",
         },
-        "key_column": "CMIP Variable Name",
+        "key_column": "CMIP Branded Variable Name",
         "column_map": {
             "Table": "table",
             "Long Name": "long_name",
