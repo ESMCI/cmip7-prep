@@ -728,15 +728,19 @@ def read_csv(filepath, config):
 
     all_entries = []
     flagged = 0
+    rows_seen: dict = {}
+    rows_kept: dict = {}
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
+            realm = row.get(realm_col, "").strip()
+            rows_seen[realm] = rows_seen.get(realm, 0) + 1
             if not should_keep(row, config):
                 continue
             name = row[key_col].strip()
             if not name:
                 continue
-            realm = row[realm_col].strip()
+            rows_kept[realm] = rows_kept.get(realm, 0) + 1
             entry = _build_entry(row, config)
             positive = config.get("positive_overrides", {}).get(name)
             if positive:
@@ -747,6 +751,23 @@ def read_csv(filepath, config):
                 for problem in problems:
                     print(f"WARN {problem}", file=sys.stderr)
             all_entries.append((name, entry, realm))
+
+    known_realms = realm_outputs or {}
+    for realm in sorted(r for r in rows_seen if r not in known_realms):
+        print(
+            f"WARN realm {realm!r} has no entry in realm_outputs: "
+            f"{rows_seen[realm]} rows dropped",
+            file=sys.stderr,
+        )
+
+    print("realm summary (rows kept / rows seen):", file=sys.stderr)
+    for realm in sorted(rows_seen):
+        note = "" if realm in known_realms else "   <- no output file"
+        print(
+            f"  {realm or '(blank)':12s} {rows_kept.get(realm, 0):5d} /"
+            f" {rows_seen[realm]:5d}{note}",
+            file=sys.stderr,
+        )
 
     if flagged:
         print(
