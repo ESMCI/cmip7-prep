@@ -1,3 +1,4 @@
+import ast
 import csv
 import json
 import os
@@ -524,6 +525,55 @@ def _split_positional(s: str, n: int) -> list:
     return parts[:n]
 
 
+# CAM history-file reduction suffixes: "PBLH:X" (max), "U10:M" (min),
+# "UGUST.X", etc.  These select a history field, they are not arithmetic, so
+# they cannot be evaluated as a formula.
+_CAM_HISTORY_SUFFIX = re.compile(r"^\s*\w+\s*[:.][AIMXS]\s*$")
+
+
+def check_entry(name, entry, raw_source=""):
+    """Return a list of problems found in a built entry, as readable strings.
+
+    Flags rows that convert without raising but cannot produce meaningful
+    output: prose or notes left in the Formula column, CAM history-field
+    notation used as a formula, and source values that are not a plain
+    comma-separated list of variable names (brace shorthand, ``[COSP]``
+    annotations).  An empty list means nothing suspect was found.
+
+    >>> check_entry("x", {"formula": "PRECC + PRECL"})
+    []
+    >>> check_entry("x", {"formula": "ask for max in history"})
+    ["x: formula 'ask for max in history' is not a valid expression"]
+    >>> check_entry("x", {"formula": "PBLH:X"})
+    ["x: formula 'PBLH:X' is CAM history-field notation, not an expression"]
+    >>> check_entry("x", {}, raw_source="TGCLDLWP, TGCLDIWP")
+    []
+    >>> check_entry("x", {}, raw_source="IWPMODIS [COSP]")
+    ["x: source 'IWPMODIS [COSP]' is not a plain list of variable names"]
+    """
+    problems = []
+
+    formula = entry.get("formula")
+    if formula:
+        if _CAM_HISTORY_SUFFIX.match(formula):
+            problems.append(
+                f"formula {formula!r} is CAM history-field notation, "
+                "not an expression"
+            )
+        else:
+            try:
+                ast.parse(formula, mode="eval")
+            except SyntaxError:
+                problems.append(f"formula {formula!r} is not a valid expression")
+
+    # Expressions belong in the Formula column; the source column should be a
+    # plain comma-separated list of model variable names.
+    if raw_source and _parse_csv_identifiers(raw_source) is None:
+        problems.append(f"source {raw_source!r} is not a plain list of variable names")
+
+    return [f"{name}: {p}" for p in problems]
+
+
 def _build_entry(row, config):
     """Build a single variable entry dict from one CSV row."""
     column_map = config["column_map"]
@@ -675,6 +725,7 @@ def read_csv(filepath, config):
     )  # optional; None means return a single combined dict
 
     all_entries = []
+    flagged = 0
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -688,7 +739,18 @@ def read_csv(filepath, config):
             positive = config.get("positive_overrides", {}).get(name)
             if positive:
                 entry["positive"] = positive
+            problems = check_entry(name, entry, row.get(config["source_column"], ""))
+            if problems:
+                flagged += 1
+                for problem in problems:
+                    print(f"WARN {problem}", file=sys.stderr)
             all_entries.append((name, entry, realm))
+
+    if flagged:
+        print(
+            f"WARN {flagged} entries need review; none were dropped",
+            file=sys.stderr,
+        )
 
     if realm_outputs:
         result = {}
@@ -793,9 +855,16 @@ def main():
         default=".",
         help="Directory to write the YAML files into (default: current directory)",
     )
+    parser.add_argument(
+        "-d",
+        "--dry-run",
+        action="store_true",
+        help="Parse the CSV and report problems without writing any files",
+    )
     args = parser.parse_args()
 
-    os.makedirs(args.outdir, exist_ok=True)
+    if not args.dry_run:
+        os.makedirs(args.outdir, exist_ok=True)
 
     config = MODEL_CONFIGS[args.model]
     input_file = args.input or config["default_input"]
@@ -813,11 +882,14 @@ def main():
     total = 0
     for output_file, file_data in merged.items():
         output_path = os.path.join(args.outdir, output_file)
-        write_yaml(file_data, output_path)
+        if not args.dry_run:
+            write_yaml(file_data, output_path)
         count = len(file_data["variables"])
         total += count
-        print(f"wrote {count} entries to {output_path}")
-    print(f"total: {total} entries written across {len(merged)} files")
+        verb = "would write" if args.dry_run else "wrote"
+        print(f"{verb} {count} entries to {output_path}")
+    verb = "would be written" if args.dry_run else "written"
+    print(f"total: {total} entries {verb} across {len(merged)} files")
 
 
 if __name__ == "__main__":
