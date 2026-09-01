@@ -218,6 +218,14 @@ class VarConfig:
 
 
 def verticalsum(arr, capped_at=None, dim="levsoi"):
+    """Sum a DataArray along a soil/vertical dimension, optionally capping it.
+
+    Parameters
+    ----------
+    arr       : xr.DataArray to reduce; non-DataArray values are passed through
+    capped_at : optional upper bound applied to the summed result
+    dim       : name of the dimension to sum over
+    """
     # arr can be a DataArray or an expression
     if isinstance(arr, xr.DataArray):
         summed = arr.sum(dim=dim, skipna=True)
@@ -226,6 +234,7 @@ def verticalsum(arr, capped_at=None, dim="levsoi"):
     if capped_at is not None:
         summed = xr.where(summed > capped_at, capped_at, summed)
     return summed
+
 
 def sumover_index(arr: xr.DataArray, indexlist: list, dimname: str) -> xr.DataArray:
     """
@@ -256,6 +265,7 @@ def sumover_index(arr: xr.DataArray, indexlist: list, dimname: str) -> xr.DataAr
     # Select only the specified indices before summing — this ensures
     # indices not in indexlist are excluded from the sum entirely.
     return arr.isel({dimname: indexlist}).sum(dim=dimname)
+
 
 def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
     """

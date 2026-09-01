@@ -984,7 +984,9 @@ class TestCheckEntry:
 
     def test_valid_formula_is_silent(self):
         """A formula using only available functions produces no problems."""
-        assert check_entry("v", {"formula": "verticalsum(SOILICE, capped_at=5000)"}) == []
+        assert (
+            check_entry("v", {"formula": "verticalsum(SOILICE, capped_at=5000)"}) == []
+        )
 
     def test_undefined_function_is_flagged(self):
         """A syntactically valid call to a missing function is reported."""
@@ -998,12 +1000,16 @@ class TestCheckEntry:
 
     def test_method_calls_are_not_flagged(self):
         """DataArray method calls have no resolvable name and are left alone."""
-        assert check_entry("v", {"formula": "(a * b).where(a > 0).sum(dim=['nj'])"}) == []
+        assert (
+            check_entry("v", {"formula": "(a * b).where(a > 0).sum(dim=['nj'])"}) == []
+        )
 
     def test_syntax_error_is_flagged(self):
         """Prose in the formula column is reported as an invalid expression."""
         problems = check_entry("v", {"formula": "ask for max in history"})
-        assert problems == ["v: formula 'ask for max in history' is not a valid expression"]
+        assert problems == [
+            "v: formula 'ask for max in history' is not a valid expression"
+        ]
 
     def test_cam_history_notation_is_flagged(self):
         """CAM history-field selectors are not arithmetic."""
