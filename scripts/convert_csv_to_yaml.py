@@ -154,7 +154,7 @@ MODEL_CONFIGS = {
             "fx": "cesm_to_cmip7_ocean.yaml",
         },
         "source_column": "CESM Variable Name",
-        "source_skip_phrases": [],
+        "source_skip_phrases": ["N/A"],
         "key_column_skip_phrases": [],
     },
 }
