@@ -71,6 +71,7 @@ MODEL_CONFIGS = {
         "default_input": "data.csv",
         "default_output": "data.yaml",
         "normalize_dim_names": True,
+        "norwegian_number_format": True,
         "dataset_overrides": {
             "institution_id": "NCC",
             "source_id": "NorESM3",
@@ -114,6 +115,7 @@ MODEL_CONFIGS = {
     "cesm": {
         "default_input": "cesm_data.csv",
         "normalize_dim_names": False,
+        "norwegian_number_format": False,
         "dataset_overrides": {
             "institution_id": "NCAR",
             "source_id": "CESM3",
@@ -577,7 +579,9 @@ def _build_entry(row, config):
                 )
                 entry["_plev_name"] = plev_dim
         elif yaml_key == "units":
-            entry["units"] = fix_number_norwegian_format(value)
+            if config.get("norwegian_number_format", False):
+                value = fix_number_norwegian_format(value)
+            entry["units"] = value
         elif yaml_key == "_source_expr":
             names = _parse_csv_identifiers(value)
             if names is not None and "FATES" not in value:
