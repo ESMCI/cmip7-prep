@@ -22,6 +22,7 @@ from convert_csv_to_yaml import (
     analyse_expression,
     clean_string,
     clean_strings,
+    check_entry,
     extract_variables,
     fix_number_norwegian_format,
     is_math_expression,
@@ -973,3 +974,49 @@ class TestWriteYaml:
             lines = f.readlines()
         source_id_idx = next(i for i, l in enumerate(lines) if "source_id:" in l)
         assert lines[source_id_idx + 1].strip() == ""
+
+
+# ── check_entry ───────────────────────────────────────────────────────────────
+
+
+class TestCheckEntry:
+    """Tests for check_entry()."""
+
+    def test_valid_formula_is_silent(self):
+        """A formula using only available functions produces no problems."""
+        assert check_entry("v", {"formula": "verticalsum(SOILICE, capped_at=5000)"}) == []
+
+    def test_undefined_function_is_flagged(self):
+        """A syntactically valid call to a missing function is reported."""
+        problems = check_entry("v", {"formula": "chunits(QICE, units='kg m-2 s-1')"})
+        assert problems == ["v: formula calls undefined function 'chunits'"]
+
+    def test_each_undefined_function_reported_once(self):
+        """Repeated calls to the same missing function collapse to one problem."""
+        problems = check_entry("v", {"formula": "chunits(A) + chunits(B)"})
+        assert problems == ["v: formula calls undefined function 'chunits'"]
+
+    def test_method_calls_are_not_flagged(self):
+        """DataArray method calls have no resolvable name and are left alone."""
+        assert check_entry("v", {"formula": "(a * b).where(a > 0).sum(dim=['nj'])"}) == []
+
+    def test_syntax_error_is_flagged(self):
+        """Prose in the formula column is reported as an invalid expression."""
+        problems = check_entry("v", {"formula": "ask for max in history"})
+        assert problems == ["v: formula 'ask for max in history' is not a valid expression"]
+
+    def test_cam_history_notation_is_flagged(self):
+        """CAM history-field selectors are not arithmetic."""
+        problems = check_entry("v", {"formula": "PBLH:X"})
+        assert "CAM history-field notation" in problems[0]
+
+    def test_plain_source_list_is_silent(self):
+        """A comma-separated list of identifiers is a well-formed source."""
+        assert check_entry("v", {}, raw_source="TGCLDLWP, TGCLDIWP") == []
+
+    def test_annotated_source_is_flagged(self):
+        """A source carrying an annotation is not a plain variable list."""
+        problems = check_entry("v", {}, raw_source="IWPMODIS [COSP]")
+        assert problems == [
+            "v: source 'IWPMODIS [COSP]' is not a plain list of variable names"
+        ]

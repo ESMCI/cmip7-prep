@@ -209,22 +209,117 @@ class VarConfig:
         return {k: v for k, v in d.items() if v is not None}
 
 
+# ── formula namespace ────────────────────────────────────────────────────────
+# The functions below, plus ``np`` and ``xr``, are the complete set of names a
+# mapping formula may call.  They are exposed as FORMULA_NAMESPACE so that
+# scripts/convert_csv_to_yaml.py can validate formulas against the same list
+# the evaluator actually uses -- adding a function here makes it available to
+# formulas and known to the CSV validator in one edit.
+
+
+def verticalsum(arr, capped_at=None, dim="levsoi"):
+    # arr can be a DataArray or an expression
+    if isinstance(arr, xr.DataArray):
+        summed = arr.sum(dim=dim, skipna=True)
+    else:
+        summed = arr  # fallback, should be DataArray
+    if capped_at is not None:
+        summed = xr.where(summed > capped_at, capped_at, summed)
+    return summed
+
+def sumover_index(arr: xr.DataArray, indexlist: list, dimname: str) -> xr.DataArray:
+    """
+    Sum a DataArray over a subset of indices along a named dimension.
+
+    Indices are 1-based.  Passing a single index collapses the dimension,
+    which is how a single level (e.g. surface or basal velocity) is picked
+    out of a vertical coordinate.
+
+    Parameters
+    ----------
+    arr       : xr.DataArray with the dimension to reduce over
+    indexlist : list of 1-based integer indices to sum over
+    dimname   : name of the dimension to select/squeeze
+    """
+    if not isinstance(arr, xr.DataArray):
+        raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
+    if dimname not in arr.dims:
+        raise ValueError(
+            f"Dimension '{dimname}' not found in array dimensions {list(arr.dims)}"
+        )
+    if not indexlist:
+        raise ValueError("indexlist must not be empty")
+
+    # Account for zero-based indexing
+    indexlist = [x - 1 for x in indexlist]
+
+    # Select only the specified indices before summing — this ensures
+    # indices not in indexlist are excluded from the sum entirely.
+    return arr.isel({dimname: indexlist}).sum(dim=dimname)
+
+def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
+    """
+    Sigma-weighted vertical mean over a non-uniformly spaced dimension.
+
+    Reproduces the weighting CISM uses for its own ``uvel_mean`` (see
+    glissade.F90): values sit on level interfaces, with sigma running 0 at
+    the upper surface to 1 at the bed, and each interface is weighted by the
+    fraction of the column it represents.  The interior weights are the gaps
+    between layer midpoints; the two end levels get the outer half-layers.
+
+    A plain ``arr.mean(dim=...)`` is NOT equivalent: CISM's sigma levels are
+    refined towards the bed by default, so an unweighted mean over-weights
+    the closely spaced basal levels.
+
+    Parameters
+    ----------
+    arr       : xr.DataArray whose vertical coordinate holds sigma values
+    levelname : name of the vertical dimension
+    """
+    if not isinstance(arr, xr.DataArray):
+        raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
+    if levelname not in arr.dims:
+        raise ValueError(
+            f"Dimension '{levelname}' not found in array dimensions "
+            f"{list(arr.dims)}"
+        )
+    if levelname not in arr.coords:
+        raise ValueError(
+            f"Dimension '{levelname}' has no coordinate values; "
+            f"verticalmean needs the sigma levels to weight by."
+        )
+
+    sigma = np.asarray(arr[levelname].values, dtype="f8")
+    if sigma.size < 2:
+        raise ValueError(f"verticalmean needs at least 2 levels, got {sigma.size}")
+
+    stag = 0.5 * (sigma[:-1] + sigma[1:])  # layer midpoints
+    w = np.empty(sigma.size, dtype="f8")
+    w[0] = stag[0] - sigma[0]  # top half-layer
+    w[1:-1] = stag[1:] - stag[:-1]
+    w[-1] = sigma[-1] - stag[-1]  # bottom half-layer
+    w /= w.sum()  # guard against a sigma range other than [0, 1]
+
+    weights = xr.DataArray(w, dims=(levelname,), coords={levelname: arr[levelname]})
+    return (arr * weights).sum(dim=levelname)
+
+
+FORMULA_NAMESPACE: Dict[str, Any] = {
+    "np": np,
+    "xr": xr,
+    "verticalsum": verticalsum,
+    "sumover_index": sumover_index,
+    "verticalmean": verticalmean,
+}
+
+
 def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     """Evaluate a formula string in a restricted namespace.
 
-    Built-in Python names are blocked (``__builtins__`` is empty).  The
-    following names are always available in addition to whatever is passed via
-    ``local_names``:
-
-    * ``np`` – NumPy
-    * ``xr`` – xarray
-    * ``verticalsum(arr, capped_at=None, dim="levsoi")`` – sum a DataArray
-      along a soil/vertical dimension, optionally capping the result.
-    * ``sumover_index(arr, indexlist, dimname)`` – sum a DataArray over a
-      subset of 1-based indices along a named dimension.  A single index
-      collapses that dimension, which is how a single level is selected.
-    * ``verticalmean(arr, levelname="level")`` – sigma-weighted vertical mean
-      over a non-uniformly spaced vertical dimension.
+    Built-in Python names are blocked (``__builtins__`` is empty).  Everything
+    in :data:`FORMULA_NAMESPACE` is available in addition to whatever is passed
+    via ``local_names``; see the individual functions above for their
+    signatures.
 
     Parameters
     ----------
@@ -248,103 +343,8 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     """
     safe_globals = {"__builtins__": {}}
 
-    # Add custom formula functions here
-    def verticalsum(arr, capped_at=None, dim="levsoi"):
-        # arr can be a DataArray or an expression
-        if isinstance(arr, xr.DataArray):
-            summed = arr.sum(dim=dim, skipna=True)
-        else:
-            summed = arr  # fallback, should be DataArray
-        if capped_at is not None:
-            summed = xr.where(summed > capped_at, capped_at, summed)
-        return summed
-
-    def sumover_index(arr: xr.DataArray, indexlist: list, dimname: str) -> xr.DataArray:
-        """
-        Sum a DataArray over a subset of indices along a named dimension.
-
-        Indices are 1-based.  Passing a single index collapses the dimension,
-        which is how a single level (e.g. surface or basal velocity) is picked
-        out of a vertical coordinate.
-
-        Parameters
-        ----------
-        arr       : xr.DataArray with the dimension to reduce over
-        indexlist : list of 1-based integer indices to sum over
-        dimname   : name of the dimension to select/squeeze
-        """
-        if not isinstance(arr, xr.DataArray):
-            raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
-        if dimname not in arr.dims:
-            raise ValueError(
-                f"Dimension '{dimname}' not found in array dimensions {list(arr.dims)}"
-            )
-        if not indexlist:
-            raise ValueError("indexlist must not be empty")
-
-        # Account for zero-based indexing
-        indexlist = [x - 1 for x in indexlist]
-
-        # Select only the specified indices before summing — this ensures
-        # indices not in indexlist are excluded from the sum entirely.
-        return arr.isel({dimname: indexlist}).sum(dim=dimname)
-
-    def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
-        """
-        Sigma-weighted vertical mean over a non-uniformly spaced dimension.
-
-        Reproduces the weighting CISM uses for its own ``uvel_mean`` (see
-        glissade.F90): values sit on level interfaces, with sigma running 0 at
-        the upper surface to 1 at the bed, and each interface is weighted by the
-        fraction of the column it represents.  The interior weights are the gaps
-        between layer midpoints; the two end levels get the outer half-layers.
-
-        A plain ``arr.mean(dim=...)`` is NOT equivalent: CISM's sigma levels are
-        refined towards the bed by default, so an unweighted mean over-weights
-        the closely spaced basal levels.
-
-        Parameters
-        ----------
-        arr       : xr.DataArray whose vertical coordinate holds sigma values
-        levelname : name of the vertical dimension
-        """
-        if not isinstance(arr, xr.DataArray):
-            raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
-        if levelname not in arr.dims:
-            raise ValueError(
-                f"Dimension '{levelname}' not found in array dimensions "
-                f"{list(arr.dims)}"
-            )
-        if levelname not in arr.coords:
-            raise ValueError(
-                f"Dimension '{levelname}' has no coordinate values; "
-                f"verticalmean needs the sigma levels to weight by."
-            )
-
-        sigma = np.asarray(arr[levelname].values, dtype="f8")
-        if sigma.size < 2:
-            raise ValueError(f"verticalmean needs at least 2 levels, got {sigma.size}")
-
-        stag = 0.5 * (sigma[:-1] + sigma[1:])  # layer midpoints
-        w = np.empty(sigma.size, dtype="f8")
-        w[0] = stag[0] - sigma[0]  # top half-layer
-        w[1:-1] = stag[1:] - stag[:-1]
-        w[-1] = sigma[-1] - stag[-1]  # bottom half-layer
-        w /= w.sum()  # guard against a sigma range other than [0, 1]
-
-        weights = xr.DataArray(w, dims=(levelname,), coords={levelname: arr[levelname]})
-        return (arr * weights).sum(dim=levelname)
-
     safe_locals = local_names.copy()
-    safe_locals.update(
-        {
-            "np": np,
-            "xr": xr,
-            "verticalsum": verticalsum,
-            "sumover_index": sumover_index,
-            "verticalmean": verticalmean,
-        }
-    )
+    safe_locals.update(FORMULA_NAMESPACE)
     # pylint: disable=eval-used
     return eval(expr, safe_globals, safe_locals)
 

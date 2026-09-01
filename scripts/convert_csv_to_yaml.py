@@ -8,6 +8,15 @@ import sys
 import argparse
 from typing import Optional
 
+from cmip7_prep.mapping_compat import FORMULA_NAMESPACE
+
+# Names a formula may call.  Taken from the evaluator itself, so adding a
+# function to FORMULA_NAMESPACE makes it available to formulas and known to
+# this validator in a single edit.  A formula calling anything else raises
+# NameError when the pipeline evaluates it, which aborts the whole CMOR run --
+# so it is caught here instead.
+FORMULA_FUNCTIONS = frozenset(FORMULA_NAMESPACE)
+
 # ── NorESM positive attribute overrides ──────────────────────────────────────
 # Maps branded variable name → "up" or "down".
 # Entries here are written as `positive: <value>` in the NorESM output YAML.
@@ -548,6 +557,10 @@ def check_entry(name, entry, raw_source=""):
     ["x: formula 'ask for max in history' is not a valid expression"]
     >>> check_entry("x", {"formula": "PBLH:X"})
     ["x: formula 'PBLH:X' is CAM history-field notation, not an expression"]
+    >>> check_entry("x", {"formula": "chunits(QICE, units='kg m-2 s-1')"})
+    ["x: formula calls undefined function 'chunits'"]
+    >>> check_entry("x", {"formula": "verticalsum(SOILICE, capped_at=5000)"})
+    []
     >>> check_entry("x", {}, raw_source="TGCLDLWP, TGCLDIWP")
     []
     >>> check_entry("x", {}, raw_source="IWPMODIS [COSP]")
@@ -564,9 +577,23 @@ def check_entry(name, entry, raw_source=""):
             )
         else:
             try:
-                ast.parse(formula, mode="eval")
+                tree = ast.parse(formula, mode="eval")
             except SyntaxError:
                 problems.append(f"formula {formula!r} is not a valid expression")
+            else:
+                # Bare calls only: an attribute call is either a DataArray
+                # method (arr.sum(...)) or np/xr, neither of which we resolve.
+                unknown = sorted(
+                    {
+                        node.func.id
+                        for node in ast.walk(tree)
+                        if isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Name)
+                        and node.func.id not in FORMULA_FUNCTIONS
+                    }
+                )
+                for func in unknown:
+                    problems.append(f"formula calls undefined function {func!r}")
 
     # Expressions belong in the Formula column; the source column should be a
     # plain comma-separated list of model variable names.
