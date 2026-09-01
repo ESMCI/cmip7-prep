@@ -1,5 +1,6 @@
 import csv
 import json
+import os
 import yaml
 import re
 import sys
@@ -783,7 +784,14 @@ def main():
         default=None,
         help="Input CSV file (default: model-specific)",
     )
+    parser.add_argument(
+        "--outdir",
+        default=".",
+        help="Directory to write the YAML files into (default: current directory)",
+    )
     args = parser.parse_args()
+
+    os.makedirs(args.outdir, exist_ok=True)
 
     config = MODEL_CONFIGS[args.model]
     input_file = args.input or config["default_input"]
@@ -800,10 +808,11 @@ def main():
 
     total = 0
     for output_file, file_data in merged.items():
-        write_yaml(file_data, output_file)
+        output_path = os.path.join(args.outdir, output_file)
+        write_yaml(file_data, output_path)
         count = len(file_data["variables"])
         total += count
-        print(f"wrote {count} entries to {output_file}")
+        print(f"wrote {count} entries to {output_path}")
     print(f"total: {total} entries written across {len(merged)} files")
 
 
