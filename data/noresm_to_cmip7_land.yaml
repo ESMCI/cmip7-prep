@@ -26,7 +26,7 @@ variables:
     description: Percentage of entire grid cell  that is covered by C3 PFTs (including
       grass, crops, and trees).
     dims: [lon, lat, time, typec3pft]
-    formula: (FATES_AREA_PLANTS-sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[14],
+    formula: (FATES_AREA_PLANTS-sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[14],
       dimname='fates_levpft'))*FATES_FRACTION*100
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_CANOPYCROWNAREA_PF,
       model_var: FATES_FRACTION]
@@ -37,7 +37,7 @@ variables:
     description: Percentage of entire grid cell  that is covered by C4 PFTs (including
       grass and crops).
     dims: [lon, lat, time, typec4pft]
-    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[14], dimname='fates_levpft')*FATES_FRACTION*100
+    formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[14], dimname='fates_levpft')*FATES_FRACTION*100
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -190,7 +190,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_VEGC_PF, pftlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_VEGC_PF, indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -200,7 +200,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_VEGC_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_VEGC_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -210,7 +210,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_VEGC_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_VEGC_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -226,7 +226,7 @@ variables:
   cropFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by crop.
     dims: [lon, lat, time, typecrop]
-    formula: (sumoverpft(FATES_PATCHAREA_LU, pftlist=[5], dimname='fates_levlanduse'))*FATES_FRACTION
+    formula: (sumover_index(FATES_PATCHAREA_LU, indexlist=[5], dimname='fates_levlanduse'))*FATES_FRACTION
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -615,7 +615,7 @@ variables:
   gpp_tavg-u-hxy-ng:
     description: Total GPP of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_GPP_PF, pftlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_GPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -623,7 +623,7 @@ variables:
   gpp_tavg-u-hxy-shb:
     description: Total GPP of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_GPP_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_GPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -631,7 +631,7 @@ variables:
   gpp_tavg-u-hxy-tree:
     description: Total GPP of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_GPP_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -647,7 +647,7 @@ variables:
   grassFracC4_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C4 natural grass.
     dims: [lon, lat, time, typec4natg]
-    formula: (sumoverpft(FATES_CROWNAREA_PF, pftlist=[14], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_CROWNAREA_PF, indexlist=[14], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -655,7 +655,7 @@ variables:
   grassFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell that is covered by natural grass.
     dims: [lon, lat, time, typenatgr]
-    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[12, 13, 14], dimname='fates_levpft')*FATES_FRACTION
+    formula: sumover_index(FATES_CROWNAREA_PF, indexlist=[12, 13, 14], dimname='fates_levpft')*FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -920,7 +920,7 @@ variables:
   npp_tavg-u-hxy-ng:
     description: Total NPP of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_NPP_PF, pftlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_NPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -928,7 +928,7 @@ variables:
   npp_tavg-u-hxy-shb:
     description: Total NPP of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_NPP_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_NPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -936,7 +936,7 @@ variables:
   npp_tavg-u-hxy-tree:
     description: Total NPP of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_NPP_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_NPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -962,7 +962,7 @@ variables:
   pastureFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by anthropogenic pasture.
     dims: [lon, lat, time, typepasture]
-    formula: (sumoverpft(FATES_PATCHAREA_LU, pftlist=[4], dimname='fates_levlanduse'))*FATES_FRACTION
+    formula: (sumover_index(FATES_PATCHAREA_LU, indexlist=[4], dimname='fates_levlanduse'))*FATES_FRACTION
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1045,8 +1045,8 @@ variables:
   ra_tavg-u-hxy-ng:
     description: Total RA of grass in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_GPP_PF, pftlist=[12, 13, 14], dimname='fates_levpft')-sumoverpft(FATES_NPP_PF,
-      pftlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_GPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
+      indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -1054,8 +1054,8 @@ variables:
   ra_tavg-u-hxy-shb:
     description: Total RA of shrubs in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_GPP_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft')-sumoverpft(FATES_NPP_PF,
-      pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_GPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
+      indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -1063,8 +1063,8 @@ variables:
   ra_tavg-u-hxy-tree:
     description: Total RA of trees in the grid cell
     dims: [lon, lat, time]
-    formula: (sumoverpft(FATES_GPP_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')-sumoverpft(FATES_NPP_PF,
-      pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
+      indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -1156,7 +1156,7 @@ variables:
   sftgif_tavg-u-hxy-u:
     description: This is needed in case the ice sheet area changes in time
     dims: [lon, lat, time]
-    formula: sumoverpft(PCT_LANDUNIT, pftlist=[4], dimname='ltype')
+    formula: sumover_index(PCT_LANDUNIT, indexlist=[4], dimname='ltype')
     sources: [model_var: PCT_LANDUNIT]
     table: land
     units: '%'
@@ -1164,7 +1164,7 @@ variables:
   sftgif_ti-u-hxy-u:
     description: fraction of grid cell occupied by "permanent" ice (i.e., glaciers).
     dims: [lon, lat]
-    formula: sumoverpft(PCT_LANDUNIT, pftlist=[4], dimname='ltype')
+    formula: sumover_index(PCT_LANDUNIT, indexlist=[4], dimname='ltype')
     sources: [model_var: PCT_LANDUNIT]
     table: land
     units: '%'
@@ -1172,7 +1172,7 @@ variables:
   shrubFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by shrub.
     dims: [lon, lat, time, typeshrub]
-    formula: sumoverpft(FATES_CROWNAREA_PF, pftlist=[7, 8, 9, 10, 11], dimname='fates_levpft')
+    formula: sumover_index(FATES_CROWNAREA_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft')
       *FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
@@ -1242,7 +1242,7 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf deciduous trees.
     dims: [lon, lat, time, typetreebd]
-    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[5, 6], dimname='fates_levpft')*FATES_FRACTION*100
+    formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[5, 6], dimname='fates_levpft')*FATES_FRACTION*100
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1251,7 +1251,7 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf evergreen trees.
     dims: [lon, lat, time, typetreebe]
-    formula: (sumoverpft(FATES_CROWNAREA_PF, pftlist=[1, 4], dimname='fates_levpft'))*FATES_FRACTION
+    formula: (sumover_index(FATES_CROWNAREA_PF, indexlist=[1, 4], dimname='fates_levpft'))*FATES_FRACTION
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1260,7 +1260,7 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf deciduous trees.
     dims: [lon, lat, time, typetreend]
-    formula: (sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[3], dimname='fates_levpft')*100)*FATES_FRACTION
+    formula: (sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[3], dimname='fates_levpft')*100)*FATES_FRACTION
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1269,7 +1269,7 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf evergreen trees.
     dims: [lon, lat, time, typetreene]
-    formula: (sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[2], dimname='fates_levpft')*100)*FATES_FRACTION
+    formula: (sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[2], dimname='fates_levpft')*100)*FATES_FRACTION
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1277,7 +1277,7 @@ variables:
   treeFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by trees.
     dims: [lon, lat, time, typetree]
-    formula: sumoverpft(FATES_CANOPYCROWNAREA_PF, pftlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')
+    formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')
       *FATES_FRACTION*100
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land

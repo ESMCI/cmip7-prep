@@ -7,7 +7,12 @@ import tempfile
 import xarray as xr
 import numpy as np
 import pytest
-from cmip7_prep.mapping_compat import Mapping, _filter_sources, _to_varconfig
+from cmip7_prep.mapping_compat import (
+    Mapping,
+    _filter_sources,
+    _safe_eval,
+    _to_varconfig,
+)
 
 
 def test_dict_style_sources_model_var():
@@ -402,3 +407,135 @@ def test_iter_variable_names_variant_entry_stays_visible(
 ):  # pylint: disable=redefined-outer-name
     """Variant-backed variables are returned once as their top-level YAML key."""
     assert siarea_mapping.iter_variable_names(freq="mon") == ["siarea_tavg-u-hm-u"]
+
+
+# ---------------------------------------------------------------------------
+# sumover_index: a single index collapses the dimension, selecting one level
+# ---------------------------------------------------------------------------
+@pytest.fixture(name="uvel")
+def uvel_fixture():
+    """A (time, level, y0, x0) field with distinguishable values per level."""
+    return xr.DataArray(
+        np.arange(2 * 11 * 4 * 5, dtype="f8").reshape(2, 11, 4, 5),
+        dims=("time", "level", "y0", "x0"),
+        coords={"level": np.linspace(0.0, 1.0, 11)},
+        name="uvel",
+    )
+
+
+def test_sumover_index_single_is_isel(uvel):  # pylint: disable=redefined-outer-name
+    """One index reproduces isel and drops the dimension.
+
+    This is what the landIce surface and basal velocity formulas rely on:
+    sumover_index(uvel, indexlist=[1]) is the top of the ice column and
+    indexlist=[11] is the bed.
+    """
+    for index in (1, 11):
+        out = _safe_eval(
+            f"sumover_index(uvel, indexlist=[{index}], dimname='level')",
+            {"uvel": uvel},
+        )
+        assert out.dims == ("time", "y0", "x0")
+        assert "level" not in out.coords
+        assert (out == uvel.isel(level=index - 1)).all()
+
+
+def test_sumover_index_is_one_based(uvel):  # pylint: disable=redefined-outer-name
+    """Index 1 is the first element, not the second."""
+    out = _safe_eval(
+        "sumover_index(uvel, indexlist=[1], dimname='level')", {"uvel": uvel}
+    )
+    assert (out == uvel.isel(level=0)).all()
+    assert not (out == uvel.isel(level=1)).all()
+
+
+def test_sumover_index_multiple_sums(uvel):  # pylint: disable=redefined-outer-name
+    """Several indices sum, and indices outside the list are excluded."""
+    out = _safe_eval(
+        "sumover_index(uvel, indexlist=[1, 2, 3], dimname='level')", {"uvel": uvel}
+    )
+    assert (out == uvel.isel(level=[0, 1, 2]).sum(dim="level")).all()
+
+
+def test_sumover_index_rejects_empty_list(uvel):  # pylint: disable=redefined-outer-name
+    """An empty index list is a formula bug, not a no-op."""
+    with pytest.raises(ValueError, match="indexlist must not be empty"):
+        _safe_eval("sumover_index(uvel, indexlist=[], dimname='level')", {"uvel": uvel})
+
+
+# ---------------------------------------------------------------------------
+# verticalmean: sigma-weighted column average
+# ---------------------------------------------------------------------------
+# The 11 sigma levels a CISM Greenland run actually uses: 0 at the upper
+# surface, 1 at the bed, refined towards the bed.
+CISM_SIGMA = [
+    0.0,
+    0.231404958677686,
+    0.407407407407407,
+    0.544378698224852,
+    0.653061224489796,
+    0.740740740740741,
+    0.8125,
+    0.8719723183391,
+    0.921810699588477,
+    0.96398891966759,
+    1.0,
+]
+
+
+@pytest.fixture(name="uvel_sigma")
+def uvel_sigma_fixture():
+    """A velocity profile falling linearly from 100 m/yr at the surface to 40 at the bed."""
+    sigma = np.array(CISM_SIGMA)
+    profile = 100.0 - 60.0 * sigma
+    data = np.broadcast_to(profile[:, None, None], (sigma.size, 3, 2)).copy()
+    return xr.DataArray(
+        data, dims=("level", "y0", "x0"), coords={"level": sigma}, name="uvel"
+    )
+
+
+def test_verticalmean_matches_analytic(
+    uvel_sigma,
+):  # pylint: disable=redefined-outer-name
+    """For a linear profile the column mean is exact: 100 - 60/2 = 70 m/yr."""
+    out = _safe_eval("verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma})
+    assert out.dims == ("y0", "x0")
+    np.testing.assert_allclose(out.values, 70.0, rtol=1e-12)
+
+
+def test_verticalmean_beats_plain_mean(
+    uvel_sigma,
+):  # pylint: disable=redefined-outer-name
+    """An unweighted mean is biased towards the bed, where levels bunch up."""
+    weighted = _safe_eval("verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma})
+    plain = uvel_sigma.mean(dim="level")
+    assert float(plain.values[0, 0]) < float(weighted.values[0, 0])
+    assert abs(float(plain.values[0, 0]) - 70.0) > 5.0
+
+
+def test_verticalmean_matches_cism(uvel_sigma):  # pylint: disable=redefined-outer-name
+    """Weights must match glissade.F90's uvel_mean accumulation exactly."""
+    sigma = np.array(CISM_SIGMA)
+    stag = 0.5 * (sigma[:-1] + sigma[1:])
+    expected = np.empty(sigma.size)
+    expected[0] = stag[0]
+    expected[1:-1] = stag[1:] - stag[:-1]
+    expected[-1] = 1.0 - stag[-1]
+    profile = 100.0 - 60.0 * sigma
+    out = _safe_eval("verticalmean(uvel, levelname='level')", {"uvel": uvel_sigma})
+    np.testing.assert_allclose(out.values[0, 0], float((profile * expected).sum()))
+
+
+def test_verticalmean_requires_coordinate_values():
+    """Without sigma values on the dimension there is nothing to weight by."""
+    arr = xr.DataArray(np.ones((4, 2)), dims=("level", "x"), name="arr")
+    with pytest.raises(ValueError, match="no coordinate values"):
+        _safe_eval("verticalmean(arr)", {"arr": arr})
+
+
+def test_verticalmean_rejects_bad_dim(
+    uvel_sigma,
+):  # pylint: disable=redefined-outer-name
+    """A wrong dimension name is reported before anything else is attempted."""
+    with pytest.raises(ValueError, match="Dimension 'lev' not found"):
+        _safe_eval("verticalmean(uvel, levelname='lev')", {"uvel": uvel_sigma})

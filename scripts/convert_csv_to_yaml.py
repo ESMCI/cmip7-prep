@@ -88,6 +88,7 @@ MODEL_CONFIGS = {
         "realm_outputs": {
             "atmos": "noresm_to_cmip7_atmos.yaml",
             "land": "noresm_to_cmip7_land.yaml",
+            "landice": "noresm_to_cmip7_landice.yaml",
             "aerosol": "noresm_to_cmip7_aerosol.yaml",
             "atmosChem": "noresm_to_cmip7_atmosChem.yaml",
         },
@@ -458,7 +459,7 @@ def parse_level_sum_formulas(expr):
         else:
             start, end = level_sum.strip("()").split(":")
             sumlist = list(range(int(start.strip()), int(end.strip()) + 1))
-        sum_expr = f"sumoverpft({var_sum}, pftlist={sumlist}, dimname='{sum_dim}')"
+        sum_expr = f"sumover_index({var_sum}, indexlist={sumlist}, dimname='{sum_dim}')"
         expr_fix = expr_fix.replace(f"{var_sum}{level_sum}", sum_expr)
     return expr_fix
 

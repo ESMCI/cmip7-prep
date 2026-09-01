@@ -275,7 +275,6 @@ def get_requested_variables(
         operation="all",
         cmip7_frequency=frequency,
         modelling_realm=realm,
-        experiment=experiment.lower(),
     )
     return {var.branded_variable_name.name for var in cmip_vars}
 

@@ -44,6 +44,21 @@ logger = logging.getLogger(__name__)
 DatasetJsonLike = Union[str, Path, AbstractContextManager]
 
 
+def _horizontal_only(da_coord: xr.DataArray, keep) -> xr.DataArray:
+    """Reduce a grid coordinate to only the dimensions in ``keep``.
+
+    Any other dimension (e.g. a stray ``time`` that rode along when coordinate
+    variables were concatenated during a multi-file merge) is collapsed by
+    taking its first index.  Used to keep the static CICE grid coordinates
+    (TLAT/TLON and their vertex bounds) at their expected 2-D/3-D shape before
+    ``cmor.grid``.  A no-op when no extra dimensions are present.
+    """
+    extra = [d for d in da_coord.dims if d not in keep]
+    if extra:
+        da_coord = da_coord.isel({d: 0 for d in extra})
+    return da_coord
+
+
 # ---------------------------------------------------------------------
 # CMOR session
 # ---------------------------------------------------------------------
@@ -74,12 +89,16 @@ class CmorSession(
         log_dir: Path | str | None = None,
         log_name: str | None = None,
         outdir: Path | str | None = None,
+        ice_sheet: str | None = None,
     ) -> None:
         self.tables_root = tables_root
         self.dataset_attrs = dict(dataset_attrs or {})
         self.dataset_json = dataset_json
         self._dataset_json_cm = None
         self.tracking_prefix = tracking_prefix
+        # Ice sheet ('gris'/'ais') selecting the CISM map projection; only used
+        # for the native land-ice grid (see _define_cism_grid).
+        self._ice_sheet = ice_sheet
         # logging config
         self._log_dir = Path(log_dir) if log_dir is not None else None
         self._log_name = log_name
@@ -334,6 +353,24 @@ class CmorSession(
                 f"(e.g. latt_bounds/lont_bounds) for variable '{var_name}'."
             )
 
+        # The horizontal grid is static.  During the multi-file merge, xarray
+        # (opened with coords="all") concatenates coordinate variables along
+        # 'time', so TLAT/TLON -- which are coordinates via the field's
+        # 'coordinates' attribute -- can arrive as (time, nj, ni) instead of
+        # (nj, ni).  cmor.grid then rejects the 3-D latitude with "latitude's
+        # rank does not match number of axes passed via axis_ids".  Collapse any
+        # non-horizontal dimension (e.g. time) by taking the first index, since
+        # the grid geometry does not vary in time.
+        tlat = _horizontal_only(tlat, ("nj", "ni"))
+        tlon = _horizontal_only(tlon, ("nj", "ni"))
+        # vertex bounds keep their trailing vertices dim in addition to nj, ni
+        lat_bnds_da = _horizontal_only(
+            lat_bnds_da, ("nj", "ni") + lat_bnds_da.dims[-1:]
+        )
+        lon_bnds_da = _horizontal_only(
+            lon_bnds_da, ("nj", "ni") + lon_bnds_da.dims[-1:]
+        )
+
         lat_vals = np.asarray(tlat.values, dtype="f8")
         lon_vals = np.mod(np.asarray(tlon.values, dtype="f8"), 360.0)
         lat_vert = np.asarray(lat_bnds_da.values, dtype="f8")
@@ -357,6 +394,74 @@ class CmorSession(
             longitude=lon_vals,
             latitude_vertices=lat_vert,
             longitude_vertices=lon_vert,
+        )
+
+    def _define_cism_grid(self, ds, var_name, var_da):
+        """Register a native CISM (land-ice) projected grid via cmor.grid().
+
+        CISM history files carry only Cartesian x/y coordinates in metres
+        (``x1``/``y1`` scalar grid or ``x0``/``y0`` velocity grid) and no
+        latitude/longitude.  The x/y are georeferenced to lat/lon (plus corner
+        vertices) with the ice sheet's map projection (see
+        ``cism_grid.project_xy_to_latlon``), then the grid is defined against the
+        CMIP7 grids table's ``x``/``y`` projection axes.  The returned grid id
+        stands in for both horizontal dimensions.
+        """
+        # Local import: only the land-ice realm needs the projection helper.
+        from cmip7_prep.cism_grid import (  # pylint: disable=import-outside-toplevel
+            project_xy_to_latlon,
+        )
+
+        if "x1" in var_da.dims and "y1" in var_da.dims:
+            xname, yname = "x1", "y1"
+        elif "x0" in var_da.dims and "y0" in var_da.dims:
+            xname, yname = "x0", "y0"
+        else:
+            raise KeyError(
+                f"CISM native grid: variable '{var_name}' has neither x1/y1 nor "
+                f"x0/y0 dims; got {tuple(var_da.dims)}."
+            )
+
+        if self._ice_sheet is None:
+            raise ValueError(
+                "CISM native grid requires an ice sheet to select the projection; "
+                "pass ice_sheet='gris' or 'ais' to CmorSession."
+            )
+
+        def _coord(dsi, nm):
+            if nm in dsi.coords:
+                return dsi.coords[nm]
+            if nm in dsi:
+                return dsi[nm]
+            raise KeyError(
+                f"CISM native grid: missing projected coordinate '{nm}' for "
+                f"variable '{var_name}'."
+            )
+
+        x = np.asarray(_coord(ds, xname).values, dtype="f8")
+        y = np.asarray(_coord(ds, yname).values, dtype="f8")
+        grid = project_xy_to_latlon(x, y, self._ice_sheet)
+
+        logger.debug(
+            "[CMOR axis debug] Defining native CISM grid for %s on (%s=%d, %s=%d), "
+            "ice_sheet=%s",
+            var_name,
+            yname,
+            y.size,
+            xname,
+            x.size,
+            self._ice_sheet,
+        )
+
+        self.load_table(self.tables_root, "grids")
+        x_id = cmor.axis(table_entry="x", units="m", coord_vals=x)
+        y_id = cmor.axis(table_entry="y", units="m", coord_vals=y)
+        return cmor.grid(
+            axis_ids=[y_id, x_id],
+            latitude=grid.lat,
+            longitude=grid.lon,
+            latitude_vertices=grid.lat_vertices,
+            longitude_vertices=grid.lon_vertices,
         )
 
     def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
@@ -389,6 +494,32 @@ class CmorSession(
             cal = time_da.attrs.get(
                 "calendar", time_da.encoding.get("calendar", "noleap")
             )
+            # CMOR's CDMS/cdtime cannot parse some UDUNITS time periods -- e.g.
+            # CISM's yearly output uses 'common_years'/'common_year', which
+            # raises "invalid units = common_year".  When the period is not one
+            # CDMS accepts, re-express the axis as 'days since <ref>'.  The time
+            # values are decoded (cftime), so re-encoding to days is exact; the
+            # reference date is preserved from the original units.
+            _cdms_periods = (
+                "day",
+                "days",
+                "hour",
+                "hours",
+                "minute",
+                "minutes",
+                "second",
+                "seconds",
+            )
+            if " since " in units:
+                _period, _ref = units.split(" since ", 1)
+            else:
+                _period, _ref = units, "1850-01-01"
+            if _period.strip().lower() not in _cdms_periods:
+                new_units = f"days since {_ref.strip()}"
+                logger.info(
+                    "Re-expressing time units %r as %r for CMOR", units, new_units
+                )
+                units = new_units
             logger.debug("Time units: %s calendar: %s", units, cal)
             tvals = encode_time_to_num(time_da, units, cal)
             bname = time_da.attrs.get("bounds")
@@ -404,6 +535,27 @@ class CmorSession(
                 )
             )
             tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
+
+            # Some model output (e.g. CISM land-ice) carries no time bounds, but
+            # CMOR requires them for time-averaged variables.  When absent,
+            # synthesize bounds from the numeric time centers using the midpoints
+            # between consecutive steps (edges extrapolated).  For evenly-spaced
+            # data this reproduces the averaging period (e.g. the calendar year
+            # for annual means).
+            if tbnum is None and tvals is not None and np.size(tvals) >= 2:
+                t = np.asarray(tvals, dtype="f8").reshape(-1)
+                mids = 0.5 * (t[:-1] + t[1:])
+                tbnum = np.empty((t.size, 2), dtype="f8")
+                tbnum[1:, 0] = mids
+                tbnum[:-1, 1] = mids
+                tbnum[0, 0] = t[0] - (mids[0] - t[0])
+                tbnum[-1, 1] = t[-1] + (t[-1] - mids[-1])
+                logger.info(
+                    "time coordinate had no bounds; synthesized %d bounds from "
+                    "centers",
+                    tbnum.shape[0],
+                )
+
             return tvals, tbnum, str(units)
 
         def _get_1d_with_bounds(dsi: xr.Dataset, name: str, units_default: str):
@@ -458,6 +610,11 @@ class CmorSession(
 
         elif "nj" in var_dims and "ni" in var_dims:
             grid_id = self._define_cice_grid(ds, var_name, var_da)
+
+        elif ("x1" in var_dims and "y1" in var_dims) or (
+            "x0" in var_dims and "y0" in var_dims
+        ):
+            grid_id = self._define_cism_grid(ds, var_name, var_da)
 
         # -------------------------
         # --- horizontal axes (use CMOR names) ----
@@ -776,12 +933,13 @@ class CmorSession(
         }
         axes_ids = []
         for d in var_dims:
-            # For the CICE native grid, the 2D cmor.grid() id stands in for both
-            # the nj and ni dimensions: map nj -> grid_id and skip ni.
-            if grid_id is not None and d == "nj":
+            # For a 2-D native grid, the single cmor.grid() id stands in for both
+            # horizontal dimensions: map the y dimension -> grid_id and skip the
+            # x dimension.  CICE uses (nj, ni); CISM uses (y1, x1) or (y0, x0).
+            if grid_id is not None and d in ("nj", "y1", "y0"):
                 axes_ids.append(grid_id)
                 continue
-            if grid_id is not None and d == "ni":
+            if grid_id is not None and d in ("ni", "x1", "x0"):
                 continue
             axis_id = dim_to_axis.get(d)
             logger.debug("[CMOR axis debug] dim '%s' → axis_id: %s", d, axis_id)
