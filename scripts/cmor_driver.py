@@ -575,6 +575,13 @@ def process_one_var(
                     tables_path=tables_root / "tables",
                     regrid_kwargs={
                         "dtype": "float32",
+                        # Match the read chunking. When these differ, each output
+                        # chunk draws from part of a larger input chunk, and since
+                        # every slab write is a separate compute() the same input
+                        # is read and interpolated once per output chunk that
+                        # overlaps it. Aligning them means each input chunk is
+                        # touched exactly once.
+                        **({"output_time_chunk": time_chunk} if time_chunk else {}),
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
