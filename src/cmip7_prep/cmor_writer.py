@@ -1296,8 +1296,20 @@ class CmorSession(
 
         logger.debug("Define CMOR axes for variable %s", bvn)
         axes_ids = self._define_axes(ds, vdef, branded_name=str(bvn))
+        logger.debug(
+            "[mem] axes defined: dims=%s chunks=%s dtype=%s",
+            data.dims,
+            getattr(data, "chunks", None),
+            data.dtype,
+        )
         logger.debug("Prepare data for CMOR %s", data.dtype)
         data_filled, fillv = filled_for_cmor(data)
+        logger.debug(
+            "[mem] after filled_for_cmor: dims=%s chunks=%s dtype=%s",
+            data_filled.dims,
+            getattr(data_filled, "chunks", None),
+            data_filled.dtype,
+        )
         if "zl" in data_filled.dims:
             data_filled = data_filled.rename({"zl": "olevel"})
         elif "zi" in data_filled.dims:
@@ -1343,6 +1355,11 @@ class CmorSession(
         # so slabbing bounds peak memory to a single slab.  Only applied when
         # 'time' is the leading axis (matching the CMOR axis order); otherwise
         # fall back to the original single write.
+        logger.debug(
+            "[mem] cmor.variable done, about to write: dims=%s chunks=%s",
+            data_filled.dims,
+            getattr(data_filled, "chunks", None),
+        )
         logger.debug("Writing CMOR variable %s", var_id)  # debug
         if data_filled.dims and data_filled.dims[0] == "time":
             ntime = int(data_filled.sizes["time"])
@@ -1361,7 +1378,14 @@ class CmorSession(
             )
             for start in range(0, ntime, slab):
                 stop = min(start + slab, ntime)
+                logger.debug("[mem] materializing slab %d:%d of %d", start, stop, ntime)
                 block = np.asarray(data_filled.isel(time=slice(start, stop)))
+                logger.debug(
+                    "[mem] slab %d:%d materialized, %.1f MB; writing",
+                    start,
+                    stop,
+                    block.nbytes / (1024 * 1024),
+                )
                 cmor.write(var_id, block, ntimes_passed=stop - start)
         else:
             cmor.write(
