@@ -1276,6 +1276,24 @@ class CmorSession(
 
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_root, self.primarytable)
+
+        # Put time first before the axes are defined.  The slabbed write below
+        # can only bound memory when time is the leading axis, and _define_axes
+        # builds axes_ids in the data's own dimension order -- so transposing
+        # here keeps the two in step and is what enables the slabbing.  Fields
+        # arriving as (plev, lat, lon, time) would otherwise take the fallback
+        # path and materialize whole, which is what OOMs on high-frequency 3-D
+        # output.  Transposing a dask array is lazy: it reorders the task graph
+        # rather than moving data.
+        if "time" in ds[str(bvn)].dims and ds[str(bvn)].dims[0] != "time":
+            logger.info(
+                "Transposing %s from %s to put time first for a slabbed write",
+                bvn,
+                ds[str(bvn)].dims,
+            )
+            ds = ds.assign({str(bvn): ds[str(bvn)].transpose("time", ...)})
+            data = ds[str(bvn)]
+
         logger.debug("Define CMOR axes for variable %s", bvn)
         axes_ids = self._define_axes(ds, vdef, branded_name=str(bvn))
         logger.debug("Prepare data for CMOR %s", data.dtype)
