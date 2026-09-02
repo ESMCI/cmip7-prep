@@ -72,6 +72,35 @@ export PYTHONPATH=/path/to/repo/cmip7-prep/src:$PYTHONPATH
 ```
 Swap `/path/to/repo` with the root path where this repository is cloned
 
+### Docker
+
+Builds a self-contained image (CMOR 3.15, ESMF/esmpy, the CMOR tables and the package itself) so no conda setup is needed on the host:
+
+```bash
+docker build -t cmip7-prep .
+```
+
+Run it with your timeseries and output directories mounted:
+
+```bash
+docker run --rm -v /path/to/timeseries:/data -v /path/to/output:/out cmip7-prep \
+    python scripts/cmor_driver.py --realm atmos --tsdir /data --outdir /out
+```
+
+The CMOR tables are cloned at build time, defaulting to the fork used by CI. Point the build at a different checkout with:
+
+```bash
+docker build -t cmip7-prep \
+    --build-arg TABLES_REPO=https://github.com/NorESMhub/cmip7-cmor-tables.git \
+    --build-arg TABLES_REF=noresm-dev .
+```
+
+To conver the image to an Apptainer `.sif` file for running on HPCs:
+
+```bash
+apptainer build cmip7-prep.sif docker-daemon://cmip7-prep:latest
+```
+
 ## Quickstart
 
 Make sure you have generated timeseries files for the run before starting.
