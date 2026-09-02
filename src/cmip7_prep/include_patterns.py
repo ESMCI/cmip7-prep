@@ -121,7 +121,7 @@ def get_include_patterns(
     where = f"model={model}, realm={realm}, frequency={frequency}"
     patterns = _select_sampling(by_sampling, sampling, where)
     patterns = _substitute_ice_sheet(patterns, realm, ice_sheet)
-    logger.info("Looking for pattern: %s", patterns)
+    logger.debug("Looking for pattern: %s", patterns)
     return patterns
 
 

@@ -24,13 +24,17 @@
 atmos:
   mon:
     tavg: [cam.h0a]
-    tpt: [cam.h0i]
   day:
     tavg: [cam.h1a]
   6hr:
     tavg: [cam.h2a]
+    tpt: [cam.h3i]
   3hr:
     tavg: [cam.h4a]
+    tpt: [cam.h5i]
+  1hr:
+    tavg: [cam.h6a]
+    tpt: [cam.h7i]
 
 atmosChem:
   mon:
@@ -39,8 +43,13 @@ atmosChem:
     tavg: [cam.h1a]
   6hr:
     tavg: [cam.h2a]
+    tpt: [cam.h3i]
   3hr:
     tavg: [cam.h4a]
+    tpt: [cam.h5i]
+  1hr:
+    tavg: [cam.h6a]
+    tpt: [cam.h7i]
 
 aerosol:
   mon:
@@ -49,8 +58,13 @@ aerosol:
     tavg: [cam.h1a]
   6hr:
     tavg: [cam.h2a]
+    tpt: [cam.h3i]
   3hr:
     tavg: [cam.h4a]
+    tpt: [cam.h5i]
+  1hr:
+    tavg: [cam.h6a]
+    tpt: [cam.h7i]
 
 land:
   mon:
