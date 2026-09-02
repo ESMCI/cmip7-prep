@@ -802,26 +802,97 @@ def read_csv(filepath, config):
             file=sys.stderr,
         )
 
+    collapsed: list = []
     if realm_outputs:
         result = {}
         for realm in realm_outputs:
             realm_entries = [(n, e) for n, e, r in all_entries if r == realm]
             result[realm] = {
                 "dataset_overrides": config["dataset_overrides"],
-                "variables": _group_entries(realm_entries),
+                "variables": _group_entries(realm_entries, collapsed=collapsed),
             }
+        _report_collapsed(collapsed)
         return result
 
     entries = [(n, e) for n, e, _ in all_entries]
+    grouped = _group_entries(entries, collapsed=collapsed)
+    _report_collapsed(collapsed)
     return {
         "dataset_overrides": config["dataset_overrides"],
-        "variables": _group_entries(entries),
+        "variables": grouped,
     }
 
 
+def _report_collapsed(collapsed):
+    """Print the duplicate-collapse tally, if any rows were discarded."""
+    if not collapsed:
+        return
+    print(
+        f"WARN {len(collapsed)} duplicate row(s) discarded across "
+        f"{len(set(collapsed))} variable(s); see the WARN lines above",
+        file=sys.stderr,
+    )
+
+
 # ── group entries ─────────────────────────────────────────────────────────────
-def _group_entries(all_entries):
-    """Group (name, entry) pairs by name, handling variants."""
+def _render_field(value):
+    """Render one entry field for a diagnostic message.
+
+    ``sources`` is a list of dicts, which is unreadable inline, so it is
+    reduced to the model variable names it carries.
+
+    >>> _render_field([{"model_var": "QICE", "freq": "mon"}])
+    '[QICE]'
+    >>> _render_field("chunits(X)")
+    "'chunits(X)'"
+    """
+    if isinstance(value, list) and all(
+        isinstance(v, dict) and "model_var" in v for v in value
+    ):
+        return "[" + ", ".join(str(v["model_var"]) for v in value) + "]"
+    return repr(value)
+
+
+def _describe_collapse(name, kept, dropped):
+    """Return the WARN lines for one discarded duplicate row.
+
+    Reports which fields differ between the row that wins and the row that is
+    thrown away, so an exact re-entry (harmless) can be told apart from two
+    rows offering genuinely different sources (real data loss).
+
+    >>> _describe_collapse("v", {"a": 1}, {"a": 1})
+    ['WARN v: 1 duplicate row discarded, keeping the first (rows are identical)']
+    """
+    _UNSET = "<unset>"
+    differing = sorted(
+        k
+        for k in set(kept) | set(dropped)
+        if kept.get(k, _UNSET) != dropped.get(k, _UNSET)
+    )
+    if not differing:
+        return [
+            f"WARN {name}: 1 duplicate row discarded, keeping the first "
+            "(rows are identical)"
+        ]
+
+    lines = [
+        f"WARN {name}: 1 duplicate row discarded, keeping the first; "
+        f"differs in {', '.join(differing)}"
+    ]
+    for field in differing:
+        kept_val = _render_field(kept[field]) if field in kept else _UNSET
+        dropped_val = _render_field(dropped[field]) if field in dropped else _UNSET
+        lines.append(f"       {field}: kept {kept_val} / discarded {dropped_val}")
+    return lines
+
+
+def _group_entries(all_entries, collapsed=None):
+    """Group (name, entry) pairs by name, handling variants.
+
+    *collapsed*, if given, is a list that receives the name of every variable
+    whose duplicate row was discarded -- one append per discarded row -- so the
+    caller can report a total.
+    """
     grouped = {}
     for name, entry in all_entries:
         grouped.setdefault(name, []).append(entry)
@@ -839,7 +910,11 @@ def _group_entries(all_entries):
                 base["variants"] = variants
                 data[name] = base
             else:
-                # Multiple rows for non-seaIce variables are duplicates; use the first.
+                for dropped in entries[1:]:
+                    for line in _describe_collapse(name, entries[0], dropped):
+                        print(line, file=sys.stderr)
+                    if collapsed is not None:
+                        collapsed.append(name)
                 data[name] = entries[0]
     return data
 

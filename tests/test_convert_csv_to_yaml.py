@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
 from convert_csv_to_yaml import (
     MODEL_CONFIGS,
+    _group_entries,
     _parse_csv_identifiers,
     _split_positional,
     analyse_expression,
@@ -1026,3 +1027,95 @@ class TestCheckEntry:
         assert problems == [
             "v: source 'IWPMODIS [COSP]' is not a plain list of variable names"
         ]
+
+
+# ── _group_entries ────────────────────────────────────────────────────────────
+
+
+class TestGroupEntriesDuplicates:
+    """Tests for the duplicate-collapse warning in _group_entries().
+
+    A non-seaIce variable with several CSV rows keeps only the first.  That is
+    sometimes right (an exact re-entry) and sometimes real data loss (two rows
+    offering different source models, as landIce ``acabf_tavg-u-hxy-is`` does),
+    so the collapse must never happen in silence.
+    """
+
+    def test_single_entry_is_silent(self, capsys):
+        """One row per name is the normal case and warns about nothing."""
+        data = _group_entries(
+            [("v", {"table": "land", "sources": [{"model_var": "A"}]})]
+        )
+        assert set(data) == {"v"}
+        assert capsys.readouterr().err == ""
+
+    def test_seaice_variants_are_not_duplicates(self, capsys):
+        """seaIce rows are merged into variants, which is not a discard."""
+        entries = [
+            ("si", {"table": "seaIce", "region": "nh", "long_name": "N"}),
+            ("si", {"table": "seaIce", "region": "sh", "long_name": "S"}),
+        ]
+        data = _group_entries(entries)
+        assert len(data["si"]["variants"]) == 2
+        assert capsys.readouterr().err == ""
+
+    def test_discarded_duplicate_warns(self, capsys):
+        """A collapsed non-seaIce duplicate names the variable on stderr."""
+        entries = [
+            ("acabf", {"table": "landIce", "sources": [{"model_var": "QICE"}]}),
+            ("acabf", {"table": "landIce", "sources": [{"model_var": "acab_applied"}]}),
+        ]
+        _group_entries(entries)
+        err = capsys.readouterr().err
+        assert "WARN acabf: 1 duplicate row discarded" in err
+
+    def test_warning_reports_differing_fields(self, capsys):
+        """The warning shows what was lost, not just that something was."""
+        entries = [
+            (
+                "acabf",
+                {
+                    "table": "landIce",
+                    "formula": 'chunits(QICE, units="kg m-2 s-1")',
+                    "sources": [{"model_var": "QICE"}],
+                },
+            ),
+            ("acabf", {"table": "landIce", "sources": [{"model_var": "acab_applied"}]}),
+        ]
+        _group_entries(entries)
+        err = capsys.readouterr().err
+        assert "sources" in err
+        assert "QICE" in err and "acab_applied" in err
+        # A field present on the kept row but absent from the dropped one is
+        # still a difference worth reporting.
+        assert "formula" in err
+
+    def test_identical_duplicate_is_called_out_as_harmless(self, capsys):
+        """An exact re-entry still warns, but says no fields differ."""
+        entry = {"table": "land", "sources": [{"model_var": "A"}]}
+        _group_entries([("v", dict(entry)), ("v", dict(entry))])
+        err = capsys.readouterr().err
+        assert "WARN v: 1 duplicate row discarded" in err
+        assert "identical" in err
+
+    def test_collapsed_rows_are_collected(self, capsys):
+        """The optional collector receives one record per discarded row."""
+        collapsed = []
+        entries = [
+            ("v", {"table": "land", "sources": [{"model_var": "A"}]}),
+            ("v", {"table": "land", "sources": [{"model_var": "B"}]}),
+            ("v", {"table": "land", "sources": [{"model_var": "C"}]}),
+        ]
+        _group_entries(entries, collapsed=collapsed)
+        assert collapsed == ["v", "v"]
+        capsys.readouterr()
+
+    def test_first_entry_still_wins(self, capsys):
+        """Warning is additive: the collapse behaviour itself is unchanged."""
+        entries = [
+            ("v", {"table": "land", "sources": [{"model_var": "A"}]}),
+            ("v", {"table": "land", "sources": [{"model_var": "B"}]}),
+        ]
+        data = _group_entries(entries)
+        assert data["v"]["sources"] == [{"model_var": "A"}]
+        capsys.readouterr()
