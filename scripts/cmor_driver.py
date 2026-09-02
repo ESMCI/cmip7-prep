@@ -104,6 +104,21 @@ def parse_args():
         help="List of CMIP variable names to process directly (bypasses variable search)",
     )
     parser.add_argument(
+        "--time-chunk",
+        type=int,
+        default=100,
+        help=(
+            "Read and process this many time steps at a time. Without chunking, "
+            "a whole time series is held in memory at once: a 3-D 6-hourly field "
+            "on a high-resolution grid is tens of GB before any output is "
+            "written, which is killed rather than reported. Time steps are "
+            "processed independently here, so chunking changes nothing about "
+            "the results and costs little. A chunk larger than the time "
+            "dimension is harmless - it simply becomes one chunk. "
+            "Use 0 to disable. (Default: 100)"
+        ),
+    )
+    parser.add_argument(
         "--workers",
         type=int,
         default=1,
@@ -308,6 +323,9 @@ def process_one_var(
     frequency="mon",
     ripf_index="r1i1p1f1",
     ocn_fx_fields=None,
+    ice_sheet=None,
+    experiment=None,
+    time_chunk=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.branded_variable_name.name
@@ -358,6 +376,17 @@ def process_one_var(
             open_kwargs = None
             if realm in ("ocean", "seaIce", "landIce"):
                 open_kwargs = {"decode_timedelta": False}
+            # Chunking has to start at the open: the vertical interpolation runs
+            # before the regrid and works on the full native field, so chunking
+            # only at the regrid step would be too late to help.
+            if time_chunk:
+                open_kwargs = dict(open_kwargs or {})
+                open_kwargs["chunks"] = {"time": time_chunk}
+                logger.info(
+                    "Reading %s in chunks of %d time steps",
+                    varname,
+                    time_chunk,
+                )
             logger.debug("Opening native data for variable %s", varname)
 
             # ds_native is an xarray dataset for the CESM/NorESM time series files
@@ -590,7 +619,7 @@ def process_one_var(
                     dataset_json=metadata_json,
                     dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
                     outdir=outdir,
-                    ice_sheet=args.ice_sheet,
+                    ice_sheet=ice_sheet,
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
                     set_cur_dataset_attribute("realization_index", realization_index)
@@ -603,7 +632,7 @@ def process_one_var(
                     set_cur_dataset_attribute("region", region)
                     # Updating with correct experiment info from CMIP7 tables
                     experiment_info = get_experiment_info_from_tables(
-                        args.experiment, tables_root
+                        experiment, tables_root
                     )
                     for key, value in experiment_info.items():
                         if isinstance(value, list):
@@ -979,6 +1008,9 @@ def main():
                         frequency=frequency,
                         ocn_fx_fields=ocn_fx_fields,
                         ripf_index=ripf_index,
+                        ice_sheet=args.ice_sheet,
+                        experiment=args.experiment,
+                        time_chunk=args.time_chunk,
                     )
                     results.extend(res)
                 except Exception as exc:
@@ -997,6 +1029,9 @@ def main():
                     frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                     ripf_index=ripf_index,
+                    ice_sheet=args.ice_sheet,
+                    experiment=args.experiment,
+                    time_chunk=args.time_chunk,
                 )
                 futures = client.compute([fut])
                 from dask.distributed import wait, as_completed
