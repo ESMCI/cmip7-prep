@@ -1368,8 +1368,23 @@ class CmorSession(
             for d in data_filled.dims:
                 if d != "time":
                     rec_bytes *= int(data_filled.sizes[d])
-            # target ~512 MB per slab (at least one time step)
-            slab = max(1, min(ntime, int((512 * 1024 * 1024) // max(rec_bytes, 1))))
+            # Prefer the array's own dask chunking along time.  Sizing the slab
+            # from the output bytes is misleading: the regridded record is small
+            # (a few MB) but computing it pulls the native field behind it, which
+            # for a 3-D high-frequency variable is an order of magnitude larger.
+            # A 512 MB output slab of 6-hourly hus on 7 levels needs ~6 GB of
+            # 58-level input to materialize, which is what OOMs.  Writing one
+            # dask chunk at a time keeps the working set to what dask was already
+            # asked to hold.
+            time_chunks = None
+            chunks = getattr(data_filled, "chunks", None)
+            if chunks:
+                time_chunks = chunks[0]
+            if time_chunks:
+                slab = max(1, min(ntime, max(time_chunks)))
+            else:
+                # not dask-backed: fall back to a byte target on the output
+                slab = max(1, min(ntime, int((512 * 1024 * 1024) // max(rec_bytes, 1))))
             logger.debug(
                 "Slabbed CMOR write: ntime=%d, slab=%d (%.1f MB/record)",
                 ntime,
