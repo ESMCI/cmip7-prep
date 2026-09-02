@@ -529,7 +529,9 @@ class CmorSession(
             longitude_vertices=grid.lon_vertices,
         )
 
-    def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
+    def _define_axes(
+        self, ds: xr.Dataset, vdef: any, branded_name: str = ""
+    ) -> list[int]:
         """Define CMOR axis IDs for the variable in ds according to the CMOR tables.
 
         Rules:
@@ -733,9 +735,12 @@ class CmorSession(
         # statistics.  Ask the table rather than guessing, and do it before
         # reading the time coordinate so bounds are never gathered for an axis
         # that cannot take them.
+        # The CMOR table is keyed by the branded variable name
+        # (e.g. 'hur_tpt-100hPa-hxy-u'), not the short CMIP name ('hur'), so the
+        # branded name has to be what we look up.
+        lookup_name = branded_name or getattr(vdef, "name", "")
         time_entry = self._time_axis_entry(
-            self.table_path(self.tables_root, self.primarytable),
-            getattr(vdef, "name", ""),
+            self.table_path(self.tables_root, self.primarytable), lookup_name
         )
         tvals, tbnds, t_units = _get_time_and_bounds(
             ds, want_bounds=(time_entry != "time1")
@@ -750,14 +755,14 @@ class CmorSession(
             )
             logger.info(
                 "Variable %s: time axis '%s' (bounds %s)",
-                getattr(vdef, "name", "?"),
+                lookup_name,
                 time_entry,
                 "yes" if tbnds is not None else "no",
             )
         elif time_entry is None:
             logger.info(
                 "Variable %s has no time axis in table %s (time-independent)",
-                getattr(vdef, "name", "?"),
+                lookup_name,
                 self.primarytable,
             )
 
@@ -1272,7 +1277,7 @@ class CmorSession(
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_root, self.primarytable)
         logger.debug("Define CMOR axes for variable %s", bvn)
-        axes_ids = self._define_axes(ds, vdef)
+        axes_ids = self._define_axes(ds, vdef, branded_name=str(bvn))
         logger.debug("Prepare data for CMOR %s", data.dtype)
         data_filled, fillv = filled_for_cmor(data)
         if "zl" in data_filled.dims:
