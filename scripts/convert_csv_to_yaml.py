@@ -542,7 +542,7 @@ def _split_positional(s: str, n: int) -> list:
 _CAM_HISTORY_SUFFIX = re.compile(r"^\s*\w+\s*[:.][AIMXS]\s*$")
 
 
-def check_entry(name, entry, raw_source=""):
+def check_entry(name, entry, raw_source="", row=None):
     """Return a list of problems found in a built entry, as readable strings.
 
     Flags rows that convert without raising but cannot produce meaningful
@@ -551,8 +551,14 @@ def check_entry(name, entry, raw_source=""):
     comma-separated list of variable names (brace shorthand, ``[COSP]``
     annotations).  An empty list means nothing suspect was found.
 
+    *row*, when given, is the spreadsheet row the entry came from and is
+    included in every message so the offending cell can be found by number
+    rather than by searching for the variable name.
+
     >>> check_entry("x", {"formula": "PRECC + PRECL"})
     []
+    >>> check_entry("x", {"formula": "PBLH:X"}, row=858)
+    ["x (row 858): formula 'PBLH:X' is CAM history-field notation, not an expression"]
     >>> check_entry("x", {"formula": "ask for max in history"})
     ["x: formula 'ask for max in history' is not a valid expression"]
     >>> check_entry("x", {"formula": "PBLH:X"})
@@ -600,7 +606,8 @@ def check_entry(name, entry, raw_source=""):
     if raw_source and _parse_csv_identifiers(raw_source) is None:
         problems.append(f"source {raw_source!r} is not a plain list of variable names")
 
-    return [f"{name}: {p}" for p in problems]
+    label = name if row is None else f"{name} (row {row})"
+    return [f"{label}: {p}" for p in problems]
 
 
 def _build_entry(row, config):
@@ -757,11 +764,18 @@ def read_csv(filepath, config):
     flagged = 0
     rows_seen: dict = {}
     rows_kept: dict = {}
+    first_row: dict = {}
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        for row in reader:
+        # Spreadsheet row numbers: the header is row 1, so records start at 2.
+        # Deliberately NOT reader.line_num, which counts physical file lines --
+        # a single newline inside a quoted cell (test_full.csv has one, in the
+        # Formula of orog_ti-u-hxy-u) would put every later row off by one,
+        # while a spreadsheet still shows that record as one row.
+        for rownum, row in enumerate(reader, start=2):
             realm = row.get(realm_col, "").strip()
             rows_seen[realm] = rows_seen.get(realm, 0) + 1
+            first_row.setdefault(realm, rownum)
             if not should_keep(row, config):
                 continue
             name = row[key_col].strip()
@@ -772,18 +786,20 @@ def read_csv(filepath, config):
             positive = config.get("positive_overrides", {}).get(name)
             if positive:
                 entry["positive"] = positive
-            problems = check_entry(name, entry, row.get(config["source_column"], ""))
+            problems = check_entry(
+                name, entry, row.get(config["source_column"], ""), row=rownum
+            )
             if problems:
                 flagged += 1
                 for problem in problems:
                     print(f"WARN {problem}", file=sys.stderr)
-            all_entries.append((name, entry, realm))
+            all_entries.append((name, entry, realm, rownum))
 
     known_realms = realm_outputs or {}
     for realm in sorted(r for r in rows_seen if r not in known_realms):
         print(
             f"WARN realm {realm!r} has no entry in realm_outputs: "
-            f"{rows_seen[realm]} rows dropped",
+            f"{rows_seen[realm]} rows dropped, first at row {first_row[realm]}",
             file=sys.stderr,
         )
 
@@ -806,7 +822,7 @@ def read_csv(filepath, config):
     if realm_outputs:
         result = {}
         for realm in realm_outputs:
-            realm_entries = [(n, e) for n, e, r in all_entries if r == realm]
+            realm_entries = [(n, e, rn) for n, e, r, rn in all_entries if r == realm]
             result[realm] = {
                 "dataset_overrides": config["dataset_overrides"],
                 "variables": _group_entries(realm_entries, collapsed=collapsed),
@@ -814,7 +830,7 @@ def read_csv(filepath, config):
         _report_collapsed(collapsed)
         return result
 
-    entries = [(n, e) for n, e, _ in all_entries]
+    entries = [(n, e, rn) for n, e, _, rn in all_entries]
     grouped = _group_entries(entries, collapsed=collapsed)
     _report_collapsed(collapsed)
     return {
@@ -853,17 +869,23 @@ def _render_field(value):
     return repr(value)
 
 
-def _describe_collapse(name, kept, dropped):
+def _describe_collapse(name, kept, dropped, kept_row=None, dropped_row=None):
     """Return the WARN lines for one discarded duplicate row.
 
     Reports which fields differ between the row that wins and the row that is
     thrown away, so an exact re-entry (harmless) can be told apart from two
     rows offering genuinely different sources (real data loss).
 
-    >>> _describe_collapse("v", {"a": 1}, {"a": 1})
-    ['WARN v: 1 duplicate row discarded, keeping the first (rows are identical)']
+    Both rows carry the same variable name, so the name alone cannot say which
+    one to go and fix; *kept_row* and *dropped_row* are the spreadsheet rows
+    they came from.
+
+    >>> _describe_collapse("v", {"a": 1}, {"a": 1}, 4, 9)
+    ['WARN v (row 9): duplicate row discarded, keeping row 4 (rows are identical)']
     """
     _UNSET = "<unset>"
+    label = name if dropped_row is None else f"{name} (row {dropped_row})"
+    keeping = "the first" if kept_row is None else f"row {kept_row}"
     differing = sorted(
         k
         for k in set(kept) | set(dropped)
@@ -871,12 +893,12 @@ def _describe_collapse(name, kept, dropped):
     )
     if not differing:
         return [
-            f"WARN {name}: 1 duplicate row discarded, keeping the first "
+            f"WARN {label}: duplicate row discarded, keeping {keeping} "
             "(rows are identical)"
         ]
 
     lines = [
-        f"WARN {name}: 1 duplicate row discarded, keeping the first; "
+        f"WARN {label}: duplicate row discarded, keeping {keeping}; "
         f"differs in {', '.join(differing)}"
     ]
     for field in differing:
@@ -887,18 +909,21 @@ def _describe_collapse(name, kept, dropped):
 
 
 def _group_entries(all_entries, collapsed=None):
-    """Group (name, entry) pairs by name, handling variants.
+    """Group (name, entry, row) triples by name, handling variants.
 
-    *collapsed*, if given, is a list that receives the name of every variable
-    whose duplicate row was discarded -- one append per discarded row -- so the
-    caller can report a total.
+    *row* is the spreadsheet row the entry was built from; it is used only for
+    diagnostics.  *collapsed*, if given, is a list that receives the name of
+    every variable whose duplicate row was discarded -- one append per
+    discarded row -- so the caller can report a total.
     """
     grouped = {}
-    for name, entry in all_entries:
-        grouped.setdefault(name, []).append(entry)
+    for name, entry, rownum in all_entries:
+        grouped.setdefault(name, []).append((entry, rownum))
 
     data = {}
-    for name, entries in grouped.items():
+    for name, pairs in grouped.items():
+        entries = [e for e, _ in pairs]
+        rownums = [r for _, r in pairs]
         if len(entries) == 1:
             data[name] = entries[0]
         else:
@@ -910,8 +935,10 @@ def _group_entries(all_entries, collapsed=None):
                 base["variants"] = variants
                 data[name] = base
             else:
-                for dropped in entries[1:]:
-                    for line in _describe_collapse(name, entries[0], dropped):
+                for dropped, dropped_row in pairs[1:]:
+                    for line in _describe_collapse(
+                        name, entries[0], dropped, rownums[0], dropped_row
+                    ):
                         print(line, file=sys.stderr)
                     if collapsed is not None:
                         collapsed.append(name)

@@ -1039,12 +1039,16 @@ class TestGroupEntriesDuplicates:
     sometimes right (an exact re-entry) and sometimes real data loss (two rows
     offering different source models, as landIce ``acabf_tavg-u-hxy-is`` does),
     so the collapse must never happen in silence.
+
+    Entries are ``(name, entry, row)`` triples; *row* is the spreadsheet row the
+    entry came from.  Both rows carry the same variable name, so the row number
+    is the only thing that tells the two apart.
     """
 
     def test_single_entry_is_silent(self, capsys):
         """One row per name is the normal case and warns about nothing."""
         data = _group_entries(
-            [("v", {"table": "land", "sources": [{"model_var": "A"}]})]
+            [("v", {"table": "land", "sources": [{"model_var": "A"}]}, 2)]
         )
         assert set(data) == {"v"}
         assert capsys.readouterr().err == ""
@@ -1052,8 +1056,8 @@ class TestGroupEntriesDuplicates:
     def test_seaice_variants_are_not_duplicates(self, capsys):
         """seaIce rows are merged into variants, which is not a discard."""
         entries = [
-            ("si", {"table": "seaIce", "region": "nh", "long_name": "N"}),
-            ("si", {"table": "seaIce", "region": "sh", "long_name": "S"}),
+            ("si", {"table": "seaIce", "region": "nh", "long_name": "N"}, 2),
+            ("si", {"table": "seaIce", "region": "sh", "long_name": "S"}, 3),
         ]
         data = _group_entries(entries)
         assert len(data["si"]["variants"]) == 2
@@ -1062,12 +1066,30 @@ class TestGroupEntriesDuplicates:
     def test_discarded_duplicate_warns(self, capsys):
         """A collapsed non-seaIce duplicate names the variable on stderr."""
         entries = [
-            ("acabf", {"table": "landIce", "sources": [{"model_var": "QICE"}]}),
-            ("acabf", {"table": "landIce", "sources": [{"model_var": "acab_applied"}]}),
+            ("acabf", {"table": "landIce", "sources": [{"model_var": "QICE"}]}, 412),
+            (
+                "acabf",
+                {"table": "landIce", "sources": [{"model_var": "acab_applied"}]},
+                858,
+            ),
         ]
         _group_entries(entries)
         err = capsys.readouterr().err
-        assert "WARN acabf: 1 duplicate row discarded" in err
+        assert "WARN acabf (row 858): duplicate row discarded" in err
+
+    def test_warning_names_both_rows(self, capsys):
+        """The row kept is named too -- the variable name matches both rows."""
+        entries = [
+            ("acabf", {"table": "landIce", "sources": [{"model_var": "QICE"}]}, 412),
+            (
+                "acabf",
+                {"table": "landIce", "sources": [{"model_var": "acab_applied"}]},
+                858,
+            ),
+        ]
+        _group_entries(entries)
+        err = capsys.readouterr().err
+        assert "row 858" in err and "keeping row 412" in err
 
     def test_warning_reports_differing_fields(self, capsys):
         """The warning shows what was lost, not just that something was."""
@@ -1079,8 +1101,13 @@ class TestGroupEntriesDuplicates:
                     "formula": 'chunits(QICE, units="kg m-2 s-1")',
                     "sources": [{"model_var": "QICE"}],
                 },
+                412,
             ),
-            ("acabf", {"table": "landIce", "sources": [{"model_var": "acab_applied"}]}),
+            (
+                "acabf",
+                {"table": "landIce", "sources": [{"model_var": "acab_applied"}]},
+                858,
+            ),
         ]
         _group_entries(entries)
         err = capsys.readouterr().err
@@ -1093,18 +1120,18 @@ class TestGroupEntriesDuplicates:
     def test_identical_duplicate_is_called_out_as_harmless(self, capsys):
         """An exact re-entry still warns, but says no fields differ."""
         entry = {"table": "land", "sources": [{"model_var": "A"}]}
-        _group_entries([("v", dict(entry)), ("v", dict(entry))])
+        _group_entries([("v", dict(entry), 2), ("v", dict(entry), 9)])
         err = capsys.readouterr().err
-        assert "WARN v: 1 duplicate row discarded" in err
+        assert "WARN v (row 9): duplicate row discarded" in err
         assert "identical" in err
 
     def test_collapsed_rows_are_collected(self, capsys):
         """The optional collector receives one record per discarded row."""
         collapsed = []
         entries = [
-            ("v", {"table": "land", "sources": [{"model_var": "A"}]}),
-            ("v", {"table": "land", "sources": [{"model_var": "B"}]}),
-            ("v", {"table": "land", "sources": [{"model_var": "C"}]}),
+            ("v", {"table": "land", "sources": [{"model_var": "A"}]}, 2),
+            ("v", {"table": "land", "sources": [{"model_var": "B"}]}, 3),
+            ("v", {"table": "land", "sources": [{"model_var": "C"}]}, 4),
         ]
         _group_entries(entries, collapsed=collapsed)
         assert collapsed == ["v", "v"]
@@ -1113,9 +1140,93 @@ class TestGroupEntriesDuplicates:
     def test_first_entry_still_wins(self, capsys):
         """Warning is additive: the collapse behaviour itself is unchanged."""
         entries = [
-            ("v", {"table": "land", "sources": [{"model_var": "A"}]}),
-            ("v", {"table": "land", "sources": [{"model_var": "B"}]}),
+            ("v", {"table": "land", "sources": [{"model_var": "A"}]}, 2),
+            ("v", {"table": "land", "sources": [{"model_var": "B"}]}, 3),
         ]
         data = _group_entries(entries)
         assert data["v"]["sources"] == [{"model_var": "A"}]
         capsys.readouterr()
+
+
+# ── row numbers in warnings ───────────────────────────────────────────────────
+
+
+class TestCheckEntryRowNumbers:
+    """check_entry() prefixes the spreadsheet row when given one."""
+
+    def test_row_is_included_when_given(self):
+        """The row number lands between the name and the problem."""
+        problems = check_entry("v", {"formula": "chunits(X)"}, row=858)
+        assert problems == ["v (row 858): formula calls undefined function 'chunits'"]
+
+    def test_row_is_omitted_when_not_given(self):
+        """Without a row the message keeps its original shape."""
+        problems = check_entry("v", {"formula": "chunits(X)"})
+        assert problems == ["v: formula calls undefined function 'chunits'"]
+
+    def test_every_problem_on_a_row_is_labelled(self):
+        """A row tripping several checks gets the row on each line."""
+        problems = check_entry(
+            "v", {"formula": "chunits(X)"}, raw_source="IWPMODIS [COSP]", row=7
+        )
+        assert len(problems) == 2
+        assert all(p.startswith("v (row 7): ") for p in problems)
+
+
+class TestReadCsvRowNumbers:
+    """read_csv() reports the spreadsheet row a flagged entry came from."""
+
+    FIELDNAMES = TestReadCsvCESM.FIELDNAMES
+    CFG = MODEL_CONFIGS["cesm"]
+
+    def _row(self, **kwargs):
+        base = {f: "" for f in self.FIELDNAMES}
+        base.update(kwargs)
+        return base
+
+    def _bad(self, name, formula="chunits(X)"):
+        return self._row(
+            **{
+                "CMIP Branded Variable Name": name,
+                "Table": "atmos",
+                "Dimensions": "time, lat, lon",
+                "CESM Variable Name": "X",
+                "Formula": formula,
+            }
+        )
+
+    def test_first_data_row_is_row_2(self, tmp_path, capsys):
+        """The header is row 1, so the first record is row 2 -- as in a sheet."""
+        path = _write_temp_csv(tmp_path, self.FIELDNAMES, [self._bad("a")])
+        read_csv(path, self.CFG)
+        assert "WARN a (row 2):" in capsys.readouterr().err
+
+    def test_rows_count_records_not_file_lines(self, tmp_path, capsys):
+        """A cell containing a newline must not shift later row numbers."""
+        rows = [
+            self._bad("a"),  # row 2
+            self._bad("b", formula="chunits(X)\nsecond physical line"),  # row 3
+            self._bad("c"),  # row 4, but file line 5
+        ]
+        path = _write_temp_csv(tmp_path, self.FIELDNAMES, rows)
+        read_csv(path, self.CFG)
+        err = capsys.readouterr().err
+        assert "WARN a (row 2):" in err
+        assert "WARN c (row 4):" in err
+        assert "row 5" not in err
+
+    def test_skipped_rows_still_advance_the_count(self, tmp_path, capsys):
+        """Rows dropped by should_keep must not renumber the rows after them."""
+        rows = [
+            self._row(
+                **{
+                    "CMIP Branded Variable Name": "skipped",
+                    "Table": "atmos",
+                    "CESM Variable Name": "N/A",
+                }
+            ),  # row 2, dropped by source_skip_phrases
+            self._bad("a"),  # row 3
+        ]
+        path = _write_temp_csv(tmp_path, self.FIELDNAMES, rows)
+        read_csv(path, self.CFG)
+        assert "WARN a (row 3):" in capsys.readouterr().err
