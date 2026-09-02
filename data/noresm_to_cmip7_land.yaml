@@ -103,7 +103,7 @@ variables:
       timber for construction, and crop harvest for food or fuel. Does NOT include
       residue which is deposited into soil or litter; end of year values (not annual
       mean).
-    dims: [lon, lat, landuse, time1]
+    dims: [lon, lat, landuse, time]
     formula: CROPPROD1C+TOT_WOODPRODC
     sources: [model_var: CROPPROD1C, model_var: TOT_WOODPRODC]
     table: land
@@ -171,7 +171,7 @@ variables:
 
   cVegLut_tpt-u-hxy-multi:
     description: end of year values (not annual mean)
-    dims: [lon, lat, landuse, time1]
+    dims: [lon, lat, landuse, time]
     formula: (FATES_VEGC_LU)*FATES_FRACTION
     sources: [model_var: FATES_VEGC_LU, model_var: FATES_FRACTION]
     table: land
@@ -564,7 +564,7 @@ variables:
       be reported as percentage of land grid cell (example: frac_lnd = 0.5, frac_ocn
       = 0.5, frac_crop_lnd = 0.2 (of land portion of grid cell), then frac_lut(crop)
       = 0.5*0.2 = 0.1)'
-    dims: [lon, lat, landuse, time1]
+    dims: [lon, lat, landuse, time]
     sources: [model_var: PCT_LANDUNIT]
     table: land
     units: '%'
@@ -760,7 +760,7 @@ variables:
 
   mrsol_tpt-d10cm-hxy-lnd:
     description: the mass of water in all phases in a thin surface soil layer.
-    dims: [lon, lat, time1, sdepth10cm]
+    dims: [lon, lat, time, sdepth10cm]
     sources: [model_var: SOILWATER_10CM]
     table: land
     units: kg m-2
@@ -1301,7 +1301,7 @@ variables:
 
   tslsi_tpt-u-hxy-lsi:
     description: Surface temperature of all surfaces except open ocean, sampled synoptically.
-    dims: [lon, lat, time1]
+    dims: [lon, lat, time]
     sources: [model_var: TSA]
     table: land
     units: K

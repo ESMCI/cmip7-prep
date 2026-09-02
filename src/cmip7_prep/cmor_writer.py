@@ -17,6 +17,7 @@ from typing import Any, Optional, Union
 import datetime as dt
 
 import logging
+from functools import lru_cache
 import cmor
 
 import numpy as np
@@ -39,6 +40,13 @@ from .cmor_utils import (
 # logging.basicConfig(level=logging.INFO)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=None)
+def _load_table_json(path: str) -> dict:
+    """Read and cache a CMOR table JSON, so it is parsed once per table."""
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 DatasetJsonLike = Union[str, Path, AbstractContextManager]
@@ -232,11 +240,68 @@ class CmorSession(
     # -------------------------
     # internal helpers
     # -------------------------
+    @staticmethod
+    def _time_axis_entry(table_path: str, var_name: str) -> str | None:
+        """Return the time axis CMOR requires for this variable, or None if it has none.
+
+        CMIP tables use several time axes and they are not interchangeable:
+        ``time`` for period means, ``time1`` for instantaneous values, ``time2``
+        and ``time3`` for climatologies, ``time4`` for daily statistics averaged
+        over a period.  Only ``time1`` is defined without bounds.
+
+        The axis is read from the variable's own entry in the table rather than
+        inferred from its branded name.  The table is what CMOR validates
+        against, so reading it cannot disagree; the mapping YAML can and does --
+        several ``_tpt`` entries there claim ``time`` and would be rejected.
+
+        Returns None for time-independent variables (the ``ti`` sampling), which
+        legitimately have no time axis at all.
+        """
+        try:
+            table = _load_table_json(str(table_path))
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning(
+                "Could not read table %s to determine the time axis for %s (%s); "
+                "falling back to 'time'",
+                table_path,
+                var_name,
+                exc,
+            )
+            return "time"
+
+        entry = (table.get("variable_entry") or {}).get(var_name)
+        if entry is None:
+            logger.warning(
+                "Variable %s not found in table %s; falling back to a 'time' axis",
+                var_name,
+                table_path,
+            )
+            return "time"
+
+        dims = entry.get("dimensions") or []
+        if isinstance(dims, str):
+            dims = dims.split()
+        for dim in dims:
+            if dim.startswith("time"):
+                return dim
+        return None
+
+    @staticmethod
+    def table_path(tables_root: Path, key: str) -> str:
+        """Resolve the CMOR table file for a key.
+
+        The single place that decides where tables live.  Both the load into
+        CMOR and any reading of the JSON ourselves go through here, so the two
+        cannot end up looking at different files and disagreeing about what a
+        variable requires.
+        """
+        return resolve_table_filename(Path(tables_root) / "tables", key)
+
     def load_table(self, tables_root: Path, key: str) -> dict:
         """Load CMOR table JSON for a given key by searching common patterns."""
         if key == self.currenttable:
             return {}  # already loaded
-        table_filename = resolve_table_filename(tables_root / "tables", key)
+        table_filename = self.table_path(tables_root, key)
         self.currenttable = key
         logger.debug("Loading CMOR table for key '%s': %s", key, table_filename)
         return cmor.load_table(table_filename)
@@ -476,7 +541,11 @@ class CmorSession(
         """
 
         # ---- helpers ----
-        def _get_time_and_bounds(dsi: xr.Dataset):
+        def _get_time_and_bounds(dsi: xr.Dataset, want_bounds: bool = True):
+            # want_bounds is False for the 'time1' axis, which is defined
+            # without bounds.  Reading or synthesizing them would only be
+            # to discard them, and the synthesis logs a line that reads as
+            # though something was needed when it was not.
             logger.debug("Defining time axis")
             time_da = (
                 dsi.coords["time"]
@@ -534,6 +603,8 @@ class CmorSession(
                     else (dsi["time_bnds"] if "time_bnds" in dsi else None)
                 )
             )
+            if not want_bounds:
+                return tvals, None, str(units)
             tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
 
             # Some model output (e.g. CISM land-ice) carries no time bounds, but
@@ -656,15 +727,39 @@ class CmorSession(
         time_id = None
         self.load_table(self.tables_root, self.primarytable)
         logger.debug("Define time axis (if present)")
-        tvals, tbnds, t_units = _get_time_and_bounds(ds)
-        if tvals is not None:
+        # Which time axis this variable needs is a property of the CMOR table,
+        # not of our mapping: 'time' for period means, 'time1' for instantaneous
+        # values, 'time2'/'time3' for climatologies, 'time4' for daily
+        # statistics.  Ask the table rather than guessing, and do it before
+        # reading the time coordinate so bounds are never gathered for an axis
+        # that cannot take them.
+        time_entry = self._time_axis_entry(
+            self.table_path(self.tables_root, self.primarytable),
+            getattr(vdef, "name", ""),
+        )
+        tvals, tbnds, t_units = _get_time_and_bounds(
+            ds, want_bounds=(time_entry != "time1")
+        )
+
+        if tvals is not None and time_entry is not None:
             time_id = cmor.axis(
-                table_entry="time",
+                table_entry=time_entry,
                 units=t_units,
                 coord_vals=tvals,
-                cell_bounds=tbnds if tbnds is not None else None,
+                cell_bounds=tbnds,
             )
-            logger.debug("time axis id: %s var_dims=%s", time_id, var_dims)
+            logger.info(
+                "Variable %s: time axis '%s' (bounds %s)",
+                getattr(vdef, "name", "?"),
+                time_entry,
+                "yes" if tbnds is not None else "no",
+            )
+        elif time_entry is None:
+            logger.info(
+                "Variable %s has no time axis in table %s (time-independent)",
+                getattr(vdef, "name", "?"),
+                self.primarytable,
+            )
 
         # -------------------------
         # --- vertical: standard_hybrid_sigma
