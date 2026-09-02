@@ -713,7 +713,11 @@ def latest_monthly_file(
 def main():
     args = parse_args()
 
-    # Set logging level
+    # Set logging level for the whole cmip7_prep package, not just this module.
+    # Setting it only on the driver's logger left cmor_writer, pipeline, regrid
+    # and the rest at the root level, so --log-level DEBUG showed driver output
+    # and nothing from the code doing the actual work.
+    logging.getLogger("cmip7_prep").setLevel(getattr(logging, args.log_level))
     logger.setLevel(getattr(logging, args.log_level))
     logger.debug(f"Parsed arguments: {args}")
 
