@@ -104,16 +104,28 @@ def test_missing_sampling_raises_rather_than_returning_averages():
         all_include_patterns("noresm", "seaIce", sampling="tpt")
 
 
-@pytest.mark.parametrize("model", MODELS)
+# Which frequency carries instantaneous output differs by model: NorESM writes
+# it sub-daily, CESM monthly.  Listed explicitly rather than crossed, so the
+# table stays readable when it changes again.
 @pytest.mark.parametrize(
-    "realm,averaged,instantaneous",
-    [("atmos", "cam.h0a", "cam.h0i"), ("land", "clm2.h0a", "clm2.h0i")],
+    "model,realm,frequency,averaged,instantaneous",
+    [
+        ("noresm", "atmos", "6hr", "cam.h2a", "cam.h3i"),
+        ("noresm", "atmos", "3hr", "cam.h4a", "cam.h5i"),
+        ("noresm", "atmos", "1hr", "cam.h6a", "cam.h7i"),
+        ("noresm", "land", "mon", "clm2.h0a", "clm2.h0i"),
+        ("cesm", "atmos", "mon", "cam.h0a", "cam.h0i"),
+        ("cesm", "land", "mon", "clm2.h0a", "clm2.h0i"),
+    ],
 )
-def test_instantaneous_output_is_declared(model, realm, averaged, instantaneous):
-    """Both models write monthly instantaneous output to the 'i' tape."""
-    assert get_include_patterns(model, realm, "mon", sampling="tpt") == [instantaneous]
-    assert get_include_patterns(model, realm, "mon") == [averaged]
-    assert all_include_patterns(model, realm, sampling="tpt") == [instantaneous]
+def test_instantaneous_output_is_declared(
+    model, realm, frequency, averaged, instantaneous
+):
+    """Instantaneous output resolves to its own tape, not the averaged one."""
+    assert get_include_patterns(model, realm, frequency, sampling="tpt") == [
+        instantaneous
+    ]
+    assert get_include_patterns(model, realm, frequency) == [averaged]
 
 
 def test_all_include_patterns_spans_frequencies_without_duplicates():
@@ -214,12 +226,22 @@ def test_sampling_rejects_a_bare_variable_name():
 
 def test_instantaneous_variable_routes_to_the_i_tape():
     """The point of the exercise: _tpt must not be built from averaged files."""
-    assert patterns_for_variable("noresm", "atmos", "mon", "ps_tpt-u-hxy-u") == [
-        "cam.h0i"
+    assert patterns_for_variable("noresm", "atmos", "6hr", "ps_tpt-u-hxy-u") == [
+        "cam.h3i"
     ]
-    assert patterns_for_variable("noresm", "atmos", "mon", "tas_tavg-u-hxy-u") == [
-        "cam.h0a"
+    assert patterns_for_variable("noresm", "atmos", "6hr", "tas_tavg-u-hxy-u") == [
+        "cam.h2a"
     ]
+
+
+def test_instantaneous_variable_never_falls_back_to_averaged():
+    """NorESM writes no monthly instantaneous atmosphere output.
+
+    Falling back to the averaged tape would produce a well-formed _tpt variable
+    holding monthly means, which is the failure this routing exists to prevent.
+    """
+    with pytest.raises(ValueError, match="sampling=tpt"):
+        patterns_for_variable("noresm", "atmos", "mon", "ps_tpt-u-hxy-u")
 
 
 def test_undeclared_signifier_falls_back_and_warns(caplog):

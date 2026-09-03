@@ -225,7 +225,10 @@ def patterns_for_variable(
             model, realm, frequency, ice_sheet=ice_sheet, sampling=sampling
         )
     except ValueError:
-        if sampling == "tavg":
+        # tavg and tpt are genuinely distinct data, so neither may fall back to
+        # the other.  The remaining signifiers (ti, tsum, tmin, tmax and friends)
+        # are derived from the averaged tapes and have never had their own.
+        if sampling in ("tavg", "tpt"):
             raise
         logger.warning(
             "No %r include patterns for model=%s realm=%s frequency=%s; "
