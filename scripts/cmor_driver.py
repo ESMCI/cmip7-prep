@@ -106,16 +106,18 @@ def parse_args():
     parser.add_argument(
         "--time-chunk",
         type=int,
-        default=100,
+        default=0,
         help=(
-            "Read and process this many time steps at a time. Without chunking, "
-            "a whole time series is held in memory at once: a 3-D 6-hourly field "
-            "on a high-resolution grid is tens of GB before any output is "
-            "written, which is killed rather than reported. Time steps are "
-            "processed independently here, so chunking changes nothing about "
-            "the results and costs little. A chunk larger than the time "
-            "dimension is harmless - it simply becomes one chunk. "
-            "Use 0 to disable. (Default: 100)"
+            "Read, regrid and write this many time steps at a time, instead of "
+            "treating the series as one piece. Intended for high-frequency 3-D "
+            "output, where a single variable is tens of GB and the job is killed "
+            "with no message. Sets the read chunking, the regrid output chunking "
+            "and the CMOR write slab together, so they cannot drift apart. "
+            "Time steps are processed independently, so this changes nothing "
+            "about the results. Note it does not bound memory on its own: the "
+            "vertical interpolation currently materializes the full native field "
+            "regardless. Monthly and 2-D output does not need it. "
+            "(Default: 0, no chunking.)"
         ),
     )
     parser.add_argument(

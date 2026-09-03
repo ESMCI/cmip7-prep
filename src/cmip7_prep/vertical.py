@@ -176,8 +176,22 @@ def to_plev(
     p0 = _resolve_p0(ds, p0_name=p0_name)
     new_levels = _read_requested_levels(tables_path, axis_name=target)
 
+    # Whether this stays lazy decides the memory profile of the whole pipeline.
+    # If chunks go from a tuple to None across this call, geocat has materialized
+    # the full native field -- for 6-hourly 3-D output that is tens of GB, and no
+    # amount of chunking upstream or slabbing downstream can help, because by
+    # this point the array is already plain numpy.
+    src = ds[str(var)]
+    logger.debug(
+        "[mem] pre-interp %s: dims=%s chunks=%s dtype=%s",
+        var,
+        src.dims,
+        getattr(src, "chunks", None),
+        src.dtype,
+    )
+
     out_da = interp_hybrid_to_pressure(
-        ds[str(var)],
+        src,
         ds[ps_name],
         ds[hyam_name],
         ds[hybm_name],
@@ -185,6 +199,24 @@ def to_plev(
         new_levels=new_levels,
         lev_dim=lev_dim,
     )
+
+    logger.debug(
+        "[mem] post-interp %s: dims=%s chunks=%s dtype=%s",
+        var,
+        out_da.dims,
+        getattr(out_da, "chunks", None),
+        out_da.dtype,
+    )
+    if getattr(src, "chunks", None) and not getattr(out_da, "chunks", None):
+        logger.warning(
+            "Vertical interpolation of %s returned an in-memory array from a "
+            "chunked input: the full native field has been materialized "
+            "(%.1f GB as %s). Chunking upstream cannot bound memory while this "
+            "is the case.",
+            var,
+            src.size * src.dtype.itemsize / 1024**3,
+            src.dtype,
+        )
 
     # Ensure dimension is named 'plev' and coordinate is present
     if "plev" not in out_da.dims:
