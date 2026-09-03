@@ -480,6 +480,13 @@ def regrid_to_latlon(
         raise KeyError(f"{varname!r} not in dataset: variables {list(ds_in.variables)}")
 
     var_da = ds_in[varname]  # always a DataArray
+    logger.debug(
+        "[mem] pre-regrid %s: dims=%s chunks=%s dtype=%s",
+        varname,
+        var_da.dims,
+        getattr(var_da, "chunks", None),
+        var_da.dtype,
+    )
 
     # In future: handle if the lat, lon coords are already present, but still on the wrong grid
     # or other changes to the grid should be made.
@@ -677,6 +684,29 @@ def regrid_to_latlon(
         out = out.transpose("lat", "lon")
     if keep_attrs and hasattr(var_da, "attrs"):
         out.attrs.update(var_da.attrs)
+    logger.debug(
+        "[mem] post-regrid %s: dims=%s chunks=%s dtype=%s",
+        varname,
+        out.dims,
+        getattr(out, "chunks", None),
+        out.dtype,
+    )
+    if getattr(var_da, "chunks", None) and not getattr(out, "chunks", None):
+        logger.warning(
+            "Regridding %s returned an in-memory array from a chunked input: "
+            "the field has been materialized (%.1f GB as %s).",
+            varname,
+            out.size * out.dtype.itemsize / 1024**3,
+            out.dtype,
+        )
+    if str(var_da.dtype) != str(out.dtype):
+        logger.warning(
+            "Regridding %s changed dtype from %s to %s, doubling memory "
+            "downstream if it widened.",
+            varname,
+            var_da.dtype,
+            out.dtype,
+        )
     return out
 
 
