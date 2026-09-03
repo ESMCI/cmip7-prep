@@ -21,6 +21,7 @@ import re
 import resource
 from typing import Optional, Tuple
 import sys
+import time
 from datetime import datetime, UTC
 import glob
 import json
@@ -300,6 +301,15 @@ def get_experiment_info_from_tables(experiment_id: str, tables_root: Path) -> st
     raise ValueError(f"Experiment ID '{experiment_id}' not found in any CMIP7 table.")
 
 
+def _format_duration(seconds: float) -> str:
+    """Format a duration as h/m/s, dropping units that are zero."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, secs = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h{minutes:02d}m{secs:02d}s" if hours else f"{minutes}m{secs:02d}s"
+
+
 def _peak_memory_gb() -> float:
     """Peak resident memory of this process so far, in GB.
 
@@ -335,6 +345,7 @@ def process_one_var(
     # At this point you have a cmip_var (metadata from database query for the target variable)
     # queried a cmor database from the cloud
     logger.info(f"Starting processing for variable: {varname}")
+    var_start = time.monotonic()
     results = [(str(varname), "started")]
 
     try:
@@ -654,9 +665,11 @@ def process_one_var(
                 # variable has needed so far, not this one alone. A jump from the
                 # previous line means this variable exceeded all before it.
                 logger.info(
-                    "Finished processing for %s with dims %s (peak so far %.1f GB)",
+                    "Finished processing for %s with dims %s "
+                    "(%s, peak so far %.1f GB)",
                     varname,
                     dims,
+                    _format_duration(time.monotonic() - var_start),
                     _peak_memory_gb(),
                 )
                 results.append((str(cmip7name), "ok"))
@@ -707,6 +720,7 @@ def latest_monthly_file(
 
 
 def main():
+    run_start = time.monotonic()
     args = parse_args()
 
     # Set the level package-wide: setting only the driver's logger left
@@ -1048,7 +1062,11 @@ def main():
         client.close()
     if cluster:
         cluster.close()
-    logger.info("Peak memory for this run: %.1f GB", _peak_memory_gb())
+    logger.info(
+        "Run complete in %s, peak memory %.1f GB",
+        _format_duration(time.monotonic() - run_start),
+        _peak_memory_gb(),
+    )
 
 
 if __name__ == "__main__":
