@@ -378,9 +378,8 @@ def process_one_var(
             open_kwargs = None
             if realm in ("ocean", "seaIce", "landIce"):
                 open_kwargs = {"decode_timedelta": False}
-            # Chunking has to start at the open: the vertical interpolation runs
-            # before the regrid and works on the full native field, so chunking
-            # only at the regrid step would be too late to help.
+            # Chunk at the open: the vertical interpolation runs before the
+            # regrid, so chunking later would be too late.
             if time_chunk:
                 open_kwargs = dict(open_kwargs or {})
                 open_kwargs["chunks"] = {"time": time_chunk}
@@ -577,12 +576,8 @@ def process_one_var(
                     tables_path=tables_root / "tables",
                     regrid_kwargs={
                         "dtype": "float32",
-                        # Match the read chunking. When these differ, each output
-                        # chunk draws from part of a larger input chunk, and since
-                        # every slab write is a separate compute() the same input
-                        # is read and interpolated once per output chunk that
-                        # overlaps it. Aligning them means each input chunk is
-                        # touched exactly once.
+                        # Match the read chunking, or each input chunk is
+                        # recomputed once per output chunk overlapping it.
                         **({"output_time_chunk": time_chunk} if time_chunk else {}),
                     },
                     open_kwargs={"decode_timedelta": True},
@@ -722,10 +717,8 @@ def latest_monthly_file(
 def main():
     args = parse_args()
 
-    # Set logging level for the whole cmip7_prep package, not just this module.
-    # Setting it only on the driver's logger left cmor_writer, pipeline, regrid
-    # and the rest at the root level, so --log-level DEBUG showed driver output
-    # and nothing from the code doing the actual work.
+    # Set the level package-wide: setting only the driver's logger left
+    # cmor_writer, pipeline and regrid at the root level.
     logging.getLogger("cmip7_prep").setLevel(getattr(logging, args.log_level))
     logger.setLevel(getattr(logging, args.log_level))
     logger.debug(f"Parsed arguments: {args}")

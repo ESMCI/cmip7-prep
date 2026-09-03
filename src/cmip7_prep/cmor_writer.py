@@ -245,17 +245,13 @@ class CmorSession(
         """Return the time axis CMOR requires for this variable, or None if it has none.
 
         CMIP tables use several time axes and they are not interchangeable:
-        ``time`` for period means, ``time1`` for instantaneous values, ``time2``
-        and ``time3`` for climatologies, ``time4`` for daily statistics averaged
-        over a period.  Only ``time1`` is defined without bounds.
+        ``time`` for period means, ``time1`` for instantaneous values,
+        ``time2``/``time3`` for climatologies, ``time4`` for daily statistics.
+        Only ``time1`` is defined without bounds.
 
-        The axis is read from the variable's own entry in the table rather than
-        inferred from its branded name.  The table is what CMOR validates
-        against, so reading it cannot disagree; the mapping YAML can and does --
-        several ``_tpt`` entries there claim ``time`` and would be rejected.
-
-        Returns None for time-independent variables (the ``ti`` sampling), which
-        legitimately have no time axis at all.
+        Read from the table rather than inferred from the branded name, since
+        the table is what CMOR validates against.  None means the variable has
+        no time axis.
         """
         try:
             table = _load_table_json(str(table_path))
@@ -544,10 +540,8 @@ class CmorSession(
 
         # ---- helpers ----
         def _get_time_and_bounds(dsi: xr.Dataset, want_bounds: bool = True):
-            # want_bounds is False for the 'time1' axis, which is defined
-            # without bounds.  Reading or synthesizing them would only be
-            # to discard them, and the synthesis logs a line that reads as
-            # though something was needed when it was not.
+            # want_bounds is False for 'time1', which takes no bounds; reading
+            # or synthesizing them would only be to discard them.
             logger.debug("Defining time axis")
             time_da = (
                 dsi.coords["time"]
@@ -729,12 +723,8 @@ class CmorSession(
         time_id = None
         self.load_table(self.tables_root, self.primarytable)
         logger.debug("Define time axis (if present)")
-        # Which time axis this variable needs is a property of the CMOR table,
-        # not of our mapping: 'time' for period means, 'time1' for instantaneous
-        # values, 'time2'/'time3' for climatologies, 'time4' for daily
-        # statistics.  Ask the table rather than guessing, and do it before
-        # reading the time coordinate so bounds are never gathered for an axis
-        # that cannot take them.
+        # Ask the table which time axis this variable needs, before reading the
+        # coordinate, so bounds are not gathered for an axis that cannot take them.
         # The CMOR table is keyed by the branded variable name
         # (e.g. 'hur_tpt-100hPa-hxy-u'), not the short CMIP name ('hur'), so the
         # branded name has to be what we look up.
@@ -1277,14 +1267,8 @@ class CmorSession(
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_root, self.primarytable)
 
-        # Put time first before the axes are defined.  The slabbed write below
-        # can only bound memory when time is the leading axis, and _define_axes
-        # builds axes_ids in the data's own dimension order -- so transposing
-        # here keeps the two in step and is what enables the slabbing.  Fields
-        # arriving as (plev, lat, lon, time) would otherwise take the fallback
-        # path and materialize whole, which is what OOMs on high-frequency 3-D
-        # output.  Transposing a dask array is lazy: it reorders the task graph
-        # rather than moving data.
+        # The slabbed write below needs time leading, and _define_axes builds
+        # axes_ids in the data's dimension order, so transpose before both.
         if "time" in ds[str(bvn)].dims and ds[str(bvn)].dims[0] != "time":
             logger.info(
                 "Transposing %s from %s to put time first for a slabbed write",
@@ -1368,14 +1352,9 @@ class CmorSession(
             for d in data_filled.dims:
                 if d != "time":
                     rec_bytes *= int(data_filled.sizes[d])
-            # Prefer the array's own dask chunking along time.  Sizing the slab
-            # from the output bytes is misleading: the regridded record is small
-            # (a few MB) but computing it pulls the native field behind it, which
-            # for a 3-D high-frequency variable is an order of magnitude larger.
-            # A 512 MB output slab of 6-hourly hus on 7 levels needs ~6 GB of
-            # 58-level input to materialize, which is what OOMs.  Writing one
-            # dask chunk at a time keeps the working set to what dask was already
-            # asked to hold.
+            # Follow the array's own chunking.  Sizing from output bytes is
+            # misleading: producing one small output record pulls the much
+            # larger native field behind it.
             time_chunks = None
             chunks = getattr(data_filled, "chunks", None)
             if chunks:

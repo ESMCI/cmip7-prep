@@ -176,11 +176,8 @@ def to_plev(
     p0 = _resolve_p0(ds, p0_name=p0_name)
     new_levels = _read_requested_levels(tables_path, axis_name=target)
 
-    # Whether this stays lazy decides the memory profile of the whole pipeline.
-    # If chunks go from a tuple to None across this call, geocat has materialized
-    # the full native field -- for 6-hourly 3-D output that is tens of GB, and no
-    # amount of chunking upstream or slabbing downstream can help, because by
-    # this point the array is already plain numpy.
+    # Chunks going from a tuple to None across this call means the full native
+    # field was materialized, and no chunking elsewhere can help.
     src = ds[str(var)]
     logger.debug(
         "[mem] pre-interp %s: dims=%s chunks=%s dtype=%s",
