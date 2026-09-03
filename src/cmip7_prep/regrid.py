@@ -684,6 +684,12 @@ def regrid_to_latlon(
         out = out.transpose("lat", "lon")
     if keep_attrs and hasattr(var_da, "attrs"):
         out.attrs.update(var_da.attrs)
+    # The ESMF weights are float64, so a float32 field is promoted by the
+    # multiply. dtype governs only what goes in, so cast back on the way out:
+    # accumulate in double, store in single, as the input already was.
+    if dtype is not None and str(out.dtype) != dtype:
+        out = out.astype(dtype)
+
     logger.debug(
         "[mem] post-regrid %s: dims=%s chunks=%s dtype=%s",
         varname,

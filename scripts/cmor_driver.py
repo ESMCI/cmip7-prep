@@ -105,23 +105,6 @@ def parse_args():
         help="List of CMIP variable names to process directly (bypasses variable search)",
     )
     parser.add_argument(
-        "--time-chunk",
-        type=int,
-        default=0,
-        help=(
-            "Read, regrid and write this many time steps at a time, instead of "
-            "treating the series as one piece. Intended for high-frequency 3-D "
-            "output, where a single variable is tens of GB and the job is killed "
-            "with no message. Sets the read chunking, the regrid output chunking "
-            "and the CMOR write slab together, so they cannot drift apart. "
-            "Time steps are processed independently, so this changes nothing "
-            "about the results. Note it does not bound memory on its own: the "
-            "vertical interpolation currently materializes the full native field "
-            "regardless. Monthly and 2-D output does not need it. "
-            "(Default: 0, no chunking.)"
-        ),
-    )
-    parser.add_argument(
         "--workers",
         type=int,
         default=1,
@@ -342,7 +325,6 @@ def process_one_var(
     ocn_fx_fields=None,
     ice_sheet=None,
     experiment=None,
-    time_chunk=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.branded_variable_name.name
@@ -393,16 +375,6 @@ def process_one_var(
             open_kwargs = None
             if realm in ("ocean", "seaIce", "landIce"):
                 open_kwargs = {"decode_timedelta": False}
-            # Chunk at the open: the vertical interpolation runs before the
-            # regrid, so chunking later would be too late.
-            if time_chunk:
-                open_kwargs = dict(open_kwargs or {})
-                open_kwargs["chunks"] = {"time": time_chunk}
-                logger.info(
-                    "Reading %s in chunks of %d time steps",
-                    varname,
-                    time_chunk,
-                )
             logger.debug("Opening native data for variable %s", varname)
 
             # ds_native is an xarray dataset for the CESM/NorESM time series files
@@ -591,9 +563,6 @@ def process_one_var(
                     tables_path=tables_root / "tables",
                     regrid_kwargs={
                         "dtype": "float32",
-                        # Match the read chunking, or each input chunk is
-                        # recomputed once per output chunk overlapping it.
-                        **({"output_time_chunk": time_chunk} if time_chunk else {}),
                     },
                     open_kwargs={"decode_timedelta": True},
                 )
@@ -1039,7 +1008,6 @@ def main():
                         ripf_index=ripf_index,
                         ice_sheet=args.ice_sheet,
                         experiment=args.experiment,
-                        time_chunk=args.time_chunk,
                     )
                     results.extend(res)
                 except Exception as exc:
@@ -1060,7 +1028,6 @@ def main():
                     ripf_index=ripf_index,
                     ice_sheet=args.ice_sheet,
                     experiment=args.experiment,
-                    time_chunk=args.time_chunk,
                 )
                 futures = client.compute([fut])
                 from dask.distributed import wait, as_completed
