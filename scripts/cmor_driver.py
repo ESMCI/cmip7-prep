@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 import logging
 import re
+import resource
 from typing import Optional, Tuple
 import sys
 from datetime import datetime, UTC
@@ -314,6 +315,17 @@ def get_experiment_info_from_tables(experiment_id: str, tables_root: Path) -> st
         logger.warning(f"Failed to read {tables_path}: {e}")
 
     raise ValueError(f"Experiment ID '{experiment_id}' not found in any CMIP7 table.")
+
+
+def _peak_memory_gb() -> float:
+    """Peak resident memory of this process so far, in GB.
+
+    ru_maxrss is a high-water mark since the process started: it never falls, so
+    it reports the largest the process has ever been, not what is held now.
+    """
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # Linux reports kilobytes, macOS bytes
+    return peak / 1024**2 if sys.platform != "darwin" else peak / 1024**3
 
 
 def process_one_var(
@@ -669,7 +681,15 @@ def process_one_var(
                     # Now use CMOR utility to write out netcdf variable
                     cm.write_variable(ds_cmor_write, cmip_var, vdef)
 
-                logger.info(f"Finished processing for {varname} with dims {dims}")
+                # A high-water mark for the process, so this is the largest any
+                # variable has needed so far, not this one alone. A jump from the
+                # previous line means this variable exceeded all before it.
+                logger.info(
+                    "Finished processing for %s with dims %s (peak so far %.1f GB)",
+                    varname,
+                    dims,
+                    _peak_memory_gb(),
+                )
                 results.append((str(cmip7name), "ok"))
             except Exception as e:
                 logger.error(
@@ -1061,6 +1081,7 @@ def main():
         client.close()
     if cluster:
         cluster.close()
+    logger.info("Peak memory for this run: %.1f GB", _peak_memory_gb())
 
 
 if __name__ == "__main__":
