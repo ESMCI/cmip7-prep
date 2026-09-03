@@ -78,6 +78,18 @@ def parse_arguments():
         ),
     )
     parser.add_argument(
+        "--frequency",
+        nargs="+",
+        default=None,
+        metavar="FREQ",
+        help=(
+            "Only generate time series for these frequencies, e.g. '--frequency "
+            "6hr' or '--frequency mon day'. Frequencies are those defined for the "
+            "realm in <model>_include_patterns.yaml. "
+            "(Default: every frequency the realm defines.)"
+        ),
+    )
+    parser.add_argument(
         "--outputdir",
         type=str,
         help="Full path to directory where output time series data will be placed (optional) "
@@ -144,12 +156,14 @@ def main():
     # placeholder (landIce), filled in from --ice-sheet at run time.
     try:
         patterns = all_include_patterns(
-            args.model, args.realm, args.ice_sheet, args.sampling
+            args.model, args.realm, args.ice_sheet, args.sampling, args.frequency
         )
     except ValueError as exc:
         logger.error("%s", exc)
         sys.exit(1)
     include_patterns = [f"*{pattern}*" for pattern in patterns]
+    if args.frequency:
+        logger.info("Restricting to frequencies: %s", ", ".join(args.frequency))
 
     # Determine input directory
     inputdir = Path(args.inputdir)

@@ -33,6 +33,7 @@ import copy
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import Sequence
 
 import yaml
 
@@ -130,11 +131,12 @@ def all_include_patterns(
     realm: str,
     ice_sheet: str | None = None,
     sampling: str | None = None,
+    frequencies: Sequence[str] | None = None,
 ) -> list[str]:
     """Return the patterns for every frequency of one model and realm.
 
-    Used when collecting raw history files, where all frequencies of a realm are
-    gathered in one pass rather than one frequency at a time.  ``sampling`` of
+    Used when collecting raw history files.  ``frequencies`` restricts the sweep
+    to those given; None takes every frequency the realm defines.  ``sampling`` of
     None collects time-averaged and instantaneous output together, which is what
     the time-series step wants: it cannot know which the later CMORization will
     ask for.  Naming one narrows the sweep.
@@ -145,6 +147,15 @@ def all_include_patterns(
         raise ValueError(
             f"No include_patterns defined for model={model}, realm={realm}"
         ) from None
+
+    if frequencies:
+        unknown = [f for f in frequencies if f not in by_frequency]
+        if unknown:
+            raise ValueError(
+                f"No include_patterns defined for model={model}, realm={realm}, "
+                f"frequency={unknown}; available: {sorted(by_frequency)}"
+            )
+        by_frequency = {f: by_frequency[f] for f in frequencies}
 
     # Frequencies can share a history file (NorESM land uses clm2.h2a for both
     # 3hr and yr), so de-duplicate while preserving order to avoid globbing the

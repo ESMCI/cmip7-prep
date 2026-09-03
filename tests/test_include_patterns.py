@@ -240,3 +240,28 @@ def test_missing_time_average_still_raises():
     """The fallback must not paper over a genuinely absent realm/frequency."""
     with pytest.raises(ValueError, match="No include_patterns defined"):
         patterns_for_variable("cesm", "land", "6hr", "mrsos_tavg-u-hxy-u")
+
+
+def test_all_include_patterns_can_be_restricted_to_frequencies():
+    """gen_timeseries sweeps one frequency without touching the others."""
+    assert all_include_patterns("noresm", "atmos", frequencies=["6hr"]) == [
+        "cam.h2a",
+        "cam.h3i",
+    ]
+    assert all_include_patterns("noresm", "atmos", frequencies=["mon", "day"]) == [
+        "cam.h0a",
+        "cam.h1a",
+    ]
+
+
+def test_frequency_and_sampling_filters_compose():
+    """Narrowing to one frequency and one sampling gives a single tape."""
+    assert all_include_patterns(
+        "noresm", "atmos", sampling="tpt", frequencies=["6hr"]
+    ) == ["cam.h3i"]
+
+
+def test_unknown_frequency_names_the_available_ones():
+    """A typo says what the realm actually defines rather than returning nothing."""
+    with pytest.raises(ValueError, match="available:"):
+        all_include_patterns("noresm", "atmos", frequencies=["nosuchfreq"])
