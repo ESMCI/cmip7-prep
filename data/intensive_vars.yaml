@@ -1,0 +1,33 @@
+# Variables regridded with the bilinear map rather than the conservative one.
+#
+# Intensive quantities -- temperature, pressure, wind, humidity, geopotential,
+# cloud fraction -- are point values, so bilinear interpolation is appropriate.
+# Extensive quantities and fluxes must conserve their integral over a cell and
+# use the conservative map, which is the default for anything not listed here.
+#
+# Unlike the include-pattern and regrid-map tables, this file is NOT per model:
+# whether a quantity is intensive is a property of the variable, not of the
+# model that produced it.  Keeping one copy stops CESM and NorESM output from
+# diverging in how the same variable was regridded.
+#
+# Editing this list changes published output.  A variable moved off this list
+# is regridded by a different method, and the values change.
+
+intensive:
+  - tas
+  - tasmin
+  - tasmax
+  - psl
+  - ps
+  - huss
+  - uas
+  - vas
+  - sfcWind
+  - ts
+  - prsn
+  - clt
+  - ta
+  - ua
+  - va
+  - zg
+  - hus

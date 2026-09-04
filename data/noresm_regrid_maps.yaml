@@ -1,0 +1,22 @@
+# ESMF regrid weight files for NorESM, keyed by resolution.
+#
+# Paths are relative to 'inputdata_dir'.  Each resolution supplies a
+# conservative map and, optionally, a bilinear one; regrid.py uses the
+# bilinear map for the intensive variables listed in INTENSIVE_VARS and
+# the conservative map for everything else, including all fx fields.
+#
+# Both maps for a resolution must target the SAME destination grid, or a
+# single run emits variables on two different grids.
+
+inputdata_dir: /nird/datalake/NS9560K/diagnostics/land_xesmf_diag_data/
+
+resolutions:
+  ne30:
+    conservative: map_ne30pg3_to_1x1d_aave.nc
+    bilinear: map_ne30pg3_to_1x1d_bilin.nc
+  ne16:
+    conservative: map_ne16pg3_to_2x2_aave_c260531.nc
+    bilinear: map_ne16pg3_to_2x2_blin_c260531.nc
+  tnx1v4:
+    conservative: map_tnx1v4_to_1x1_aave_c260531.nc
+    bilinear: map_tnx1v4_to_1x1_blin_c260531.nc

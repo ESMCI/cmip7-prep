@@ -15,6 +15,7 @@ import xarray as xr
 # import warnings
 import numpy as np
 from cmip7_prep.cache_tools import FXCache, RegridderCache
+from cmip7_prep.regrid_maps import get_map_paths, load_intensive_vars
 from cmip7_prep import vertical
 
 logging.basicConfig(level=logging.INFO)
@@ -27,73 +28,6 @@ try:
 except ModuleNotFoundError as e:
     _HAS_DASK = False
 
-# ---------------------------------------------------------
-# Default NorESM weight maps; override via function args.
-# ---------------------------------------------------------
-
-INPUTDATA_DIR_noresm = Path("/nird/datalake/NS9560K/diagnostics/land_xesmf_diag_data/")
-DEFAULT_CONS_MAP_NE30_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1d_aave.nc"
-)
-DEFAULT_BILIN_MAP_NE30_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne30pg3_to_1x1d_bilin.nc"
-)
-DEFAULT_CONS_MAP_NE16_noresm = Path(
-    # INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_aave_c260531.nc"
-    INPUTDATA_DIR_noresm
-    / "map_ne16pg3_to_1.9x2.5_nomask_scripgrids_c250425.nc"
-)
-DEFAULT_BILIN_MAP_NE16_noresm = Path(
-    INPUTDATA_DIR_noresm / "map_ne16pg3_to_2x2_blin_c260531.nc"
-)
-DEFAULT_CONS_MAP_TNX1V4 = Path(
-    INPUTDATA_DIR_noresm / "map_tnx1v4_to_1x1_aave_c260531.nc"
-)
-DEFAULT_BILIN_MAP_TNX1V4 = Path(
-    INPUTDATA_DIR_noresm / "map_tnx1v4_to_1x1_blin_c260531.nc"
-)
-
-# ---------------------------------------------------------
-# Default CESM weight maps; override via function args.
-# ---------------------------------------------------------
-
-INPUTDATA_DIR_cesm = Path("/glade/campaign/cesm/cesmdata/inputdata/")
-DEFAULT_CONS_MAP_NE30_cesm = Path(
-    INPUTDATA_DIR_cesm / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc"
-)
-DEFAULT_BILIN_MAP_NE30_cesm = Path(
-    INPUTDATA_DIR_cesm / "cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc"
-)
-DEFAULT_CONS_MAP_T232 = Path(
-    INPUTDATA_DIR_cesm / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc"
-)
-DEFAULT_BILIN_MAP_T232 = Path(
-    INPUTDATA_DIR_cesm / "cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc"
-)  # optional bilinear map
-
-# ---------------------------------------------------------
-# Intensive variables
-# ---------------------------------------------------------
-
-INTENSIVE_VARS = {
-    "tas",
-    "tasmin",
-    "tasmax",
-    "psl",
-    "ps",
-    "huss",
-    "uas",
-    "vas",
-    "sfcWind",
-    "ts",
-    "prsn",
-    "clt",
-    "ta",
-    "ua",
-    "va",
-    "zg",
-    "hus",
-}
 
 
 @dataclass(frozen=True)
@@ -262,49 +196,9 @@ def _pick_maps(
     force_method: Optional[str] = None,
 ) -> MapSpec:
     """Choose which precomputed map file to use for a variable."""
-    cons = None
-    bilin = None
-    if model == "cesm":
-        if resolution == "ne30":
-            cons = (
-                Path(conservative_map)
-                if conservative_map
-                else DEFAULT_CONS_MAP_NE30_cesm
-            )
-            bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30_cesm
-        else:
-            cons = Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_T232
-            bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_T232
-    elif model == "noresm":
-        if resolution == "ne30":
-            cons = (
-                Path(conservative_map)
-                if conservative_map
-                else DEFAULT_CONS_MAP_NE30_noresm
-            )
-            bilin = (
-                Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE30_noresm
-            )
-        elif resolution == "ne16":
-            cons = (
-                Path(conservative_map)
-                if conservative_map
-                else DEFAULT_CONS_MAP_NE16_noresm
-            )
-            bilin = (
-                Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_NE16_noresm
-            )
-        else:
-            cons = (
-                Path(conservative_map) if conservative_map else DEFAULT_CONS_MAP_TNX1V4
-            )
-            bilin = Path(bilinear_map) if bilinear_map else DEFAULT_BILIN_MAP_TNX1V4
-
-    if cons is None and bilin is None:
-        raise FileNotFoundError(
-            f"No regrid weight file defined for model={model!r}, resolution={resolution!r}. "
-            "Add an entry to _pick_maps in regrid.py or pass --conservative-map / --bilinear-map."
-        )
+    paths = get_map_paths(model, resolution)
+    cons = Path(conservative_map) if conservative_map else paths.get("conservative")
+    bilin = Path(bilinear_map) if bilinear_map else paths.get("bilinear")
 
     if force_method:
         if force_method not in {"conservative", "bilinear"}:
@@ -313,13 +207,9 @@ def _pick_maps(
             if not bilin or not str(bilin):
                 raise FileNotFoundError("Bilinear map requested but not provided.")
             return MapSpec("bilinear", bilin)
-        if cons is None:
-            raise FileNotFoundError(
-                f"Conservative map not defined for model={model!r}, resolution={resolution!r}."
-            )
         return MapSpec("conservative", cons)
 
-    if varname in INTENSIVE_VARS and bilin and str(bilin):
+    if varname in load_intensive_vars() and bilin and str(bilin):
         return MapSpec("bilinear", bilin)
     return MapSpec("conservative", cons)
 
@@ -613,7 +503,6 @@ def regrid_to_latlon(
     # print(f"longitudes are {lon}")
     # print(f"number of longitudes are {nx}")
     # print(f"number of latitudes  are {ny}")
-    # weight_file = DEFAULT_CONS_MAP_NE16_noresm
 
     weight_file = spec.path
     weights = xr.open_dataset(weight_file)
