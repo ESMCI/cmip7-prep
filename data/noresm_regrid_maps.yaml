@@ -15,8 +15,8 @@ resolutions:
     conservative: map_ne30pg3_to_1x1d_aave.nc
     bilinear: map_ne30pg3_to_1x1d_bilin.nc
   ne16:
-    conservative: map_ne16pg3_to_2x2_aave_c260531.nc
-    bilinear: map_ne16pg3_to_2x2_blin_c260531.nc
+    conservative: map_ne16pg3_to_2x2_aave_c20260904.nc
+    bilinear: map_ne16pg3_to_2x2_blin_c20260904.nc
   tnx1v4:
     conservative: map_tnx1v4_to_1x1_aave_c260531.nc
     bilinear: map_tnx1v4_to_1x1_blin_c260531.nc
