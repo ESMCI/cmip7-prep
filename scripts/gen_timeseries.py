@@ -24,7 +24,7 @@ from pathlib import Path
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 
-from cmor_driver import INCLUDE_PATTERN_MAP
+from cmip7_prep.include_patterns import all_include_patterns
 
 # ++++++++++++++++++++++++++++++
 # Input argument parser function
@@ -65,6 +65,28 @@ def parse_arguments():
         help=(
             "Ice sheet for the landIce realm: 'gris' (Greenland) or 'ais' "
             "(Antarctica). Required when --realm landIce; ignored otherwise."
+        ),
+    )
+    parser.add_argument(
+        "--sampling",
+        choices=["tavg", "tpt"],
+        default=None,
+        help=(
+            "Restrict to time-averaged ('tavg') or instantaneous ('tpt') history "
+            "files. Default: collect both, since which is needed depends on the "
+            "CMIP7 variable being produced later."
+        ),
+    )
+    parser.add_argument(
+        "--frequency",
+        nargs="+",
+        default=None,
+        metavar="FREQ",
+        help=(
+            "Only generate time series for these frequencies, e.g. '--frequency "
+            "6hr' or '--frequency mon day'. Frequencies are those defined for the "
+            "realm in <model>_include_patterns.yaml. "
+            "(Default: every frequency the realm defines.)"
         ),
     )
     parser.add_argument(
@@ -132,17 +154,16 @@ def main():
 
     # Determine include patterns.  Patterns may contain a '{ice_sheet}'
     # placeholder (landIce), filled in from --ice-sheet at run time.
-    include_patterns = []
-    for _, pattern_list in INCLUDE_PATTERN_MAP[args.model][args.realm].items():
-        for pattern in pattern_list:
-            if "{ice_sheet}" in pattern:
-                if args.ice_sheet is None:
-                    logger.error(
-                        "realm '%s' requires --ice-sheet (gris or ais)", args.realm
-                    )
-                    sys.exit(1)
-                pattern = pattern.format(ice_sheet=args.ice_sheet)
-            include_patterns.append(f"*{pattern}*")
+    try:
+        patterns = all_include_patterns(
+            args.model, args.realm, args.ice_sheet, args.sampling, args.frequency
+        )
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(1)
+    include_patterns = [f"*{pattern}*" for pattern in patterns]
+    if args.frequency:
+        logger.info("Restricting to frequencies: %s", ", ".join(args.frequency))
 
     # Determine input directory
     inputdir = Path(args.inputdir)

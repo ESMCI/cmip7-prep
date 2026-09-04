@@ -14,7 +14,7 @@ variables:
 
   ccb_tpt-u-hs-u:
     cell_methods: 'area: point time: point'
-    dims: [site, time1]
+    dims: [site, time]
     long_name: Air Pressure at Convective Cloud Base
     sources: [model_var: N, model_var: A]
     standard_name: air_pressure_at_convective_cloud_base
@@ -33,7 +33,7 @@ variables:
 
   cct_tpt-u-hs-u:
     cell_methods: 'area: point time: point'
-    dims: [site, time1]
+    dims: [site, time]
     long_name: Air Pressure at Convective Cloud Top
     sources: [model_var: N, model_var: A]
     standard_name: air_pressure_at_convective_cloud_top

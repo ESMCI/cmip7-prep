@@ -197,7 +197,7 @@ variables:
 
   cLitterLut_tpt-u-hxy-multi:
     cell_methods: 'area: mean where sector time: point'
-    dims: [longitude, latitude, landuse, time1]
+    dims: [longitude, latitude, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(TOTLITC,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g/m^2'')  #clm2.h4'
     long_name: Carbon  in Above and Below-Ground Litter Pools on Land-Use Tiles
@@ -243,7 +243,7 @@ variables:
 
   cProductLut_tpt-u-hxy-multi:
     cell_methods: 'area: mean where sector time: point'
-    dims: [longitude, latitude, landuse, time1]
+    dims: [longitude, latitude, landuse, time]
     long_name: Wood and Agricultural Product Pool Carbon Associated with Land-Use
       Tiles
     sources: [model_var: N, model_var: A]
@@ -271,7 +271,7 @@ variables:
 
   cSoilLut_tpt-u-hxy-multi:
     cell_methods: 'area: mean where sector time: point'
-    dims: [longitude, latitude, landuse, time1]
+    dims: [longitude, latitude, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(TOTSOMC,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g/m^2'') #clm2.h4'
     long_name: Carbon in Soil Pool on Land-Use Tiles
@@ -332,7 +332,7 @@ variables:
 
   cVegLut_tpt-u-hxy-multi:
     cell_methods: 'area: mean where sector time: point'
-    dims: [longitude, latitude, landuse, time1]
+    dims: [longitude, latitude, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(TOTVEGC,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g/m^2'') #clm2.h4'
     long_name: Carbon in Vegetation on Land-Use Tiles
@@ -959,7 +959,7 @@ variables:
 
   fracLut_tpt-u-hxy-u:
     cell_methods: 'area: mean time: point'
-    dims: [longitude, latitude, landuse, time1]
+    dims: [longitude, latitude, landuse, time]
     formula: reduce_lu(PCT_LANDUNIT,landUse)
     long_name: Percentage of Grid Cell for Each Land-Use Tile
     sources: [model_var: PCT_LANDUNIT]
@@ -1262,7 +1262,7 @@ variables:
 
   mrsol_tpt-d10cm-hxy-lnd:
     cell_methods: 'area: mean where land time: point'
-    dims: [longitude, latitude, time1, sdepth10cm]
+    dims: [longitude, latitude, time, sdepth10cm]
     long_name: Moisture in Upper Portion of Soil Column
     sources: [model_var: SOILWATER_10CM]
     standard_name: mass_content_of_water_in_soil_layer
@@ -2155,7 +2155,7 @@ variables:
 
   tslsi_tpt-u-hxy-lsi:
     cell_methods: 'area: mean (over land and sea ice) time: point'
-    dims: [longitude, latitude, time1]
+    dims: [longitude, latitude, time]
     long_name: Surface Temperature Where Land or Sea Ice
     sources: [model_var: TSKIN]
     standard_name: surface_temperature

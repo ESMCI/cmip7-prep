@@ -18,8 +18,10 @@ import os
 from pathlib import Path
 import logging
 import re
+import resource
 from typing import Optional, Tuple
 import sys
+import time
 from datetime import datetime, UTC
 import glob
 import json
@@ -31,6 +33,10 @@ from cmip7_prep.cmor_utils import (
     bounds_from_centers_1d,
     roll_for_monotonic_with_bounds,
     packaged_dataset_json,
+)
+from cmip7_prep.include_patterns import (
+    get_include_patterns,
+    patterns_for_variable,
 )
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
@@ -81,81 +87,6 @@ REALM_YAML_MAP = {
         "land": "cesm_to_cmip7_land.yaml",
         "seaIce": "cesm_to_cmip7_seaIce.yaml",
         "ocean": "cesm_to_cmip7_ocean.yaml",
-    },
-}
-
-INCLUDE_PATTERN_MAP = {
-    "cesm": {
-        "aerosol": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "atmosChem": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "atmos": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "land": {
-            "mon": ["clm2.h0a"],
-        },
-        "ocnBgchem": {
-            "mon": ["mom6.h.z", "mom6.h.native."],
-            "day": ["mom6.h.sfc"],
-        },
-        "ocean": {
-            "mon": ["mom6.h.z", "mom6.h.native."],
-            "day": ["mom6.h.sfc"],
-        },
-        "seaIce": {
-            "mon": ["cice.h."],
-            "day": ["cice.h1."],
-        },
-    },
-    "noresm": {
-        "atmos": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "atmosChem": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "aerosol": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "land": {
-            "mon": ["clm2.h0a"],
-            "day": ["clm2.h1a"],
-            "3hr": ["clm2.h2a"],
-            "yr": [
-                "clm2.h2a"
-            ],  # Temporary change for WIEMIP TODO to change back ["clm2.h3a"],
-        },
-        "seaIce": {
-            "mon": ["cice.h."],
-            "day": ["cice.h1."],
-        },
-        # landIce is per ice-sheet: the '{ice_sheet}' placeholder is filled in
-        # from --ice-sheet (gris/ais) so each run targets a single CISM domain.
-        "landIce": {
-            "yr": ["cism.{ice_sheet}.h"],
-        },
     },
 }
 
@@ -253,8 +184,11 @@ def parse_args():
         "--frequency",
         type=str,
         default="mon",
-        choices=["mon", "day", "6hr", "3hr", "yr"],
-        help="Frequency of data to be translated (mon, day, 6hr, 3hr, yr), (Default: mon)",
+        choices=["mon", "day", "6hr", "3hr", "1hr", "yr"],
+        help=(
+            "Frequency of data to be translated "
+            "(mon, day, 6hr, 3hr, 1hr, yr), (Default: mon)"
+        ),
     )
     parser.add_argument(
         "--outdir",
@@ -367,6 +301,26 @@ def get_experiment_info_from_tables(experiment_id: str, tables_root: Path) -> st
     raise ValueError(f"Experiment ID '{experiment_id}' not found in any CMIP7 table.")
 
 
+def _format_duration(seconds: float) -> str:
+    """Format a duration as h/m/s, dropping units that are zero."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, secs = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h{minutes:02d}m{secs:02d}s" if hours else f"{minutes}m{secs:02d}s"
+
+
+def _peak_memory_gb() -> float:
+    """Peak resident memory of this process so far, in GB.
+
+    ru_maxrss is a high-water mark since the process started: it never falls, so
+    it reports the largest the process has ever been, not what is held now.
+    """
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # Linux reports kilobytes, macOS bytes
+    return peak / 1024**2 if sys.platform != "darwin" else peak / 1024**3
+
+
 def process_one_var(
     cmip_var,
     mapping,
@@ -379,6 +333,8 @@ def process_one_var(
     frequency="mon",
     ripf_index="r1i1p1f1",
     ocn_fx_fields=None,
+    ice_sheet=None,
+    experiment=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.branded_variable_name.name
@@ -389,6 +345,7 @@ def process_one_var(
     # At this point you have a cmip_var (metadata from database query for the target variable)
     # queried a cmor database from the cloud
     logger.info(f"Starting processing for variable: {varname}")
+    var_start = time.monotonic()
     results = [(str(varname), "started")]
 
     try:
@@ -661,7 +618,7 @@ def process_one_var(
                     dataset_json=metadata_json,
                     dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
                     outdir=outdir,
-                    ice_sheet=args.ice_sheet,
+                    ice_sheet=ice_sheet,
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
                     set_cur_dataset_attribute("realization_index", realization_index)
@@ -674,7 +631,7 @@ def process_one_var(
                     set_cur_dataset_attribute("region", region)
                     # Updating with correct experiment info from CMIP7 tables
                     experiment_info = get_experiment_info_from_tables(
-                        args.experiment, tables_root
+                        experiment, tables_root
                     )
                     for key, value in experiment_info.items():
                         if isinstance(value, list):
@@ -704,7 +661,17 @@ def process_one_var(
                     # Now use CMOR utility to write out netcdf variable
                     cm.write_variable(ds_cmor_write, cmip_var, vdef)
 
-                logger.info(f"Finished processing for {varname} with dims {dims}")
+                # A high-water mark for the process, so this is the largest any
+                # variable has needed so far, not this one alone. A jump from the
+                # previous line means this variable exceeded all before it.
+                logger.info(
+                    "Finished processing for %s with dims %s "
+                    "(%s, peak so far %.1f GB)",
+                    varname,
+                    dims,
+                    _format_duration(time.monotonic() - var_start),
+                    _peak_memory_gb(),
+                )
                 results.append((str(cmip7name), "ok"))
             except Exception as e:
                 logger.error(
@@ -752,29 +719,13 @@ def latest_monthly_file(
     return path, year, month
 
 
-def get_include_patterns(
-    model: str, realm: str, frequency: str, ice_sheet: str | None = None
-) -> list[str]:
-    try:
-        patterns = INCLUDE_PATTERN_MAP[model][realm][frequency]
-    except KeyError:
-        raise ValueError(
-            f"No include_patterns defined for model={model}, "
-            f"realm={realm}, frequency={frequency}"
-        )
-    # landIce patterns are per ice-sheet; fill in the selected one (gris/ais).
-    if realm == "landIce":
-        if ice_sheet is None:
-            raise ValueError("realm 'landIce' requires --ice-sheet (gris or ais)")
-        patterns = [p.format(ice_sheet=ice_sheet) for p in patterns]
-    logger.info("Looking for pattern: %s", patterns)
-    return patterns
-
-
 def main():
+    run_start = time.monotonic()
     args = parse_args()
 
-    # Set logging level
+    # Set the level package-wide: setting only the driver's logger left
+    # cmor_writer, pipeline and regrid at the root level.
+    logging.getLogger("cmip7_prep").setLevel(getattr(logging, args.log_level))
     logger.setLevel(getattr(logging, args.log_level))
     logger.debug(f"Parsed arguments: {args}")
 
@@ -976,13 +927,13 @@ def main():
 
     # Load requested variables
     if len(cmip_vars) > 0:
+        # Glob the union of every time sampling for this realm and frequency.
+        # Each variable is narrowed to its own sampling inside the loop below,
+        # using the signifier in its branded name -- CMIP7 frequency alone
+        # cannot tell a time-averaged variable from an instantaneous one.
         include_patterns = get_include_patterns(
-            model, realm, frequency, ice_sheet=args.ice_sheet
+            model, realm, frequency, ice_sheet=args.ice_sheet, sampling=None
         )
-        if len(include_patterns) == 1:
-            glob_pattern = f"*{include_patterns[0]}*.nc"
-        else:
-            glob_pattern = "*.nc"
 
         # Determine TABLES directory
         _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
@@ -1003,13 +954,20 @@ def main():
         logger.info(f"Using CMOR tables from: {tables_root}")
 
         # Determine time series files
-        all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
+        all_ts_files = sorted(
+            {
+                path
+                for pattern in include_patterns
+                for path in Path(TSDIR).glob(f"*{pattern}*.nc")
+            }
+        )
         logger.info(
-            f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'"
+            f"Found {len(all_ts_files)} candidate timeseries files "
+            f"matching {include_patterns}"
         )
         if not all_ts_files:
             logger.error(
-                f"No timeseries files found in {TSDIR} matching '{glob_pattern}'"
+                f"No timeseries files found in {TSDIR} matching {include_patterns}"
             )
             sys.exit(1)
 
@@ -1021,11 +979,22 @@ def main():
                 model_vars = _collect_required_model_vars(mapping, [varname])
             except Exception:
                 model_vars = []
+            # Narrow to the history files this variable's sampling lives in.
+            # Without this an instantaneous variable would be built from
+            # time-averaged input: well-formed output, silently wrong values.
+            try:
+                var_patterns = patterns_for_variable(
+                    model, realm, frequency, varname, ice_sheet=args.ice_sheet
+                )
+            except ValueError as exc:
+                logger.warning("Skipping %s: %s", varname, exc)
+                continue
             ts_files = sorted(
                 {
                     p
                     for p in all_ts_files
-                    if any(_filename_contains_var(p, mv) for mv in model_vars)
+                    if any(pattern in p.name for pattern in var_patterns)
+                    and any(_filename_contains_var(p, mv) for mv in model_vars)
                 }
             )
             logger.info("=" * 60)
@@ -1051,6 +1020,8 @@ def main():
                         frequency=frequency,
                         ocn_fx_fields=ocn_fx_fields,
                         ripf_index=ripf_index,
+                        ice_sheet=args.ice_sheet,
+                        experiment=args.experiment,
                     )
                     results.extend(res)
                 except Exception as exc:
@@ -1069,6 +1040,8 @@ def main():
                     frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                     ripf_index=ripf_index,
+                    ice_sheet=args.ice_sheet,
+                    experiment=args.experiment,
                 )
                 futures = client.compute([fut])
                 from dask.distributed import wait, as_completed
@@ -1089,6 +1062,11 @@ def main():
         client.close()
     if cluster:
         cluster.close()
+    logger.info(
+        "Run complete in %s, peak memory %.1f GB",
+        _format_duration(time.monotonic() - run_start),
+        _peak_memory_gb(),
+    )
 
 
 if __name__ == "__main__":

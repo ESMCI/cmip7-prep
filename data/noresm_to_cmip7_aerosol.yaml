@@ -66,7 +66,7 @@ variables:
   bs550aer_tpt-al-hxy-u:
     description: Aerosol  Backscatter at wavelength 550nm and scattering angle 180
       degrees, computed from extinction and lidar ratio
-    dims: [lon, lat, lev, time1, lambda550nm]
+    dims: [lon, lat, lev, time, lambda550nm]
     formula: BS550AER/DAYFOC
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
@@ -225,7 +225,7 @@ variables:
 
   ec550aer_tpt-al-hxy-u:
     description: Aerosol Extinction @550nm
-    dims: [lon, lat, lev, time1, lambda550nm]
+    dims: [lon, lat, lev, time, lambda550nm]
     formula: EC550AER/DAYFOC
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
@@ -369,7 +369,7 @@ variables:
   mmraerh2o_tpt-h2m-hs-u:
     description: "This variable represents the instantaneous near surface aerosol\
       \ water\_Mass Mixing Ratio at CF sites, sampled every 3 hours"
-    dims: [site, time1, height2m]
+    dims: [site, time, height2m]
     sources: [model_var: MMR_AH2O]
     table: aerosol
     units: kg kg-1
@@ -409,7 +409,7 @@ variables:
   mmrdust_tpt-h2m-hs-u:
     description: This variable represents the instantaneous near surface Dust Aerosol
       Mass Mixing Ratio at CF sites, sampled every 3 hours
-    dims: [site, time1, height2m]
+    dims: [site, time, height2m]
     sources: [model_var: mmr_DUST]
     table: aerosol
     units: kg kg-1
@@ -434,7 +434,7 @@ variables:
   mmroa_tpt-h2m-hs-u:
     description: "This variable represents the instantaneous near surface organic\
       \ aerosol\_Mass Mixing Ratio at CF sites, sampled every 3 hours."
-    dims: [site, time1, height2m]
+    dims: [site, time, height2m]
     sources: [model_var: mmr_OM]
     table: aerosol
     units: kg kg-1
@@ -479,7 +479,7 @@ variables:
   mmrso4_tpt-h2m-hs-u:
     description: This variable is for instantaneous near surface mass mixing ratio
       of sulfate aerosol at CF sites, sampled every 3 hours
-    dims: [site, time1, height2m]
+    dims: [site, time, height2m]
     sources: [model_var: mmr_SULFATE]
     table: aerosol
     units: kg kg-1
@@ -724,7 +724,7 @@ variables:
   so2_tpt-h2m-hs-u:
     description: This variable represents the instantaneous near surface so2 volume
       mixing ration at CF sites, sampled every 3 hours
-    dims: [site, time1, height2m]
+    dims: [site, time, height2m]
     sources: [model_var: SO2]
     table: aerosol
     units: mol mol-1
