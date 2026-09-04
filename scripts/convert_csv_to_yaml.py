@@ -1,10 +1,21 @@
+import ast
 import csv
 import json
+import os
 import yaml
 import re
 import sys
 import argparse
 from typing import Optional
+
+from cmip7_prep.mapping_compat import FORMULA_NAMESPACE
+
+# Names a formula may call.  Taken from the evaluator itself, so adding a
+# function to FORMULA_NAMESPACE makes it available to formulas and known to
+# this validator in a single edit.  A formula calling anything else raises
+# NameError when the pipeline evaluates it, which aborts the whole CMOR run --
+# so it is caught here instead.
+FORMULA_FUNCTIONS = frozenset(FORMULA_NAMESPACE)
 
 # ── NorESM positive attribute overrides ──────────────────────────────────────
 # Maps branded variable name → "up" or "down".
@@ -70,6 +81,7 @@ MODEL_CONFIGS = {
         "default_input": "data.csv",
         "default_output": "data.yaml",
         "normalize_dim_names": True,
+        "norwegian_number_format": True,
         "dataset_overrides": {
             "institution_id": "NCC",
             "source_id": "NorESM3",
@@ -113,12 +125,13 @@ MODEL_CONFIGS = {
     "cesm": {
         "default_input": "cesm_data.csv",
         "normalize_dim_names": False,
+        "norwegian_number_format": False,
         "dataset_overrides": {
             "institution_id": "NCAR",
             "source_id": "CESM3",
             "nominal_resolution": "100 km",
         },
-        "key_column": "CMIP Variable Name",
+        "key_column": "CMIP Branded Variable Name",
         "column_map": {
             "Table": "table",
             "Long Name": "long_name",
@@ -146,12 +159,14 @@ MODEL_CONFIGS = {
             "atmosChem": "cesm_to_cmip7_atmosChem.yaml",
             "aerosol": "cesm_to_cmip7_aerosol.yaml",
             "land": "cesm_to_cmip7_land.yaml",
-            "seaIce": "cesm_to_cmip7_seaice.yaml",
+            "seaIce": "cesm_to_cmip7_seaIce.yaml",
+            "landIce": "cesm_to_cmip7_landIce.yaml",
             "ocean": "cesm_to_cmip7_ocean.yaml",
+            "ocnBgchem": "cesm_to_cmip7_ocnBgchem.yaml",
             "fx": "cesm_to_cmip7_ocean.yaml",
         },
         "source_column": "CESM Variable Name",
-        "source_skip_phrases": [],
+        "source_skip_phrases": ["N/A"],
         "key_column_skip_phrases": [],
     },
 }
@@ -521,6 +536,80 @@ def _split_positional(s: str, n: int) -> list:
     return parts[:n]
 
 
+# CAM history-file reduction suffixes: "PBLH:X" (max), "U10:M" (min),
+# "UGUST.X", etc.  These select a history field, they are not arithmetic, so
+# they cannot be evaluated as a formula.
+_CAM_HISTORY_SUFFIX = re.compile(r"^\s*\w+\s*[:.][AIMXS]\s*$")
+
+
+def check_entry(name, entry, raw_source="", row=None):
+    """Return a list of problems found in a built entry, as readable strings.
+
+    Flags rows that convert without raising but cannot produce meaningful
+    output: prose or notes left in the Formula column, CAM history-field
+    notation used as a formula, and source values that are not a plain
+    comma-separated list of variable names (brace shorthand, ``[COSP]``
+    annotations).  An empty list means nothing suspect was found.
+
+    *row*, when given, is the spreadsheet row the entry came from and is
+    included in every message so the offending cell can be found by number
+    rather than by searching for the variable name.
+
+    >>> check_entry("x", {"formula": "PRECC + PRECL"})
+    []
+    >>> check_entry("x", {"formula": "PBLH:X"}, row=858)
+    ["x (row 858): formula 'PBLH:X' is CAM history-field notation, not an expression"]
+    >>> check_entry("x", {"formula": "ask for max in history"})
+    ["x: formula 'ask for max in history' is not a valid expression"]
+    >>> check_entry("x", {"formula": "PBLH:X"})
+    ["x: formula 'PBLH:X' is CAM history-field notation, not an expression"]
+    >>> check_entry("x", {"formula": "chunits(QICE, units='kg m-2 s-1')"})
+    ["x: formula calls undefined function 'chunits'"]
+    >>> check_entry("x", {"formula": "verticalsum(SOILICE, capped_at=5000)"})
+    []
+    >>> check_entry("x", {}, raw_source="TGCLDLWP, TGCLDIWP")
+    []
+    >>> check_entry("x", {}, raw_source="IWPMODIS [COSP]")
+    ["x: source 'IWPMODIS [COSP]' is not a plain list of variable names"]
+    """
+    problems = []
+
+    formula = entry.get("formula")
+    if formula:
+        if _CAM_HISTORY_SUFFIX.match(formula):
+            problems.append(
+                f"formula {formula!r} is CAM history-field notation, "
+                "not an expression"
+            )
+        else:
+            try:
+                tree = ast.parse(formula, mode="eval")
+            except SyntaxError:
+                problems.append(f"formula {formula!r} is not a valid expression")
+            else:
+                # Bare calls only: an attribute call is either a DataArray
+                # method (arr.sum(...)) or np/xr, neither of which we resolve.
+                unknown = sorted(
+                    {
+                        node.func.id
+                        for node in ast.walk(tree)
+                        if isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Name)
+                        and node.func.id not in FORMULA_FUNCTIONS
+                    }
+                )
+                for func in unknown:
+                    problems.append(f"formula calls undefined function {func!r}")
+
+    # Expressions belong in the Formula column; the source column should be a
+    # plain comma-separated list of model variable names.
+    if raw_source and _parse_csv_identifiers(raw_source) is None:
+        problems.append(f"source {raw_source!r} is not a plain list of variable names")
+
+    label = name if row is None else f"{name} (row {row})"
+    return [f"{label}: {p}" for p in problems]
+
+
 def _build_entry(row, config):
     """Build a single variable entry dict from one CSV row."""
     column_map = config["column_map"]
@@ -576,7 +665,9 @@ def _build_entry(row, config):
                 )
                 entry["_plev_name"] = plev_dim
         elif yaml_key == "units":
-            entry["units"] = fix_number_norwegian_format(value)
+            if config.get("norwegian_number_format", False):
+                value = fix_number_norwegian_format(value)
+            entry["units"] = value
         elif yaml_key == "_source_expr":
             names = _parse_csv_identifiers(value)
             if names is not None and "FATES" not in value:
@@ -670,47 +761,169 @@ def read_csv(filepath, config):
     )  # optional; None means return a single combined dict
 
     all_entries = []
+    flagged = 0
+    rows_seen: dict = {}
+    rows_kept: dict = {}
+    first_row: dict = {}
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        for row in reader:
+        # Spreadsheet row numbers: the header is row 1, so records start at 2.
+        # Deliberately NOT reader.line_num, which counts physical file lines --
+        # a single newline inside a quoted cell (test_full.csv has one, in the
+        # Formula of orog_ti-u-hxy-u) would put every later row off by one,
+        # while a spreadsheet still shows that record as one row.
+        for rownum, row in enumerate(reader, start=2):
+            realm = row.get(realm_col, "").strip()
+            rows_seen[realm] = rows_seen.get(realm, 0) + 1
+            first_row.setdefault(realm, rownum)
             if not should_keep(row, config):
                 continue
             name = row[key_col].strip()
             if not name:
                 continue
-            realm = row[realm_col].strip()
+            rows_kept[realm] = rows_kept.get(realm, 0) + 1
             entry = _build_entry(row, config)
             positive = config.get("positive_overrides", {}).get(name)
             if positive:
                 entry["positive"] = positive
-            all_entries.append((name, entry, realm))
+            problems = check_entry(
+                name, entry, row.get(config["source_column"], ""), row=rownum
+            )
+            if problems:
+                flagged += 1
+                for problem in problems:
+                    print(f"WARN {problem}", file=sys.stderr)
+            all_entries.append((name, entry, realm, rownum))
 
+    known_realms = realm_outputs or {}
+    for realm in sorted(r for r in rows_seen if r not in known_realms):
+        print(
+            f"WARN realm {realm!r} has no entry in realm_outputs: "
+            f"{rows_seen[realm]} rows dropped, first at row {first_row[realm]}",
+            file=sys.stderr,
+        )
+
+    print("realm summary (rows kept / rows seen):", file=sys.stderr)
+    for realm in sorted(rows_seen):
+        note = "" if realm in known_realms else "   <- no output file"
+        print(
+            f"  {realm or '(blank)':12s} {rows_kept.get(realm, 0):5d} /"
+            f" {rows_seen[realm]:5d}{note}",
+            file=sys.stderr,
+        )
+
+    if flagged:
+        print(
+            f"WARN {flagged} entries need review; none were dropped",
+            file=sys.stderr,
+        )
+
+    collapsed: list = []
     if realm_outputs:
         result = {}
         for realm in realm_outputs:
-            realm_entries = [(n, e) for n, e, r in all_entries if r == realm]
+            realm_entries = [(n, e, rn) for n, e, r, rn in all_entries if r == realm]
             result[realm] = {
                 "dataset_overrides": config["dataset_overrides"],
-                "variables": _group_entries(realm_entries),
+                "variables": _group_entries(realm_entries, collapsed=collapsed),
             }
+        _report_collapsed(collapsed)
         return result
 
-    entries = [(n, e) for n, e, _ in all_entries]
+    entries = [(n, e, rn) for n, e, _, rn in all_entries]
+    grouped = _group_entries(entries, collapsed=collapsed)
+    _report_collapsed(collapsed)
     return {
         "dataset_overrides": config["dataset_overrides"],
-        "variables": _group_entries(entries),
+        "variables": grouped,
     }
 
 
+def _report_collapsed(collapsed):
+    """Print the duplicate-collapse tally, if any rows were discarded."""
+    if not collapsed:
+        return
+    print(
+        f"WARN {len(collapsed)} duplicate row(s) discarded across "
+        f"{len(set(collapsed))} variable(s); see the WARN lines above",
+        file=sys.stderr,
+    )
+
+
 # ── group entries ─────────────────────────────────────────────────────────────
-def _group_entries(all_entries):
-    """Group (name, entry) pairs by name, handling variants."""
+def _render_field(value):
+    """Render one entry field for a diagnostic message.
+
+    ``sources`` is a list of dicts, which is unreadable inline, so it is
+    reduced to the model variable names it carries.
+
+    >>> _render_field([{"model_var": "QICE", "freq": "mon"}])
+    '[QICE]'
+    >>> _render_field("chunits(X)")
+    "'chunits(X)'"
+    """
+    if isinstance(value, list) and all(
+        isinstance(v, dict) and "model_var" in v for v in value
+    ):
+        return "[" + ", ".join(str(v["model_var"]) for v in value) + "]"
+    return repr(value)
+
+
+def _describe_collapse(name, kept, dropped, kept_row=None, dropped_row=None):
+    """Return the WARN lines for one discarded duplicate row.
+
+    Reports which fields differ between the row that wins and the row that is
+    thrown away, so an exact re-entry (harmless) can be told apart from two
+    rows offering genuinely different sources (real data loss).
+
+    Both rows carry the same variable name, so the name alone cannot say which
+    one to go and fix; *kept_row* and *dropped_row* are the spreadsheet rows
+    they came from.
+
+    >>> _describe_collapse("v", {"a": 1}, {"a": 1}, 4, 9)
+    ['WARN v (row 9): duplicate row discarded, keeping row 4 (rows are identical)']
+    """
+    _UNSET = "<unset>"
+    label = name if dropped_row is None else f"{name} (row {dropped_row})"
+    keeping = "the first" if kept_row is None else f"row {kept_row}"
+    differing = sorted(
+        k
+        for k in set(kept) | set(dropped)
+        if kept.get(k, _UNSET) != dropped.get(k, _UNSET)
+    )
+    if not differing:
+        return [
+            f"WARN {label}: duplicate row discarded, keeping {keeping} "
+            "(rows are identical)"
+        ]
+
+    lines = [
+        f"WARN {label}: duplicate row discarded, keeping {keeping}; "
+        f"differs in {', '.join(differing)}"
+    ]
+    for field in differing:
+        kept_val = _render_field(kept[field]) if field in kept else _UNSET
+        dropped_val = _render_field(dropped[field]) if field in dropped else _UNSET
+        lines.append(f"       {field}: kept {kept_val} / discarded {dropped_val}")
+    return lines
+
+
+def _group_entries(all_entries, collapsed=None):
+    """Group (name, entry, row) triples by name, handling variants.
+
+    *row* is the spreadsheet row the entry was built from; it is used only for
+    diagnostics.  *collapsed*, if given, is a list that receives the name of
+    every variable whose duplicate row was discarded -- one append per
+    discarded row -- so the caller can report a total.
+    """
     grouped = {}
-    for name, entry in all_entries:
-        grouped.setdefault(name, []).append(entry)
+    for name, entry, rownum in all_entries:
+        grouped.setdefault(name, []).append((entry, rownum))
 
     data = {}
-    for name, entries in grouped.items():
+    for name, pairs in grouped.items():
+        entries = [e for e, _ in pairs]
+        rownums = [r for _, r in pairs]
         if len(entries) == 1:
             data[name] = entries[0]
         else:
@@ -722,7 +935,13 @@ def _group_entries(all_entries):
                 base["variants"] = variants
                 data[name] = base
             else:
-                # Multiple rows for non-seaIce variables are duplicates; use the first.
+                for dropped, dropped_row in pairs[1:]:
+                    for line in _describe_collapse(
+                        name, entries[0], dropped, rownums[0], dropped_row
+                    ):
+                        print(line, file=sys.stderr)
+                    if collapsed is not None:
+                        collapsed.append(name)
                 data[name] = entries[0]
     return data
 
@@ -783,7 +1002,21 @@ def main():
         default=None,
         help="Input CSV file (default: model-specific)",
     )
+    parser.add_argument(
+        "--outdir",
+        default=".",
+        help="Directory to write the YAML files into (default: current directory)",
+    )
+    parser.add_argument(
+        "-d",
+        "--dry-run",
+        action="store_true",
+        help="Parse the CSV and report problems without writing any files",
+    )
     args = parser.parse_args()
+
+    if not args.dry_run:
+        os.makedirs(args.outdir, exist_ok=True)
 
     config = MODEL_CONFIGS[args.model]
     input_file = args.input or config["default_input"]
@@ -800,11 +1033,15 @@ def main():
 
     total = 0
     for output_file, file_data in merged.items():
-        write_yaml(file_data, output_file)
+        output_path = os.path.join(args.outdir, output_file)
+        if not args.dry_run:
+            write_yaml(file_data, output_path)
         count = len(file_data["variables"])
         total += count
-        print(f"wrote {count} entries to {output_file}")
-    print(f"total: {total} entries written across {len(merged)} files")
+        verb = "would write" if args.dry_run else "wrote"
+        print(f"{verb} {count} entries to {output_path}")
+    verb = "would be written" if args.dry_run else "written"
+    print(f"total: {total} entries {verb} across {len(merged)} files")
 
 
 if __name__ == "__main__":
