@@ -46,6 +46,7 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     dims: [lon, lat, time]
+    formula: TOTECOSYSC / 1000
     sources: [model_var: TOTECOSYSC]
     table: land
     units: kg m-2
@@ -63,7 +64,7 @@ variables:
       dead organic matter composed of coarse wood. It is distinct from fine litter.
       The precise distinction between "fine" and "coarse" is model dependent.'
     dims: [lon, lat, time]
-    formula: (FATES_LITTER_BG_CWD_EL)*FATES_FRACTION
+    formula: (sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
     sources: [model_var: FATES_LITTER_BG_CWD_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -71,7 +72,8 @@ variables:
   cLitterSubSurf_tavg-u-hxy-lnd:
     description: subsurface litter pool fed by root inputs.
     dims: [lon, lat, time]
-    formula: (FATES_LITTER_BG_FINE_EL + FATES_LITTER_BG_CWD_EL)*FATES_FRACTION
+    formula: (sumover_index(FATES_LITTER_BG_FINE_EL, indexlist=[1], dimname='fates_levelem')
+      + sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
     sources: [model_var: FATES_LITTER_BG_FINE_EL, model_var: FATES_LITTER_BG_CWD_EL,
       model_var: FATES_FRACTION]
     table: land
@@ -81,7 +83,7 @@ variables:
     description: Surface or near-surface litter pool fed by leaf and above-ground
       litterfall
     dims: [lon, lat, time]
-    formula: (FATES_LITTER_AG_FINE_EL)*FATES_FRACTION
+    formula: (sumover_index(FATES_LITTER_AG_FINE_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
     sources: [model_var: FATES_LITTER_AG_FINE_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -92,20 +94,6 @@ variables:
     formula: (FATES_SEED_BANK + FATES_REPROC + FATES_STOREC)*FATES_FRACTION
     sources: [model_var: FATES_SEED_BANK, model_var: FATES_REPROC, model_var: FATES_STOREC,
       model_var: FATES_FRACTION]
-    table: land
-    units: kg m-2
-
-  cProductLut_tpt-u-hxy-multi:
-    description: Anthropogenic pools associated with land use tiles into which harvests
-      and cleared carbon are deposited before release into atmosphere PLUS any remaining
-      anthropogenic pools that may be associated with lands which were converted into
-      land use tiles during reported period. Examples of products include paper, cardboard,
-      timber for construction, and crop harvest for food or fuel. Does NOT include
-      residue which is deposited into soil or litter; end of year values (not annual
-      mean).
-    dims: [lon, lat, landuse, time]
-    formula: CROPPROD1C+TOT_WOODPRODC
-    sources: [model_var: CROPPROD1C, model_var: TOT_WOODPRODC]
     table: land
     units: kg m-2
 
@@ -350,7 +338,7 @@ variables:
     description: Carbon mass flux per unit area into soil from litter (dead plant
       material in or above the soil).
     dims: [lon, lat, time]
-    formula: (FATES_LITTER_OUT_EL)*FATES_FRACTION
+    formula: (sumover_index(FATES_LITTER_OUT_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
     sources: [model_var: FATES_LITTER_OUT_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -358,6 +346,7 @@ variables:
   fLuc_tavg-u-hxy-lnd:
     description: Net Carbon Mass Flux into Atmosphere due to Land Use Change
     dims: [lon, lat, time]
+    formula: LAND_USE_FLUX / 1000
     sources: [model_var: LAND_USE_FLUX]
     table: land
     units: kg m-2 s-1
@@ -372,39 +361,11 @@ variables:
     table: land
     units: kg m-2 s-1
 
-  fN2O_tavg-u-hxy-lnd:
-    description: Surface upward flux of nitrous oxide (N2O) from vegetation (any living
-      plants e.g. trees, shrubs, grass), litter (dead plant material in or above the
-      soil), soil.
-    dims: [lon, lat, time]
-    formula: F_N2O_DENIT+F_N2O_NIT
-    positive: up
-    sources: [model_var: F_N2O_DENIT, model_var: F_N2O_NIT]
-    table: land
-    units: kg m-2 s-1
-
   fNLandToOcean_tavg-u-hxy-lnd:
     description: leached nitrogen etc that goes into run off or river routing and
       finds its way into ocean should be reported here.
     dims: [lon, lat, time]
     formula: (SMIN_NO3_LEACHED+ SMIN_NO3_RUNOFF) / 1000
-    sources: [model_var: SMIN_NO3_LEACHED, model_var: SMIN_NO3_RUNOFF]
-    table: land
-    units: kg m-2 s-1
-
-  fNOx_tavg-u-hxy-lnd:
-    description: The surface called "surface" means the lower boundary of the atmosphere.
-      "Upward" indicates a vector component which is positive when directed upward
-      (negative downward). In accordance with common usage in geophysical disciplines,
-      "flux" implies per unit area, called "flux density" in physics. The phrase "expressed_as"
-      is used in the construction A_expressed_as_B, where B is a chemical constituent
-      of A. It means that the quantity indicated by the standard name is calculated
-      solely with respect to the B contained in A, neglecting all other chemical constituents
-      of A. "Nox" means a combination of two radical species containing nitrogen and
-      oxygen NO+NO2. "Vegetation" means any living plants e.g. trees, shrubs, grass.
-      "Litter" is dead plant material in or above the soil.
-    dims: [lon, lat, time]
-    formula: SMIN_NO3_LEACHED+SMIN_NO3_RUNOFF
     sources: [model_var: SMIN_NO3_LEACHED, model_var: SMIN_NO3_RUNOFF]
     table: land
     units: kg m-2 s-1
@@ -417,37 +378,6 @@ variables:
     dims: [lon, lat, time]
     formula: DWT_WOODPRODN_GAIN + DWT_CROPPROD1N_GAIN
     sources: [model_var: DWT_WOODPRODN_GAIN, model_var: DWT_CROPPROD1N_GAIN]
-    table: land
-    units: kg m-2 s-1
-
-  fNdep_tavg-u-hxy-lnd:
-    description: Surface deposition rate of nitrogen.
-    dims: [lon, lat, time]
-    sources: [model_var: NDEP_TO_SMINN]
-    table: land
-    units: kg m-2 s-1
-
-  fNgasFire_tavg-u-hxy-lnd:
-    description: Flux of Nitrogen from the land into the atmosphere due to fire
-    dims: [lon, lat, time]
-    sources: [model_var: COL_FIRE_NLOSS]
-    table: land
-    units: kg m-2 s-1
-
-  fNgasNonFire_tavg-u-hxy-lnd:
-    description: Flux of Nitrogen from the land into the atmosphere due to all processes
-      other than fire
-    dims: [lon, lat, time]
-    formula: DENIT+F_N2O_NIT
-    sources: [model_var: DENIT, model_var: F_N2O_NIT]
-    table: land
-    units: kg m-2 s-1
-
-  fNgas_tavg-u-hxy-lnd:
-    description: Total flux of Nitrogen from the land into the atmosphere.
-    dims: [lon, lat, time]
-    formula: DENIT+F_N2O_NIT+COL_FIRE_NLOSS
-    sources: [model_var: DENIT, model_var: F_N2O_NIT, model_var: COL_FIRE_NLOSS]
     table: land
     units: kg m-2 s-1
 
@@ -471,17 +401,6 @@ variables:
     formula: DENIT+ F_N2O_NIT+ SMIN_NO3_LEACHED + SMIN_NO3_RUNOFF
     sources: [model_var: DENIT, model_var: F_N2O_NIT, model_var: SMIN_NO3_LEACHED,
       model_var: SMIN_NO3_RUNOFF]
-    table: land
-    units: kg m-2 s-1
-
-  fNnetmin_tavg-u-hxy-lnd:
-    description: Loss of soil nitrogen through remineralization and immobilisation.
-      Remineralization is the degradation of organic matter into inorganic forms of
-      carbon, nitrogen, phosphorus and other micronutrients, which consumes oxygen
-      and releases energy. Immobilisation of nitrogen refers to retention of nitrogen
-      by micro-organisms under certain conditions, making it unavailable for plants.
-    dims: [lon, lat, time]
-    sources: [model_var: NET_NMIN]
     table: land
     units: kg m-2 s-1
 
@@ -521,7 +440,7 @@ variables:
     description: needed to separate changing vegetation C turnover times resulting
       from changing allocation versus changing mortality
     dims: [lon, lat, time]
-    formula: (FATES_LITTER_IN_EL-FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
+    formula: (sumover_index(FATES_LITTER_IN_EL, indexlist=[1], dimname='fates_levelem')-FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
     sources: [model_var: FATES_LITTER_IN_EL, model_var: FATES_MORTALITY_CFLUX_CANOPY,
       model_var: FATES_MORTALITY_CFLUX_USTORY, model_var: FATES_FRACTION]
     table: land
@@ -536,7 +455,7 @@ variables:
       standard names mass_flux_of_carbon_into_litter_from_vegetation_due_to_mortality
       and mass_flux_of_carbon_into_litter_from_vegetation_due_to_senescence is mass_flux_of_carbon_into_litter_from_vegetation.
     dims: [lon, lat, time]
-    formula: (FATES_LITTER_IN_EL)*FATES_FRACTION
+    formula: (sumover_index(FATES_LITTER_IN_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
     sources: [model_var: FATES_LITTER_IN_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -778,22 +697,6 @@ variables:
     dims: [lon, lat, time]
     formula: TOTECOSYSN / 1000
     sources: [model_var: TOTECOSYSN]
-    table: land
-    units: kg m-2
-
-  nMineralNH4_tavg-u-hxy-lnd:
-    description: SUM of ammonium over all soil layers
-    dims: [lon, lat, time]
-    formula: SMIN_NH4 / 1000
-    sources: [model_var: SMIN_NH4]
-    table: land
-    units: kg m-2
-
-  nMineralNO3_tavg-u-hxy-lnd:
-    description: SUM of nitrate over all soil layers
-    dims: [lon, lat, time]
-    formula: SMIN_NO3 / 1000
-    sources: [model_var: SMIN_NO3]
     table: land
     units: kg m-2
 
@@ -1172,9 +1075,9 @@ variables:
   shrubFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by shrub.
     dims: [lon, lat, time, typeshrub]
-    formula: sumover_index(FATES_CROWNAREA_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft')
-      *FATES_FRACTION
-    sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
+    formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[7, 8, 9, 10, 11],
+      dimname='fates_levpft') *FATES_FRACTION
+    sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
@@ -1201,19 +1104,6 @@ variables:
     sources: [model_var: H2OSFC, model_var: VOLR]
     table: land
     units: kg m-2
-
-  sweLut_tavg-u-hxy-multi:
-    description: The surface called "surface" means the lower boundary of the atmosphere.
-      "lwe" means liquid water equivalent. "Amount" means mass per unit area. The
-      construction lwe_thickness_of_X_amount or _content means the vertical extent
-      of a layer of liquid water having the same mass per unit area. Surface amount
-      refers to the amount on the ground, excluding that on the plant or vegetation
-      canopy.
-    dims: [lon, lat, landuse, time]
-    formula: SNOWICE+SNOWLIQ
-    sources: [model_var: SNOWICE, model_var: SNOWLIQ]
-    table: land
-    units: m
 
   tasLut_tavg-h2m-hxy-multi:
     description: Air temperature is the bulk temperature of the air, not the surface
@@ -1277,8 +1167,8 @@ variables:
   treeFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by trees.
     dims: [lon, lat, time, typetree]
-    formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')
-      *FATES_FRACTION*100
+    formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[1, 2, 3, 4, 5, 6],
+      dimname='fates_levpft') *FATES_FRACTION*100
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
