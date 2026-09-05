@@ -8,6 +8,7 @@ import xarray as xr
 import pytest  # type: ignore
 
 from cmip7_prep import regrid
+from cmip7_prep.regrid_maps import get_map_paths, load_intensive_vars
 
 
 class _FakeRegridder:
@@ -209,7 +210,31 @@ def test_pick_maps_noresm_ne16_defaults():
     bilin = regrid._pick_maps(  # pylint: disable=protected-access
         "tas", resolution="ne16", model="noresm"
     )
+    paths = get_map_paths("noresm", "ne16")
     assert cons.method_label == "conservative"
-    assert cons.path == regrid.DEFAULT_CONS_MAP_NE16_noresm
+    assert cons.path == paths["conservative"]
     assert bilin.method_label == "bilinear"
-    assert bilin.path == regrid.DEFAULT_BILIN_MAP_NE16_noresm
+    assert bilin.path == paths["bilinear"]
+
+
+def test_pick_maps_unknown_resolution_raises():
+    """An unknown resolution fails instead of falling back to another grid."""
+    with pytest.raises(ValueError, match="No regrid maps defined"):
+        regrid._pick_maps(  # pylint: disable=protected-access
+            "pr", resolution="ne120", model="noresm"
+        )
+
+
+def test_intensive_vars_loaded_from_yaml():
+    """The bilinear-variable list comes from the shared YAML table."""
+    intensive = load_intensive_vars()
+    assert "tas" in intensive
+    assert "pr" not in intensive
+
+
+def test_pick_maps_uses_intensive_list():
+    """A variable off the intensive list takes the conservative map."""
+    spec = regrid._pick_maps(  # pylint: disable=protected-access
+        "pr", resolution="ne16", model="noresm"
+    )
+    assert spec.method_label == "conservative"

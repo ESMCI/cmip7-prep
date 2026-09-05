@@ -363,8 +363,7 @@ variables:
   co2mass_tavg-u-hm-u:
     description: Total atmospheric mass of Carbon Dioxide
     dims: [time]
-    formula: co2vmr*1.5172413793
-    sources: [model_var: co2vmr]
+    sources: [model_var: TMCO2]
     table: atmos
     units: kg
 
@@ -565,7 +564,7 @@ variables:
 
   hus_tpt-p7h-hxy-air:
     description: Extra levels - 925, 700, 600, 300, 50
-    dims: [plev, lat, lon, time]
+    dims: [time, plev, lat, lon]
     levels: {name: plev7h, units: Pa}
     sources: [model_var: Q]
     table: atmos
@@ -691,12 +690,37 @@ variables:
     table: atmos
     units: Pa
 
+  pfull_tavg-al-hxy-u:
+    description: The atmospheric pressure at the model layer midpoints for all times
+      and levels in the associated output variables
+    dims: [lon, lat, lev, time]
+    levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
+      units: '1'}
+    sources: [model_var: PMID]
+    table: atmos
+    units: Pa
+
   pfull_tpt-al-hxy-u:
     description: Air pressure on model levels
     dims: [lon, lat, lev, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     sources: [model_var: PMID]
+    table: atmos
+    units: Pa
+
+  phalf_tavg-alh-hxy-u:
+    description: The atmospheric pressure at the model layer interfaces for all times
+      and levels in the associated output variables
+    dims: [lon, lat, alevhalf, time]
+    sources: [model_var: PINT]
+    table: atmos
+    units: Pa
+
+  phalf_tpt-alh-hs-u:
+    description: Air pressure on model half-levels
+    dims: [alevhalf, site, time]
+    sources: [model_var: PINT]
     table: atmos
     units: Pa
 
@@ -864,7 +888,7 @@ variables:
     units: m
 
   reffclws_tpt-al-hs-scl:
-    description: alevel site time
+    description: alevel site time1
     dims: [lev, site, time]
     formula: 1E-6* AREL/FREQL
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
@@ -1435,7 +1459,7 @@ variables:
 
   ta_tpt-p3-hxy-air:
     description: Air Temperature
-    dims: [plev, lat, lon, time]
+    dims: [time, plev, lat, lon]
     levels: {name: plev3, units: Pa}
     sources: [model_var: T]
     table: atmos
@@ -1467,7 +1491,7 @@ variables:
     description: 'minimum near-surface (usually, 2 meter) air temperature (add cell_method
       attribute "time: min")'
     dims: [lon, lat, time, height2m]
-    sources: [model_var: TREFMNAV]
+    sources: [model_var: TREFHTMN]
     table: atmos
     units: K
 
@@ -1624,7 +1648,7 @@ variables:
 
   ua_tpt-p3-hxy-air:
     description: Zonal wind (positive in a eastward direction).
-    dims: [plev, lat, lon, time]
+    dims: [time, plev, lat, lon]
     levels: {name: plev3, units: Pa}
     sources: [model_var: U]
     table: atmos
@@ -1683,7 +1707,7 @@ variables:
 
   va_tpt-p3-hxy-air:
     description: Meridional wind (positive in a northward direction).
-    dims: [plev, lat, lon, time]
+    dims: [time, plev, lat, lon]
     levels: {name: plev3, units: Pa}
     sources: [model_var: V]
     table: atmos
@@ -1835,7 +1859,7 @@ variables:
       height is the geopotential divided by the standard acceleration due to gravity.
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
-    dims: [plev, lat, lon, time]
+    dims: [time, plev, lat, lon]
     levels: {name: plev3, units: Pa}
     sources: [model_var: Z3]
     table: atmos
@@ -1847,7 +1871,7 @@ variables:
       height is the geopotential divided by the standard acceleration due to gravity.
       It is numerically similar to the altitude (or geometric height) and not to the
       quantity with standard name height, which is relative to the surface.
-    dims: [plev, lat, lon, time]
+    dims: [time, plev, lat, lon]
     levels: {name: plev7h, units: Pa}
     sources: [model_var: Z3]
     table: atmos

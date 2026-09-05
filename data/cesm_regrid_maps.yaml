@@ -1,0 +1,12 @@
+# ESMF regrid weight files for CESM, keyed by resolution.
+# See noresm_regrid_maps.yaml for the schema.
+
+inputdata_dir: /glade/campaign/cesm/cesmdata/inputdata/
+
+resolutions:
+  ne30:
+    conservative: cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc
+    bilinear: cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc
+  t232:
+    conservative: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc
+    bilinear: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc
