@@ -38,7 +38,7 @@ ARG TABLES_REF=cesm-dev
 RUN rm -rf cmip7-cmor-tables \
     && git clone --depth 1 --branch "${TABLES_REF}" "${TABLES_REPO}" cmip7-cmor-tables
 
-RUN pip install --no-cache-dir --no-deps .
+RUN pip install --no-cache-dir --no-deps -e .
 ENV PYTHONPATH=/opt/cmip7-prep
 
 CMD ["bash"]
