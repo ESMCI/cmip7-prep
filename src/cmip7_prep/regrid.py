@@ -718,8 +718,6 @@ def _regrid_fx_once(
         out_vars["sftlf"] = xr.open_mfdataset(sftlf_path)["sftlf"]
 
     ds_fx_native = _build_fx_native(ds_native)
-    # Determine regridder
-    regridder = RegridderCache.get(mapfile, "conservative")
 
     # Regrid sftlf from source if present
     if "sftlf" not in out_vars and "sftlf" in ds_fx_native:
@@ -745,6 +743,10 @@ def _regrid_fx_once(
                 dim=("lndgrid")
             )
             logger.debug("Total land area on source grid: %.3e m^2", lndarea.values)
+            # Built here rather than above: when sftlf already has lat/lon
+            # nothing is regridded, and constructing a regridder would demand
+            # a weight file the caller has no use for.
+            regridder = RegridderCache.get(mapfile, "conservative")
             out = regridder(da2, skipna=True, na_thres=1.0)  # Regrid
             spatial = [d for d in out.dims if d in ("lat", "lon")]
             out = out.transpose(*spatial)

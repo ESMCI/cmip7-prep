@@ -7,6 +7,16 @@ resolutions:
   ne30:
     conservative: cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_aave.nc
     bilinear: cpl/gridmaps/ne30pg3/map_ne30pg3_to_1x1d_bilin.nc
-  t232:
+  tx2_3v2:
+    conservative: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc
+    bilinear: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc
+
+  # 'regular' means the variable already carries lat/lon, so nothing is
+  # regridded (see the resolution == "regular" branch in regrid.py) and no
+  # weights are ever applied.  The entry exists only because _regrid_fx_once
+  # builds a regridder before checking whether it needs one, so the file must
+  # exist to be opened and discarded.  These are the maps the old implicit
+  # fallback used; they are named here to keep that behaviour visible.
+  regular:
     conservative: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc
     bilinear: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc

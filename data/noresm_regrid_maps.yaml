@@ -2,8 +2,8 @@
 #
 # Paths are relative to 'inputdata_dir'.  Each resolution supplies a
 # conservative map and, optionally, a bilinear one; regrid.py uses the
-# bilinear map for the intensive variables listed in INTENSIVE_VARS and
-# the conservative map for everything else, including all fx fields.
+# bilinear map for the variables listed in intensive_vars.yaml and the
+# conservative map for everything else, including all fx fields.
 #
 # Both maps for a resolution must target the SAME destination grid, or a
 # single run emits variables on two different grids.
@@ -18,5 +18,15 @@ resolutions:
     conservative: map_ne16pg3_to_2x2_aave_c20260904.nc
     bilinear: map_ne16pg3_to_2x2_blin_c20260904.nc
   tnx1v4:
+    conservative: map_tnx1v4_to_1x1_aave_c260531.nc
+    bilinear: map_tnx1v4_to_1x1_blin_c260531.nc
+
+  # 'regular' means the variable already carries lat/lon, so nothing is
+  # regridded (see the resolution == "regular" branch in regrid.py) and no
+  # weights are ever applied.  The entry exists only because _regrid_fx_once
+  # builds a regridder before checking whether it needs one, so the file must
+  # exist to be opened and discarded.  These are the maps the old implicit
+  # fallback used; they are named here to keep that behaviour visible.
+  regular:
     conservative: map_tnx1v4_to_1x1_aave_c260531.nc
     bilinear: map_tnx1v4_to_1x1_blin_c260531.nc

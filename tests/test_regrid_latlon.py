@@ -8,7 +8,11 @@ import xarray as xr
 import pytest  # type: ignore
 
 from cmip7_prep import regrid
-from cmip7_prep.regrid_maps import get_map_paths, load_intensive_vars
+from cmip7_prep.regrid_maps import (
+    get_map_paths,
+    load_intensive_vars,
+    load_regrid_maps,
+)
 
 
 class _FakeRegridder:
@@ -238,3 +242,23 @@ def test_pick_maps_uses_intensive_list():
         "pr", resolution="ne16", model="noresm"
     )
     assert spec.method_label == "conservative"
+
+
+def test_tables_cover_driver_resolution_choices():
+    """Every --resolution the driver accepts is defined for some model.
+
+    The driver's choices and the YAML keys are edited in different files, so
+    they can drift apart; a missing key turns a valid run into a ValueError.
+    """
+    driver_choices = {"ne16", "ne30", "tx2_3v2", "tnx1v4", "regular"}
+    defined = set()
+    for model in ("cesm", "noresm"):
+        defined |= set(load_regrid_maps(model)["resolutions"])
+    assert driver_choices <= defined
+
+
+def test_regular_resolution_has_maps():
+    """'regular' skips regridding, but the fx path still asks for a map."""
+    for model in ("cesm", "noresm"):
+        assert "conservative" in get_map_paths(model, "regular")
+
