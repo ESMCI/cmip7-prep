@@ -771,6 +771,10 @@ def read_csv(filepath, config):
         # Formula of orog_ti-u-hxy-u) would put every later row off by one,
         # while a spreadsheet still shows that record as one row.
         for rownum, row in enumerate(reader, start=2):
+            # Drop [COSP]-style simulator tags from the source cell
+            src_col = config["source_column"]
+            if row.get(src_col):
+                row[src_col] = re.sub(r"\s*\[[^\]]*\]", "", row[src_col]).strip()
             realm = row.get(realm_col, "").strip()
             rows_seen[realm] = rows_seen.get(realm, 0) + 1
             first_row.setdefault(realm, rownum)

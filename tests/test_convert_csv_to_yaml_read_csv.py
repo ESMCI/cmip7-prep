@@ -422,6 +422,33 @@ class TestReadCsvCESM:
         assert variables["clt"]["formula"] == "CLDTOT * 100"
         assert "formula" not in variables["pr"]
 
+    def test_cosp_annotation_stripped_from_source(self, tmp_path):
+        """[COSP] tags are dropped per token, so comma-separated lists survive."""
+        rows = [
+            self._row(
+                **{
+                    "Branded Variable Name": "clt",
+                    "Modelling Realm - Primary": "atmos",
+                    "CESM Variable Name": "CLDTOT_CAL  [COSP]",
+                }
+            ),
+            self._row(
+                **{
+                    "Branded Variable Name": "clmodis",
+                    "Modelling Realm - Primary": "atmos",
+                    "CESM Variable Name": "IWPMODIS [COSP], CLWMODIS [COSP]",
+                }
+            ),
+        ]
+        variables = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG
+        )["atmos"]["variables"]
+        assert variables["clt"]["sources"] == [{"model_var": "CLDTOT_CAL"}]
+        assert variables["clmodis"]["sources"] == [
+            {"model_var": "IWPMODIS"},
+            {"model_var": "CLWMODIS"},
+        ]
+
     def test_scale_from_column(self, tmp_path):
         """Scale column is merged into the sources list as a float."""
         rows = [
