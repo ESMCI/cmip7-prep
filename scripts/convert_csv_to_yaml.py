@@ -6,6 +6,7 @@ import yaml
 import re
 import sys
 import argparse
+from collections import Counter
 from typing import Optional
 
 from cmip7_prep.mapping_compat import FORMULA_NAMESPACE
@@ -908,6 +909,63 @@ def _describe_collapse(name, kept, dropped, kept_row=None, dropped_row=None):
     return lines
 
 
+_MERGE_IGNORE_FIELDS = ("description", "long_name")
+
+
+def _source_key(s):
+    """Identity of a source dict for de-duplication across merged rows."""
+    if not isinstance(s, dict):
+        return (s,)
+    return (s.get("model_var"), s.get("freq"), s.get("alias"))
+
+
+def _union_sources(entries):
+    """Union the ``sources`` lists of *entries*, preserving order, de-duped."""
+    seen = set()
+    union = []
+    for e in entries:
+        for s in e.get("sources", []):
+            key = _source_key(s)
+            if key in seen:
+                continue
+            seen.add(key)
+            union.append(s)
+    return union
+
+
+def _freq_mergeable(entries, union):
+    """True if *entries* are the same variable emitted at different frequencies.
+
+    They must agree on every field except the source
+    list and ignorable free-text and any source that is *not* shared
+    identically by all rows must carry a ``freq`` tag so the pipeline's
+    ``_filter_sources`` can pick the right one per output frequency.  Sources
+    present in every row (shared formula inputs such as ``tarea``) may stay
+    untagged.  *union* is the already-computed ``_union_sources(entries)``.
+    """
+    if len(entries) < 2:
+        return True
+
+    def sig(e):
+        return {
+            k: v
+            for k, v in e.items()
+            if k not in _MERGE_IGNORE_FIELDS and k != "sources"
+        }
+
+    base = sig(entries[0])
+    if any(sig(e) != base for e in entries[1:]):
+        return False
+
+    counts = Counter(_source_key(s) for e in entries for s in e.get("sources", []))
+    n = len(entries)
+    for s in union:
+        shared = counts[_source_key(s)] == n
+        if not shared and not (isinstance(s, dict) and s.get("freq")):
+            return False
+    return True
+
+
 def _group_entries(all_entries, collapsed=None):
     """Group (name, entry, row) triples by name, handling variants.
 
@@ -915,34 +973,67 @@ def _group_entries(all_entries, collapsed=None):
     diagnostics.  *collapsed*, if given, is a list that receives the name of
     every variable whose duplicate row was discarded -- one append per
     discarded row -- so the caller can report a total.
+
+    Rows that share a branded name but only differ in output frequency (the new
+    per-frequency CSV layout: one row per ``Freq``) are merged into a single
+    entry carrying per-source ``freq`` tags -- the shape the pipeline already
+    understands and that NorESM seaIce uses -- instead of being discarded.
     """
     grouped = {}
     for name, entry, rownum in all_entries:
         grouped.setdefault(name, []).append((entry, rownum))
 
+    def _discard(kept, kept_row, drop_pairs):
+        """Report *drop_pairs* as discarded relative to *kept*."""
+        for dropped, dropped_row in drop_pairs:
+            for line in _describe_collapse(name, kept, dropped, kept_row, dropped_row):
+                print(line, file=sys.stderr)
+            if collapsed is not None:
+                collapsed.append(name)
+
     data = {}
     for name, pairs in grouped.items():
-        entries = [e for e, _ in pairs]
-        rownums = [r for _, r in pairs]
-        if len(entries) == 1:
-            data[name] = entries[0]
-        else:
-            if entries[0].get("table") == "seaIce":
-                base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
-                variants = [
-                    {k: e[k] for k in _VARIANT_FIELDS if k in e} for e in entries
-                ]
-                base["variants"] = variants
-                data[name] = base
+        if len(pairs) == 1:
+            data[name] = pairs[0][0]
+            continue
+
+        by_region: dict = {}
+        for entry, rownum in pairs:
+            by_region.setdefault(entry.get("region"), []).append((entry, rownum))
+
+        region_entries = []  # (entry, first_rownum) per distinct region
+        for region_pairs in by_region.values():
+            ents = [e for e, _ in region_pairs]
+            first_row = region_pairs[0][1]
+            union = _union_sources(ents)
+            if (
+                len(ents) > 1
+                and len(union) > len(ents[0].get("sources", []))
+                and _freq_mergeable(ents, union)
+            ):
+                print(
+                    f"INFO {name}: merged {len(ents)} frequency rows into "
+                    f"{len(union)} freq-tagged source(s)",
+                    file=sys.stderr,
+                )
+                region_entries.append(({**ents[0], "sources": union}, first_row))
             else:
-                for dropped, dropped_row in pairs[1:]:
-                    for line in _describe_collapse(
-                        name, entries[0], dropped, rownums[0], dropped_row
-                    ):
-                        print(line, file=sys.stderr)
-                    if collapsed is not None:
-                        collapsed.append(name)
-                data[name] = entries[0]
+                _discard(ents[0], first_row, region_pairs[1:])
+                region_entries.append((ents[0], first_row))
+
+        if len(region_entries) == 1:
+            data[name] = region_entries[0][0]
+        elif pairs[0][0].get("table") == "seaIce":
+            regs = [e for e, _ in region_entries]
+            base = {k: v for k, v in regs[0].items() if k not in _VARIANT_FIELDS}
+            base["variants"] = [
+                {k: e[k] for k in _VARIANT_FIELDS if k in e} for e in regs
+            ]
+            data[name] = base
+        else:
+            kept_entry, kept_row = region_entries[0]
+            _discard(kept_entry, kept_row, region_entries[1:])
+            data[name] = kept_entry
     return data
 
 
