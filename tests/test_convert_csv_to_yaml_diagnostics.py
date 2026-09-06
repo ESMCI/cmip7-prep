@@ -33,13 +33,17 @@ class TestCheckEntry:
 
     def test_undefined_function_is_flagged(self):
         """A syntactically valid call to a missing function is reported."""
-        problems = check_entry("v", {"formula": "chunits(QICE, units='kg m-2 s-1')"})
-        assert problems == ["v: formula calls undefined function 'chunits'"]
+        problems = check_entry("v", {"formula": "no_such_fn(QICE, units='kg m-2 s-1')"})
+        assert problems == ["v: formula calls undefined function 'no_such_fn'"]
+
+    def test_registered_formula_function_is_silent(self):
+        """A call to a registered (even if unimplemented) function is accepted."""
+        assert check_entry("v", {"formula": "chunits(QICE, units='kg m-2 s-1')"}) == []
 
     def test_each_undefined_function_reported_once(self):
         """Repeated calls to the same missing function collapse to one problem."""
-        problems = check_entry("v", {"formula": "chunits(A) + chunits(B)"})
-        assert problems == ["v: formula calls undefined function 'chunits'"]
+        problems = check_entry("v", {"formula": "no_such_fn(A) + no_such_fn(B)"})
+        assert problems == ["v: formula calls undefined function 'no_such_fn'"]
 
     def test_method_calls_are_not_flagged(self):
         """DataArray method calls have no resolvable name and are left alone."""
@@ -140,7 +144,7 @@ class TestGroupEntriesDuplicates:
                 "acabf",
                 {
                     "table": "landIce",
-                    "formula": 'chunits(QICE, units="kg m-2 s-1")',
+                    "formula": 'no_such_fn(QICE, units="kg m-2 s-1")',
                     "sources": [{"model_var": "QICE"}],
                 },
                 412,
@@ -198,18 +202,18 @@ class TestCheckEntryRowNumbers:
 
     def test_row_is_included_when_given(self):
         """The row number lands between the name and the problem."""
-        problems = check_entry("v", {"formula": "chunits(X)"}, row=858)
-        assert problems == ["v (row 858): formula calls undefined function 'chunits'"]
+        problems = check_entry("v", {"formula": "no_such_fn(X)"}, row=858)
+        assert problems == ["v (row 858): formula calls undefined function 'no_such_fn'"]
 
     def test_row_is_omitted_when_not_given(self):
         """Without a row the message keeps its original shape."""
-        problems = check_entry("v", {"formula": "chunits(X)"})
-        assert problems == ["v: formula calls undefined function 'chunits'"]
+        problems = check_entry("v", {"formula": "no_such_fn(X)"})
+        assert problems == ["v: formula calls undefined function 'no_such_fn'"]
 
     def test_every_problem_on_a_row_is_labelled(self):
         """A row tripping several checks gets the row on each line."""
         problems = check_entry(
-            "v", {"formula": "chunits(X)"}, raw_source="IWPMODIS [COSP]", row=7
+            "v", {"formula": "no_such_fn(X)"}, raw_source="IWPMODIS [COSP]", row=7
         )
         assert len(problems) == 2
         assert all(p.startswith("v (row 7): ") for p in problems)
@@ -226,7 +230,7 @@ class TestReadCsvRowNumbers:
         base.update(kwargs)
         return base
 
-    def _bad(self, name, formula="chunits(X)"):
+    def _bad(self, name, formula="no_such_fn(X)"):
         return self._row(
             **{
                 "Branded Variable Name": name,
@@ -247,7 +251,7 @@ class TestReadCsvRowNumbers:
         """A cell containing a newline must not shift later row numbers."""
         rows = [
             self._bad("a"),  # row 2
-            self._bad("b", formula="chunits(X)\nsecond physical line"),  # row 3
+            self._bad("b", formula="no_such_fn(X)\nsecond physical line"),  # row 3
             self._bad("c"),  # row 4, but file line 5
         ]
         path = _write_temp_csv(tmp_path, self.FIELDNAMES, rows)

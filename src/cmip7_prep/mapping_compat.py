@@ -313,6 +313,32 @@ def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
     weights = xr.DataArray(w, dims=(levelname,), coords={levelname: arr[levelname]})
     return (arr * weights).sum(dim=levelname)
 
+_UNIMPLEMENTED_FORMULAS: Dict[str, str] = {
+    "chunits": "relabel a DataArray's units without converting values",
+    "sum": "sum over a named dimension",
+    "masked_invalid": "mask non-finite values",
+    "dailymax": "daily-maximum resample",
+    "yeartomonth_data": "expand CLM annual data onto the monthly time axis",
+    "CLM_pft_to_CMIP6_vegtype": "remap CLM PFTs onto CMIP6 vegtype tiles",
+    "CLM_landunit_to_CMIP6_Lut": "remap CLM landunits onto CMIP6 land-use tiles",
+    "reduce_lu": "reduce a landunit-resolved field",
+    "get_soilpools": "aggregate CLM soil carbon pools",
+    "burntFraction": "burnt-area fraction",
+}
+
+
+def _unimplemented_formula(name: str, purpose: str):
+    """Build a placeholder formula function that raises when evaluated."""
+
+    def stub(*_args, **_kwargs):
+        raise NotImplementedError(
+            f"formula function {name!r} ({purpose}) is registered for the CESM3 "
+            "port but not yet implemented"
+        )
+
+    stub.__name__ = name
+    return stub
+
 
 FORMULA_NAMESPACE: Dict[str, Any] = {
     "np": np,
@@ -320,6 +346,10 @@ FORMULA_NAMESPACE: Dict[str, Any] = {
     "verticalsum": verticalsum,
     "sumover_index": sumover_index,
     "verticalmean": verticalmean,
+    **{
+        name: _unimplemented_formula(name, purpose)
+        for name, purpose in _UNIMPLEMENTED_FORMULAS.items()
+    },
 }
 
 

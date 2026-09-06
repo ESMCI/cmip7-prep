@@ -8,11 +8,21 @@ import xarray as xr
 import numpy as np
 import pytest
 from cmip7_prep.mapping_compat import (
+    FORMULA_NAMESPACE,
+    _UNIMPLEMENTED_FORMULAS,
     Mapping,
     _filter_sources,
     _safe_eval,
     _to_varconfig,
 )
+
+
+def test_unimplemented_formula_stubs_registered_and_raise():
+    """Each stub is in the namespace and raises NotImplementedError when called."""
+    for name in _UNIMPLEMENTED_FORMULAS:
+        assert name in FORMULA_NAMESPACE
+        with pytest.raises(NotImplementedError):
+            _safe_eval(f"{name}(1)", {})
 
 
 def test_dict_style_sources_model_var():
