@@ -620,11 +620,9 @@ def _build_entry(row, config):
             continue  # skip columns absent from this CSV
         value = row[csv_col].strip()
         if yaml_key == "_formula":
-            # An explicit (possibly empty) Formula column is authoritative: clear
-            # any formula that _source_expr may have set from the human-readable
-            # CESM Variable Name column (round-trip case).
-            if value:
-                entry["formula"] = value
+            formula = value.split("#", 1)[0].strip()
+            if formula:
+                entry["formula"] = formula
             else:
                 entry.pop("formula", None)
             continue

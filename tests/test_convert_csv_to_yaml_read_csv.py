@@ -395,6 +395,33 @@ class TestReadCsvCESM:
         assert var["formula"] == "CLDTOT * 100"
         assert var["sources"] == [{"model_var": "CLDTOT"}]
 
+    def test_formula_history_note_dropped(self, tmp_path):
+        """A trailing # note is stripped; a note-only cell leaves no formula."""
+        rows = [
+            self._row(
+                **{
+                    "Branded Variable Name": "clt",
+                    "Modelling Realm - Primary": "atmos",
+                    "Dimensions": "time, lat, lon",
+                    "CESM Variable Name": "CLDTOT",
+                    "Formula": "CLDTOT * 100  #clm2.h0a",
+                }
+            ),
+            self._row(
+                **{
+                    "Branded Variable Name": "pr",
+                    "Modelling Realm - Primary": "atmos",
+                    "Dimensions": "time, lat, lon",
+                    "CESM Variable Name": "PRECT",
+                    "Formula": "#h0a file",
+                }
+            ),
+        ]
+        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        variables = data["atmos"]["variables"]
+        assert variables["clt"]["formula"] == "CLDTOT * 100"
+        assert "formula" not in variables["pr"]
+
     def test_scale_from_column(self, tmp_path):
         """Scale column is merged into the sources list as a float."""
         rows = [
