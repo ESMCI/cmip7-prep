@@ -246,8 +246,12 @@ class TestShouldKeepCESM:
 
     CFG = MODEL_CONFIGS["cesm"]
 
-    def _row(self, realm, source):
-        return {"Modelling Realm - Primary": realm, "CESM Variable Name": source}
+    def _row(self, realm, source, region=""):
+        return {
+            "Modelling Realm - Primary": realm,
+            "CESM Variable Name": source,
+            "Region": region,
+        }
 
     def test_keep_atmos(self):
         """Atmos rows with a valid source are kept."""
@@ -276,6 +280,17 @@ class TestShouldKeepCESM:
     def test_keep_math_expression(self):
         """Rows with a math expression as the source are kept."""
         assert should_keep(self._row("atmos", "CLDTOT * 100"), self.CFG) is True
+
+    def test_keep_global_region(self):
+        """The global region is kept."""
+        assert should_keep(self._row("atmos", "TREFHT", region="glb"), self.CFG) is True
+
+    def test_drop_30s_90s_region(self):
+        """The 30S-90S regional duplicate is dropped (pipeline never emits it)."""
+        assert (
+            should_keep(self._row("atmos", "TREFHT", region="30S-90S"), self.CFG)
+            is False
+        )
 
 
 # ── clean_string / clean_strings ──────────────────────────────────────────────

@@ -74,6 +74,9 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
 #   realm_outputs       : maps realm name → output YAML path; only realms listed here are kept
 #   source_column       : CSV column containing the model variable expression
 #   source_skip_phrases : rows whose source column contains any of these are dropped
+#   region_column       : CSV column containing the region (optional)
+#   region_skip_values  : rows whose region equals any of these are dropped -- used
+#                         for regional duplicates the pipeline never emits (30S-90S)
 #   dataset_overrides   : written verbatim as the top-level "dataset_overrides" block
 #   default_input       : default CSV path when --input is omitted
 
@@ -167,6 +170,8 @@ MODEL_CONFIGS = {
         },
         "source_column": "CESM Variable Name",
         "source_skip_phrases": ["N/A"],
+        "region_column": "Region",
+        "region_skip_values": ["30S-90S"],
         "key_column_skip_phrases": [],
     },
 }
@@ -210,6 +215,12 @@ def should_keep(row, config):
     skip_phrases = config.get("source_skip_phrases", [])
 
     if row.get(realm_col) not in config["realm_outputs"]:
+        return False
+
+    region_col = config.get("region_column")
+    if region_col and row.get(region_col, "").strip() in config.get(
+        "region_skip_values", []
+    ):
         return False
 
     source = row.get(source_col, "").strip()
