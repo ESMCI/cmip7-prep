@@ -229,8 +229,8 @@ class TestReadCsvRowNumbers:
     def _bad(self, name, formula="chunits(X)"):
         return self._row(
             **{
-                "CMIP Branded Variable Name": name,
-                "Table": "atmos",
+                "Branded Variable Name": name,
+                "Modelling Realm - Primary": "atmos",
                 "Dimensions": "time, lat, lon",
                 "CESM Variable Name": "X",
                 "Formula": formula,
@@ -262,8 +262,8 @@ class TestReadCsvRowNumbers:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "skipped",
-                    "Table": "atmos",
+                    "Branded Variable Name": "skipped",
+                    "Modelling Realm - Primary": "atmos",
                     "CESM Variable Name": "N/A",
                 }
             ),  # row 2, dropped by source_skip_phrases

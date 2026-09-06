@@ -247,7 +247,7 @@ class TestShouldKeepCESM:
     CFG = MODEL_CONFIGS["cesm"]
 
     def _row(self, realm, source):
-        return {"Table": realm, "CESM Variable Name": source}
+        return {"Modelling Realm - Primary": realm, "CESM Variable Name": source}
 
     def test_keep_atmos(self):
         """Atmos rows with a valid source are kept."""
@@ -265,9 +265,9 @@ class TestShouldKeepCESM:
         """SeaIce rows are kept for CESM."""
         assert should_keep(self._row("seaIce", "siconc"), self.CFG) is True
 
-    def test_keep_fx(self):
-        """FX rows are kept for CESM (written into the ocean yaml)."""
-        assert should_keep(self._row("fx", "deptho"), self.CFG) is True
+    def test_drop_fx(self):
+        """FX is not a realm in the CESM3 layout, so those rows are dropped."""
+        assert should_keep(self._row("fx", "deptho"), self.CFG) is False
 
     def test_skip_empty_source(self):
         """Rows with an empty source field are skipped."""

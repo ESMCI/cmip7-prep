@@ -233,10 +233,10 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "tas",
-                    "Table": "atmos",
-                    "Long Name": "Near-Surface Air Temperature",
-                    "Units": "K",
+                    "Branded Variable Name": "tas",
+                    "Modelling Realm - Primary": "atmos",
+                    "Title": "Near-Surface Air Temperature",
+                    "Units (from Physical Parameter)": "K",
                     "Dimensions": "time, lat, lon",
                     "CESM Variable Name": "TREFHT",
                 }
@@ -254,8 +254,8 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "tos",
-                    "Table": "ocean",
+                    "Branded Variable Name": "tos",
+                    "Modelling Realm - Primary": "ocean",
                     "CESM Variable Name": "SST",
                 }
             )
@@ -268,8 +268,8 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "siconc",
-                    "Table": "seaIce",
+                    "Branded Variable Name": "siconc",
+                    "Modelling Realm - Primary": "seaIce",
                     "CESM Variable Name": "siconc",
                 }
             )
@@ -282,10 +282,10 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "pr",
-                    "Table": "atmos",
-                    "Standard Name": "precipitation_flux",
-                    "Units": "kg m-2 s-1",
+                    "Branded Variable Name": "pr",
+                    "Modelling Realm - Primary": "atmos",
+                    "CF Standard Name (from Physical Parameter)": "precipitation_flux",
+                    "Units (from Physical Parameter)": "kg m-2 s-1",
                     "Dimensions": "time, lat, lon",
                     "CESM Variable Name": "PRECT",
                 }
@@ -299,9 +299,9 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "cl",
-                    "Table": "atmos",
-                    "Units": "%",
+                    "Branded Variable Name": "cl",
+                    "Modelling Realm - Primary": "atmos",
+                    "Units (from Physical Parameter)": "%",
                     "Dimensions": "time, lev, lat, lon",
                     "CESM Variable Name": "CLOUD",
                     "Formula": "CLOUD * 100",
@@ -317,9 +317,9 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "pr",
-                    "Table": "atmos",
-                    "Units": "kg m-2 s-1",
+                    "Branded Variable Name": "pr",
+                    "Modelling Realm - Primary": "atmos",
+                    "Units (from Physical Parameter)": "kg m-2 s-1",
                     "Dimensions": "time, lat, lon",
                     "CESM Variable Name": "PRECT",
                     "Regrid Method": "conservative",
@@ -334,9 +334,9 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "cl",
-                    "Table": "atmos",
-                    "Units": "%",
+                    "Branded Variable Name": "cl",
+                    "Modelling Realm - Primary": "atmos",
+                    "Units (from Physical Parameter)": "%",
                     "Dimensions": "time, lev, lat, lon",
                     "CESM Variable Name": "CLOUD",
                     "Formula": "CLOUD * 100",
@@ -352,8 +352,8 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "tas",
-                    "Table": "atmos",
+                    "Branded Variable Name": "tas",
+                    "Modelling Realm - Primary": "atmos",
                     "CESM Variable Name": "TREFHT",
                 }
             )
@@ -367,8 +367,8 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "tas",
-                    "Table": "atmos",
+                    "Branded Variable Name": "tas",
+                    "Modelling Realm - Primary": "atmos",
                     "CESM Variable Name": "",
                 }
             )
@@ -381,9 +381,9 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "clt",
-                    "Table": "atmos",
-                    "Units": "%",
+                    "Branded Variable Name": "clt",
+                    "Modelling Realm - Primary": "atmos",
+                    "Units (from Physical Parameter)": "%",
                     "Dimensions": "time, lat, lon",
                     "CESM Variable Name": "CLDTOT",
                     "Formula": "CLDTOT * 100",
@@ -400,9 +400,9 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "evspsbl",
-                    "Table": "atmos",
-                    "Units": "kg m-2 s-1",
+                    "Branded Variable Name": "evspsbl",
+                    "Modelling Realm - Primary": "atmos",
+                    "Units (from Physical Parameter)": "kg m-2 s-1",
                     "Dimensions": "time, lat, lon",
                     "CESM Variable Name": "QFLX",
                     "Scale": "-1.0",
@@ -418,12 +418,12 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "siarea",
-                    "Table": "seaIce",
-                    "Units": "m2",
+                    "Branded Variable Name": "siarea",
+                    "Modelling Realm - Primary": "seaIce",
+                    "Units (from Physical Parameter)": "m2",
                     "Dimensions": "time",
                     "CESM Variable Name": "siconc_d, siconc",
-                    "Freq": "day, mon",
+                    "CMIP7 Frequency": "day, mon",
                 }
             )
         ]
@@ -439,12 +439,12 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "siarea",
-                    "Table": "seaIce",
-                    "Units": "m2",
+                    "Branded Variable Name": "siarea",
+                    "Modelling Realm - Primary": "seaIce",
+                    "Units (from Physical Parameter)": "m2",
                     "Dimensions": "time",
                     "CESM Variable Name": "siconc_d, siconc, tarea",
-                    "Freq": "day, mon, ",
+                    "CMIP7 Frequency": "day, mon, ",
                     "Alias": "siconc, , ",
                 }
             )
@@ -460,9 +460,9 @@ class TestReadCsvCESM:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "pr",
-                    "Table": "atmos",
-                    "Units": "kg m-2 s-1",
+                    "Branded Variable Name": "pr",
+                    "Modelling Realm - Primary": "atmos",
+                    "Units (from Physical Parameter)": "kg m-2 s-1",
                     "Dimensions": "time, lat, lon",
                     "CESM Variable Name": "PRECC, PRECL",
                     "Formula": "(PRECC + PRECL) * 1000.0",

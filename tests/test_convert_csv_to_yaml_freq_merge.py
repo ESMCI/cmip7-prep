@@ -139,18 +139,18 @@ class TestFreqMergeIntegration:
         rows = [
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "siconc",
-                    "Table": "seaIce",
+                    "Branded Variable Name": "siconc",
+                    "Modelling Realm - Primary": "seaIce",
                     "CESM Variable Name": "siconc",
-                    "Freq": "mon",
+                    "CMIP7 Frequency": "mon",
                 }
             ),
             self._row(
                 **{
-                    "CMIP Branded Variable Name": "siconc",
-                    "Table": "seaIce",
+                    "Branded Variable Name": "siconc",
+                    "Modelling Realm - Primary": "seaIce",
                     "CESM Variable Name": "siconc_d",
-                    "Freq": "day",
+                    "CMIP7 Frequency": "day",
                 }
             ),
         ]

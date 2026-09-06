@@ -10,16 +10,16 @@ import csv
 
 # The CESM spreadsheet layout, as convert_csv_to_yaml expects to receive it.
 CESM_FIELDNAMES = [
-    "CMIP Branded Variable Name",
-    "Table",
-    "Long Name",
-    "Standard Name",
-    "Units",
+    "Branded Variable Name",
+    "Modelling Realm - Primary",
+    "Title",
+    "CF Standard Name (from Physical Parameter)",
+    "Units (from Physical Parameter)",
     "Dimensions",
     "CESM Variable Name",
     "Formula",
     "Scale",
-    "Freq",
+    "CMIP7 Frequency",
     "Alias",
     "Cell Methods",
     "Regrid Method",
