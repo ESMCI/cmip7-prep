@@ -5,7 +5,7 @@ variables:
   ccb_tavg-u-hxy-ccl:
     cell_methods: 'area: time: mean where convective_cloud (weighted by total convective
       cloud area)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Air Pressure at Convective Cloud Base
     sources: [model_var: PCLDBOT]
     standard_name: air_pressure_at_convective_cloud_base
@@ -24,7 +24,7 @@ variables:
   cct_tavg-u-hxy-ccl:
     cell_methods: 'area: time: mean where convective_cloud (weighted by total convective
       cloud area)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Air Pressure at Convective Cloud Top
     sources: [model_var: PCLDTOP]
     standard_name: air_pressure_at_convective_cloud_top
@@ -55,7 +55,7 @@ variables:
   cldnci_tavg-u-hxy-cl:
     cell_methods: 'area: time: mean where cloud (mean over the portion of the cell
       containing ice topped cloud, as seen from top of atmosphere)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Ice Crystal Number Concentration of Cloud Tops
     sources: [model_var: ACTNI]
     standard_name: number_concentration_of_ice_crystals_in_air_at_ice_cloud_top
@@ -65,7 +65,7 @@ variables:
   cldncl_tavg-u-hxy-cl:
     cell_methods: 'area: time: mean where cloud (mean over the portion of the cell
       containing liquid topped cloud, as seen from top of atmosphere)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Cloud Droplet Number Concentration of Cloud Tops
     sources: [model_var: ACTNL]
     standard_name: number_concentration_of_cloud_liquid_water_particles_in_air_at_liquid_water_cloud_top
@@ -82,7 +82,7 @@ variables:
 
   climodis_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: MODIS Ice Cloud Area Percentage
     sources: [{model_var: 'CLIMODIS [COSP]'}]
     standard_name: modis_ice_topped_cloud_area_fraction
@@ -97,7 +97,7 @@ variables:
 
   clivic_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Convective Ice Water Path
     sources: [model_var: N, model_var: A]
     standard_name: atmosphere_mass_content_of_convective_cloud_ice
@@ -106,7 +106,7 @@ variables:
 
   clivimodis_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: MODIS Ice Water Path
     sources: [{model_var: 'IWPMODIS [COSP]'}]
     standard_name: atmosphere_mass_content_of_cloud_ice
@@ -115,7 +115,7 @@ variables:
 
   clmodis_tavg-p7c-hxy-air:
     cell_methods: 'area: time: mean where air'
-    dims: [time, plev, longitude, latitude, tau]
+    dims: [time, plev, lon, lat, tau]
     levels: {name: plev7c, units: Pa}
     long_name: MODIS Cloud Area Percentage
     sources: [{model_var: 'CLMODIS [COSP]'}]
@@ -125,7 +125,7 @@ variables:
 
   clmodisice_tavg-p7c-hxy-air:
     cell_methods: 'area: time: mean where air'
-    dims: [time, plev, longitude, latitude, tau]
+    dims: [time, plev, lon, lat, tau]
     levels: {name: plev7c, units: Pa}
     long_name: MODIS Ice Topped Cloud Area Percentage
     sources: [{model_var: 'CLIMODIS [COSP]'}]
@@ -135,7 +135,7 @@ variables:
 
   clmodisliquid_tavg-p7c-hxy-air:
     cell_methods: 'area: time: mean where air'
-    dims: [time, plev, longitude, latitude, tau]
+    dims: [time, plev, lon, lat, tau]
     levels: {name: plev7c, units: Pa}
     long_name: MODIS Liquid Topped Cloud Area Percentage
     sources: [model_var: N, model_var: A]
@@ -166,7 +166,7 @@ variables:
 
   clwvimodis_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: IWPMODIS+CLWMODIS
     long_name: MODIS Condensed Water Path
     sources: [{model_var: 'IWPMODIS [COSP], CLWMODIS [COSP]'}]
@@ -176,7 +176,7 @@ variables:
 
   co23D_tavg-al-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, alevel, time]
+    dims: [lon, lat, alevel, time]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: 3D-Field of Transported CO2

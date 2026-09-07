@@ -5,7 +5,7 @@ variables:
   albc_tavg-u-hxy-veg:
     cell_methods: 'area: time: mean where vegetation (weighted by canopy area and
       by downwelling shortwave radiation at the surface)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Canopy Albedo
     sources: [model_var: N, model_var: A]
     standard_name: canopy_albedo
@@ -14,7 +14,7 @@ variables:
 
   areacellg_ti-u-hxy-u:
     cell_methods: 'area: sum'
-    dims: [longitude, latitude]
+    dims: [lon, lat]
     long_name: Grid-Cell Area for Ice Sheet Variables
     sources: [model_var: area]
     standard_name: cell_area
@@ -23,7 +23,7 @@ variables:
 
   areacellr_ti-u-hxy-u:
     cell_methods: 'area: sum'
-    dims: [longitude, latitude]
+    dims: [lon, lat]
     long_name: Grid-Cell Area for River Model Variables
     sources: [model_var: N, model_var: A]
     standard_name: cell_area
@@ -32,7 +32,7 @@ variables:
 
   baresoilFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typebare]
+    dims: [lon, lat, time, typebare]
     formula: 'yeartomonth_data(PCT_NAT_PFT[:,0,:,:], time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:],
       time, lat, lon)  #clm2.h3'
     long_name: Bare Soil Percentage Area Coverage
@@ -43,7 +43,7 @@ variables:
 
   burntFractionAll_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typeburnt]
+    dims: [lon, lat, time, typeburnt]
     formula: chunits(burntFraction(FAREA_BURNED),units='%')
     long_name: Percentage of Entire Grid Cell That Is Covered by Burnt Vegetation
       (All Classes)
@@ -54,7 +54,7 @@ variables:
 
   c13Land_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C13_TOTECOSYSC, units='g/m^2')
     long_name: Mass of 13C in All Terrestrial Carbon Pools
     sources: [model_var: C13_TOTECOSYSC]
@@ -64,7 +64,7 @@ variables:
 
   c13Litter_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C13_TOTLITC, units='g/m^2')
     long_name: Mass of 13C in Litter Pool
     sources: [model_var: C13_TOTLITC]
@@ -74,7 +74,7 @@ variables:
 
   c13Soil_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C13_TOTSOMC, units='g/m^2')
     long_name: Mass of 13C in Soil Pool
     sources: [model_var: C13_TOTSOMC]
@@ -84,7 +84,7 @@ variables:
 
   c13Veg_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C13_TOTVEGC, units='g/m^2')
     long_name: Mass of 13C in Vegetation
     sources: [model_var: C13_TOTVEGC]
@@ -94,7 +94,7 @@ variables:
 
   c14Land_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C14_TOTECOSYSC, units='g/m^2')
     long_name: Mass of 14C in All Terrestrial Carbon Pools
     sources: [model_var: C14_TOTECOSYSC]
@@ -104,7 +104,7 @@ variables:
 
   c14Litter_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C14_TOTLITC, units='g/m^2')
     long_name: Mass of 14C in Litter Pool
     sources: [model_var: C14_TOTLITC]
@@ -114,7 +114,7 @@ variables:
 
   c14Soil_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C14_TOTSOMC, units='g/m^2')
     long_name: Mass of 14C in Soil Pool
     sources: [model_var: C14_TOTSOMC]
@@ -124,7 +124,7 @@ variables:
 
   c14Veg_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C14_TOTVEGC, units='g/m^2')
     long_name: Mass of 14C in Vegetation
     sources: [model_var: C14_TOTVEGC]
@@ -134,7 +134,7 @@ variables:
 
   c3PftFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typec3pft]
+    dims: [lon, lat, time, typec3pft]
     formula: 'yeartomonth_data(PCT_NAT_PFT[:,1,:,:]+PCT_NAT_PFT[:,2,:,:]+PCT_NAT_PFT[:,3,:,:]+PCT_NAT_PFT[:,4,:,:]+PCT_NAT_PFT[:,5,:,:]+PCT_NAT_PFT[:,6,:,:]+PCT_NAT_PFT[:,7,:,:]+PCT_NAT_PFT[:,8,:,:]+PCT_NAT_PFT[:,9,:,:]+PCT_NAT_PFT[:,10,:,:]+PCT_NAT_PFT[:,11,:,:]+PCT_NAT_PFT[:,12,:,:]+PCT_NAT_PFT[:,13,:,:],
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)+yeartomonth_data(PCT_CFT[:,4,:,:]+PCT_CFT[:,5,:,:]+PCT_CFT[:,8,:,:]+PCT_CFT[:,9,:,:]+PCT_CFT[:,26,:,:]+PCT_CFT[:,27,:,:]+PCT_CFT[:,46,:,:]+PCT_CFT[:,47,:,:]+PCT_CFT[:,62,:,:]+PCT_CFT[:,63,:,:],
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,1,:,:], time, lat, lon)  #clm2.h3'
@@ -146,7 +146,7 @@ variables:
 
   c4PftFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typec4pft]
+    dims: [lon, lat, time, typec4pft]
     formula: 'yeartomonth_data(PCT_NAT_PFT[:,14,:,:], time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:],
       time, lat, lon)+yeartomonth_data(PCT_CFT[:,2,:,:]+PCT_CFT[:,3,:,:]+PCT_CFT[:,52,:,:]+PCT_CFT[:,53,:,:]+PCT_CFT[:,60,:,:]+PCT_CFT[:,61,:,:],
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,1,:,:], time, lat, lon)  #clm2.h3'
@@ -158,7 +158,7 @@ variables:
 
   cGeologicStorage_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Carbon Mass in Geologic Storage
     sources: [model_var: N, model_var: A]
     standard_name: carbon_mass_content_of_geological_storage
@@ -167,7 +167,7 @@ variables:
 
   cLand_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(TOTECOSYSC, units=''g/m^2'')  #clm2.h0'
     long_name: Total Carbon in All Terrestrial Carbon Pools
     sources: [model_var: TOTECOSYSC]
@@ -177,7 +177,7 @@ variables:
 
   cLeaf_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LEAFC, units='g m-2')
     long_name: Carbon Mass in Leaves
     sources: [model_var: LEAFC]
@@ -187,7 +187,7 @@ variables:
 
   cLitterCwd_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(CWDC, units='g/m^2')
     long_name: Carbon Mass in Coarse Woody Debris
     sources: [model_var: CWDC]
@@ -197,7 +197,7 @@ variables:
 
   cLitterLut_tpt-u-hxy-multi:
     cell_methods: 'area: mean where sector time: point'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(TOTLITC,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g/m^2'')  #clm2.h4'
     long_name: Carbon  in Above and Below-Ground Litter Pools on Land-Use Tiles
@@ -208,7 +208,7 @@ variables:
 
   cLitterSubSurf_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Carbon Mass in Below-Ground Litter
     sources: [model_var: N, model_var: A]
     standard_name: subsurface_litter_mass_content_of_carbon
@@ -217,7 +217,7 @@ variables:
 
   cLitterSurf_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Carbon Mass in Above-Ground Litter
     sources: [model_var: N, model_var: A]
     standard_name: surface_litter_mass_content_of_carbon
@@ -233,7 +233,7 @@ variables:
 
   cOther_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(STORVEGC, units='g/m^2')
     long_name: Carbon Mass in Vegetation Components Other than Leaves, Stems and Roots
     sources: [model_var: STORVEGC]
@@ -243,7 +243,7 @@ variables:
 
   cProductLut_tpt-u-hxy-multi:
     cell_methods: 'area: mean where sector time: point'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     long_name: Wood and Agricultural Product Pool Carbon Associated with Land-Use
       Tiles
     sources: [model_var: N, model_var: A]
@@ -260,7 +260,7 @@ variables:
 
   cRoot_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: '(FROOTC+LIVECROOTC+DEADCROOTC)/1000.chunits(FROOTC+LIVECROOTC+DEADCROOTC,
       units=''g m-2'')  #clm2.h0'
     long_name: Carbon Mass in Roots
@@ -271,7 +271,7 @@ variables:
 
   cSoilLut_tpt-u-hxy-multi:
     cell_methods: 'area: mean where sector time: point'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(TOTSOMC,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g/m^2'') #clm2.h4'
     long_name: Carbon in Soil Pool on Land-Use Tiles
@@ -282,7 +282,7 @@ variables:
 
   cSoilPools_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, soilpools, time]
+    dims: [lon, lat, soilpools, time]
     formula: 'chunits(get_soilpools(SOIL1C,SOIL2C,SOIL3C,soilpools), units=''g/m^2'')  #clm2.h0'
     long_name: Carbon Mass in Each Model Soil Pool (Summed over Vertical Levels)
     sources: [{model_var: 'SOIL1C, SOIL2C, SOIL3C, soilpools)'}]
@@ -292,7 +292,7 @@ variables:
 
   cSoil_tavg-d100cm-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time, sdepth100cm]
+    dims: [lon, lat, time, sdepth100cm]
     formula: 'chunits(TOTSOMC_1m, units=''g/m^2'')  #clm2.h0'
     long_name: Carbon Mass in Soil Pool Above 1m Depth
     sources: [model_var: TOTSOMC_1m]
@@ -302,7 +302,7 @@ variables:
 
   cSoil_tavg-sl-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, sdepth, time]
+    dims: [lon, lat, sdepth, time]
     formula: 'chunits(yeartomonth_data3D(SOIL1C_vr, time, lat, lon,levsoi)+yeartomonth_data3D(SOIL2C_vr,
       time, lat, lon,levsoi)+yeartomonth_data3D(SOIL3C_vr, time, lat, lon,levsoi),
       units=''g/m^2'')  #clm2.h3'
@@ -322,7 +322,7 @@ variables:
 
   cStem_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LIVESTEMC + DEADSTEMC, units='g/m^2')
     long_name: Carbon Mass in Stem
     sources: [model_var: LIVESTEMC, model_var: DEADSTEMC]
@@ -332,7 +332,7 @@ variables:
 
   cVegLut_tpt-u-hxy-multi:
     cell_methods: 'area: mean where sector time: point'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(TOTVEGC,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g/m^2'') #clm2.h4'
     long_name: Carbon in Vegetation on Land-Use Tiles
@@ -350,7 +350,7 @@ variables:
 
   cVeg_tavg-u-hxy-ng:
     cell_methods: 'area: time: mean where natural_grasses (mask=grassFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(TOTVEGC,''grass'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -363,7 +363,7 @@ variables:
 
   cVeg_tavg-u-hxy-shb:
     cell_methods: 'area: time: mean where shrubs (mask=shrubFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(TOTVEGC,''shrub'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -376,7 +376,7 @@ variables:
 
   cVeg_tavg-u-hxy-tree:
     cell_methods: 'area: time: mean where trees (mask=treeFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(CLM_pft_to_CMIP6_vegtype(TOTVEGC,'tree',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -389,7 +389,7 @@ variables:
 
   cnc_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Canopy Covered Area Percentage
     sources: [model_var: N, model_var: A]
     standard_name: vegetation_area_fraction
@@ -410,7 +410,7 @@ variables:
 
   cropFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typecrop]
+    dims: [lon, lat, time, typecrop]
     formula: PCT_LANDUNIT[:,1,:,:]
     long_name: Percentage Crop Cover
     sources: [model_var: PCT_LANDUNIT]
@@ -426,7 +426,7 @@ variables:
 
   depthl_ti-u-hxy-u:
     cell_methods: 'area: mean'
-    dims: [longitude, latitude]
+    dims: [lon, lat]
     long_name: Depth of Lake Below the Surface
     sources: [model_var: N, model_var: A]
     standard_name: depth
@@ -435,7 +435,7 @@ variables:
 
   depthsl_ti-u-hxy-u:
     cell_methods: 'area: mean'
-    dims: [longitude, latitude]
+    dims: [lon, lat]
     long_name: Total (Cumulative) Thickness of All Soil Layers
     sources: [model_var: N, model_var: A]
     standard_name: depth
@@ -508,7 +508,7 @@ variables:
 
   fAnthDisturb_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LAND_USE_FLUX-CROPPROD1C_LOSS, units='g m-2 s-1')
     long_name: Carbon Mass Flux from Vegetation, Litter or Soil Pools into the Atmosphere
       Due to any Human Activity [kgC m-2 s-1]
@@ -519,7 +519,7 @@ variables:
 
   fBNF_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(FFIX_TO_SMINN, units='g m-2 s-1')+chunits(NFIX, units='g m-2
       s-1')
     long_name: Biological Nitrogen Fixation
@@ -530,7 +530,7 @@ variables:
 
   fCLandToOcean_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(SOM_C_LEACHED, units='g m-2 s-1')
     long_name: Lateral Transfer of Carbon out of Grid Cell That Eventually Goes into
       Ocean
@@ -541,7 +541,7 @@ variables:
 
   fDeforestToAtmos_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(DWT_CONV_CFLUX, units='g m-2 s-1')
     long_name: Deforested Biomass That Goes into Atmosphere as a Result of Anthropogenic
       Land-Use Change [kgC m-2 s-1]
@@ -552,7 +552,7 @@ variables:
 
   fDeforestToProduct_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(DWT_WOOD_PRODUCTC_GAIN_PATCH, units=''g m-2 s-1'')  #clm2.h0'
     long_name: Deforested Biomass That Goes into Product Pool as a Result of Anthropogenic
       Land-Use Change
@@ -563,7 +563,7 @@ variables:
 
   fFireAll_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(COL_FIRE_CLOSS, units=''g m-2 s-1'')   #clm2.h0'
     long_name: Carbon Mass Flux into Atmosphere Due to CO2 Emission from Fire Including
       All Sources [kgC m-2 s-1]
@@ -574,7 +574,7 @@ variables:
 
   fFireNat_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Carbon Mass Flux into Atmosphere Due to CO2 Emission from Natural Fire
       [kgC m-2 s-1]
     sources: [model_var: N, model_var: A]
@@ -592,7 +592,7 @@ variables:
 
   fHarvestToAtmos_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Harvested Biomass That Goes Straight into Atmosphere as Carbon Mass
       Flux [kgC m-2 s-1]
     positive: up
@@ -603,7 +603,7 @@ variables:
 
   fHarvestToGeologicStorage_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Harvested Biomass That Goes into Geological Storage
     positive: down
     sources: [model_var: N, model_var: A]
@@ -613,7 +613,7 @@ variables:
 
   fHarvestToProduct_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(WOOD_HARVESTC, units=''g m-2 s-1'')  #clm2.h0'
     long_name: Harvested Biomass That Goes into Product Pool
     sources: [model_var: WOOD_HARVESTC]
@@ -623,7 +623,7 @@ variables:
 
   fLitterFire_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Carbon Mass Flux from Litter, CWD or any non-Living Pool into Atmosphere
       Due to CO2 Emission from All Fire [kgC m-2 s-1]
     sources: [model_var: N, model_var: A]
@@ -633,7 +633,7 @@ variables:
 
   fLitterSoil_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits((LITR1C_TO_SOIL1C+LITR2C_TO_SOIL1C+LITR3C_TO_SOIL2C), units='g
       m-2 s-1')
     long_name: Total Carbon Mass Flux from Litter to Soil
@@ -644,7 +644,7 @@ variables:
 
   fLuc_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits((DWT_CONV_CFLUX+TOT_WOODPRODC_LOSS), units='g m-2 s-1')
     long_name: Net Carbon Mass Flux into Atmosphere Due to Land-Use Change [kgC m-2
       s-1]
@@ -656,7 +656,7 @@ variables:
 
   fLulccAtmLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(DWT_CONV_CFLUX_PATCH,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g m-2 s-1'')   #clm2.h2'
     long_name: Carbon Transferred Directly to Atmosphere Due to any Land-Use or Land-Cover
@@ -669,7 +669,7 @@ variables:
 
   fN2O_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: F_N2O_DENIT + F_N2O_NIT
     long_name: Total Land N2O Flux
     positive: up
@@ -680,7 +680,7 @@ variables:
 
   fNAnthDisturb_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Nitrogen Mass Flux out of Land Due to any Human Activity
     sources: [model_var: N, model_var: A]
     standard_name: tendency_of_atmosphere_mass_content_of_nitrogen_compounds_expressed_as_nitrogen_due_to_anthropogenic_emission
@@ -689,7 +689,7 @@ variables:
 
   fNLandToOcean_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Lateral Transfer of Nitrogen out of Grid Cell That Eventually Goes
       into Ocean
     sources: [model_var: N, model_var: A]
@@ -699,7 +699,7 @@ variables:
 
   fNLitterSoil_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits((LITR1N_TO_SOIL1N+LITR2N_TO_SOIL1N+LITR3N_TO_SOIL2N), units='g
       m-2 s-1')
     long_name: Total Nitrogen Mass Flux from Litter to Soil
@@ -710,7 +710,7 @@ variables:
 
   fNOx_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Total Land NOx Flux
     positive: up
     sources: [model_var: N, model_var: A]
@@ -720,7 +720,7 @@ variables:
 
   fNProduct_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(TOT_WOODPRODN_LOSS, units='g m-2 s-1')
     long_name: Deforested or Harvested Biomass as a Result of Anthropogenic Land-Use
       or Change
@@ -731,7 +731,7 @@ variables:
 
   fNVegLitter_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LITFALL_N, units='g m-2 s-1')
     long_name: Total Nitrogen Mass Flux from Vegetation to Litter
     sources: [model_var: LITFALL_N]
@@ -749,7 +749,7 @@ variables:
 
   fNdep_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(NDEP_TO_SMINN, units='g m-2 s-1')
     long_name: Dry and Wet Deposition of Reactive Nitrogen onto Land
     sources: [model_var: NDEP_TO_SMINN]
@@ -759,7 +759,7 @@ variables:
 
   fNfert_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(NFERTILIZATION, units='g m-2 s-1')
     long_name: Total Nitrogen Added for Cropland Fertilisation (Artificial and Manure)
     sources: [model_var: NFERTILIZATION]
@@ -769,7 +769,7 @@ variables:
 
   fNgasFire_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(PFT_FIRE_NLOSS,units='g m-2 s-1')
     long_name: Total Nitrogen Lost to the Atmosphere (Including NHx, NOx, N2O, N2)
       from Fire
@@ -780,7 +780,7 @@ variables:
 
   fNgasNonFire_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(F_N2O_NIT,units='g m-2 s-1') + chunits(F_DENIT,units='g m-2 s-1')
     long_name: Total Nitrogen Lost to the Atmosphere (Including NHx, NOx, N2O, N2)
       from All Processes Except Fire
@@ -791,7 +791,7 @@ variables:
 
   fNgas_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(PFT_FIRE_NLOSS,units='g m-2 s-1') + chunits(F_N2O_NIT,units='g
       m-2 s-1') + chunits(F_DENIT,units='g m-2 s-1')
     long_name: Total Nitrogen Lost to the Atmosphere (Sum of NHx, NOx, N2O, N2)
@@ -802,7 +802,7 @@ variables:
 
   fNleach_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(SMIN_NO3_LEACHED,units='g m-2 s-1') + chunits(SMIN_NO3_RUNOFF,units='g
       m-2 s-1')
     long_name: Total Nitrogen Loss to Leaching or Runoff (Sum of Ammonium, Nitrite
@@ -814,7 +814,7 @@ variables:
 
   fNloss_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits((PFT_FIRE_NLOSS + F_N2O_NIT + F_DENIT + SMIN_NO3_LEACHED + SMIN_NO3_RUNOFF),
       units='g m-2 s-1')
     long_name: Total Nitrogen Lost (Including NHx, NOx, N2O, N2 and Leaching)
@@ -826,7 +826,7 @@ variables:
 
   fNnetmin_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(ACTUAL_IMMOB, units='g m-2 s-1')+chunits(NET_NMIN, units='g m-2
       s-1')
     long_name: Net Nitrogen Release from Soil and Litter as the Outcome of Nitrogen
@@ -838,7 +838,7 @@ variables:
 
   fNup_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(NUPTAKE, units='g m-2 s-1')
     long_name: Total Plant Nitrogen Uptake (Sum of Ammonium and Nitrate) Irrespective
       of the Source of Nitrogen
@@ -849,7 +849,7 @@ variables:
 
   fProductDecomp_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(TOT_WOODPRODC_LOSS, units='g m-2 s-1')+chunits(CROPPROD1C_LOSS,
       units='g m-2 s-1')
     long_name: Decomposition out of Product Pools to CO2 in Atmosphere as Carbon Mass
@@ -861,7 +861,7 @@ variables:
 
   fVegFire_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(PFT_FIRE_CLOSS, units='g m-2 s-1')
     long_name: Carbon Mass Flux from Vegetation into Atmosphere Due to CO2 Emission
       from All Fire [kgC m-2 s-1]
@@ -872,7 +872,7 @@ variables:
 
   fVegLitterMortality_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: SUM(H928)
     long_name: Total Carbon Mass Flux from Vegetation to Litter as a Result of Mortality
     sources: [model_var: M_LEAFC_TO_LITTER, model_var: M_LEAFC_STORAGE_TO_LITTER,
@@ -901,7 +901,7 @@ variables:
 
   fVegLitterSenescence_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LEAFC_TO_LITTER + FROOTC_TO_LITTER, units='g m-2 s-1')
     long_name: Total Carbon Mass Flux from Vegetation to Litter as a Result of Leaf,
       Branch, and Root Senescence
@@ -912,7 +912,7 @@ variables:
 
   fVegLitter_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LITFALL, units='g m-2 s-1')
     long_name: Total Carbon Mass Flux from Vegetation to Litter
     sources: [model_var: LITFALL]
@@ -922,7 +922,7 @@ variables:
 
   fVegSoilMortality_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Total Carbon Mass Flux from Vegetation to Soil as a Result of Mortality
     sources: [model_var: N, model_var: A]
     standard_name: mass_flux_of_carbon_into_soil_from_vegetation_due_to_mortality
@@ -931,7 +931,7 @@ variables:
 
   fVegSoilSenescence_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Total Carbon Mass Flux from Vegetation to Soil as a Result of Leaf,
       Branch, and Root Senescence
     sources: [model_var: N, model_var: A]
@@ -941,7 +941,7 @@ variables:
 
   fVegSoil_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Total Carbon Mass Flux from Vegetation Directly to Soil
     sources: [model_var: N, model_var: A]
     standard_name: carbon_mass_flux_into_soil_from_vegetation_excluding_litter
@@ -949,7 +949,7 @@ variables:
     units: kg m-2 s-1
   fracInLut_tsum-u-hxy-lnd:
     cell_methods: 'area: mean where land over all_area_types time: sum'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     long_name: Annual Gross Percentage That Was Transferred into This Tile from Other
       Land-Use Tiles
     sources: [model_var: N, model_var: A]
@@ -959,7 +959,7 @@ variables:
 
   fracLut_tpt-u-hxy-u:
     cell_methods: 'area: mean time: point'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: reduce_lu(PCT_LANDUNIT,landUse)
     long_name: Percentage of Grid Cell for Each Land-Use Tile
     sources: [model_var: PCT_LANDUNIT]
@@ -968,7 +968,7 @@ variables:
     units: '%'
   fracOutLut_tsum-u-hxy-lnd:
     cell_methods: 'area: mean where land over all_area_types time: sum'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     long_name: Annual Gross Percentage of Land-Use Tile That Was Transferred into
       Other Land-Use Tiles
     sources: [model_var: N, model_var: A]
@@ -978,7 +978,7 @@ variables:
 
   gppLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(GPP,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g m-2 s-1'') #clm2.h2'
     long_name: Gross Primary Production on Land-Use Tile as Carbon Mass Flux [kgC
@@ -990,7 +990,7 @@ variables:
 
   gppVgt_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, vegtype, time]
+    dims: [lon, lat, vegtype, time]
     formula: chunits(GPP, units='g m-2 s-1')
     long_name: Gross Primary Production on Vegetation type as Carbon Mass Flux [kgC
       m-2 s-1]
@@ -1008,7 +1008,7 @@ variables:
 
   gpp_tavg-u-hxy-ng:
     cell_methods: 'area: time: mean where natural_grasses (mask=grassFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(GPP,''grass'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1022,7 +1022,7 @@ variables:
 
   gpp_tavg-u-hxy-shb:
     cell_methods: 'area: time: mean where shrubs (mask=shrubFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(GPP,''shrub'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1036,7 +1036,7 @@ variables:
 
   gpp_tavg-u-hxy-tree:
     cell_methods: 'area: time: mean where trees (mask=treeFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(GPP,''tree'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1050,7 +1050,7 @@ variables:
 
   gppc13_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C13_GPP, units='g m-2 s-1')
     long_name: Carbon-13 Mass Flux out of Atmosphere Due to Gross Primary Production
       on Land [kgC m-2 s-1]
@@ -1061,7 +1061,7 @@ variables:
 
   gppc14_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C14_GPP, units='g m-2 s-1')
     long_name: Carbon-14 Mass Flux out of Atmosphere Due to Gross Primary Production
       on Land [kgC m-2 s-1]
@@ -1072,7 +1072,7 @@ variables:
 
   grassFracC3_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typec3natg]
+    dims: [lon, lat, time, typec3natg]
     formula: 'yeartomonth_data((PCT_NAT_PFT[:,12,:,:]+PCT_NAT_PFT[:,13,:,:]), time,
       lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     long_name: C3 Natural Grass Area Percentage
@@ -1083,7 +1083,7 @@ variables:
 
   grassFracC4_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typec4natg]
+    dims: [lon, lat, time, typec4natg]
     formula: 'yeartomonth_data(PCT_NAT_PFT[:,14,:,:], time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:],
       time, lat, lon)  #clm2.h3'
     long_name: C4 Natural Grass Area Percentage
@@ -1094,7 +1094,7 @@ variables:
 
   grassFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typenatgr]
+    dims: [lon, lat, time, typenatgr]
     formula: 'yeartomonth_data((PCT_NAT_PFT[:,12,:,:]+PCT_NAT_PFT[:,13,:,:]+PCT_NAT_PFT[:,14,:,:]),
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon))  #clm2.h3'
     long_name: Natural Grass Area Percentage
@@ -1105,7 +1105,7 @@ variables:
 
   hfdsl_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Ground heat flux at 3hr
     positive: up
     sources: [model_var: FGR12]
@@ -1115,7 +1115,7 @@ variables:
 
   hflsLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'CLM_landunit_to_CMIP6_Lut(EFLX_LH_TOT,"all",time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)   #clm2.h2'
     long_name: Latent Heat Flux on Land-Use Tile
     positive: up
@@ -1126,7 +1126,7 @@ variables:
 
   hfssLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'CLM_landunit_to_CMIP6_Lut(FSH,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     long_name: Sensible Heat Flux on Land-Use Tile
     positive: up
@@ -1137,7 +1137,7 @@ variables:
 
   irrLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: chunits(CLM_landunit_to_CMIP6_Lut(QIRRIG,'all',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units='kg m-2 s-1')
     long_name: Irrigation Flux Including any Irrigation for Crops, Trees, Pasture,
@@ -1150,7 +1150,7 @@ variables:
 
   laiLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'CLM_landunit_to_CMIP6_Lut(TLAI,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     long_name: Leaf Area Index on Land-Use Tile
     sources: [model_var: TLAI, model_var: landunit, model_var: level]
@@ -1160,7 +1160,7 @@ variables:
 
   laiVgt_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, vegtype, time]
+    dims: [lon, lat, vegtype, time]
     long_name: Leaf Area Index on Vegetation type
     sources: [model_var: TLAI, model_var: pft, model_var: level]
     standard_name: leaf_area_index
@@ -1175,7 +1175,7 @@ variables:
 
   landCoverFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, vegtype, time]
+    dims: [lon, lat, vegtype, time]
     long_name: Percentage of Area by Vegetation or Land-Cover Category
     sources: [model_var: N, model_var: A]
     standard_name: area_fraction
@@ -1221,7 +1221,7 @@ variables:
 
   mrsofc_ti-u-hxy-lnd:
     cell_methods: 'area: mean where land'
-    dims: [longitude, latitude]
+    dims: [lon, lat]
     long_name: Capacity of Soil to Store Water (Field Capacity)
     sources: [model_var: N, model_var: A]
     standard_name: soil_moisture_content_at_field_capacity
@@ -1230,7 +1230,7 @@ variables:
 
   mrsolLut_tavg-d10cm-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time, sdepth10cm]
+    dims: [lon, lat, landuse, time, sdepth10cm]
     formula: 'CLM_landunit_to_CMIP6_Lut(SOILWATER_10CM,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     long_name: Moisture in Upper Portion of Soil Column of Land-Use Tile
     sources: [model_var: SOILWATER_10CM]
@@ -1240,7 +1240,7 @@ variables:
 
   mrsol_tavg-d100cm-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time, sdepth100cm]
+    dims: [lon, lat, time, sdepth100cm]
     long_name: Soil moisture in the top 1 m of the soil column
     sources: [model_var: N, model_var: A]
     standard_name: mass_content_of_water_in_soil_layer
@@ -1262,7 +1262,7 @@ variables:
 
   mrsol_tpt-d10cm-hxy-lnd:
     cell_methods: 'area: mean where land time: point'
-    dims: [longitude, latitude, time, sdepth10cm]
+    dims: [lon, lat, time, sdepth10cm]
     long_name: Moisture in Upper Portion of Soil Column
     sources: [model_var: SOILWATER_10CM]
     standard_name: mass_content_of_water_in_soil_layer
@@ -1271,7 +1271,7 @@ variables:
 
   mrsow_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Total Soil Wetness
     sources: [model_var: N, model_var: A]
     standard_name: volume_fraction_of_condensed_water_in_soil_at_field_capacity
@@ -1280,7 +1280,7 @@ variables:
 
   mrtws_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(TWS, units='kg m-2')
     long_name: Terrestrial Water Storage
     sources: [model_var: TWS]
@@ -1290,7 +1290,7 @@ variables:
 
   nLand_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(TOTECOSYSN, units='g m-2')
     long_name: Total Nitrogen in All Terrestrial Nitrogen Pools
     sources: [model_var: TOTECOSYSN]
@@ -1300,7 +1300,7 @@ variables:
 
   nLeaf_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LEAFN, units='g m-2')
     long_name: Nitrogen Mass in Leaves
     sources: [model_var: LEAFN]
@@ -1310,7 +1310,7 @@ variables:
 
   nLitterCwd_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(CWDN, units='g m-2')
     long_name: Nitrogen Mass in Coarse Woody Debris
     sources: [model_var: CWDN]
@@ -1320,7 +1320,7 @@ variables:
 
   nLitterSubSurf_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Nitrogen Mass in Below-Ground Litter (non CWD)
     sources: [model_var: N, model_var: A]
     standard_name: subsurface_litter_mass_content_of_nitrogen
@@ -1329,7 +1329,7 @@ variables:
 
   nLitterSurf_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Nitrogen Mass in Above-Ground Litter (non CWD)
     sources: [model_var: N, model_var: A]
     standard_name: surface_litter_mass_content_of_nitrogen
@@ -1338,7 +1338,7 @@ variables:
 
   nLitter_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(TOTLITN, units='g m-2')
     long_name: Nitrogen Mass in Litter Pool
     sources: [model_var: TOTLITN]
@@ -1348,7 +1348,7 @@ variables:
 
   nMineralNH4_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(SMIN_NH4, units='g m-2')
     long_name: Mineral Ammonium in the Soil
     sources: [model_var: SMIN_NH4]
@@ -1358,7 +1358,7 @@ variables:
 
   nMineralNO3_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(SMIN_NO3, units='g m-2')
     long_name: Mineral Nitrate in the Soil
     sources: [model_var: SMIN_NO3]
@@ -1368,7 +1368,7 @@ variables:
 
   nMineral_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(SMINN/1000, units='kg/m^2')
     long_name: Mineral Nitrogen in the Soil
     sources: [model_var: SMINN]
@@ -1378,7 +1378,7 @@ variables:
 
   nOther_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Nitrogen Mass in Vegetation Components Other than Leaves, Stem and
       Root
     sources: [model_var: N, model_var: A]
@@ -1388,7 +1388,7 @@ variables:
 
   nProduct_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(TOT_WOODPRODN, units='g m-2')
     long_name: Nitrogen Mass in Products of Land-Use Change
     sources: [model_var: TOT_WOODPRODN]
@@ -1398,7 +1398,7 @@ variables:
 
   nRoot_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LIVECROOTN, units='g m-2')+chunits(DEADCROOTN, units='g m-2')+chunits(FROOTN,
       units='g m-2')
     long_name: Nitrogen Mass in Roots
@@ -1409,7 +1409,7 @@ variables:
 
   nSoil_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(TOTSOMN, units='g m-2')
     long_name: Nitrogen Mass in Soil Pool
     sources: [model_var: TOTSOMN]
@@ -1419,7 +1419,7 @@ variables:
 
   nStem_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(DEADSTEMN, units='g m-2')+chunits(LIVESTEMN, units='g m-2')
     long_name: Nitrogen Mass in Stem
     sources: [model_var: DEADSTEMN, model_var: LIVESTEMN]
@@ -1436,7 +1436,7 @@ variables:
 
   nbpLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     long_name: Net Carbon Mass Flux into Land-Use Tile [kgC m-2 s-1]
     positive: down
     sources: [model_var: N, model_var: A]
@@ -1454,7 +1454,7 @@ variables:
 
   nep_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(NEE, units='g m-2 s-1')
     long_name: Net Carbon Mass Flux out of Atmosphere Due to Net Ecosystem Productivity
       on Land [kgC m-2 s-1]
@@ -1466,7 +1466,7 @@ variables:
 
   netAtmosLandC13Flux_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C13_NBP, units='g m-2 s-1')
     long_name: Net Mass Flux of 13C Between Atmosphere and Land (Positive into Land)
       as a Result of All Processes [kgC m-2 s-1]
@@ -1478,7 +1478,7 @@ variables:
 
   netAtmosLandC14Flux_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C14_NBP, units='g m-2 s-1')
     long_name: Net Mass Flux of 14C Between Atmosphere and Land (Positive into Land)
       as a Result of All Processes [kgC m-2 s-1]
@@ -1490,7 +1490,7 @@ variables:
 
   nppLeaf_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LEAFC_ALLOC, units='g m-2 s-1')
     long_name: Net Primary Production Allocated to Leaves as Carbon Mass Flux [kgC
       m-2 s-1]
@@ -1502,7 +1502,7 @@ variables:
 
   nppLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(NPP,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g m-2 s-1'')  #clm2.h2'
     long_name: Net Primary Production on Land-Use Tile as Carbon Mass Flux [kgC m-2
@@ -1514,7 +1514,7 @@ variables:
 
   nppOther_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Net Primary Production Allocated to Other Pools (not Leaves Stem or
       Roots) as Carbon Mass Flux [kgC m-2 s-1]
     sources: [model_var: N, model_var: A]
@@ -1524,7 +1524,7 @@ variables:
 
   nppRoot_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(FROOTC_ALLOC, units='g m-2 s-1')
     long_name: Net Primary Production Allocated to Roots as Carbon Mass Flux [kgC
       m-2 s-1]
@@ -1536,7 +1536,7 @@ variables:
 
   nppStem_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(WOODC_ALLOC, units='g m-2 s-1')
     long_name: Net Primary Production Allocated to Stem as Carbon Mass Flux [kgC m-2
       s-1]
@@ -1547,7 +1547,7 @@ variables:
 
   nppVgt_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, vegtype, time]
+    dims: [lon, lat, vegtype, time]
     long_name: Net Primary Production on Vegetation type as Carbon Mass Flux [kgC
       m-2 s-1]
     sources: [model_var: NPP, model_var: pft, model_var: level]
@@ -1565,7 +1565,7 @@ variables:
 
   npp_tavg-u-hxy-ng:
     cell_methods: 'area: time: mean where natural_grasses (mask=grassFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(NPP,''grass'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1579,7 +1579,7 @@ variables:
 
   npp_tavg-u-hxy-shb:
     cell_methods: 'area: time: mean where shrubs (mask=shrubFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(NPP,''shrub'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1593,7 +1593,7 @@ variables:
 
   npp_tavg-u-hxy-tree:
     cell_methods: 'area: time: mean where trees (mask=treeFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(NPP,''tree'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1618,7 +1618,7 @@ variables:
 
   pastureFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typepasture]
+    dims: [lon, lat, time, typepasture]
     long_name: Percentage of Land Which Is Anthropogenic Pasture
     sources: [model_var: N, model_var: A]
     standard_name: area_fraction
@@ -1633,7 +1633,7 @@ variables:
 
   qgwr_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Groundwater Recharge from Soil Layer
     sources: [model_var: N, model_var: A]
     standard_name: downward_liquid_water_mass_flux_into_groundwater
@@ -1642,7 +1642,7 @@ variables:
 
   raLeaf_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LEAF_MR, units='g m-2 s-1')
     long_name: Total Respiration from Leaves as Carbon Mass Flux [kgC m-2 s-1]
     sources: [model_var: LEAF_MR]
@@ -1652,7 +1652,7 @@ variables:
 
   raLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(AR,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g m-2 s-1'')  #clm2.h2'
     long_name: Autotrophic Respiration on Land-Use Tile as Carbon Mass Flux [kgC m-2
@@ -1664,7 +1664,7 @@ variables:
 
   raOther_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(NPP_NUPTAKE, units=''g m-2 s-1'')  # included in AR flux Lmon.ra'
     long_name: Total Respiration from Other Pools (not Leaves Stem or Roots) as Carbon
       Mass Flux [kgC m-2 s-1]
@@ -1675,7 +1675,7 @@ variables:
 
   raRoot_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(RR, units='g m-2 s-1')
     long_name: Total Respiration from Roots as Carbon Mass Flux [kgC m-2 s-1]
     sources: [model_var: RR]
@@ -1685,7 +1685,7 @@ variables:
 
   raStem_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LIVESTEM_MR + CPOOL_LIVESTEM_GR, units='g m-2 s-1')
     long_name: Total Respiration from Stem as Carbon Mass Flux [kgC m-2 s-1]
     sources: [model_var: LIVESTEM_MR, model_var: CPOOL_LIVESTEM_GR]
@@ -1695,7 +1695,7 @@ variables:
 
   raVgt_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, vegtype, time]
+    dims: [lon, lat, vegtype, time]
     long_name: Autotrophic Respiration on Vegetation type as Carbon Mass Flux [kgC
       m-2 s-1]
     sources: [model_var: AR, model_var: pft, model_var: level]
@@ -1713,7 +1713,7 @@ variables:
 
   ra_tavg-u-hxy-ng:
     cell_methods: 'area: time: mean where natural_grasses (mask=grassFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(AR,''grass'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1727,7 +1727,7 @@ variables:
 
   ra_tavg-u-hxy-shb:
     cell_methods: 'area: time: mean where shrubs (mask=shrubFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(AR,''shrub'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1741,7 +1741,7 @@ variables:
 
   ra_tavg-u-hxy-tree:
     cell_methods: 'area: time: mean where trees (mask=treeFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(CLM_pft_to_CMIP6_vegtype(AR,''tree'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit),
@@ -1755,7 +1755,7 @@ variables:
 
   rac13_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C13_AR, units='g m-2 s-1')
     long_name: Carbon-13 Mass Flux into Atmosphere Due to Autotrophic (Plant) Respiration
       on Land [kgC m-2 s-1]
@@ -1766,7 +1766,7 @@ variables:
 
   rac14_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C14_AR, units='g m-2 s-1')
     long_name: Carbon-14 Mass Flux into Atmosphere Due to Autotrophic (Plant) Respiration
       on Land [kgC m-2 s-1]
@@ -1777,7 +1777,7 @@ variables:
 
   residualFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typeresidual]
+    dims: [lon, lat, time, typeresidual]
     formula: 1-PCT_LANDUNIT[:,0,:,:]-PCT_LANDUNIT[:,1,:,:]
     long_name: Percentage of Grid Cell That Is Land but neither Vegetation Covered
       nor Bare Soil
@@ -1788,7 +1788,7 @@ variables:
 
   rhLitter_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(LITTERC_HR, units='g m-2 s-1')
     long_name: Carbon Mass Flux into Atmosphere Due to Heterotrophic Respiration from
       Litter on Land
@@ -1799,7 +1799,7 @@ variables:
 
   rhLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'chunits(CLM_landunit_to_CMIP6_Lut(HR,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse),
       units=''g m-2 s-1'')  #clm2.h2'
     long_name: Heterotrophic Respiration on Land-Use Tile as Carbon Mass Flux [kgC
@@ -1811,7 +1811,7 @@ variables:
 
   rhSoil_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(SOILC_HR, units='g m-2 s-1')
     long_name: Carbon Mass Flux into Atmosphere Due to Heterotrophic Respiration from
       Soil on Land
@@ -1822,7 +1822,7 @@ variables:
 
   rhVgt_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, vegtype, time]
+    dims: [lon, lat, vegtype, time]
     long_name: Heterotrophic Respiration on Vegetation type as Carbon Mass Flux [kgC
       m-2 s-1]
     sources: [model_var: N, model_var: A]
@@ -1840,7 +1840,7 @@ variables:
 
   rh_tavg-u-hxy-ng:
     cell_methods: 'area: time: mean where natural_grasses (mask=grassFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Heterotrophic Respiration on Grass Tiles as Carbon Mass Flux [kgC m-2
       s-1]
     sources: [model_var: N, model_var: A]
@@ -1850,7 +1850,7 @@ variables:
 
   rh_tavg-u-hxy-shb:
     cell_methods: 'area: time: mean where shrubs (mask=shrubFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Heterotrophic Respiration on Shrub Tiles as Carbon Mass Flux [kgC m-2
       s-1]
     sources: [model_var: N, model_var: A]
@@ -1860,7 +1860,7 @@ variables:
 
   rh_tavg-u-hxy-tree:
     cell_methods: 'area: time: mean where trees (mask=treeFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Heterotrophic Respiration on Tree Tiles as Carbon Mass Flux [kgC m-2
       s-1]
     sources: [model_var: N, model_var: A]
@@ -1870,7 +1870,7 @@ variables:
 
   rhc13_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C13_HR, units='g m-2 s-1')
     long_name: Carbon-13 Mass Flux into Atmosphere Due to Heterotrophic Respiration
       on Land [kgC m-2 s-1]
@@ -1881,7 +1881,7 @@ variables:
 
   rhc14_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(C14_HR, units='g m-2 s-1')
     long_name: Carbon-14 Mass Flux into Atmosphere Due to Heterotrophic Respiration
       on Land [kgC m-2 s-1]
@@ -1892,7 +1892,7 @@ variables:
 
   rivi_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: River Inflow
     sources: [model_var: N, model_var: A]
     standard_name: incoming_water_volume_transport_along_river_channel
@@ -1901,7 +1901,7 @@ variables:
 
   rivo_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'RIVER_DISCHARGE_OVER_LAND_LIQ  #mosart.h1'
     long_name: River Discharge
     sources: [model_var: RIVER_DISCHARGE_OVER_LAND_LIQ]
@@ -1911,7 +1911,7 @@ variables:
 
   rootd_ti-u-hxy-lnd:
     cell_methods: 'area: mean where land'
-    dims: [longitude, latitude]
+    dims: [lon, lat]
     long_name: Maximum Root Depth
     sources: [model_var: N, model_var: A]
     standard_name: root_depth
@@ -1927,7 +1927,7 @@ variables:
 
   rsds_tavg-u-hxy-sn:
     cell_methods: 'area: time: mean where snow (mask=snc)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Surface Downwelling Shortwave Radiation over Snow
     positive: down
     sources: [model_var: N, model_var: A]
@@ -1937,7 +1937,7 @@ variables:
 
   rsus_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Surface Upwelling Shortwave Radiation over Land
     positive: up
     sources: [model_var: FSR]
@@ -1947,7 +1947,7 @@ variables:
 
   rsus_tavg-u-hxy-sn:
     cell_methods: 'area: time: mean where snow (mask=snc)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: SSRE_FSRVI + SSRE_FSRVD (NEED use_SSRE = .true.)
     long_name: Surface Upwelling Shortwave Radiation over Snow
     positive: up
@@ -1958,7 +1958,7 @@ variables:
 
   rzwc_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Root Zone Soil Moisture
     sources: [model_var: N, model_var: A]
     standard_name: mass_content_of_water_in_soil_layer_defined_by_root_depth
@@ -1967,7 +1967,7 @@ variables:
 
   sftgif_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'PCT_LANDUNIT[:,3,:,:]  #clm2.h0'
     long_name: Land Ice Area Percentage
     sources: [model_var: PCT_LANDUNIT]
@@ -1977,7 +1977,7 @@ variables:
 
   sftgif_ti-u-hxy-u:
     cell_methods: 'area: mean'
-    dims: [longitude, latitude]
+    dims: [lon, lat]
     long_name: Land Ice Area Percentage
     sources: [model_var: N, model_var: A]
     standard_name: land_ice_area_fraction
@@ -1986,7 +1986,7 @@ variables:
 
   sftlaf_ti-u-hxy-u:
     cell_methods: 'area: mean'
-    dims: [longitude, latitude, typelkins]
+    dims: [lon, lat, typelkins]
     formula: 'PCT_LANDUNIT[:,4,:,:]  #clm2.h0'
     long_name: Fraction of the Grid Cell Occupied by Lake
     sources: [model_var: PCT_LANDUNIT]
@@ -1996,7 +1996,7 @@ variables:
 
   shrubFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typeshrub]
+    dims: [lon, lat, time, typeshrub]
     formula: 'yeartomonth_data((PCT_NAT_PFT[:,9,:,:]+PCT_NAT_PFT[:,10,:,:]+PCT_NAT_PFT[:,11,:,:]),
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     long_name: Percentage Cover by Shrub
@@ -2007,7 +2007,7 @@ variables:
 
   slthick_ti-sl-hxy-lnd:
     cell_methods: 'area: mean where land'
-    dims: [longitude, latitude, sdepth]
+    dims: [lon, lat, sdepth]
     long_name: Thickness of Soil Layers
     sources: [model_var: DZSOI]
     standard_name: cell_thickness
@@ -2016,7 +2016,7 @@ variables:
 
   srfrad_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: FSA - FIRA
     long_name: Net radiative flux at surface
     positive: down
@@ -2027,7 +2027,7 @@ variables:
 
   sw_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'chunits(H2OSFC, units=''kg m-2'')  #clm2.h5'
     long_name: Surface Water Storage
     sources: [model_var: H2OSFC]
@@ -2037,7 +2037,7 @@ variables:
 
   sweLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'CLM_landunit_to_CMIP6_Lut(H2OSNO,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     long_name: Snow Water Equivalent on Land-Use Tile
     sources: [model_var: H2OSNO]
@@ -2047,7 +2047,7 @@ variables:
 
   tasLut_tavg-h2m-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time, height2m]
+    dims: [lon, lat, landuse, time, height2m]
     formula: 'CLM_landunit_to_CMIP6_Lut(TSA,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     long_name: Near-Surface Air Temperature on Land Use Tile
     sources: [model_var: TSA]
@@ -2065,7 +2065,7 @@ variables:
 
   tran_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(QVEGT, units='kg m-2 s-1')
     long_name: Transpiration
     positive: up
@@ -2076,7 +2076,7 @@ variables:
 
   treeFracBdlDcd_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typetreebd]
+    dims: [lon, lat, time, typetreebd]
     formula: 'yeartomonth_data((PCT_NAT_PFT[:,6,:,:]+PCT_NAT_PFT[:,7,:,:]+PCT_NAT_PFT[:,8,:,:]),
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     long_name: Broadleaf Deciduous Tree Area Percentage
@@ -2087,7 +2087,7 @@ variables:
 
   treeFracBdlEvg_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typetreebe]
+    dims: [lon, lat, time, typetreebe]
     formula: 'yeartomonth_data((PCT_NAT_PFT[:,4,:,:]+PCT_NAT_PFT[:,5,:,:]), time,
       lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     long_name: Broadleaf Evergreen Tree Area Percentage
@@ -2098,7 +2098,7 @@ variables:
 
   treeFracNdlDcd_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typetreend]
+    dims: [lon, lat, time, typetreend]
     formula: 'yeartomonth_data(PCT_NAT_PFT[:,3,:,:], time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:],
       time, lat, lon)  #clm2.h3'
     long_name: Needleleaf Deciduous Tree Area Percentage
@@ -2109,7 +2109,7 @@ variables:
 
   treeFracNdlEvg_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typetreene]
+    dims: [lon, lat, time, typetreene]
     formula: 'yeartomonth_data((PCT_NAT_PFT[:,1,:,:]+PCT_NAT_PFT[:,2,:,:]), time,
       lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     long_name: Needleleaf Evergreen Tree Area Percentage
@@ -2120,7 +2120,7 @@ variables:
 
   treeFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typetree]
+    dims: [lon, lat, time, typetree]
     formula: '(PCT_NAT_PFT[:,1,:,:]+PCT_NAT_PFT[:,2,:,:]+PCT_NAT_PFT[:,3,:,:]+PCT_NAT_PFT[:,4,:,:]+PCT_NAT_PFT[:,5,:,:]+PCT_NAT_PFT[:,6,:,:]+PCT_NAT_PFT[:,7,:,:]+PCT_NAT_PFT[:,8,:,:])*PCT_LANDUNIT[:,0,:,:]  #clm2.h3'
     long_name: Tree Cover Percentage
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
@@ -2130,7 +2130,7 @@ variables:
 
   tsLut_tavg-u-hxy-multi:
     cell_methods: 'area: time: mean where sector'
-    dims: [longitude, latitude, landuse, time]
+    dims: [lon, lat, landuse, time]
     formula: 'CLM_landunit_to_CMIP6_Lut(TSKIN,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     long_name: Surface Temperature on Landuse Tile
     sources: [model_var: TSKIN]
@@ -2146,7 +2146,7 @@ variables:
 
   tslsi_tavg-u-hxy-lsi:
     cell_methods: 'area: time: mean (over land and sea ice)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Surface Temperature Where Land or Sea Ice
     sources: [model_var: TSKIN]
     standard_name: surface_temperature
@@ -2155,7 +2155,7 @@ variables:
 
   tslsi_tpt-u-hxy-lsi:
     cell_methods: 'area: mean (over land and sea ice) time: point'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Surface Temperature Where Land or Sea Ice
     sources: [model_var: TSKIN]
     standard_name: surface_temperature
@@ -2164,7 +2164,7 @@ variables:
 
   vegFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typeveg]
+    dims: [lon, lat, time, typeveg]
     formula: PCT_LANDUNIT[:,0,:,:]+PCT_LANDUNIT[:,1,:,:]
     long_name: Total Vegetated Percentage Cover
     sources: [model_var: PCT_LANDUNIT]
@@ -2174,7 +2174,7 @@ variables:
 
   vegHeight_tavg-u-hxy-ng:
     cell_methods: 'area: time: mean where natural_grasses (mask=grassFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'CLM_pft_to_CMIP6_vegtype(HTOP,''grass'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit)  #clm2.h1'
@@ -2186,7 +2186,7 @@ variables:
 
   vegHeight_tavg-u-hxy-shb:
     cell_methods: 'area: time: mean where shrubs (mask=shrubFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'CLM_pft_to_CMIP6_vegtype(HTOP,''shrub'',time, lat, lon, grid1d_ixy,
       grid1d_jxy, grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit)  #clm2.h1'
@@ -2198,7 +2198,7 @@ variables:
 
   vegHeight_tavg-u-hxy-tree:
     cell_methods: 'area: time: mean where trees (mask=treeFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: 'CLM_pft_to_CMIP6_vegtype(HTOP,''tree'',time, lat, lon, grid1d_ixy, grid1d_jxy,
       grid1d_lon,grid1d_lat, land1d_lon, land1d_lat, land1d_ityplunit,pfts1d_lon,
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit)  #clm2.h1'
@@ -2210,7 +2210,7 @@ variables:
 
   vegHeight_tavg-u-hxy-veg:
     cell_methods: 'area: time: mean where vegetation (mask=vegFrac)'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Height of the Vegetation Canopy
     sources: [model_var: HTOP]
     standard_name: canopy_height
@@ -2219,7 +2219,7 @@ variables:
 
   wetlandCH4_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(FCH4, units='kg/m2/s')
     long_name: Grid Averaged Methane Emissions from Wetlands
     sources: [model_var: FCH4]
@@ -2229,7 +2229,7 @@ variables:
 
   wetlandCH4cons_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(CH4PROD, units='g/m2/s') - chunits(FCH4, units='kg/m2/s')
     long_name: Grid Averaged Methane Consumption (Methanotrophy) from Wetlands
     sources: [model_var: CH4PROD]
@@ -2239,7 +2239,7 @@ variables:
 
   wetlandCH4prod_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     formula: chunits(CH4PROD, units='g/m2/s')
     long_name: Grid Averaged Methane Production (Methanogenesis) from Wetlands
     sources: [model_var: CH4PROD]
@@ -2249,7 +2249,7 @@ variables:
 
   wetlandFrac_tavg-u-hxy-u:
     cell_methods: 'area: time: mean'
-    dims: [longitude, latitude, time, typewetla]
+    dims: [lon, lat, time, typewetla]
     long_name: Wetland Percentage Cover
     sources: [model_var: FINUNDATED]
     standard_name: area_fraction
@@ -2258,7 +2258,7 @@ variables:
 
   wtd_tavg-u-hxy-lnd:
     cell_methods: 'area: mean where land time: mean'
-    dims: [longitude, latitude, time]
+    dims: [lon, lat, time]
     long_name: Water Table Depth
     sources: [model_var: ZWT]
     standard_name: water_table_depth

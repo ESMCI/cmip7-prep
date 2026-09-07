@@ -377,7 +377,7 @@ variables:
     units: kg m-2
 
   simassacrossline_tavg-u-ht-u:
-    dims: [time, latitude]
+    dims: [time, siline]
     long_name: Sea Ice Mass Across Line
     regrid_method: conservative
     sources: [{freq: day, model_var: simassacrossline_d}, {freq: mon, model_var: simassacrossline}]
@@ -544,7 +544,7 @@ variables:
           ''ni''])', long_name: Sea Ice Snow Mass (Southern Hemisphere), region: sh}]
 
   sisnmassacrossline_tavg-u-ht-u:
-    dims: [time, latitude]
+    dims: [time, siline]
     long_name: Sea Ice Mass Across Line
     regrid_method: conservative
     sources: [{freq: day, model_var: sisnmassacrossline_d}, {freq: mon, model_var: sisnmassacrossline}]
@@ -661,7 +661,7 @@ variables:
     units: m s-1
 
   siv_tavg-u-hxy-ifs:
-    dims: [time, latitude, longitude]
+    dims: [time, nj, ni]
     regrid_method: conservative
     sources: [{freq: day, model_var: siv_d}, {freq: mon, model_var: siv}]
     table: seaIce
