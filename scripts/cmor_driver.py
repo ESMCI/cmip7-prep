@@ -83,6 +83,19 @@ REALM_YAML_MAP = {
     },
 }
 
+# If CESM archives time series under a component directory, a realm has to be
+# mapped to the component that wrote it.  Several realms share a component.
+REALM_COMPONENT_MAP = {
+    "atmos": "atm",
+    "aerosol": "atm",
+    "atmosChem": "atm",
+    "land": "lnd",
+    "ocean": "ocn",
+    "ocnBgchem": "ocn",
+    "seaIce": "ice",
+    "landIce": "glc",
+}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -706,12 +719,12 @@ def main():
     TSDIR = None
     if args.tsdir:
         TSDIR = Path(args.tsdir)
-        if not os.path.exists(TSDIR):
-            logger.error(f"Time series directory {str(TSDIR)} does not exist")
+        if not TSDIR.exists():
+            logger.error(f"Time series directory {TSDIR} does not exist")
             sys.exit(1)
     else:
         if model == "noresm":
-            logger.error(f"must specify --tsdir as an input argument for noresm model")
+            logger.error("must specify --tsdir as an input argument for noresm model")
             sys.exit(1)
         elif model == "cesm":
             if args.caseroot and args.cimeroot:
@@ -727,28 +740,20 @@ def main():
                     sys.exit(1)
                 with Case(caseroot, read_only=True) as case:
                     inputroot = case.get_value("DOUT_S_ROOT")
-                if realm in ("atmos", "aerosol", "atmosChem"):
-                    TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
-                elif realm == "land":
-                    TSDIR = Path(inputroot) / "lnd" / "proc" / "tseries"
-                elif realm in ("ocean", "ocnBgchem"):
-                    TSDIR = Path(inputroot) / "ocn" / "proc" / "tseries"
-                elif realm == "seaIce":
-                    TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
-                elif realm == "landIce":
-                    TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
-                else:
-                    logger.error(f"no time series directory exists for realm {realm} ")
+                component = REALM_COMPONENT_MAP.get(realm)
+                if component is None:
+                    logger.error(f"no time series directory exists for realm {realm}")
                     sys.exit(1)
-                TSDIR = TSDIR / args.frequency
+                TSDIR = (
+                    Path(inputroot) / component / "proc" / "tseries" / args.frequency
+                )
             else:
-                logger.error(f"no TSDIR found for cesm model model")
+                logger.error("no time series directory found for cesm model")
                 sys.exit(1)
 
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)
-    if not os.path.exists(str(OUTDIR)):
-        os.makedirs(str(OUTDIR))
+    OUTDIR.mkdir(parents=True, exist_ok=True)
 
     # Load and evaluate the CMIP mapping YAML file for this model and realm
     if custom_yaml := args.custom_yaml:
