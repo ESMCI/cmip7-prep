@@ -402,8 +402,6 @@ def process_one_var(
                 logger.warning(f"Source variable(s) not found for {varname}, skipping")
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
-            if "TLAT" in ds_native:
-                logger.debug("TLAT is present")
             if model == "cesm":
                 # Append ocn_fx_fields to ds_native if available
                 # fx - grid definition like topography, fraction
@@ -418,20 +416,19 @@ def process_one_var(
                 varname,
                 dims,
             )
-            # TODO: why does this not abort the program?
-            # JPE: because I don't want to abort the whole program
-            # if one variable is missing - I want to log the error and
-            # move on to the next variable
+            # A missing source variable is logged and skipped rather than
+            # raised: one unmappable variable should not cost the whole run.
+            # The result list records it so the summary reports what was lost.
             if var is None:
                 logger.warning(f"Source variable(s) not found for {varname}")
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
 
-            # For ocean realm: distinguish native vs regridded by dims
+            # For CESM: distinguish latitude/longitude variable versus regridded
             if model == "cesm" and "latitude" in dims and "longitude" in dims:
                 # output ocn on the native grid, but apply realize for formulas/mapping
                 logger.info(
-                    f"Preparing native grid output for mom6 variable {varname}, applying realize"
+                    f"Applying realize for latitude/longitude cesm variable {varname}"
                 )
                 realized = mapping.realize(ds_native, varname)
                 ds_c = (
@@ -444,7 +441,7 @@ def process_one_var(
                     ds_c = ds_c.assign(time_bounds=ds_native["time_bounds"])
                 cmor_items = [(ds_c, cfg)]
                 results.append(
-                    (str(varname), "analyzed native mom6 grid (realize applied)")
+                    (str(varname), "realized latitude/longitude cesm variable")
                 )
             elif realm == "seaIce" and (model == "noresm" or len(dims) == 1):
                 # NorESM seaIce is always kept on the native CICE (nj, ni) grid:
@@ -648,7 +645,6 @@ def process_one_var(
                             "name": shortname,
                             "table": write_cfg.get("table", "atmos"),
                             "units": write_cfg.get("units", ""),
-                            "dims": dims,
                             "positive": write_cfg.get("positive", None),
                             "cell_methods": write_cfg.get("cell_methods", None),
                             "long_name": write_cfg.get("long_name", None),
