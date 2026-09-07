@@ -885,6 +885,12 @@ def main():
                 model_vars = _collect_required_model_vars(mapping, [varname])
             except Exception:
                 model_vars = []
+            # Without a mapping there are no source variables to match against,
+            # so the file search below would always come up empty and report a
+            # missing-data problem instead of the missing mapping already
+            # logged by _collect_required_model_vars.
+            if not model_vars:
+                continue
             # Narrow to the history files this variable's sampling lives in.
             # Without this an instantaneous variable would be built from
             # time-averaged input: well-formed output, silently wrong values.
@@ -908,7 +914,7 @@ def main():
                 logger.warning(f"No timeseries files found for variable {varname}")
                 continue
             else:
-                logger.info(
+                logger.debug(
                     f"Found {len(ts_files)} timeseries files for variable {varname} "
                     f"(model vars: {model_vars})"
                 )
