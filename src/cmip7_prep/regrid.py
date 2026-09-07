@@ -18,7 +18,6 @@ from cmip7_prep.cache_tools import FXCache, RegridderCache
 from cmip7_prep.regrid_maps import get_map_paths, load_intensive_vars
 from cmip7_prep import vertical
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:

@@ -57,7 +57,6 @@ import numpy as np
 import xarray as xr
 import yaml  # runtime dep
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

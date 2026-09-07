@@ -52,6 +52,8 @@ from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 
 from dask import delayed
 
+# The only logging configuration in the package: library modules attach
+# handlers to their own loggers but leave the root config to the entry point.
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
@@ -63,7 +65,6 @@ logger = logging.getLogger("cmip7_prep.cmor_driver")
 # TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
 TABLES_noresm = str(Path(__file__).parent.parent / "cmip7-cmor-tables")
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 REALM_YAML_MAP = {
     "noresm": {
