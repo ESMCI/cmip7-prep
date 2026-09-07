@@ -19,7 +19,7 @@ from pathlib import Path
 import logging
 import re
 import resource
-from typing import Optional, Tuple
+from typing import Tuple
 import sys
 import time
 from datetime import datetime, UTC
@@ -57,14 +57,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("cmip7_prep.cmor_driver")
-
-# Regex for date extraction from filenames
-_DATE_RE = re.compile(
-    r"[\.\-](?P<year>\d{4})"  # year
-    r"(?P<sep>-?)"  # optional hyphen
-    r"(?P<month>0[1-9]|1[0-2])"  # month 01–12
-    r"\.nc(?!\S)"  # literal .nc and then end (or whitespace)
-)
 
 # Path for cmor tables
 # TODO: the following TABLES_cesm is no longer valid - can the TABLES_noresm be used?
@@ -679,40 +671,6 @@ def process_one_var(
 process_one_var_delayed = delayed(process_one_var)
 
 
-def latest_monthly_file(
-    directory: Path, *, require_consistent_style: bool = True
-) -> Optional[Tuple[Path, int, int]]:
-    """
-    Find the file in `directory` with the most recent YYYYMM.nc or YYYY-MM.nc date in its name.
-    Returns (path, year, month) or None if no matching files are found.
-    If `require_consistent_style` is True, raises ValueError if both styles are present.
-    """
-    if not directory.is_dir():
-        raise NotADirectoryError(directory)
-    found = []
-    seps = set()
-    logger.debug(f"Looking for files in {str(directory)}")
-    for p in directory.iterdir():
-        if not p.is_file():
-            continue
-        m = _DATE_RE.search(p.name)
-        if not m:
-            continue
-        year = int(m.group("year"))
-        month = int(m.group("month"))
-        sep = m.group("sep")
-        seps.add(sep)
-        found.append((year, month, p))
-    if not found:
-        return None
-    if require_consistent_style and len(seps) > 1:
-        raise ValueError("Mixed date styles detected (YYYYMM.nc and YYYY-MM.nc).")
-    logger.debug(f"Found {len(found)} files in {str(directory)}")
-    found.sort(key=lambda t: (t[0], t[1], t[2].name))
-    year, month, path = found[-1]
-    return path, year, month
-
-
 def main():
     run_start = time.monotonic()
     args = parse_args()
@@ -743,15 +701,13 @@ def main():
                     f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
                 )
 
-    # Determine TSDIR
+    # Determine time series directory (TSDIR)
     TSDIR = None
     if args.tsdir:
         TSDIR = Path(args.tsdir)
         if not os.path.exists(TSDIR):
             logger.error(f"Time series directory {str(TSDIR)} does not exist")
             sys.exit(1)
-        timeseries = latest_monthly_file(TSDIR)
-        logger.info(f"latest monthly time series file is {timeseries}")
     else:
         if model == "noresm":
             logger.error(f"must specify --tsdir as an input argument for noresm model")
@@ -770,7 +726,6 @@ def main():
                     sys.exit(1)
                 with Case(caseroot, read_only=True) as case:
                     inputroot = case.get_value("DOUT_S_ROOT")
-                    casename = case.get_value("CASE")
                 if realm in ("atmos", "aerosol", "atmosChem"):
                     TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
                 elif realm == "land":
@@ -781,6 +736,9 @@ def main():
                     TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
                 elif realm == "landIce":
                     TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
+                else:
+                    logger.error(f"no time series directory exists for realm {realm} ")
+                    sys.exit(1)
                 TSDIR = TSDIR / args.frequency
             else:
                 logger.error(f"no TSDIR found for cesm model model")
