@@ -29,7 +29,6 @@ except ModuleNotFoundError as e:
     _HAS_DASK = False
 
 
-
 @dataclass(frozen=True)
 class MapSpec:
     """Specification of which weight map to use for a variable."""

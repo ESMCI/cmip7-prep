@@ -261,4 +261,3 @@ def test_regular_resolution_has_maps():
     """'regular' skips regridding, but the fx path still asks for a map."""
     for model in ("cesm", "noresm"):
         assert "conservative" in get_map_paths(model, "regular")
-
