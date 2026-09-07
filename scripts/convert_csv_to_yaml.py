@@ -631,6 +631,12 @@ def _build_entry(row, config):
             "src_axis_bnds": "ilev",
         }
 
+    # 'dims' is parsed only to derive 'levels' above; it is not written to the
+    # YAML.  Nothing in the pipeline reads it -- the output dimension names come
+    # from the CMOR tables, and the data request CSV is the record of what a
+    # variable's dimensions should be.
+    entry.pop("dims", None)
+
     # Merge Freq/Alias columns into the per-source dicts.
     freq_str = entry.pop("_freq", None)
     alias_str = entry.pop("_alias", None)

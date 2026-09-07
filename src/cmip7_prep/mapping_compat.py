@@ -153,8 +153,9 @@ class VarConfig:
         Human-readable variable description.
     standard_name:
         CF standard name.
-    dims:
-        Expected output dimension list (e.g. ``["time", "lat", "lon"]``).
+    grids:
+        CMIP grid labels to produce for this variable, e.g. ``["gn", "gr"]``
+        for both the native and the regridded grid.  Defaults to ``["gr"]``.
     source_aliases:
         Mapping of formula token → native model variable name.  Allows the
         formula to use short alias names that differ from the actual variable
@@ -176,7 +177,7 @@ class VarConfig:
     regrid_method: Optional[str] = None
     long_name: Optional[str] = None
     standard_name: Optional[str] = None
-    dims: Optional[List[str]] = None
+    grids: Optional[List[str]] = None
     source_aliases: Optional[Dict[str, str]] = None  # alias → model_var
     region: Optional[str] = None
 
@@ -201,7 +202,7 @@ class VarConfig:
             "regrid_method": self.regrid_method,
             "long_name": self.long_name,
             "standard_name": self.standard_name,
-            "dims": self.dims,
+            "grids": self.grids,
             "source_aliases": self.source_aliases,
             "region": self.region,
         }
@@ -745,7 +746,7 @@ def _to_varconfig(
         regrid_method=cfg.get("regrid_method"),
         long_name=cfg.get("long_name"),
         standard_name=cfg.get("standard_name"),
-        dims=cfg.get("dims"),
+        grids=cfg.get("grids"),
         source_aliases=aliases if aliases else None,
         region=cfg.get("region"),
     )

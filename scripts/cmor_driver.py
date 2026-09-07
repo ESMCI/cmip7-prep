@@ -361,21 +361,13 @@ def process_one_var(
         results.append((varname, f"ERROR: {e}"))
         return results
 
-    # These are the dims on the destination
-    # (interpolated dims if you WILL do interpolation - have not done it yet)
-    dims_list = cfg.get("dims")
+    # CMIP grid labels to write for this variable.  Most variables are written
+    # once, on the regridded grid; a few MOM6 fields are requested on both the
+    # native tripolar grid and the regridded one, hence the loop.
+    grids = cfg.get("grids") or ["gr"]
 
-    # If dims is a single list (atm/lnd), wrap in a list for uniformity
-    if dims_list and len(dims_list) > 0 and isinstance(dims_list[0], str):
-        dims_list = [dims_list]
-
-    # Loop over dims - in most cases there will only be one entry -
-    # but for some variables (like ocean sos) there needs to be an
-    # entry both the native and the interpolated grid - so there will
-    # be two entries - hence the loop below
-
-    for dims in dims_list:
-        logger.info(f"Processing {varname} with dims {dims}")
+    for grid in grids:
+        logger.info(f"Processing {varname} on grid {grid}")
 
         # ---------------------------------------------
         # Read in time series, do the mapping and then regrid if necessary
@@ -411,10 +403,9 @@ def process_one_var(
 
             # Output ds_native keys
             logger.debug(
-                "ds_native keys: %s for var %s with dims %s",
+                "ds_native keys: %s for var %s",
                 list(ds_native.variables.keys()),
                 varname,
-                dims,
             )
             # A missing source variable is logged and skipped rather than
             # raised: one unmappable variable should not cost the whole run.
@@ -424,8 +415,9 @@ def process_one_var(
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
 
-            # For CESM: distinguish latitude/longitude variable versus regridded
-            if model == "cesm" and "latitude" in dims and "longitude" in dims:
+            # 'gn' means write the data on the grid it arrives on -- realize
+            # only, for formulas and unit conversion, and no regridding.
+            if grid == "gn":
                 # output ocn on the native grid, but apply realize for formulas/mapping
                 logger.info(
                     f"Applying realize for latitude/longitude cesm variable {varname}"
@@ -443,10 +435,10 @@ def process_one_var(
                 results.append(
                     (str(varname), "realized latitude/longitude cesm variable")
                 )
-            elif realm == "seaIce" and (model == "noresm" or len(dims) == 1):
+            elif realm == "seaIce" and (model == "noresm" or grid == "gm"):
                 # NorESM seaIce is always kept on the native CICE (nj, ni) grid:
-                # no regridding, regardless of dims. CESM seaIce keeps the prior
-                # behavior (native only for scalar/integrated len(dims) == 1 vars).
+                # no regridding.  For CESM only the global means ('gm') stay
+                # native; gridded CESM seaIce fields fall through and regrid.
                 logger.info(
                     f"Preparing seaIce field variants via realize_all for {varname}"
                 )
@@ -556,10 +548,8 @@ def process_one_var(
                     ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
                 cmor_items = [(ds_cmor, cfg)]
             else:
-                # For lnd/atm or any other dims, use existing logic
-                logger.debug(
-                    "Processing %s for dims %s (atm/lnd or other)", varname, dims
-                )
+                # lnd/atm and anything else: regrid to the target grid
+                logger.debug("Processing %s (atm/lnd or other)", varname)
                 # Obtain an xr.Dataset (ds_cmor) with the requested CMIP variable ready for CMOR.
                 # (this will include mapping from SE to lat/lon)
                 ds_cmor = realize_regrid_prepare(
@@ -586,9 +576,8 @@ def process_one_var(
             continue
         except Exception as e:
             logger.error(
-                "Exception during regridding of %s with dims %s: %r",
+                "Exception during regridding of %s: %r",
                 varname,
-                dims,
                 e,
             )
             raise
@@ -636,7 +625,7 @@ def process_one_var(
                         set_cur_dataset_attribute(key, value)
 
                     logger.info(
-                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency} and dims {dims}"
+                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
                     )
                     vdef = type(
                         "VDef",
@@ -661,17 +650,17 @@ def process_one_var(
                 # variable has needed so far, not this one alone. A jump from the
                 # previous line means this variable exceeded all before it.
                 logger.info(
-                    "Finished processing for %s with dims %s "
+                    "Finished processing for %s on grid %s "
                     "(%s, peak so far %.1f GB)",
                     varname,
-                    dims,
+                    grid,
                     _format_duration(time.monotonic() - var_start),
                     _peak_memory_gb(),
                 )
                 results.append((str(cmip7name), "ok"))
             except Exception as e:
                 logger.error(
-                    f"Exception while processing {varname} with dims {dims}: {e!r}"
+                    f"Exception while processing {varname} on grid {grid}: {e!r}"
                 )
                 results.append((str(varname), f"ERROR: {e!r}"))
     logger.debug(f"Completed all processing for variable: {varname}, results {results}")
