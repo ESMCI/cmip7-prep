@@ -716,40 +716,7 @@ def main():
                 )
 
     # Determine time series directory (TSDIR)
-    TSDIR = None
-    if args.tsdir:
-        TSDIR = Path(args.tsdir)
-        if not TSDIR.exists():
-            logger.error(f"Time series directory {TSDIR} does not exist")
-            sys.exit(1)
-    else:
-        if model == "noresm":
-            logger.error("must specify --tsdir as an input argument for noresm model")
-            sys.exit(1)
-        elif model == "cesm":
-            if args.caseroot and args.cimeroot:
-                caseroot = args.caseroot
-                cimeroot = args.cimeroot
-                sys.path.append(cimeroot)
-                _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
-                sys.path.append(_LIBDIR)
-                try:
-                    from CIME.case import Case
-                except ImportError as e:
-                    logger.error(f"Error importing CIME modules: {e}")
-                    sys.exit(1)
-                with Case(caseroot, read_only=True) as case:
-                    inputroot = case.get_value("DOUT_S_ROOT")
-                component = REALM_COMPONENT_MAP.get(realm)
-                if component is None:
-                    logger.error(f"no time series directory exists for realm {realm}")
-                    sys.exit(1)
-                TSDIR = (
-                    Path(inputroot) / component / "proc" / "tseries" / args.frequency
-                )
-            else:
-                logger.error("no time series directory found for cesm model")
-                sys.exit(1)
+    TSDIR = _resolve_tsdir(args, model, realm)
 
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)
@@ -1021,6 +988,45 @@ def main():
         _format_duration(time.monotonic() - run_start),
         _peak_memory_gb(),
     )
+
+
+def _resolve_tsdir(args, model, realm):
+    """Return the time series directory (TSDIR) for this run."""
+    TSDIR = None
+    if args.tsdir:
+        TSDIR = Path(args.tsdir)
+        if not TSDIR.exists():
+            logger.error(f"Time series directory {TSDIR} does not exist")
+            sys.exit(1)
+    else:
+        if model == "noresm":
+            logger.error("must specify --tsdir as an input argument for noresm model")
+            sys.exit(1)
+        elif model == "cesm":
+            if args.caseroot and args.cimeroot:
+                caseroot = args.caseroot
+                cimeroot = args.cimeroot
+                sys.path.append(cimeroot)
+                _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
+                sys.path.append(_LIBDIR)
+                try:
+                    from CIME.case import Case
+                except ImportError as e:
+                    logger.error(f"Error importing CIME modules: {e}")
+                    sys.exit(1)
+                with Case(caseroot, read_only=True) as case:
+                    inputroot = case.get_value("DOUT_S_ROOT")
+                component = REALM_COMPONENT_MAP.get(realm)
+                if component is None:
+                    logger.error(f"no time series directory exists for realm {realm}")
+                    sys.exit(1)
+                TSDIR = (
+                    Path(inputroot) / component / "proc" / "tseries" / args.frequency
+                )
+            else:
+                logger.error("no time series directory found for cesm model")
+                sys.exit(1)
+    return TSDIR
 
 
 if __name__ == "__main__":
