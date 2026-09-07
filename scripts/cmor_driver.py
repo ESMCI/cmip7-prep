@@ -890,6 +890,7 @@ def main():
             # missing-data problem instead of the missing mapping already
             # logged by _collect_required_model_vars.
             if not model_vars:
+                results.append((varname, "ERROR: no mapping in YAML"))
                 continue
             # Narrow to the history files this variable's sampling lives in.
             # Without this an instantaneous variable would be built from
