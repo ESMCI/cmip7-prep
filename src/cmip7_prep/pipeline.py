@@ -53,7 +53,7 @@ def _collect_required_model_vars(
         try:
             cfg = mapping.get_cfg(var) or {}
         except KeyError:
-            logger.warning("Skipping '%s': no mapping found in %s", var, mapping.path)
+            logger.warning("no mapping found in %s for variable %s", mapping.path, var)
             continue
         src = cfg.get("source")
         raws = cfg.get("raw_variables") or cfg.get("sources") or []
@@ -82,7 +82,6 @@ def _open_dataset_with_cftime(files, parallel, use_cftime=True, **open_kwargs):
     return xr.open_mfdataset(
         files,
         combine="nested",
-        # combine="by_coords",
         decode_times=time_coder,
         parallel=parallel,
         data_vars="minimal",
@@ -169,23 +168,11 @@ def open_native_for_cmip_vars(
     selected = sorted(
         {str(p) for p in files if any(_filename_contains_var(p, v) for v in required)}
     )
-    # multivar_multitime = False
-    # found_multi_one_var = False
-    # for v in required:
-    #     if len([p for p in selected if _filename_contains_var(p, v)]) > 1:
-    #         if not found_multi_one_var:
-    #             found_multi_one_var = True
-    #         else:
-    #             multivar_multitime = True
-    #             break
-
-    # if not selected:
-    #     logger.warning(
-    #         "no native inputs found for requested CMIP variables: %s", cmip_vars
-    #     )
-    #     return None, None
-    logger.info(required)
-    # logger.info(multivar_multitime)
+    if not selected:
+        logger.warning(
+            "no native inputs found for requested CMIP variables: %s", cmip_vars
+        )
+        return None, None
     if len(required) > 1:
         logger.info(
             "Merging multiple time series files for each variable: %s", required
@@ -215,7 +202,6 @@ def open_native_for_cmip_vars(
 
 
 # ----------------------- realization / vertical -----------------------
-#    ds_vert = _apply_vertical_if_needed(ds_vars, cmip_var, cfg, mapping, tables_path=tables_path)
 
 
 def _apply_vertical_if_needed(
