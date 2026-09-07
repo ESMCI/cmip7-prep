@@ -380,6 +380,8 @@ def clean_string(value, normalize_dim_names=False):
             value = "lev"
         #  It is possible that this would also be needed for CESM, and that it could even be
         # applied to all timex dimensions where x is a number, but we apply it like this for now
+        elif value == "time1":
+            value = "time"
         elif value == "time4":
             value = "time"
     return value
