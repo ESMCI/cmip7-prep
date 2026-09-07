@@ -562,10 +562,13 @@ class Mapping:
             Output frequency token (e.g. 'mon', 'day').
         """
         if cmip_name not in self._vars:
-            warnings.warn(
-                f"[mapping] no mapping found for CMIP variable {cmip_name} — skipping",
-                RuntimeWarning,
-                stacklevel=2,
+            # One channel for both lines: warnings.warn goes to stderr and is
+            # deduplicated per call site, so it would print once however many
+            # variables are unmapped, while the separator printed every time.
+            logger.warning("=" * 60)
+            logger.warning(
+                "[mapping] no mapping found for CMIP variable %s - skipping",
+                cmip_name,
             )
             return []
         effective_freq = freq if freq is not None else self.default_freq
