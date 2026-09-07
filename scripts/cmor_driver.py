@@ -154,12 +154,6 @@ def parse_args():
         help="input_grid name (Default: ne30)",
     )
     parser.add_argument(
-        "--ocn-grid-file",
-        type=str,
-        default="/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc",
-        help="Path to ocean grid description file for CESM/MOM (optional)",
-    )
-    parser.add_argument(
         "--ocn-static-file",
         type=str,
         default=None,
@@ -738,15 +732,11 @@ def main():
     logger.debug("Realm is %s", realm)
     ripf_index = args.realization_initialization_physics_forcing
 
-    # Set ocn_grid and ocn_fx_fields
-    # TODO: it looks like ocn_grid is not used after this - so can it
-    # be removed from the input argument list and from cmor_driver.py
-    ocn_grid = None
+    # Ocean fx fields (areacello, deptho, sftof) are read from the MOM6 static
+    # file and merged into the native data and the CMOR output.  CESM only.
     ocn_fx_fields = None
     if model == "cesm":
         if realm in ["ocean", "seaIce"]:
-            if args.ocn_grid_file:
-                ocn_grid = args.ocn_grid_file
             if args.ocn_static_file:
                 ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
                 logger.info(
