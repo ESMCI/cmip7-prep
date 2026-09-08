@@ -8,6 +8,7 @@ variables:
   baresoilFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by bare soil.
     formula: (1-FATES_AREA_PLANTS)*FATES_FRACTION*100
+    grids: [gr]
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -16,6 +17,7 @@ variables:
     description: Percentage of grid cell burned due to all fires including natural
       and anthropogenic fires and those associated with anthropogenic land use change
     formula: (FATES_BURNFRAC *3600*24*30*100)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_BURNFRAC, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -25,6 +27,7 @@ variables:
       grass, crops, and trees).
     formula: (FATES_AREA_PLANTS-sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[14],
       dimname='fates_levpft'))*FATES_FRACTION*100
+    grids: [gr]
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_CANOPYCROWNAREA_PF,
       model_var: FATES_FRACTION]
     table: land
@@ -34,6 +37,7 @@ variables:
     description: Percentage of entire grid cell  that is covered by C4 PFTs (including
       grass and crops).
     formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[14], dimname='fates_levpft')*FATES_FRACTION*100
+    grids: [gr]
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -42,6 +46,7 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     formula: TOTECOSYSC / 1000
+    grids: [gr]
     sources: [model_var: TOTECOSYSC]
     table: land
     units: kg m-2
@@ -49,6 +54,7 @@ variables:
   cLeaf_tavg-u-hxy-lnd:
     description: Carbon mass per unit area in leaves.
     formula: (FATES_LEAFC)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LEAFC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -58,6 +64,7 @@ variables:
       dead organic matter composed of coarse wood. It is distinct from fine litter.
       The precise distinction between "fine" and "coarse" is model dependent.'
     formula: (sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LITTER_BG_CWD_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -66,6 +73,7 @@ variables:
     description: subsurface litter pool fed by root inputs.
     formula: (sumover_index(FATES_LITTER_BG_FINE_EL, indexlist=[1], dimname='fates_levelem')
       + sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LITTER_BG_FINE_EL, model_var: FATES_LITTER_BG_CWD_EL,
       model_var: FATES_FRACTION]
     table: land
@@ -75,6 +83,7 @@ variables:
     description: Surface or near-surface litter pool fed by leaf and above-ground
       litterfall
     formula: (sumover_index(FATES_LITTER_AG_FINE_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LITTER_AG_FINE_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -82,6 +91,7 @@ variables:
   cOther_tavg-u-hxy-lnd:
     description: E.g. fruits, seeds, etc.
     formula: (FATES_SEED_BANK + FATES_REPROC + FATES_STOREC)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_SEED_BANK, model_var: FATES_REPROC, model_var: FATES_STOREC,
       model_var: FATES_FRACTION]
     table: land
@@ -91,6 +101,7 @@ variables:
     description: Carbon mass per unit area in that has been removed from the environment
       through  land use change.
     formula: TOT_WOODPRODC / 1000
+    grids: [gr]
     sources: [model_var: TOT_WOODPRODC]
     table: land
     units: kg m-2
@@ -98,6 +109,7 @@ variables:
   cRoot_tavg-u-hxy-lnd:
     description: including fine and coarse roots.
     formula: (FATES_VEGC - FATES_VEGC_ABOVEGROUND) * FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_VEGC, model_var: FATES_VEGC_ABOVEGROUND, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -105,6 +117,7 @@ variables:
   cSoilPools_tavg-u-hxy-lnd:
     description: For models with multiple soil carbon pools, report each pool here.
       If models also have vertical discretisation these should be aggregated
+    grids: [gr]
     sources: [model_var: SOIL1C, model_var: SOIL2C, model_var: SOIL3C, model_var: SOIL4C]
     table: land
     units: kg m-2
@@ -113,6 +126,7 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     formula: TOTSOMC_1m / 1000
+    grids: [gr]
     sources: [model_var: TOTSOMC_1m]
     table: land
     units: kg m-2
@@ -121,6 +135,7 @@ variables:
     description: for models with vertically discretised soil carbon, report total
       soil carbon for each level
     formula: SOILC_vr * ZSOI / 1000
+    grids: [gr]
     sources: [model_var: SOILC_vr, model_var: ZSOI]
     table: land
     units: kg m-2
@@ -128,6 +143,7 @@ variables:
   cSoil_tavg-u-hxy-lnd:
     description: Carbon mass in the full depth of the soil model.
     formula: TOTSOMC / 1000
+    grids: [gr]
     sources: [model_var: TOTSOMC]
     table: land
     units: kg m-2
@@ -135,6 +151,7 @@ variables:
   cStem_tavg-u-hxy-lnd:
     description: including sapwood and hardwood.
     formula: (FATES_VEGC_ABOVEGROUND - FATES_LEAFC - FATES_REPROC - FATES_STOREC)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_VEGC_ABOVEGROUND, model_var: FATES_LEAFC, model_var: FATES_REPROC,
       model_var: FATES_STOREC, model_var: FATES_FRACTION]
     table: land
@@ -143,6 +160,7 @@ variables:
   cVegLut_tpt-u-hxy-multi:
     description: end of year values (not annual mean)
     formula: (FATES_VEGC_LU)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_VEGC_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -150,6 +168,7 @@ variables:
   cVeg_tavg-u-hxy-lnd:
     description: Carbon mass per unit area in vegetation.
     formula: FATES_VEGC *FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_VEGC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -159,6 +178,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     formula: (sumover_index(FATES_VEGC_PF, indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -168,6 +188,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     formula: (sumover_index(FATES_VEGC_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -177,6 +198,7 @@ variables:
       any plants e.g. trees, shrubs, grass. Plants are autotrophs i.e. "producers"
       of biomass using carbon obtained from carbon dioxide.'
     formula: (sumover_index(FATES_VEGC_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_VEGC_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2
@@ -184,6 +206,7 @@ variables:
   cnc_tavg-u-hxy-u:
     description: Canopy covered fraction
     formula: (FATES_AREA_PLANTS * 100)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -191,6 +214,7 @@ variables:
   cropFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell  that is covered by crop.
     formula: (sumover_index(FATES_PATCHAREA_LU, indexlist=[5], dimname='fates_levlanduse'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -199,6 +223,7 @@ variables:
     description: Total (cumulative) thickness of all soil layers. This is the sum
       of individual thicknesses of all soil layers.
     formula: sum(DZSOI)
+    grids: [gr]
     sources: [model_var: DZSOI]
     table: land
     units: m
@@ -206,18 +231,21 @@ variables:
   esn_tavg-u-hxy-lnd:
     description: The flux due to conversion of liquid or solid water into vapor at
       the surface where there is snow on land
+    grids: [gr]
     sources: [model_var: QSNOEVAP]
     table: land
     units: kg m-2 s-1
 
   evspsblsoi_tavg-u-hxy-lnd:
     description: includes sublimation.
+    grids: [gr]
     sources: [model_var: QSOIL]
     table: land
     units: kg m-2 s-1
 
   evspsblsoi_tavg-u-hxy-u:
     description: Water evaporation from soil
+    grids: [gr]
     positive: up
     sources: [model_var: QSOIL]
     table: land
@@ -225,12 +253,14 @@ variables:
 
   evspsblveg_tavg-u-hxy-lnd:
     description: the canopy evaporation+sublimation (if present in model).
+    grids: [gr]
     sources: [model_var: QVEGE]
     table: land
     units: kg m-2 s-1
 
   evspsblveg_tavg-u-hxy-u:
     description: Evaporation from canopy
+    grids: [gr]
     positive: up
     sources: [model_var: QVEGE]
     table: land
@@ -239,6 +269,7 @@ variables:
   fBNF_tavg-u-hxy-lnd:
     description: The fixation (uptake of nitrogen gas directly from the atmosphere)
       of nitrogen due to biological processes.
+    grids: [gr]
     sources: [model_var: NFIX_TO_SMINN]
     table: land
     units: kg m-2 s-1
@@ -247,6 +278,7 @@ variables:
     description: leached carbon etc that goes into run off or river routing and finds
       its way into ocean should be reported here.
     formula: SOM_C_LEACHED /1000
+    grids: [gr]
     sources: [model_var: SOM_C_LEACHED]
     table: land
     units: kg m-2 s-1
@@ -257,6 +289,7 @@ variables:
       biomass differs significantly across models, but it should be straight-forward
       to compare deforested biomass across models.
     formula: (FATES_LUCHANGE_WOODPROD_C_FLUX / (365 * 86400))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LUCHANGE_WOODPROD_C_FLUX, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -265,6 +298,7 @@ variables:
     description: From all sources,  Including natural, anthropogenic and Land-use
       change. Only total fire emissions can be compared to observations.
     formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -272,6 +306,7 @@ variables:
   fFireNat_tavg-u-hxy-lnd:
     description: CO2 emissions from natural fires
     formula: (FATES_FIRE_CLOSS - FATES_FIRE_CLOSS_LANDUSECHANGE)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FIRE_CLOSS_LANDUSECHANGE,
       model_var: FATES_FRACTION]
     table: land
@@ -283,6 +318,7 @@ variables:
       any CO2 flux from fire included in fLuc, defined below (CO2 Flux to Atmosphere
       from Land Use Change).
     formula: (FATES_FIRE_CLOSS - FATES_FIRE_CLOSS_LANDUSECHANGE)*FATES_FRACTION
+    grids: [gr]
     positive: up
     sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FIRE_CLOSS_LANDUSECHANGE,
       model_var: FATES_FRACTION]
@@ -293,6 +329,7 @@ variables:
     description: be it food or wood harvest, any carbon that is subsequently stored
       is reported here
     formula: (FATES_HARVEST_WOODPROD_C_FLUX  / (365 * 86400))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_HARVEST_WOODPROD_C_FLUX, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -301,6 +338,7 @@ variables:
     description: Carbon mass flux per unit area into soil from litter (dead plant
       material in or above the soil).
     formula: (sumover_index(FATES_LITTER_OUT_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LITTER_OUT_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -308,6 +346,7 @@ variables:
   fLuc_tavg-u-hxy-lnd:
     description: Net Carbon Mass Flux into Atmosphere due to Land Use Change
     formula: LAND_USE_FLUX / 1000
+    grids: [gr]
     sources: [model_var: LAND_USE_FLUX]
     table: land
     units: kg m-2 s-1
@@ -317,6 +356,7 @@ variables:
       the atmosphere due to any land-use or land-cover change activities.  Include
       carbon transferred due to deforestation or agricultural directly into atmosphere,
       and  emissions form anthropogenic pools into atmosphere
+    grids: [gr]
     sources: [model_var: DWT_CONV_CFLUX]
     table: land
     units: kg m-2 s-1
@@ -325,6 +365,7 @@ variables:
     description: leached nitrogen etc that goes into run off or river routing and
       finds its way into ocean should be reported here.
     formula: (SMIN_NO3_LEACHED+ SMIN_NO3_RUNOFF) / 1000
+    grids: [gr]
     sources: [model_var: SMIN_NO3_LEACHED, model_var: SMIN_NO3_RUNOFF]
     table: land
     units: kg m-2 s-1
@@ -335,6 +376,7 @@ variables:
       biomass differs significantly across models, but it should be straight-forward
       to compare deforested biomass across models.
     formula: DWT_WOODPRODN_GAIN + DWT_CROPPROD1N_GAIN
+    grids: [gr]
     sources: [model_var: DWT_WOODPRODN_GAIN, model_var: DWT_CROPPROD1N_GAIN]
     table: land
     units: kg m-2 s-1
@@ -348,6 +390,7 @@ variables:
       species from soil. Runoff is the liquid water which drains from land. If not
       specified, "runoff" refers to the sum of surface runoff and subsurface drainage.
     formula: SMIN_NO3_LEACHED / 1000
+    grids: [gr]
     sources: [model_var: SMIN_NO3_LEACHED]
     table: land
     units: kg m-2 s-1
@@ -355,6 +398,7 @@ variables:
   fNloss_tavg-u-hxy-lnd:
     description: Not all models split losses into gaseous and leaching
     formula: DENIT+ F_N2O_NIT+ SMIN_NO3_LEACHED + SMIN_NO3_RUNOFF
+    grids: [gr]
     sources: [model_var: DENIT, model_var: F_N2O_NIT, model_var: SMIN_NO3_LEACHED,
       model_var: SMIN_NO3_RUNOFF]
     table: land
@@ -368,6 +412,7 @@ variables:
       to conserve carbon and allow its eventual release into the atmosphere, for example,
       when the products decompose in landfill sites.
     formula: TOT_WOODPRODC_LOSS  /1000
+    grids: [gr]
     sources: [model_var: TOT_WOODPRODC_LOSS]
     table: land
     units: kg m-2 s-1
@@ -376,6 +421,7 @@ variables:
     description: Required for unambiguous separation of vegetation and soil + litter
       turnover times, since total fire flux draws from both sources
     formula: (FATES_FIRE_CLOSS)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -384,6 +430,7 @@ variables:
     description: needed to separate changing vegetation C turnover times resulting
       from changing allocation versus changing mortality
     formula: (FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_MORTALITY_CFLUX_CANOPY, model_var: FATES_MORTALITY_CFLUX_USTORY,
       model_var: FATES_FRACTION]
     table: land
@@ -393,6 +440,7 @@ variables:
     description: needed to separate changing vegetation C turnover times resulting
       from changing allocation versus changing mortality
     formula: (sumover_index(FATES_LITTER_IN_EL, indexlist=[1], dimname='fates_levelem')-FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LITTER_IN_EL, model_var: FATES_MORTALITY_CFLUX_CANOPY,
       model_var: FATES_MORTALITY_CFLUX_USTORY, model_var: FATES_FRACTION]
     table: land
@@ -407,6 +455,7 @@ variables:
       standard names mass_flux_of_carbon_into_litter_from_vegetation_due_to_mortality
       and mass_flux_of_carbon_into_litter_from_vegetation_due_to_senescence is mass_flux_of_carbon_into_litter_from_vegetation.
     formula: (sumover_index(FATES_LITTER_IN_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LITTER_IN_EL, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -415,6 +464,7 @@ variables:
     description: needed to separate changing vegetation C turnover times resulting
       from changing allocation versus changing mortality
     formula: (FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_MORTALITY_CFLUX_CANOPY, model_var: FATES_MORTALITY_CFLUX_USTORY,
       model_var: FATES_FRACTION]
     table: land
@@ -423,6 +473,7 @@ variables:
     description: Cumulative percentage transitions over the year; note that percentage
       should be reported as a percentage of atmospheric grid cell
     formula: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_TRANSITION_MATRIX_LULU, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -432,6 +483,7 @@ variables:
       be reported as percentage of land grid cell (example: frac_lnd = 0.5, frac_ocn
       = 0.5, frac_crop_lnd = 0.2 (of land portion of grid cell), then frac_lut(crop)
       = 0.5*0.2 = 0.1)'
+    grids: [gr]
     sources: [model_var: PCT_LANDUNIT]
     table: land
     units: '%'
@@ -439,6 +491,7 @@ variables:
     description: Cumulative percentage transitions over the year; note that percentage
       should be reported as percentage of atmospheric grid cell
     formula: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_TRANSITION_MATRIX_LULU, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -450,6 +503,7 @@ variables:
       this biomass and the difference is referred to as the net primary production.
       Reported on land-use tiles.
     formula: (FATES_GPP_LU)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -461,6 +515,7 @@ variables:
       this biomass and the difference is referred to as the net primary production.
       Reported on land-use tiles.
     formula: (FATES_GPP_PF)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -471,6 +526,7 @@ variables:
       photosynthesis in plants or phytoplankton. The producers also respire some of
       this biomass and the difference is referred to as the net primary production.
     formula: (FATES_GPP)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -478,6 +534,7 @@ variables:
   gpp_tavg-u-hxy-ng:
     description: Total GPP of grass in the grid cell
     formula: (sumover_index(FATES_GPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -485,6 +542,7 @@ variables:
   gpp_tavg-u-hxy-shb:
     description: Total GPP of shrubs in the grid cell
     formula: (sumover_index(FATES_GPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -492,6 +550,7 @@ variables:
   gpp_tavg-u-hxy-tree:
     description: Total GPP of trees in the grid cell
     formula: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -499,6 +558,7 @@ variables:
   grassFracC3_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C3 natural grass.
     formula: (FATES_CROWNAREA_PF(12+13))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -506,6 +566,7 @@ variables:
   grassFracC4_tavg-u-hxy-u:
     description: Percentage of entire grid cell covered by C4 natural grass.
     formula: (sumover_index(FATES_CROWNAREA_PF, indexlist=[14], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -513,12 +574,14 @@ variables:
   grassFrac_tavg-u-hxy-u:
     description: Percentage of entire grid cell that is covered by natural grass.
     formula: sumover_index(FATES_CROWNAREA_PF, indexlist=[12, 13, 14], dimname='fates_levpft')*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
   hfdsl_tavg-u-hxy-lnd:
     description: Ground heat flux at 3hr
+    grids: [gr]
     sources: [model_var: FGR]
     table: land
     units: W m-2
@@ -527,6 +590,7 @@ variables:
     description: A ratio obtained by dividing the total upper leaf surface area of
       vegetation by the (horizontal) surface area of the land on which it grows.
     formula: (FATES_LAI)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LAI, model_var: FATES_FRACTION]
     table: land
     units: '1'
@@ -536,6 +600,7 @@ variables:
       definitions.   This may include natural PFTs, anthropogenic PFTs, bare soil,
       lakes, urban areas, etc.   Sum of all should equal the fraction of the grid-cell
       that is land.
+    grids: [gr]
     sources: [model_var: PCT_LANDUNIT]
     table: land
     units: '%'
@@ -543,18 +608,21 @@ variables:
   mrro_tavg-u-hxy-lnd:
     description: the total runoff (including "drainage" through the base of the soil
       model) leaving the land portion of the grid cell.
+    grids: [gr]
     sources: [model_var: QRUNOFF]
     table: land
     units: kg m-2 s-1
 
   mrrob_tavg-u-hxy-lnd:
     description: subsurface_runoff_flux
+    grids: [gr]
     sources: [model_var: QDRAI]
     table: land
     units: kg m-2 s-1
 
   mrros_tavg-u-hxy-lnd:
     description: the total surface runoff leaving the land portion of the grid cell.
+    grids: [gr]
     sources: [model_var: QOVER]
     table: land
     units: kg m-2 s-1
@@ -562,6 +630,7 @@ variables:
   mrsfl_tavg-sl-hxy-lnd:
     description: in each soil layer, the mass of water in ice phase.  Reported as
       "missing" for grid cells occupied entirely by "sea"
+    grids: [gr]
     sources: [model_var: SOILICE]
     table: land
     units: kg m-2
@@ -569,6 +638,7 @@ variables:
   mrsll_tavg-sl-hxy-lnd:
     description: in each soil layer, the mass of water in liquid phase.  Reported
       as "missing" for grid cells occupied entirely by "sea"
+    grids: [gr]
     sources: [model_var: SOILLIQ]
     table: land
     units: kg m-2
@@ -577,6 +647,7 @@ variables:
     description: the mass per unit area  (summed over all soil layers) of water in
       all phases.
     formula: TOTSOILLIQ+TOTSOILICE
+    grids: [gr]
     sources: [model_var: TOTSOILLIQ, model_var: TOTSOILICE]
     table: land
     units: kg m-2
@@ -585,12 +656,14 @@ variables:
     description: 'reported "where land": divide the total water holding capacity of
       all the soil in the grid cell by the land area in the grid cell;  reported as
       "missing" where the land fraction is 0.'
+    grids: [gr]
     sources: [model_var: SUCSAT]
     table: land
     units: kg m-2
 
   mrsol_tavg-d10cm-hxy-lnd:
     description: the mass of water in all phases in a thin surface soil layer.
+    grids: [gr]
     sources: [model_var: SOILWATER_10CM]
     table: land
     units: kg m-2
@@ -599,18 +672,21 @@ variables:
     description: in each soil layer, the mass of water in all phases, including ice.  Reported
       as "missing" for grid cells occupied entirely by "sea"
     formula: SOILLIQ+SOILICE
+    grids: [gr]
     sources: [model_var: SOILLIQ, model_var: SOILICE]
     table: land
     units: kg m-2
 
   mrsol_tpt-d10cm-hxy-lnd:
     description: the mass of water in all phases in a thin surface soil layer.
+    grids: [gr]
     sources: [model_var: SOILWATER_10CM]
     table: land
     units: kg m-2
 
   mrtws_tavg-u-hxy-lnd:
     description: canopy_and_surface_and_subsurface_water_amount
+    grids: [gr]
     sources: [model_var: TWS]
     table: land
     units: kg m-2
@@ -619,6 +695,7 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     formula: TOTECOSYSN / 1000
+    grids: [gr]
     sources: [model_var: TOTECOSYSN]
     table: land
     units: kg m-2
@@ -626,6 +703,7 @@ variables:
   nMineral_tavg-u-hxy-lnd:
     description: SUM of ammonium, nitrite, nitrate, etc over all soil layers
     formula: SMINN / 1000
+    grids: [gr]
     sources: [model_var: SMINN]
     table: land
     units: kg m-2
@@ -634,6 +712,7 @@ variables:
     description: Report missing data over ocean grid cells. For fractional land report
       value averaged over the land fraction.
     formula: (TOTSOMN+SMINN) / 1000
+    grids: [gr]
     sources: [model_var: TOTSOMN, model_var: SMINN]
     table: land
     units: kg m-2
@@ -643,6 +722,7 @@ variables:
       as photosynthesis MINUS the sum of  plant and soil respiration, carbonfluxes  from
       fire, harvest, grazing  and land use change. Positive flux  is into the land.
     formula: -FCO2*(12.01/44.01)
+    grids: [gr]
     positive: down
     sources: [model_var: FCO2]
     table: land
@@ -651,6 +731,7 @@ variables:
   nep_tavg-u-hxy-lnd:
     description: Net Ecosystem Exchange
     formula: (FATES_NEP)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_NEP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -658,6 +739,7 @@ variables:
   nppLeaf_tavg-u-hxy-lnd:
     description: This is the rate of carbon uptake by leaves due to NPP
     formula: (FATES_LEAF_ALLOC)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LEAF_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -674,6 +756,7 @@ variables:
       solely with respect to the B contained in A, neglecting all other chemical constituents
       of A.'
     formula: (FATES_NPP_LU)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -681,6 +764,7 @@ variables:
   nppOther_tavg-u-hxy-lnd:
     description: added for completeness with npp_root
     formula: (FATES_SEED_ALLOC+FATES_STORE_ALLOC)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_SEED_ALLOC, model_var: FATES_STORE_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -688,6 +772,7 @@ variables:
   nppRoot_tavg-u-hxy-lnd:
     description: This is the rate of carbon uptake by roots due to NPP
     formula: (FATES_CROOT_ALLOC+FATES_FROOT_ALLOC)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CROOT_ALLOC, model_var: FATES_FROOT_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -695,6 +780,7 @@ variables:
   nppStem_tavg-u-hxy-lnd:
     description: added for completeness with npp_root
     formula: (FATES_STEM_ALLOC)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_STEM_ALLOC, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -711,6 +797,7 @@ variables:
       solely with respect to the B contained in A, neglecting all other chemical constituents
       of A.'
     formula: (FATES_NPP_PF)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -727,6 +814,7 @@ variables:
       solely with respect to the B contained in A, neglecting all other chemical constituents
       of A.'
     formula: (FATES_NPP)*FATES_FRACTION
+    grids: [gr]
     positive: down
     sources: [model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
@@ -735,6 +823,7 @@ variables:
   npp_tavg-u-hxy-ng:
     description: Total NPP of grass in the grid cell
     formula: (sumover_index(FATES_NPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -742,6 +831,7 @@ variables:
   npp_tavg-u-hxy-shb:
     description: Total NPP of shrubs in the grid cell
     formula: (sumover_index(FATES_NPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -749,12 +839,14 @@ variables:
   npp_tavg-u-hxy-tree:
     description: Total NPP of trees in the grid cell
     formula: (sumover_index(FATES_NPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
 
   orog_tavg-u-hxy-is:
     description: This is needed in case the ice sheet elevation changes in time
+    grids: [gr]
     sources: [model_var: usurf]
     table: land
     units: m
@@ -765,6 +857,7 @@ variables:
       mean sea level. Under this definition, the geoid changes as the mean volume
       of the ocean changes (e.g., due to glacial melt, or global warming of the ocean).  Reported
       here is the height above the present-day geoid (0.0 over ocean).
+    grids: [gr]
     sources: [model_var: PHIS]
     table: land
     units: m
@@ -772,6 +865,7 @@ variables:
   pastureFrac_tavg-u-hxy-u:
     description: fraction of entire grid cell  that is covered by anthropogenic pasture.
     formula: (sumover_index(FATES_PATCHAREA_LU, indexlist=[4], dimname='fates_levlanduse'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_PATCHAREA_LU, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -779,12 +873,14 @@ variables:
   prveg_tavg-u-hxy-lnd:
     description: the precipitation flux that is intercepted by the vegetation canopy
       (if present in model) before reaching the ground.
+    grids: [gr]
     sources: [model_var: QINTR]
     table: land
     units: kg m-2 s-1
 
   qgwr_tavg-u-hxy-lnd:
     description: water_flux_from_soil_layer_to_groundwater
+    grids: [gr]
     sources: [model_var: QCHARGE]
     table: land
     units: kg m-2 s-1
@@ -792,6 +888,7 @@ variables:
   raLeaf_tavg-u-hxy-lnd:
     description: added for completeness with Ra_root
     formula: (FATES_LEAFMAINTAR + (FATES_GROWTH_RESP * FATES_LEAFC_ALLOC / FATES_NPP))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LEAFMAINTAR, model_var: FATES_GROWTH_RESP, model_var: FATES_LEAFC_ALLOC,
       model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
@@ -802,6 +899,7 @@ variables:
       respiration on land (respiration by producers) [see rh for heterotrophic production].
       Calculated on land-use tiles.
     formula: (FATES_GPP_LU-FATES_NPP_LU)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_LU, model_var: FATES_NPP_LU, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -812,6 +910,7 @@ variables:
       to observations of total soil respiration.
     formula: ((FATES_FROOTMAINTAR+FATES_CROOTMAINTAR) + (FATES_GROWTH_RESP * (FATES_FROOT_ALLOC
       + FATES_CROOT_ALLOC) / FATES_NPP))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_FROOTMAINTAR, model_var: FATES_CROOTMAINTAR, {
         model_var: FATES_GROWTH_RESP}, model_var: FATES_FROOT_ALLOC, model_var: FATES_CROOT_ALLOC,
       model_var: FATES_NPP, model_var: FATES_FRACTION]
@@ -821,6 +920,7 @@ variables:
   raStem_tavg-u-hxy-lnd:
     description: added for completeness with Ra_root
     formula: (FATES_LSTEMMAINTAR)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_LSTEMMAINTAR, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -830,6 +930,7 @@ variables:
       respiration on land (respiration by producers) [see rh for heterotrophic production].
       Calculated on vegetation type.
     formula: (FATES_AUTORESP)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -838,6 +939,7 @@ variables:
     description: Carbon mass flux per unit area into atmosphere due to autotrophic
       respiration on land (respiration by producers) [see rh for heterotrophic production]
     formula: FATES_AUTORESP*FATES_FRACTION
+    grids: [gr]
     positive: up
     sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTION]
     table: land
@@ -847,6 +949,7 @@ variables:
     description: Total RA of grass in the grid cell
     formula: (sumover_index(FATES_GPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
       indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -855,6 +958,7 @@ variables:
     description: Total RA of shrubs in the grid cell
     formula: (sumover_index(FATES_GPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
       indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -863,6 +967,7 @@ variables:
     description: Total RA of trees in the grid cell
     formula: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
       indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_GPP_PF, model_var: FATES_NPP_PF, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -871,6 +976,7 @@ variables:
     description: Percentage of entire grid cell  that is land and is covered by  neither
       vegetation nor bare-soil (e.g., urban, ice, lakes, etc.)
     formula: 1-FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -879,6 +985,7 @@ variables:
     description: Needed to calculate litter bulk turnover time. Includes respiration
       from CWD as well.
     formula: LITTERC_HR /1000
+    grids: [gr]
     sources: [model_var: LITTERC_HR]
     table: land
     units: kg m-2 s-1
@@ -886,6 +993,7 @@ variables:
   rhSoil_tavg-u-hxy-lnd:
     description: Needed to calculate soil bulk turnover time
     formula: SOILC_HR /1000
+    grids: [gr]
     sources: [model_var: SOILC_HR]
     table: land
     units: kg m-2 s-1
@@ -894,6 +1002,7 @@ variables:
     description: Carbon mass flux per unit area into atmosphere due to heterotrophic
       respiration on land (respiration by consumers), calculated on vegetation type.
     formula: (FATES_HET_RESP)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_HET_RESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -902,6 +1011,7 @@ variables:
     description: Carbon mass flux per unit area into atmosphere due to heterotrophic
       respiration on land (respiration by consumers)
     formula: HR / 1000
+    grids: [gr]
     positive: up
     sources: [model_var: HR]
     table: land
@@ -910,6 +1020,7 @@ variables:
   rsds_tavg-u-hxy-lnd:
     description: Surface Downwelling Shortwave Radiation over land. Can be used for
       computation of surface albedo.
+    grids: [gr]
     positive: down
     sources: [model_var: FSDS]
     table: land
@@ -919,6 +1030,7 @@ variables:
     description: Surface Downwelling Shortwave Radiation over the portion of a land
       grid cell covered by snow but not by ice. Can be used for computation of surface
       albedo.
+    grids: [gr]
     positive: down
     sources: [model_var: FSDS]
     table: land
@@ -927,6 +1039,7 @@ variables:
   rsus_tavg-u-hxy-lnd:
     description: Surface Upwelling Shortwave Radiation over land. Can be used for
       computation of surface albedo.
+    grids: [gr]
     positive: up
     sources: [model_var: FSR]
     table: land
@@ -936,6 +1049,7 @@ variables:
     description: Surface Upwelling Shortwave Radiation over the portion of a land
       grid cell covered by snow. Can be used for computation of surface albedo.
     formula: SNOFSRVI+SNOFSRVD+SNOFSRNI+SNOFSRND
+    grids: [gr]
     positive: up
     sources: [model_var: SNOFSRVI, model_var: SNOFSRVD, model_var: SNOFSRNI,
       model_var: SNOFSRND]
@@ -945,6 +1059,7 @@ variables:
   sftgif_tavg-u-hxy-u:
     description: This is needed in case the ice sheet area changes in time
     formula: sumover_index(PCT_LANDUNIT, indexlist=[4], dimname='ltype')
+    grids: [gr]
     sources: [model_var: PCT_LANDUNIT]
     table: land
     units: '%'
@@ -952,6 +1067,7 @@ variables:
   sftgif_ti-u-hxy-u:
     description: fraction of grid cell occupied by "permanent" ice (i.e., glaciers).
     formula: sumover_index(PCT_LANDUNIT, indexlist=[4], dimname='ltype')
+    grids: [gr]
     sources: [model_var: PCT_LANDUNIT]
     table: land
     units: '%'
@@ -960,12 +1076,14 @@ variables:
     description: fraction of entire grid cell  that is covered by shrub.
     formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[7, 8, 9, 10, 11],
       dimname='fates_levpft') *FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
 
   slthick_ti-sl-hxy-lnd:
     description: Thickness of Soil Layers
+    grids: [gr]
     sources: [model_var: ZSOI]
     table: land
     units: m
@@ -973,6 +1091,7 @@ variables:
   srfrad_tavg-u-hxy-u:
     description: Net radiative flux at surface
     formula: FSA - FIRA
+    grids: [gr]
     sources: [model_var: FSA, model_var: FIRA]
     table: land
     units: W m-2
@@ -981,6 +1100,7 @@ variables:
     description: Total liquid water storage, other than soil, snow or interception
       storage (i.e. lakes, river channel or depression storage).
     formula: H2OSFC+ VOLR
+    grids: [gr]
     sources: [model_var: H2OSFC, model_var: VOLR]
     table: land
     units: kg m-2
@@ -988,12 +1108,14 @@ variables:
   tasLut_tavg-h2m-hxy-multi:
     description: Air temperature is the bulk temperature of the air, not the surface
       (skin) temperature.
+    grids: [gr]
     sources: [model_var: TSA]
     table: land
     units: K
 
   tran_tavg-u-hxy-lnd:
     description: Transpiration (may include dew formation as a negative flux).
+    grids: [gr]
     positive: up
     sources: [model_var: QVEGT]
     table: land
@@ -1001,6 +1123,7 @@ variables:
 
   tran_tavg-u-hxy-u:
     description: Transpiration
+    grids: [gr]
     sources: [model_var: QVEGT]
     table: land
     units: kg m-2 s-1
@@ -1009,6 +1132,7 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf deciduous trees.
     formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[5, 6], dimname='fates_levpft')*FATES_FRACTION*100
+    grids: [gr]
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1017,6 +1141,7 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       broadleaf evergreen trees.
     formula: (sumover_index(FATES_CROWNAREA_PF, indexlist=[1, 4], dimname='fates_levpft'))*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1025,6 +1150,7 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf deciduous trees.
     formula: (sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[3], dimname='fates_levpft')*100)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1033,6 +1159,7 @@ variables:
     description: This is the percentage of the entire grid cell that is covered by
       needleleaf evergreen trees.
     formula: (sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[2], dimname='fates_levpft')*100)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1041,6 +1168,7 @@ variables:
     description: fraction of entire grid cell  that is covered by trees.
     formula: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[1, 2, 3, 4, 5, 6],
       dimname='fates_levpft') *FATES_FRACTION*100
+    grids: [gr]
     sources: [model_var: FATES_CANOPYCROWNAREA_PF, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1048,6 +1176,7 @@ variables:
   tsLut_tavg-u-hxy-multi:
     description: Surface temperature (i.e. temperature at which long-wave radiation
       emitted)
+    grids: [gr]
     sources: [model_var: TSKIN]
     table: land
     units: K
@@ -1055,12 +1184,14 @@ variables:
   tsl_tavg-sl-hxy-lnd:
     description: Temperature of each soil layer.  Reported as "missing" for grid cells
       occupied entirely by "sea".
+    grids: [gr]
     sources: [model_var: TSOI]
     table: land
     units: K
 
   tslsi_tpt-u-hxy-lsi:
     description: Surface temperature of all surfaces except open ocean, sampled synoptically.
+    grids: [gr]
     sources: [model_var: TSA]
     table: land
     units: K
@@ -1069,6 +1200,7 @@ variables:
     description: Percentage of grid cell that is covered by vegetation.This SHOULD
       be the sum of tree, grass (natural and pasture), crop and shrub fractions.
     formula: (FATES_AREA_PLANTS)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_AREA_PLANTS, model_var: FATES_FRACTION]
     table: land
     units: '%'
@@ -1076,6 +1208,7 @@ variables:
   vegHeight_tavg-u-hxy-ng:
     description: Vegetation height averaged over the grass fraction of a grid cell.
     formula: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CA_WEIGHTED_HEIGHT, model_var: FATES_FRACTION]
     table: land
     units: m
@@ -1084,6 +1217,7 @@ variables:
     description: Vegetation height averaged over all vegetation types and over the
       vegetated fraction of a grid cell.
     formula: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
+    grids: [gr]
     sources: [model_var: FATES_CA_WEIGHTED_HEIGHT, model_var: FATES_FRACTION]
     table: land
     units: m
@@ -1095,6 +1229,7 @@ variables:
       season).
     formula: (CH4_SURF_DIFF_SAT+CH4_SURF_EBUL_SAT+CH4_SURF_AERE_SAT) * 0.016043 *
       FINUNDATED
+    grids: [gr]
     sources: [model_var: CH4_SURF_DIFF_SAT, model_var: CH4_SURF_EBUL_SAT, model_var: CH4_SURF_AERE_SAT,
       model_var: FINUNDATED]
     table: land
@@ -1103,12 +1238,14 @@ variables:
   wetlandFrac_tavg-u-hxy-u:
     description: Percentage of grid cell covered by wetland. Report only one year
       if  fixed percentage is used, or time series if values are determined dynamically.
+    grids: [gr]
     sources: [model_var: FINUNDATED]
     table: land
     units: '%'
 
   wtd_tavg-u-hxy-lnd:
     description: depth_of_soil_moisture_saturation
+    grids: [gr]
     sources: [model_var: ZWT]
     table: land
     units: m
