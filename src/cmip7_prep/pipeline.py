@@ -176,7 +176,7 @@ def open_native_for_cmip_vars(
         return None, None
     if len(required) > 1:
         logger.info(
-            "Merging multiple time series files for each variable: %s", required
+            "   Merging multiple time series files for each variable: %s", required
         )
         ds_list = []
         for v in required:

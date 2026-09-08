@@ -344,7 +344,7 @@ def process_one_var(
     )
     # At this point you have a cmip_var (metadata from database query for the target variable)
     # queried a cmor database from the cloud
-    logger.info(f"Starting processing for variable: {varname}")
+    logger.debug(f"Starting processing for variable: {varname}")
     var_start = time.monotonic()
     results = [(str(varname), "started")]
 

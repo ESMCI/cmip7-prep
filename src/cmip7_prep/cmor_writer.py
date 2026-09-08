@@ -741,7 +741,7 @@ class CmorSession(
                 coord_vals=tvals,
                 cell_bounds=tbnds,
             )
-            logger.info(
+            logger.debug(
                 "Variable %s: time axis '%s' (bounds %s)",
                 lookup_name,
                 time_entry,

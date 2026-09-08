@@ -154,8 +154,20 @@ class VarConfig:
     standard_name:
         CF standard name.
     grids:
-        CMIP grid labels to produce for this variable, e.g. ``["gn", "gr"]``
-        for both the native and the regridded grid.  Defaults to ``["gr"]``.
+        CMIP grid labels to produce for this variable.  The 'g' is *grid*, not
+        global::
+
+            gn   grid, native      -- written on the grid the data arrives on
+            gr   grid, regridded   -- interpolated to the target grid
+            gm   global mean       -- no horizontal grid at all
+
+        One entry per output, so ``["gn", "gr"]`` writes the variable twice,
+        once on each grid.  Defaults to ``["gr"]``, which is what every
+        variable without the key gets.
+
+        These are the CMIP controlled-vocabulary values that appear as
+        ``grid_label`` in the output path and filename, so they are spelled the
+        same here to avoid a translation step.
     source_aliases:
         Mapping of formula token → native model variable name.  Allows the
         formula to use short alias names that differ from the actual variable
