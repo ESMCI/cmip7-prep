@@ -435,10 +435,8 @@ def process_one_var(
                 results.append(
                     (str(varname), "realized latitude/longitude cesm variable")
                 )
-            elif realm == "seaIce" and (model == "noresm" or grid == "gm"):
-                # NorESM seaIce is always kept on the native CICE (nj, ni) grid:
-                # no regridding.  For CESM only the global means ('gm') stay
-                # native; gridded CESM seaIce fields fall through and regrid.
+            elif realm == "seaIce":
+                # seaIce is always kept on the native CICE (nj, ni) grid
                 logger.info(
                     f"Preparing seaIce field variants via realize_all for {varname}"
                 )
