@@ -6,6 +6,41 @@ import sys
 import argparse
 from typing import Optional
 
+# ── Grid labels ──────────────────────────────────────────────────────────────
+# Which CMIP grid_label(s) each realm's variables are written on.  'gn' is the
+# model's native grid, 'gr' the regridded target grid, 'gm' a global mean with
+# no horizontal grid.  Realms whose output is regridded from an unstructured
+# grid get 'gr'; those kept on their native grid get 'gn'.
+#
+# Realm spellings differ between the two model CSVs, so both are listed.
+REALM_GRIDS: dict[str, list[str]] = {
+    "atmos": ["gr"],
+    "atmosChem": ["gr"],
+    "aerosol": ["gr"],
+    "land": ["gr"],
+    "seaIce": ["gn"],
+    "seaice": ["gn"],
+    "landIce": ["gn"],
+    "landice": ["gn"],
+    "ocean": ["gn"],
+    "fx": ["gn"],
+}
+
+# Per-variable exceptions to REALM_GRIDS, keyed by branded variable name.
+# The MOM6 fields below are published on both grids; the sea-ice entries are
+# global means with no horizontal grid.
+GRIDS_OVERRIDES: dict[str, list[str]] = {
+    "sos_tavg-u-hxy-sea": ["gn", "gr"],
+    "thetao_tavg-ol-hxy-sea": ["gn", "gr"],
+    "tos_tavg-u-hxy-sea": ["gn", "gr"],
+    "vo_tavg-ol-hxy-sea": ["gn", "gr"],
+    "wo_tavg-ol-hxy-sea": ["gn", "gr"],
+    "siarea_tavg-u-hm-u": ["gm"],
+    "siextent_tavg-u-hm-u": ["gm"],
+    "sisnmass_tavg-u-hm-si": ["gm"],
+    "sivol_tavg-u-hm-u": ["gm"],
+}
+
 # ── NorESM positive attribute overrides ──────────────────────────────────────
 # Maps branded variable name → "up" or "down".
 # Entries here are written as `positive: <value>` in the NorESM output YAML.
@@ -688,6 +723,13 @@ def read_csv(filepath, config):
                 continue
             realm = row[realm_col].strip()
             entry = _build_entry(row, config)
+            grids = GRIDS_OVERRIDES.get(name) or REALM_GRIDS.get(realm)
+            if grids is None:
+                raise ValueError(
+                    f"no grid label known for realm {realm!r}; "
+                    "add it to REALM_GRIDS in convert_csv_to_yaml.py"
+                )
+            entry["grids"] = list(grids)
             positive = config.get("positive_overrides", {}).get(name)
             if positive:
                 entry["positive"] = positive
