@@ -646,6 +646,7 @@ class CmorSession(
         logger.debug("found var_da with name: %s and dims: %s", var_da.name, var_dims)
 
         alev_id = None
+        alevh_id = None
         plev_id = None
         lat_id = None
         lon_id = None
@@ -1093,6 +1094,8 @@ class CmorSession(
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
             "lev": alev_id,  # sometimes used for hybrid
+            "ilev": alevh_id,  # hybrid sigma half levels (interfaces)
+            "alevhalf": alevh_id,
             "sdepth": sdepth_id,
             "z_l": lev_id,
             "olevel": lev_id,
