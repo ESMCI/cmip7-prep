@@ -801,19 +801,23 @@ class CmorSession(
             )
             cmor.set_cur_dataset_attribute("vertical_label", "alevhalf")
 
-            # 2) z-factors are named as for the midpoint axis -- a, b, p0, ps --
-            # per 'z_factors: p0: p0 a: a b: b ps: ps' in the coordinate table.
+            # 2) z-factors.  The name is the *formula entry* name, not the term
+            # name in the output file.  CMIP7_formula_terms.json defines
+            # a_half and b_half on dimension 'alevhalf', both with out_name
+            # 'a'/'b'.  Passing "a" attaches an entry declared on 'alevel' and
+            # CMOR rejects the axis type.  p0 and ps have no vertical
+            # dimension, so those are shared with the midpoint case.
             cmor.zfactor(
                 zaxis_id=alevh_id,
-                zfactor_name="a",
-                units="1",
+                zfactor_name="a_half",
+                units="",
                 axis_ids=[alevh_id],
                 zfactor_values=np.asarray(ds[hyai_name].values),
             )
             cmor.zfactor(
                 zaxis_id=alevh_id,
-                zfactor_name="b",
-                units="1",
+                zfactor_name="b_half",
+                units="",
                 axis_ids=[alevh_id],
                 zfactor_values=np.asarray(ds[hybi_name].values),
             )
