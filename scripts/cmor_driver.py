@@ -363,8 +363,14 @@ def process_one_var(
 
     # CMIP grid labels to write for this variable.  Most variables are written
     # once, on the regridded grid; a few MOM6 fields are requested on both the
-    # native tripolar grid and the regridded one, hence the loop.
-    grids = cfg.get("grids") or ["gr"]
+    # native tripolar grid and the regridded one, hence the loop.  There is no
+    # default: every variable states its grids, so a missing key is a mapping
+    # error rather than something to guess at.
+    grids = cfg.get("grids")
+    if not grids:
+        logger.error("no grids specified for %s in the mapping YAML", varname)
+        results.append((str(varname), "ERROR: no grids in mapping YAML"))
+        return results
 
     for grid in grids:
         logger.info(f"Processing {varname} on grid {grid}")
@@ -415,160 +421,174 @@ def process_one_var(
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
 
-            # 'gn' means write the data on the grid it arrives on -- realize
-            # only, for formulas and unit conversion, and no regridding.
-            if grid == "gn":
-                # output ocn on the native grid, but apply realize for formulas/mapping
-                logger.info(
-                    f"Applying realize for latitude/longitude cesm variable {varname}"
-                )
-                realized = mapping.realize(ds_native, varname)
-                ds_c = (
-                    realized
-                    if isinstance(realized, xr.Dataset)
-                    else xr.Dataset({varname: realized})
-                )
-                # Ensure time_bounds is included if present
-                if "time_bounds" in ds_native and "time_bounds" not in ds_c:
-                    ds_c = ds_c.assign(time_bounds=ds_native["time_bounds"])
-                cmor_items = [(ds_c, cfg)]
-                results.append(
-                    (str(varname), "realized latitude/longitude cesm variable")
-                )
-            elif realm == "seaIce":
-                # seaIce is always kept on the native CICE (nj, ni) grid
-                logger.info(
-                    f"Preparing seaIce field variants via realize_all for {varname}"
-                )
-                for da, variant_cfg in mapping.realize_all(
-                    ds_native, varname, freq=frequency
-                ):
-                    ds_v = (
-                        da if isinstance(da, xr.Dataset) else xr.Dataset({varname: da})
+            # 'gn' and 'gm' both mean "do not regrid": write the data on
+            # the grid it arrives on, or with no horizontal grid at all.  The
+            # realm still decides what has to ride along -- sea ice needs its
+            # NH/SH variants and the CICE grid definition, land ice its
+            # projected axes -- so the realm dispatch sits inside this arm.
+            if grid in ("gn", "gm"):
+                if realm not in ("seaIce", "landIce"):
+                    logger.info(f"Writing {varname} on its native grid (realize only)")
+                    realized = mapping.realize(ds_native, varname)
+                    ds_c = (
+                        realized
+                        if isinstance(realized, xr.Dataset)
+                        else xr.Dataset({varname: realized})
                     )
-                    if "time_bounds" in ds_native and "time_bounds" not in ds_v:
-                        ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
-                    # Carry the native CICE grid definition (cell centers + vertex
-                    # bounds) into the trimmed variant dataset, but only for 2D
-                    # (nj, ni) variants that are written on the native grid. TLAT/TLON
-                    # ride along as coords, but the *_bounds vars are data_vars and
-                    # would be dropped by the realize_all projection.
-                    if "nj" in da.dims and "ni" in da.dims:
-                        for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
-                            if gname in ds_native and gname not in ds_v:
-                                ds_v = ds_v.assign({gname: ds_native[gname]})
-                    cmor_items.append((ds_v, variant_cfg))
-                results.append(
-                    (
-                        str(varname),
-                        f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
+                    # Ensure time_bounds is included if present
+                    if "time_bounds" in ds_native and "time_bounds" not in ds_c:
+                        ds_c = ds_c.assign(time_bounds=ds_native["time_bounds"])
+                    cmor_items = [(ds_c, cfg)]
+                    results.append((str(varname), "native grid (realize applied)"))
+                elif realm == "seaIce":
+                    # seaIce is always kept on the native CICE (nj, ni) grid
+                    logger.info(
+                        f"Preparing seaIce field variants via realize_all for {varname}"
                     )
-                )
-            elif realm == "landIce":
-                # CISM land-ice is kept on its native projected (x, y) grid: no
-                # regridding, and no NH/SH variants -- a variable is realized once
-                # and simply appears across the different frequency files.  The
-                # projected x/y coordinate axes ride along (dimension coordinates)
-                # so the writer can georeference them via the ice-sheet projection
-                # in _define_cism_grid.
-                logger.info(
-                    f"Preparing native landIce variable {varname}, applying realize"
-                )
-                realized = mapping.realize(ds_native, varname)
-                ds_cmor = (
-                    realized
-                    if isinstance(realized, xr.Dataset)
-                    else xr.Dataset({varname: realized})
-                )
-                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
-                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
-                # Carry the projected coordinate axes if not already present
-                # (defensive; dimension coordinates normally ride along).
-                for gname in ("x0", "y0", "x1", "y1"):
-                    if (
-                        gname in ds_native
-                        and gname not in ds_cmor.coords
-                        and gname not in ds_cmor
+                    for da, variant_cfg in mapping.realize_all(
+                        ds_native, varname, freq=frequency
                     ):
-                        ds_cmor = ds_cmor.assign({gname: ds_native[gname]})
-                cmor_items = [(ds_cmor, cfg)]
-                results.append(
-                    (str(varname), "landIce field (native, realize applied)")
-                )
-            elif cfg.get("levels", {}).get("name") == "plev39":
-                logger.info(
-                    "Processing plev39 variable %s: realize → regrid to lat/lon "
-                    "→ zonal_mean_on_pressure_grid",
-                    varname,
-                )
-                # Realize the variable — handles single-source and formula cases uniformly.
-                realized = mapping.realize(ds_native, varname)
+                        ds_v = (
+                            da
+                            if isinstance(da, xr.Dataset)
+                            else xr.Dataset({varname: da})
+                        )
+                        if "time_bounds" in ds_native and "time_bounds" not in ds_v:
+                            ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
+                        # Carry the native CICE grid definition (cell centers + vertex
+                        # bounds) into the trimmed variant dataset, but only for 2D
+                        # (nj, ni) variants that are written on the native grid. TLAT/TLON
+                        # ride along as coords, but the *_bounds vars are data_vars and
+                        # would be dropped by the realize_all projection.
+                        if "nj" in da.dims and "ni" in da.dims:
+                            for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+                                if gname in ds_native and gname not in ds_v:
+                                    ds_v = ds_v.assign({gname: ds_native[gname]})
+                        cmor_items.append((ds_v, variant_cfg))
+                    results.append(
+                        (
+                            str(varname),
+                            f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
+                        )
+                    )
+                elif realm == "landIce":
+                    # CISM land-ice is kept on its native projected (x, y) grid: no
+                    # regridding, and no NH/SH variants -- a variable is realized once
+                    # and simply appears across the different frequency files.  The
+                    # projected x/y coordinate axes ride along (dimension coordinates)
+                    # so the writer can georeference them via the ice-sheet projection
+                    # in _define_cism_grid.
+                    logger.info(
+                        f"Preparing native landIce variable {varname}, applying realize"
+                    )
+                    realized = mapping.realize(ds_native, varname)
+                    ds_cmor = (
+                        realized
+                        if isinstance(realized, xr.Dataset)
+                        else xr.Dataset({varname: realized})
+                    )
+                    if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+                        ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+                    # Carry the projected coordinate axes if not already present
+                    # (defensive; dimension coordinates normally ride along).
+                    for gname in ("x0", "y0", "x1", "y1"):
+                        if (
+                            gname in ds_native
+                            and gname not in ds_cmor.coords
+                            and gname not in ds_cmor
+                        ):
+                            ds_cmor = ds_cmor.assign({gname: ds_native[gname]})
+                    cmor_items = [(ds_cmor, cfg)]
+                    results.append(
+                        (str(varname), "landIce field (native, realize applied)")
+                    )
+            elif grid == "gr":
+                # Regridded to the target grid.  plev39 additionally takes a
+                # zonal mean over longitude afterwards.
+                if cfg.get("levels", {}).get("name") == "plev39":
+                    logger.info(
+                        "Processing plev39 variable %s: realize → regrid to lat/lon "
+                        "→ zonal_mean_on_pressure_grid",
+                        varname,
+                    )
+                    # Realize the variable — handles single-source and formula cases uniformly.
+                    realized = mapping.realize(ds_native, varname)
 
-                # normalizes the result to always be a DataArray:
-                #   - If realize returned a DataArray directly → use it as-is
-                #   - If realize returned a Dataset → extract the named variable from it: realized[varname]
-                # After this line, da_realized is always an xr.DataArray containing the CMIP variable
-                # on the native SE/ncol grid — whether it came from a direct mapping or a formula evaluation.
-                da_realized = (
-                    realized
-                    if isinstance(realized, xr.DataArray)
-                    else realized[varname]
-                )
+                    # normalizes the result to always be a DataArray:
+                    #   - If realize returned a DataArray directly → use it as-is
+                    #   - If realize returned a Dataset → extract the named variable from it: realized[varname]
+                    # After this line, da_realized is always an xr.DataArray containing the CMIP variable
+                    # on the native SE/ncol grid — whether it came from a direct mapping or a formula evaluation.
+                    da_realized = (
+                        realized
+                        if isinstance(realized, xr.DataArray)
+                        else realized[varname]
+                    )
 
-                # Build a dataset with the realized variable plus PS for pressure
-                # computation.  The 1-D coefficients (hyam, hybm, P0, lev) are carried
-                # through unchanged by regrid_to_latlon_ds via _attach_vertical_metadata.
-                ds_to_regrid = xr.Dataset({varname: da_realized})
-                for aux in ("PS", "hyam", "hybm", "P0", "lev"):
-                    if aux in ds_native:
-                        ds_to_regrid[aux] = ds_native[aux]
+                    # Build a dataset with the realized variable plus PS for pressure
+                    # computation.  The 1-D coefficients (hyam, hybm, P0, lev) are carried
+                    # through unchanged by regrid_to_latlon_ds via _attach_vertical_metadata.
+                    ds_to_regrid = xr.Dataset({varname: da_realized})
+                    for aux in ("PS", "hyam", "hybm", "P0", "lev"):
+                        if aux in ds_native:
+                            ds_to_regrid[aux] = ds_native[aux]
 
-                # Regrid variable and PS from the native (SE/ncol) grid to lat/lon.
-                vars_to_regrid = [varname] + [v for v in ("PS",) if v in ds_to_regrid]
-                ds_latlon = regrid_to_latlon_ds(
-                    ds_to_regrid,
-                    vars_to_regrid,
-                    resolution,
-                    model,
-                    time_from=ds_native,
-                    dtype="float32",
-                )
+                    # Regrid variable and PS from the native (SE/ncol) grid to lat/lon.
+                    vars_to_regrid = [varname] + [
+                        v for v in ("PS",) if v in ds_to_regrid
+                    ]
+                    ds_latlon = regrid_to_latlon_ds(
+                        ds_to_regrid,
+                        vars_to_regrid,
+                        resolution,
+                        model,
+                        time_from=ds_native,
+                        dtype="float32",
+                    )
 
-                # Zonal mean over lon then interpolate to plev39 pressure levels.
-                da = zonal_mean_on_pressure_grid(
-                    ds_latlon,
-                    varname,
-                    tables_path=tables_root / "tables",
-                    target="plev39",
-                )
-                ds_cmor = xr.Dataset({varname: da})
-                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
-                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
-                cmor_items = [(ds_cmor, cfg)]
+                    # Zonal mean over lon then interpolate to plev39 pressure levels.
+                    da = zonal_mean_on_pressure_grid(
+                        ds_latlon,
+                        varname,
+                        tables_path=tables_root / "tables",
+                        target="plev39",
+                    )
+                    ds_cmor = xr.Dataset({varname: da})
+                    if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+                        ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+                    cmor_items = [(ds_cmor, cfg)]
+                else:
+                    # lnd/atm and anything else: regrid to the target grid
+                    logger.debug("Processing %s (atm/lnd or other)", varname)
+                    # Obtain an xr.Dataset (ds_cmor) with the requested CMIP variable ready for CMOR.
+                    # (this will include mapping from SE to lat/lon)
+                    ds_cmor = realize_regrid_prepare(
+                        resolution,
+                        model,
+                        mapping,
+                        ds_native,
+                        varname,
+                        tables_path=tables_root / "tables",
+                        regrid_kwargs={
+                            "dtype": "float32",
+                        },
+                        open_kwargs={"decode_timedelta": True},
+                    )
+                    logger.debug("ds_cmor is not None")
+
+                    # Attach ocn_fx_fields to regridded output for writing
+                    if ocn_fx_fields is not None:
+                        ds_cmor = ds_cmor.merge(ocn_fx_fields)
+                    cmor_items = [(ds_cmor, cfg)]
+
             else:
-                # lnd/atm and anything else: regrid to the target grid
-                logger.debug("Processing %s (atm/lnd or other)", varname)
-                # Obtain an xr.Dataset (ds_cmor) with the requested CMIP variable ready for CMOR.
-                # (this will include mapping from SE to lat/lon)
-                ds_cmor = realize_regrid_prepare(
-                    resolution,
-                    model,
-                    mapping,
-                    ds_native,
+                logger.error(
+                    "unrecognised grid label %r for %s; expected gn, gr or gm",
+                    grid,
                     varname,
-                    tables_path=tables_root / "tables",
-                    regrid_kwargs={
-                        "dtype": "float32",
-                    },
-                    open_kwargs={"decode_timedelta": True},
                 )
-                logger.debug("ds_cmor is not None")
-
-                # Attach ocn_fx_fields to regridded output for writing
-                if ocn_fx_fields is not None:
-                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
-                cmor_items = [(ds_cmor, cfg)]
-
+                results.append((str(varname), f"ERROR: bad grid label {grid!r}"))
+                continue
         except (FileNotFoundError, KeyError) as e:
             results.append((varname, f"ERROR {model} file not not found: {e}"))
             continue
