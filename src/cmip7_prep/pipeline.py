@@ -294,7 +294,13 @@ def realize_regrid_prepare(
     logger.debug("Obtaining mapping cfg for %s: %s", cmip_var, cfg)
     levels = cfg.get("levels", {}) or {}
     lev_kind = (levels.get("name") or "").lower()
-    is_hybrid = lev_kind in {"standard_hybrid_sigma", "alev", "alevel"}
+    is_hybrid = lev_kind in {
+        "standard_hybrid_sigma",
+        "standard_hybrid_sigma_half",
+        "alev",
+        "alevel",
+        "alevhalf",
+    }
 
     # 4) If hybrid: carry PS in the working dataset (so we can regrid it)
     # and make sure 1-D coefficients are available
