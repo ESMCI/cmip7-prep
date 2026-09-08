@@ -53,6 +53,7 @@ def _collect_required_model_vars(
         try:
             cfg = mapping.get_cfg(var) or {}
         except KeyError:
+            logger.warning("=" * 60)
             logger.warning("no mapping found in %s for variable %s", mapping.path, var)
             continue
         src = cfg.get("source")
