@@ -203,7 +203,9 @@ class TestCheckEntryRowNumbers:
     def test_row_is_included_when_given(self):
         """The row number lands between the name and the problem."""
         problems = check_entry("v", {"formula": "no_such_fn(X)"}, row=858)
-        assert problems == ["v (row 858): formula calls undefined function 'no_such_fn'"]
+        assert problems == [
+            "v (row 858): formula calls undefined function 'no_such_fn'"
+        ]
 
     def test_row_is_omitted_when_not_given(self):
         """Without a row the message keeps its original shape."""

@@ -313,6 +313,7 @@ def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
     weights = xr.DataArray(w, dims=(levelname,), coords={levelname: arr[levelname]})
     return (arr * weights).sum(dim=levelname)
 
+
 _UNIMPLEMENTED_FORMULAS: Dict[str, str] = {
     "chunits": "relabel a DataArray's units without converting values",
     "sum": "sum over a named dimension",

@@ -110,9 +110,7 @@ class TestGroupEntriesFreqMerge:
         a = _entry([{"model_var": "x", "freq": "mon"}], table="atmos")
         b = _entry([{"model_var": "x", "freq": "mon"}], table="atmos")
         collapsed = []
-        data = _group_entries(
-            [("v", a, 2), ("v", b, 3)], collapsed=collapsed
-        )
+        data = _group_entries([("v", a, 2), ("v", b, 3)], collapsed=collapsed)
         assert data["v"]["sources"] == [{"model_var": "x", "freq": "mon"}]
         assert collapsed == ["v"]
 
@@ -162,3 +160,79 @@ class TestFreqMergeIntegration:
             {"model_var": "siconc", "freq": "mon"},
             {"model_var": "siconc_d", "freq": "day"},
         ]
+
+    def _region_freq_rows(self, table):
+        """Four rows for one name: two regions (ata, grl) x two frequencies."""
+        return [
+            self._row(
+                **{
+                    "Branded Variable Name": "v",
+                    "Modelling Realm - Primary": table,
+                    "Units (from Physical Parameter)": "W m-2",
+                    "CESM Variable Name": var,
+                    "CMIP7 Frequency": freq,
+                    "Region": region,
+                }
+            )
+            for region, var, freq in (
+                ("ata", "A_mon", "mon"),
+                ("ata", "A_day", "day"),
+                ("grl", "G_mon", "mon"),
+                ("grl", "G_day", "day"),
+            )
+        ]
+
+    def _read(self, tmp_path, table):
+        """Run the four region x frequency rows through read_csv."""
+        data = read_csv(
+            _write_temp_csv(tmp_path, CESM_FIELDNAMES, self._region_freq_rows(table)),
+            MODEL_CONFIGS["cesm"],
+        )
+        return data[table]["variables"]["v"]
+
+    def test_region_and_freq_non_seaice_keeps_one_region(self, tmp_path, capsys):
+        """Frequencies merge within a region; then all but the first region go.
+
+        ``_group_entries`` buckets by region first and freq-merges inside each
+        bucket, so both regions do merge -- and then the non-seaIce branch keeps
+        ``region_entries[0]`` and discards the rest.  The Antarctic pair
+        survives as one freq-tagged entry and the Greenland pair is dropped
+        outright.
+
+        This pins today's lossy behaviour, not the desired one: on the real
+        spreadsheet it is how 51 ``grl`` rows vanish (TASKS.md D14).  When D14
+        lands this test should fail, and the new expectation belongs here.
+        """
+        var = self._read(tmp_path, "landIce")
+
+        assert var["region"] == "ata"
+        assert var["sources"] == [
+            {"model_var": "A_mon", "freq": "mon"},
+            {"model_var": "A_day", "freq": "day"},
+        ]
+        assert "G_mon" not in str(var) and "G_day" not in str(var)
+
+        err = capsys.readouterr().err
+        assert "duplicate row discarded" in err
+        assert "region: kept 'ata' / discarded 'grl'" in err
+
+    def test_region_and_freq_seaice_keeps_regions_but_not_their_sources(
+        self, tmp_path, capsys
+    ):
+        """seaIce turns regions into variants -- carrying only region, not sources.
+
+        The variant machinery copies ``_VARIANT_FIELDS`` (long_name, formula,
+        region) into each variant and takes everything else, ``sources``
+        included, from the first region.  So both regions are named, but only
+        the Antarctic sources survive, and unlike the non-seaIce path this
+        collapse emits no WARN.
+        """
+        var = self._read(tmp_path, "seaIce")
+
+        assert var["variants"] == [{"region": "ata"}, {"region": "grl"}]
+        assert var["sources"] == [
+            {"model_var": "A_mon", "freq": "mon"},
+            {"model_var": "A_day", "freq": "day"},
+        ]
+        assert "G_mon" not in str(var) and "G_day" not in str(var)
+        assert "duplicate row discarded" not in capsys.readouterr().err

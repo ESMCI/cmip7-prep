@@ -23,6 +23,7 @@ CESM_FIELDNAMES = [
     "Alias",
     "Cell Methods",
     "Regrid Method",
+    "Region",
 ]
 
 # The NorESM spreadsheet layout.
