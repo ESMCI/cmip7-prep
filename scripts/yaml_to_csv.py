@@ -20,7 +20,7 @@ import argparse
 
 # Column names expected by convert_csv_to_yaml.py when --model cesm is used.
 CESM_COLUMNS = [
-    "CMIP Variable Name",
+    "CMIP Branded Variable Name",
     "Table",
     "Long Name",
     "Standard Name",
@@ -101,7 +101,7 @@ def variable_to_rows(name: str, var: dict) -> list:
     >>> rows = variable_to_rows("tas", {"table": "atmos", "units": "K", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "TREFHT"}]})
     >>> len(rows)
     1
-    >>> rows[0]["CMIP Variable Name"]
+    >>> rows[0]["CMIP Branded Variable Name"]
     'tas'
     >>> rows[0]["CESM Variable Name"]
     'TREFHT'
@@ -147,7 +147,7 @@ def variable_to_rows(name: str, var: dict) -> list:
     freq_str, alias_str = sources_to_freq_alias(sources)
 
     base = {
-        "CMIP Variable Name": name,
+        "CMIP Branded Variable Name": name,
         "Table": var.get("table", ""),
         "Standard Name": var.get("standard_name", ""),
         "Units": var.get("units", ""),

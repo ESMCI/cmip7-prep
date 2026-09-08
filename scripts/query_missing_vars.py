@@ -162,7 +162,7 @@ def table_entry_to_stub_row(bvn: str, entry: dict) -> dict:
 
     >>> entry = {"long_name": "Surface Temperature", "units": "K", "dimensions": ["longitude", "latitude", "time"], "modeling_realm": "atmos", "standard_name": "surface_temperature", "cell_methods": "time: mean", "positive": "", "_table_id": "atmos"}
     >>> row = table_entry_to_stub_row("ts_foo", entry)
-    >>> row["CMIP Variable Name"]
+    >>> row["CMIP Branded Variable Name"]
     'ts_foo'
     >>> row["Table"]
     'atmos'
@@ -185,7 +185,7 @@ def table_entry_to_stub_row(bvn: str, entry: dict) -> dict:
     table = realm_raw.split()[0] if realm_raw.strip() else entry.get("_table_id", "")
 
     return {
-        "CMIP Variable Name": bvn,
+        "CMIP Branded Variable Name": bvn,
         "Table": table,
         "Long Name": entry.get("long_name", ""),
         "Standard Name": entry.get("standard_name", ""),
@@ -304,7 +304,7 @@ def build_merged_rows(
 
     # Annotate existing rows with priority and experiments from the data request.
     for row in existing_rows:
-        meta = var_metadata.get(row["CMIP Variable Name"])
+        meta = var_metadata.get(row["CMIP Branded Variable Name"])
         if meta:
             row["Physical Parameter"] = meta["physical_parameter"]
             row["Priority"] = meta["priority"]
@@ -333,7 +333,7 @@ def build_merged_rows(
         )
         for bvn in missing_bvns
     ]
-    stub_rows.sort(key=lambda r: (r["Table"], r["CMIP Variable Name"]))
+    stub_rows.sort(key=lambda r: (r["Table"], r["CMIP Branded Variable Name"]))
     print(f"  {len(stub_rows)} new stub rows added")
     return existing_rows, stub_rows
 
