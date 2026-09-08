@@ -14,7 +14,12 @@ import yaml
 # Allow importing the script directly from the scripts/ directory.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
-from convert_csv_to_yaml import MODEL_CONFIGS, read_csv, write_yaml
+from convert_csv_to_yaml import (
+    MODEL_CONFIGS,
+    missing_columns,
+    read_csv,
+    write_yaml,
+)
 
 from tests.csv_helpers import (
     CESM_FIELDNAMES,
@@ -603,3 +608,72 @@ class TestWriteYaml:
             lines = f.readlines()
         source_id_idx = next(i for i, l in enumerate(lines) if "source_id:" in l)
         assert lines[source_id_idx + 1].strip() == ""
+
+
+class TestMissingColumns:
+    """A config naming a column the CSV lacks is reported, not skipped quietly.
+
+    ``_build_entry`` ignores absent columns so one config can serve several
+    spreadsheets.  That is also how six dead ``column_map`` entries survived a
+    layout change unnoticed, so the mismatch is now announced up front.
+    """
+
+    def test_absent_mapped_column_is_reported(self):
+        """A column_map key the CSV lacks comes back in the missing list."""
+        cfg = dict(MODEL_CONFIGS["cesm"])
+        assert "Levels Name" in missing_columns(cfg, CESM_FIELDNAMES)
+
+    def test_present_columns_are_not_reported(self):
+        """Columns the CSV does provide are left out of the report."""
+        cfg = dict(MODEL_CONFIGS["cesm"])
+        missing = missing_columns(cfg, CESM_FIELDNAMES)
+        for col in ("Branded Variable Name", "Formula", "CESM Variable Name"):
+            assert col not in missing
+
+    def test_key_realm_and_source_columns_are_checked_too(self):
+        """The three special columns are not in column_map but still matter."""
+        cfg = {
+            "key_column": "K",
+            "realm_column": "R",
+            "source_column": "S",
+            "column_map": {},
+        }
+        assert missing_columns(cfg, ["K"]) == ["R", "S"]
+
+    def test_optional_region_column_is_checked_when_configured(self):
+        """region_column is checked when set and ignored when absent."""
+        cfg = {
+            "key_column": "K",
+            "realm_column": "K",
+            "source_column": "K",
+            "column_map": {},
+            "region_column": "Region",
+        }
+        assert missing_columns(cfg, ["K"]) == ["Region"]
+        del cfg["region_column"]
+        assert missing_columns(cfg, ["K"]) == []
+
+    def test_nothing_missing_is_an_empty_list(self):
+        """A config whose columns are all present reports nothing."""
+        cfg = dict(MODEL_CONFIGS["noresm"])
+        assert missing_columns(cfg, NORESM_FIELDNAMES) == []
+
+    def test_read_csv_warns_on_stderr(self, tmp_path, capsys):
+        """The warning reaches stderr during a real read, naming the column."""
+        path = _write_temp_csv(
+            tmp_path,
+            CESM_FIELDNAMES,
+            [
+                {
+                    "Branded Variable Name": "tas_tavg-u-hxy-u",
+                    "Modelling Realm - Primary": "atmos",
+                    "Units (from Physical Parameter)": "K",
+                    "Dimensions": "time",
+                    "CESM Variable Name": "TREFHT",
+                }
+            ],
+        )
+        read_csv(path, MODEL_CONFIGS["cesm"])
+        err = capsys.readouterr().err
+        assert "WARN configured column 'Levels Name' is not in the CSV" in err
+        assert "'Formula'" not in err

@@ -751,6 +751,31 @@ def _build_entry(row, config):
 _VARIANT_FIELDS = ("long_name", "formula", "region")
 
 
+def missing_columns(config, fieldnames):
+    """Return the CSV columns *config* names that *fieldnames* does not provide.
+
+    >>> cfg = {"key_column": "K", "realm_column": "R", "source_column": "S",
+    ...        "column_map": {"S": "_source_expr", "Gone": "units"}}
+    >>> missing_columns(cfg, ["K", "R", "S"])
+    ['Gone']
+    >>> missing_columns(cfg, ["K", "S"])
+    ['Gone', 'R']
+    >>> missing_columns(cfg, None)
+    ['Gone', 'K', 'R', 'S']
+    """
+    wanted = {
+        config["key_column"],
+        config["realm_column"],
+        config["source_column"],
+        *config["column_map"],
+    }
+    region_col = config.get("region_column")
+    if region_col:
+        wanted.add(region_col)
+    present = set(fieldnames or ())
+    return sorted(wanted - present)
+
+
 def read_csv(filepath, config):
     """Read CSV and return a dict mapping each realm to its own data dict::
 
@@ -776,6 +801,12 @@ def read_csv(filepath, config):
     first_row: dict = {}
     with open(filepath, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
+        for col in missing_columns(config, reader.fieldnames):
+            print(
+                f"WARN configured column {col!r} is not in the CSV; "
+                "anything it fed is silently dropped",
+                file=sys.stderr,
+            )
         # Spreadsheet row numbers: the header is row 1, so records start at 2.
         # Deliberately NOT reader.line_num, which counts physical file lines --
         # a single newline inside a quoted cell (test_full.csv has one, in the
