@@ -73,9 +73,8 @@ land:
   day:
     tavg: [clm2.h1a]
   3hr:
-    tavg: [clm2.h2a]
+    tavg: [clm2.h3a]
   yr:
-    # Temporary change for WIEMIP.  TODO: change back to [clm2.h3a]
     tavg: [clm2.h2a]
 
 seaIce:
