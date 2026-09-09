@@ -133,7 +133,7 @@ class TestCollectRequiredModelVars:
         assert any(
             record.levelno == logging.WARNING
             and record.name == "cmip7_prep.pipeline"
-            and "no mapping found" in record.getMessage()
+            and "no mapping found" in record.getMessage().lower()
             and "nonexistent_var" in record.getMessage()
             for record in caplog.records
         )
