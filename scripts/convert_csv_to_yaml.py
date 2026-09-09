@@ -80,11 +80,13 @@ NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
     "rsus_tavg-u-hxy-lnd": "up",
     "rsus_tavg-u-hxy-sn": "up",
     "tran_tavg-u-hxy-lnd": "up",
+    "tran_tavg-u-hxy-u": "up",
     "evspsblsoi_tavg-u-hxy-u": "up",
     "evspsblveg_tavg-u-hxy-u": "up",
     "ra_tavg-u-hxy-lnd": "up",
     "fN2O_tavg-u-hxy-lnd": "up",
     "nbp_tavg-u-hxy-lnd": "down",
+    "srfrad_tavg-u-hxy-u": "down",
 }
 
 # ── model configurations ─────────────────────────────────────────────────────
