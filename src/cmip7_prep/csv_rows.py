@@ -1,21 +1,9 @@
-"""yaml_to_csv.py — Generate a CSV from a YAML variable-mapping file.
+"""Turn a YAML variable entry into CSV rows.
 
-The CSV produced here uses the CESM column layout understood by convert_csv_to_yaml.py
-(--model cesm).  The primary use-case is bootstrapping a CESM CSV from an upstream
-YAML file such as
-  https://github.com/ESMCI/cmip7-prep/blob/features/seaice2/data/cesm_to_cmip7.yaml
-
-Usage
------
-    python yaml_to_csv.py --input cesm_to_cmip7.yaml --output cesm_data.csv
-
-The script is intentionally simple: it does a best-effort translation and flags any
-variables that could not be represented cleanly so the user can review them.
+The CSV layout is the CESM one that convert_csv_to_yaml.py reads back
+(--model cesm).  query_missing_vars.py uses these helpers so its output
+matches that layout exactly.
 """
-
-import yaml
-import csv
-import argparse
 
 # Column names expected by convert_csv_to_yaml.py when --model cesm is used.
 CESM_COLUMNS = [
@@ -24,7 +12,8 @@ CESM_COLUMNS = [
     "Long Name",
     "Standard Name",
     "Units",
-    "CESM Variable Name",  # comma-separated source variable name(s); used by convert_csv_to_yaml.py as skip filter
+    # comma-separated source name(s); convert_csv_to_yaml uses it as a skip filter
+    "CESM Variable Name",
     "Formula",  # the formula string, present only when original had one
     "Freq",  # comma-separated sampling frequencies, positionally aligned with CESM Variable Name
     "Alias",  # comma-separated source aliases, positionally aligned with CESM Variable Name
@@ -51,7 +40,7 @@ def sources_to_names(sources: list[dict]) -> str:
     >>> sources_to_names([{"model_var": "PRECC"}, {"model_var": "PRECL"}])
     'PRECC, PRECL'
     >>> sources_to_names([{"model_var": "sialgc", "freq": "day"}])
-    'QFLX'
+    'sialgc'
     >>> sources_to_names([])
     ''
     """
@@ -60,7 +49,7 @@ def sources_to_names(sources: list[dict]) -> str:
     )
 
 
-def sources_to_freq_alias(sources: list[dict]) -> tuple[str, str, str]:
+def sources_to_freq_alias(sources: list[dict]) -> tuple[str, str]:
     """Return (freq_str, alias_str) for the Freq/Alias CSV columns.
 
     Each returned string is a comma-separated list positionally aligned with
@@ -70,11 +59,11 @@ def sources_to_freq_alias(sources: list[dict]) -> tuple[str, str, str]:
     >>> sources_to_freq_alias([{"model_var": "TREFHT"}])
     ('', '')
     >>> sources_to_freq_alias([{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}])
-    ( 'day, ', '')
+    ('day, ', '')
     >>> sources_to_freq_alias([{"model_var": "A", "freq": "day", "alias": "a"}, {"model_var": "B"}])
     ('day, ', 'a, ')
     >>> sources_to_freq_alias([])
-    ('', '', '')
+    ('', '')
     """
     if not sources:
         return ("", "")
@@ -96,7 +85,9 @@ def variable_to_rows(name: str, var: dict) -> list:
     and ``Alias`` columns as comma-separated values positionally aligned with
     ``CESM Variable Name``.
 
-    >>> rows = variable_to_rows("tas", {"table": "atmos", "units": "K", "sources": [{"model_var": "TREFHT"}]})
+    >>> tas = {"table": "atmos", "units": "K",
+    ...        "sources": [{"model_var": "TREFHT"}]}
+    >>> rows = variable_to_rows("tas", tas)
     >>> len(rows)
     1
     >>> rows[0]["CMIP Variable Name"]
@@ -108,13 +99,24 @@ def variable_to_rows(name: str, var: dict) -> list:
     >>> rows[0]["Region"]
     ''
 
-    >>> rows2 = variable_to_rows("pr", {"table": "atmos", "units": "kg m-2 s-1", "formula": "PRECC + PRECL", "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}]})
+    >>> pr = {"table": "atmos", "units": "kg m-2 s-1",
+    ...       "formula": "PRECC + PRECL",
+    ...       "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}]}
+    >>> rows2 = variable_to_rows("pr", pr)
     >>> rows2[0]["Formula"]
     'PRECC + PRECL'
     >>> rows2[0]["CESM Variable Name"]
     'PRECC, PRECL'
 
-    >>> var_with_variants = {"table": "seaIce", "units": "m2", "sources": [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}], "variants": [{"long_name": "NH", "region": "nh", "formula": "siconc.where(lat>0)"}, {"long_name": "SH", "region": "sh", "formula": "siconc.where(lat<0)"}]}
+    >>> var_with_variants = {
+    ...     "table": "seaIce", "units": "m2",
+    ...     "sources": [{"model_var": "siconc", "freq": "day"},
+    ...                 {"model_var": "tarea"}],
+    ...     "variants": [
+    ...         {"long_name": "NH", "region": "nh", "formula": "siconc.where(lat>0)"},
+    ...         {"long_name": "SH", "region": "sh", "formula": "siconc.where(lat<0)"},
+    ...     ],
+    ... }
     >>> rows3 = variable_to_rows("siarea_tavg-u-hm-u", var_with_variants)
     >>> len(rows3)
     2
@@ -175,61 +177,3 @@ def variable_to_rows(name: str, var: dict) -> list:
     row["Formula"] = formula or ""
     row["Region"] = ""
     return [row]
-
-
-def yaml_to_csv(yaml_path: str, csv_path: str) -> int:
-    """Convert *yaml_path* to *csv_path* and return the number of rows written.
-
-    >>> import tempfile, os, yaml
-    >>> data = {"dataset_overrides": {"source_id": "CESM3"}, "variables": {"tas": {"table": "atmos", "units": "K", "sources": [{"model_var": "TREFHT"}]}}}
-    >>> with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-    ...     yaml.dump(data, f)
-    ...     ypath = f.name
-    >>> import csv as _csv, tempfile as _tmp
-    >>> cpath = _tmp.mktemp(suffix=".csv")
-    >>> yaml_to_csv(ypath, cpath)
-    1
-    >>> os.unlink(ypath); os.unlink(cpath)
-    """
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
-    variables = data.get("variables", {})
-    rows = [
-        row for name, var in variables.items() for row in variable_to_rows(name, var)
-    ]
-
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CESM_COLUMNS)
-        writer.writeheader()
-        writer.writerows(rows)
-
-    return len(rows)
-
-
-# ── main ──────────────────────────────────────────────────────────────────────
-def main():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Convert a YAML variable-mapping file to a CSV suitable for "
-            "convert_csv_to_yaml.py --model cesm."
-        )
-    )
-    parser.add_argument(
-        "--input",
-        default="cesm_to_cmip7.yaml",
-        help="Input YAML file (default: cesm_to_cmip7.yaml)",
-    )
-    parser.add_argument(
-        "--output",
-        default="cesm_data.csv",
-        help="Output CSV file (default: cesm_data.csv)",
-    )
-    args = parser.parse_args()
-
-    n = yaml_to_csv(args.input, args.output)
-    print(f"wrote {n} entries to {args.output}")
-
-
-if __name__ == "__main__":
-    main()

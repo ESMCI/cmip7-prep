@@ -584,7 +584,7 @@ def _build_entry(row, config):
         if yaml_key == "dims":
             normalize = config.get("normalize_dim_names", False)
             if value.startswith("["):
-                # JSON-encoded dims from yaml_to_csv (handles flat and nested lists).
+                # Older CSVs wrote dims as JSON; handle flat and nested lists.
                 try:
                     dims = json.loads(value)
                 except json.JSONDecodeError:

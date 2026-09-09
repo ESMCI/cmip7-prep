@@ -4,7 +4,7 @@
 The output CSV contains two sections:
 
 1. **Existing variables** — every variable already in the mapping YAML, serialised
-   with the same logic as :mod:`yaml_to_csv`.  Running
+   with the same logic as :mod:`cmip7_prep.csv_rows`.  Running
    ``convert_csv_to_yaml.py --model cesm`` on this section alone reproduces the
    original YAML exactly.
 
@@ -47,15 +47,11 @@ from pathlib import Path
 
 import yaml
 
-# Import the row-serialisation logic from yaml_to_csv so the existing-variable
-# section of the output is byte-for-byte identical to what yaml_to_csv produces.
-_SCRIPTS = Path(__file__).parent
-sys.path.insert(0, str(_SCRIPTS))
-from yaml_to_csv import CESM_COLUMNS, variable_to_rows  # noqa: E402
+from cmip7_prep.csv_rows import CESM_COLUMNS, variable_to_rows
 
 # Extended column list for this script's output only.  The two extra columns
 # (Priority, Experiments) are data-request metadata and are not part of the
-# standard CESM_COLUMNS used by yaml_to_csv / convert_csv_to_yaml.
+# standard CESM_COLUMNS that convert_csv_to_yaml reads.
 _OUTPUT_COLUMNS = (
     CESM_COLUMNS[:1]
     + ["Physical Parameter"]
