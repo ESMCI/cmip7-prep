@@ -9,6 +9,7 @@ variables:
     description: Optical thickness of atmospheric aerosols at wavelength 550 nanometers.
     formula: ABS550AL/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: ABS550AL, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -17,6 +18,7 @@ variables:
     description: This is the black carbon aerosol optical depth at 550nm due to absorption
     formula: A550_BC/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: A550_BC, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -25,6 +27,7 @@ variables:
     description: This is the dust aerosol optical depth at 550nm due to absorption
     formula: A550_DU/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: A550_DU, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -34,6 +37,7 @@ variables:
       due to absorption
     formula: A550_POM/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: A550_POM, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -42,6 +46,7 @@ variables:
     description: This is the sulphate aerosol optical depth at 550nm due to absorption
     formula: A550_SO4/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: A550_SO4, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -50,6 +55,7 @@ variables:
     description: This is the sea salt aerosol optical depth at 550nm due to absorption
     formula: A550_SS/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: A550_SS, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -59,6 +65,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: AIRMASSL]
     table: aerosol
     units: kg m-2
@@ -70,6 +77,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: BS550AER, model_var: DAYFOC]
     table: aerosol
     units: m-1 sr-1
@@ -81,6 +89,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CCN7, model_var: e6]
     table: aerosol
     units: m-3
@@ -89,6 +98,7 @@ variables:
     description: 'proposed name: number_concentration_of_ambient_aerosol_in_air_at_liquid_water_cloud_top'
     formula: CCN_B/FCTL_B
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CCN_B, model_var: FCTL_B]
     table: aerosol
     units: m-3
@@ -100,6 +110,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CCN5, model_var: e6]
     table: aerosol
     units: m-3
@@ -110,6 +121,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: AWNC, model_var: FREQL]
     table: aerosol
     units: m-3
@@ -120,6 +132,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: AQSO4_H2O2_3D, model_var: AQSO4_O3_3D]
     table: aerosol
     units: kg m-2 s-1
@@ -129,6 +142,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: GSSO4_3D]
     table: aerosol
     units: kg m-2 s-1
@@ -139,6 +153,7 @@ variables:
       organic matter, not mass of organic carbon alone.
     formula: GS_SOA_LV + GS_SOA_SV
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: GS_SOA_LV, model_var: GS_SOA_SV]
     table: aerosol
     units: kg m-2 s-1
@@ -157,6 +172,7 @@ variables:
       the phrase.
     formula: TAUTMODIS/CLTMODIS
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TAUTMODIS, model_var: CLTMODIS]
     table: aerosol
     units: '1'
@@ -167,6 +183,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: N_AER, model_var: e6]
     table: aerosol
     units: m-3
@@ -174,6 +191,7 @@ variables:
   drybc_tavg-u-hxy-u:
     description: Dry Deposition Rate of Black Carbon Aerosol Mass
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: dry_BC]
     table: aerosol
     units: kg m-2 s-1
@@ -181,6 +199,7 @@ variables:
   drydust_tavg-u-hxy-u:
     description: Dry Deposition Rate of Dust
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: dry_DUST]
     table: aerosol
     units: kg m-2 s-1
@@ -188,6 +207,7 @@ variables:
   dryoa_tavg-u-hxy-u:
     description: Dry Deposition Rate of Dry Aerosol Total Organic Matter
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: dry_OM]
     table: aerosol
     units: kg m-2 s-1
@@ -195,6 +215,7 @@ variables:
   dryso2_tavg-u-hxy-u:
     description: Dry Deposition Rate of SO2
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DF_SO2]
     table: aerosol
     units: kg m-2 s-1
@@ -202,6 +223,7 @@ variables:
   dryso4_tavg-u-hxy-u:
     description: Dry Deposition Rate of SO4
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: dry_SULFATE]
     table: aerosol
     units: kg m-2 s-1
@@ -209,6 +231,7 @@ variables:
   dryss_tavg-u-hxy-u:
     description: Dry Deposition Rate of Sea-Salt Aerosol
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: dry_SALT]
     table: aerosol
     units: kg m-2 s-1
@@ -219,6 +242,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: EC550AER, model_var: DAYFOC]
     table: aerosol
     units: m-1
@@ -229,6 +253,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: EC550AER, model_var: DAYFOC]
     table: aerosol
     units: m-1
@@ -236,6 +261,7 @@ variables:
   emibc_tavg-u-hxy-u:
     description: Integrate 3D emission field vertically to 2d field.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_BC]
     table: aerosol
     units: kg m-2 s-1
@@ -247,6 +273,7 @@ variables:
       a comment to your file.
     formula: emis_isoprene+emis_monoterp
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_isoprene, model_var: emis_monoterp]
     table: aerosol
     units: kg m-2 s-1
@@ -254,6 +281,7 @@ variables:
   emidms_tavg-u-hxy-u:
     description: Integrate 3D emission field vertically to 2d field.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_DMS]
     table: aerosol
     units: kg m-2 s-1
@@ -261,6 +289,7 @@ variables:
   emidust_tavg-u-hxy-u:
     description: Integrate 3D emission field vertically to 2d field.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_DUST]
     table: aerosol
     units: kg m-2 s-1
@@ -268,6 +297,7 @@ variables:
   emiisop_tavg-u-hxy-u:
     description: Integrate 3D emission field vertically to 2d field
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_isoprene]
     table: aerosol
     units: kg m-2 s-1
@@ -279,6 +309,7 @@ variables:
       model has more detailed info available.  Integrate 3D chemical production and
       emission field vertically to 2d field.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_OM]
     table: aerosol
     units: kg m-2 s-1
@@ -286,6 +317,7 @@ variables:
   emiso2_tavg-u-hxy-u:
     description: Integrate 3D emission field vertically to 2d field.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_SO2]
     table: aerosol
     units: kg m-2 s-1
@@ -294,6 +326,7 @@ variables:
     description: Direct primary emission does not include secondary sulfate production.
       Integrate 3D emission field vertically to 2d field.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_SULFATE]
     table: aerosol
     units: kg m-2 s-1
@@ -301,6 +334,7 @@ variables:
   emiss_tavg-u-hxy-u:
     description: Integrate 3D emission field vertically to 2d field.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_SALT]
     table: aerosol
     units: kg m-2 s-1
@@ -312,6 +346,7 @@ variables:
       a comment to your file.
     formula: emis_isoprene+emis_monoterp
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: emis_isoprene, model_var: emis_monoterp]
     table: aerosol
     units: kg m-2 s-1
@@ -322,6 +357,7 @@ variables:
       radical is HO2.
     grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: conservative
     sources: [model_var: HO2_aft]
     table: aerosol
     units: mol mol-1
@@ -331,6 +367,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: isoprene]
     table: aerosol
     units: mol mol-1
@@ -338,6 +375,7 @@ variables:
   lwp_tavg-u-hxy-u:
     description: The total mass of liquid water in cloud per unit area.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDLWP]
     table: aerosol
     units: kg m-2
@@ -355,6 +393,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: MMR_AH2O]
     table: aerosol
     units: kg kg-1
@@ -362,6 +401,7 @@ variables:
   mmraerh2o_tavg-h2m-hxy-u:
     description: Daily mean Aerosol water mass mixing ratio near surface.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: MMR_AH2O]
     table: aerosol
     units: kg kg-1
@@ -370,6 +410,7 @@ variables:
     description: "This variable represents the instantaneous near surface aerosol\
       \ water\_Mass Mixing Ratio at CF sites, sampled every 3 hours"
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: MMR_AH2O]
     table: aerosol
     units: kg kg-1
@@ -379,6 +420,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: mmr_BC]
     table: aerosol
     units: kg kg-1
@@ -386,6 +428,7 @@ variables:
   mmrbc_tavg-h2m-hxy-u:
     description: Daily mean elemental carbon mass mixing ratio near surface.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: mmr_BC]
     table: aerosol
     units: kg kg-1
@@ -395,6 +438,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: mmr_DUST]
     table: aerosol
     units: kg kg-1
@@ -402,6 +446,7 @@ variables:
   mmrdust_tavg-h2m-hxy-u:
     description: Daily mean dust aerosol mass mixing ratio near surface.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: mmr_DUST]
     table: aerosol
     units: kg kg-1
@@ -410,6 +455,7 @@ variables:
     description: This variable represents the instantaneous near surface Dust Aerosol
       Mass Mixing Ratio at CF sites, sampled every 3 hours
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: mmr_DUST]
     table: aerosol
     units: kg kg-1
@@ -420,6 +466,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: mmr_OM]
     table: aerosol
     units: kg kg-1
@@ -427,6 +474,7 @@ variables:
   mmroa_tavg-h2m-hxy-u:
     description: Daily mean total organic aerosol mass mixing ratio near surface.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: mmr_OM]
     table: aerosol
     units: kg kg-1
@@ -435,6 +483,7 @@ variables:
     description: "This variable represents the instantaneous near surface organic\
       \ aerosol\_Mass Mixing Ratio at CF sites, sampled every 3 hours."
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: mmr_OM]
     table: aerosol
     units: kg kg-1
@@ -445,6 +494,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: MMRPM1]
     table: aerosol
     units: kg kg-1
@@ -455,6 +505,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: MMRPM2P5]
     table: aerosol
     units: kg kg-1
@@ -465,6 +516,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: mmr_SULFATE]
     table: aerosol
     units: kg kg-1
@@ -472,6 +524,7 @@ variables:
   mmrso4_tavg-h2m-hxy-u:
     description: Daily mean sulfate aerosol mass mixing ratio near surface.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: mmr_SULFATE]
     table: aerosol
     units: kg kg-1
@@ -480,6 +533,7 @@ variables:
     description: This variable is for instantaneous near surface mass mixing ratio
       of sulfate aerosol at CF sites, sampled every 3 hours
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: mmr_SULFATE]
     table: aerosol
     units: kg kg-1
@@ -491,6 +545,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: SOA_NA, model_var: SOA_A1]
     table: aerosol
     units: kg kg-1
@@ -499,6 +554,7 @@ variables:
     description: Daily mean secondary organic aerosol mass mixing ratio near surface.
     formula: SOA_NA+SOA_A1
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOA_NA, model_var: SOA_A1]
     table: aerosol
     units: kg kg-1
@@ -508,6 +564,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: mmr_SALT]
     table: aerosol
     units: kg kg-1
@@ -515,6 +572,7 @@ variables:
   mmrss_tavg-h2m-hxy-u:
     description: Daily mean Sea Salt mass mixing ratio near surface.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: mmr_SALT]
     table: aerosol
     units: kg kg-1
@@ -526,6 +584,7 @@ variables:
       Needs a comment attribute "wavelength: 443 nm"'
     formula: DOD440/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DOD440, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -537,6 +596,7 @@ variables:
       550 nm"'
     formula: DOD550/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DOD550, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -545,6 +605,7 @@ variables:
     description: 'proposed name: atmosphere_optical_thickness_due_to_water_ambient_aerosol'
     formula: (DOD550-OD550DRY)/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DOD550, model_var: OD550DRY, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -554,6 +615,7 @@ variables:
       550 nanometres.
     formula: D550_BC/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: D550_BC, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -565,6 +627,7 @@ variables:
       types. Needs a comment attribute "wavelength: 550 nm"'
     formula: CDOD550/DAYFOC/CLDFREE
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CDOD550, model_var: DAYFOC, model_var: CLDFREE]
     table: aerosol
     units: '1'
@@ -573,6 +636,7 @@ variables:
     description: Total aerosol AOD due to dust aerosol at a wavelength of 550 nanometres.
     formula: D550_DU/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: D550_DU, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -584,6 +648,7 @@ variables:
       diameter less than 1 um.
     formula: (DLT_SS+DLT_DUST+DLT_SO4+DLT_BC+DLT_POM)/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DLT_SS, model_var: DLT_DUST, model_var: DLT_SO4, {
         model_var: DLT_BC}, model_var: DLT_POM, model_var: DAYFOC]
     table: aerosol
@@ -594,6 +659,7 @@ variables:
       + secondary ; natural + anthropogenic including biomasss burning organic aerosol
     formula: D550_POM/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: D550_POM, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -602,6 +668,7 @@ variables:
     description: Total aerosol AOD due to sulfate aerosol at a wavelength of 550 nanometres.
     formula: D550_SO4/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: D550_SO4, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -611,6 +678,7 @@ variables:
       nanometres.
     formula: D550_SS/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: D550_SS, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -622,6 +690,7 @@ variables:
       865 nm"'
     formula: DOD870/DAYFOC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DOD870, model_var: DAYFOC]
     table: aerosol
     units: '1'
@@ -632,6 +701,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: OH_aft]
     table: aerosol
     units: mol mol-1
@@ -641,6 +711,7 @@ variables:
       where X is a material constituent of Y.
     grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: conservative
     sources: [model_var: OH_aft]
     table: aerosol
     units: mol mol-1
@@ -655,6 +726,7 @@ variables:
       of  (as seen from TOA) each time sample when computing monthly mean.
     formula: REFFCLWMODIS/CLWMODIS
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: REFFCLWMODIS, model_var: CLWMODIS]
     table: aerosol
     units: m
@@ -665,6 +737,7 @@ variables:
     formula: FLNSCAF-FLDSCAF
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: FLNSCAF, model_var: FLDSCAF]
     table: aerosol
     units: W m-2
@@ -674,6 +747,7 @@ variables:
     formula: FSNTOAAF-FSNTAF+FLNTAF
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: FSNTOAAF, model_var: FSNTAF, model_var: FLNTAF]
     table: aerosol
     units: W m-2
@@ -683,6 +757,7 @@ variables:
     formula: FSNTOACAF-FSNTCAF+FLNTCAF
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: FSNTOACAF, model_var: FSNTCAF, model_var: FLNTCAF]
     table: aerosol
     units: W m-2
@@ -691,6 +766,7 @@ variables:
     description: Flux corresponding to rsut resulting fom aerosol-free call to radiation
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: FSUTOAAF]
     table: aerosol
     units: W m-2
@@ -700,6 +776,7 @@ variables:
     formula: SOLIN-FSNTOACAF
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: SOLIN, model_var: FSNTOACAF]
     table: aerosol
     units: W m-2
@@ -710,6 +787,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: SO2]
     table: aerosol
     units: mol mol-1
@@ -717,6 +795,7 @@ variables:
   so2_tavg-h2m-hxy-u:
     description: Daily mean SO2 volume mixing ratio near surface.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SO2]
     table: aerosol
     units: mol mol-1
@@ -725,6 +804,7 @@ variables:
     description: This variable represents the instantaneous near surface so2 volume
       mixing ration at CF sites, sampled every 3 hours
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SO2]
     table: aerosol
     units: mol mol-1
@@ -733,6 +813,7 @@ variables:
     description: 2D monthly mean thermal tropopause calculated using WMO tropopause
       definition on 3d temperature
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TROP_T]
     table: aerosol
     units: K
@@ -740,6 +821,7 @@ variables:
   toz_tavg-u-hxy-u:
     description: Total ozone column
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: cb_ozone_c]
     table: aerosol
     units: m
@@ -747,6 +829,7 @@ variables:
   ua_tavg-10hPa-hxy-air:
     description: Zonal wind on the 10 hPa surface
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: U010]
     table: aerosol
     units: m s-1
@@ -754,6 +837,7 @@ variables:
   wetbc_tavg-u-hxy-u:
     description: Surface deposition rate of black carbon (dry mass) due to wet processes
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: wet_BC]
     table: aerosol
     units: kg m-2 s-1
@@ -761,6 +845,7 @@ variables:
   wetdust_tavg-u-hxy-u:
     description: Surface deposition rate of dust (dry mass) due to wet processes
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: wet_DUST]
     table: aerosol
     units: kg m-2 s-1
@@ -769,6 +854,7 @@ variables:
     description: Deposition rate of organic matter in aerosols (measured by the dry
       mass) due to wet processes
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: wet_OM]
     table: aerosol
     units: kg m-2 s-1
@@ -776,6 +862,7 @@ variables:
   wetso2_tavg-u-hxy-u:
     description: Deposition rate of sulfur dioxide due to wet processes
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: WD_A_SO2]
     table: aerosol
     units: kg m-2 s-1
@@ -783,6 +870,7 @@ variables:
   wetso4_tavg-u-hxy-u:
     description: 'proposed name: tendency_of_atmosphere_mass_content_of_sulfate_dry_aerosol_due_to_wet_deposition'
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: wet_SULFATE]
     table: aerosol
     units: kg m-2 s-1
@@ -791,6 +879,7 @@ variables:
     description: Deposition rate of sea salt aerosols (measured by the dry mass) due
       to wet processes
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: wet_SALT]
     table: aerosol
     units: kg m-2 s-1
@@ -798,6 +887,7 @@ variables:
   zg_tavg-10hPa-hxy-air:
     description: Geopotential height on the 10 hPa surface
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: Z010]
     table: aerosol
     units: m

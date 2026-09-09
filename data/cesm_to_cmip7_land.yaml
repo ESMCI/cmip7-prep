@@ -7,6 +7,7 @@ variables:
       by downwelling shortwave radiation at the surface)'
     grids: [gr]
     long_name: Canopy Albedo
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: canopy_albedo
     table: land
@@ -16,6 +17,7 @@ variables:
     cell_methods: 'area: sum'
     grids: [gr]
     long_name: Grid-Cell Area for Ice Sheet Variables
+    regrid_method: conservative
     sources: [model_var: area]
     standard_name: cell_area
     table: land
@@ -25,6 +27,7 @@ variables:
     cell_methods: 'area: sum'
     grids: [gr]
     long_name: Grid-Cell Area for River Model Variables
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: cell_area
     table: land
@@ -36,6 +39,7 @@ variables:
       time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: Bare Soil Percentage Area Coverage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -47,6 +51,7 @@ variables:
     grids: [gr]
     long_name: Percentage of Entire Grid Cell That Is Covered by Burnt Vegetation
       (All Classes)
+    regrid_method: conservative
     sources: [model_var: FAREA_BURNED]
     standard_name: area_fraction
     table: land
@@ -57,6 +62,7 @@ variables:
     formula: chunits(C13_TOTECOSYSC, units='g/m^2')
     grids: [gr]
     long_name: Mass of 13C in All Terrestrial Carbon Pools
+    regrid_method: conservative
     sources: [model_var: C13_TOTECOSYSC]
     standard_name: mass_content_of_13C_in_vegetation_and_litter_and_soil_and_forestry_and_agricultural_products
     table: land
@@ -67,6 +73,7 @@ variables:
     formula: chunits(C13_TOTLITC, units='g/m^2')
     grids: [gr]
     long_name: Mass of 13C in Litter Pool
+    regrid_method: conservative
     sources: [model_var: C13_TOTLITC]
     standard_name: litter_mass_content_of_13C
     table: land
@@ -77,6 +84,7 @@ variables:
     formula: chunits(C13_TOTSOMC, units='g/m^2')
     grids: [gr]
     long_name: Mass of 13C in Soil Pool
+    regrid_method: conservative
     sources: [model_var: C13_TOTSOMC]
     standard_name: soil_mass_content_of_13C
     table: land
@@ -87,6 +95,7 @@ variables:
     formula: chunits(C13_TOTVEGC, units='g/m^2')
     grids: [gr]
     long_name: Mass of 13C in Vegetation
+    regrid_method: conservative
     sources: [model_var: C13_TOTVEGC]
     standard_name: vegetation_mass_content_of_13C
     table: land
@@ -97,6 +106,7 @@ variables:
     formula: chunits(C14_TOTECOSYSC, units='g/m^2')
     grids: [gr]
     long_name: Mass of 14C in All Terrestrial Carbon Pools
+    regrid_method: conservative
     sources: [model_var: C14_TOTECOSYSC]
     standard_name: mass_content_of_14C_in_vegetation_and_litter_and_soil_and_forestry_and_agricultural_products
     table: land
@@ -107,6 +117,7 @@ variables:
     formula: chunits(C14_TOTLITC, units='g/m^2')
     grids: [gr]
     long_name: Mass of 14C in Litter Pool
+    regrid_method: conservative
     sources: [model_var: C14_TOTLITC]
     standard_name: litter_mass_content_of_14C
     table: land
@@ -117,6 +128,7 @@ variables:
     formula: chunits(C14_TOTSOMC, units='g/m^2')
     grids: [gr]
     long_name: Mass of 14C in Soil Pool
+    regrid_method: conservative
     sources: [model_var: C14_TOTSOMC]
     standard_name: soil_mass_content_of_14C
     table: land
@@ -127,6 +139,7 @@ variables:
     formula: chunits(C14_TOTVEGC, units='g/m^2')
     grids: [gr]
     long_name: Mass of 14C in Vegetation
+    regrid_method: conservative
     sources: [model_var: C14_TOTVEGC]
     standard_name: vegetation_mass_content_of_14C
     table: land
@@ -139,6 +152,7 @@ variables:
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,1,:,:], time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: Percentage Cover by C3 Plant Functional Type
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT, model_var: PCT_CFT]
     standard_name: area_fraction
     table: land
@@ -151,6 +165,7 @@ variables:
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,1,:,:], time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: Percentage Cover by C4 Plant Functional Type
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT, model_var: PCT_CFT]
     standard_name: area_fraction
     table: land
@@ -160,6 +175,7 @@ variables:
     cell_methods: 'area: time: mean'
     grids: [gr]
     long_name: Carbon Mass in Geologic Storage
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: carbon_mass_content_of_geological_storage
     table: land
@@ -170,6 +186,7 @@ variables:
     formula: 'chunits(TOTECOSYSC, units=''g/m^2'')  #clm2.h0'
     grids: [gr]
     long_name: Total Carbon in All Terrestrial Carbon Pools
+    regrid_method: conservative
     sources: [model_var: TOTECOSYSC]
     standard_name: mass_content_of_carbon_in_vegetation_and_litter_and_soil_and_forestry_and_agricultural_products
     table: land
@@ -180,6 +197,7 @@ variables:
     formula: chunits(LEAFC, units='g m-2')
     grids: [gr]
     long_name: Carbon Mass in Leaves
+    regrid_method: conservative
     sources: [model_var: LEAFC]
     standard_name: leaf_mass_content_of_carbon
     table: land
@@ -190,6 +208,7 @@ variables:
     formula: chunits(CWDC, units='g/m^2')
     grids: [gr]
     long_name: Carbon Mass in Coarse Woody Debris
+    regrid_method: conservative
     sources: [model_var: CWDC]
     standard_name: wood_debris_mass_content_of_carbon
     table: land
@@ -201,6 +220,7 @@ variables:
       units=''g/m^2'')  #clm2.h4'
     grids: [gr]
     long_name: Carbon  in Above and Below-Ground Litter Pools on Land-Use Tiles
+    regrid_method: conservative
     sources: [model_var: TOTLITC]
     standard_name: litter_mass_content_of_carbon
     table: land
@@ -210,6 +230,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Carbon Mass in Below-Ground Litter
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: subsurface_litter_mass_content_of_carbon
     table: land
@@ -219,6 +240,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Carbon Mass in Above-Ground Litter
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_litter_mass_content_of_carbon
     table: land
@@ -227,6 +249,7 @@ variables:
   cLitter_tavg-u-hxy-lnd:
     formula: (TOTLITC + CWD_C)/1000.0
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TOTLITC, model_var: CWD_C]
     table: land
     units: kg m-2
@@ -236,6 +259,7 @@ variables:
     formula: chunits(STORVEGC, units='g/m^2')
     grids: [gr]
     long_name: Carbon Mass in Vegetation Components Other than Leaves, Stems and Roots
+    regrid_method: conservative
     sources: [model_var: STORVEGC]
     standard_name: miscellaneous_living_matter_mass_content_of_carbon
     table: land
@@ -246,6 +270,7 @@ variables:
     grids: [gr]
     long_name: Wood and Agricultural Product Pool Carbon Associated with Land-Use
       Tiles
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: carbon_mass_content_of_forestry_and_agricultural_products
     table: land
@@ -254,6 +279,7 @@ variables:
   cProduct_tavg-u-hxy-lnd:
     formula: (TOTPRODC + CWD_P)/1000.0
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TOTPRODC, model_var: CWD_P]
     table: land
     units: kg m-2
@@ -264,6 +290,7 @@ variables:
       units=''g m-2'')  #clm2.h0'
     grids: [gr]
     long_name: Carbon Mass in Roots
+    regrid_method: conservative
     sources: [model_var: FROOTC, model_var: LIVECROOTC, model_var: DEADCROOTC]
     standard_name: root_mass_content_of_carbon
     table: land
@@ -275,6 +302,7 @@ variables:
       units=''g/m^2'') #clm2.h4'
     grids: [gr]
     long_name: Carbon in Soil Pool on Land-Use Tiles
+    regrid_method: conservative
     sources: [model_var: TOTSOMC]
     standard_name: soil_mass_content_of_carbon
     table: land
@@ -285,6 +313,7 @@ variables:
     formula: 'chunits(get_soilpools(SOIL1C,SOIL2C,SOIL3C,soilpools), units=''g/m^2'')  #clm2.h0'
     grids: [gr]
     long_name: Carbon Mass in Each Model Soil Pool (Summed over Vertical Levels)
+    regrid_method: conservative
     sources: [{model_var: 'SOIL1C, SOIL2C, SOIL3C, soilpools)'}]
     standard_name: soil_mass_content_of_carbon
     table: land
@@ -295,6 +324,7 @@ variables:
     formula: 'chunits(TOTSOMC_1m, units=''g/m^2'')  #clm2.h0'
     grids: [gr]
     long_name: Carbon Mass in Soil Pool Above 1m Depth
+    regrid_method: conservative
     sources: [model_var: TOTSOMC_1m]
     standard_name: carbon_mass_content_of_soil_layer
     table: land
@@ -308,6 +338,7 @@ variables:
     grids: [gr]
     long_name: Carbon Mass in Each Model Soil Level (Summed over All Soil Carbon Pools
       in That Level)
+    regrid_method: conservative
     sources: [model_var: TOTSOMC]
     standard_name: carbon_mass_content_of_soil_layer
     table: land
@@ -316,6 +347,7 @@ variables:
   cSoil_tavg-u-hxy-lnd:
     formula: (SOIL1C + SOIL2C + SOIL3C)/1000.0
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOIL1C, model_var: SOIL2C, model_var: SOIL3C]
     table: land
     units: kg m-2
@@ -325,6 +357,7 @@ variables:
     formula: chunits(LIVESTEMC + DEADSTEMC, units='g/m^2')
     grids: [gr]
     long_name: Carbon Mass in Stem
+    regrid_method: conservative
     sources: [model_var: LIVESTEMC, model_var: DEADSTEMC]
     standard_name: stem_mass_content_of_carbon
     table: land
@@ -336,6 +369,7 @@ variables:
       units=''g/m^2'') #clm2.h4'
     grids: [gr]
     long_name: Carbon in Vegetation on Land-Use Tiles
+    regrid_method: conservative
     sources: [model_var: TOTVEGC]
     standard_name: vegetation_carbon_content
     table: land
@@ -344,6 +378,7 @@ variables:
   cVeg_tavg-u-hxy-lnd:
     formula: (TOTVEGC)/1000.0
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TOTVEGC]
     table: land
     units: kg m-2
@@ -356,6 +391,7 @@ variables:
       units=''g/m^2'')   #clm2.h1'
     grids: [gr]
     long_name: Carbon Mass in Vegetation on Grass Tiles
+    regrid_method: conservative
     sources: [model_var: TOTVEGC]
     standard_name: vegetation_carbon_content
     table: land
@@ -369,6 +405,7 @@ variables:
       units=''g/m^2'')   #clm2.h2'
     grids: [gr]
     long_name: Carbon Mass in Vegetation on Shrub Tiles
+    regrid_method: conservative
     sources: [model_var: TOTVEGC]
     standard_name: vegetation_carbon_content
     table: land
@@ -382,6 +419,7 @@ variables:
       units='g/m^2')
     grids: [gr]
     long_name: Carbon Mass in Vegetation on Tree Tiles
+    regrid_method: conservative
     sources: [model_var: TOTVEGC]
     standard_name: vegetation_carbon_content
     table: land
@@ -391,6 +429,7 @@ variables:
     cell_methods: 'area: time: mean'
     grids: [gr]
     long_name: Canopy Covered Area Percentage
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: vegetation_area_fraction
     table: land
@@ -398,12 +437,14 @@ variables:
 
   cropFracC3_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CROP_C3_FRAC]
     table: land
     units: '1'
 
   cropFracC4_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CROP_C4_FRAC]
     table: land
     units: '1'
@@ -413,6 +454,7 @@ variables:
     formula: PCT_LANDUNIT[:,1,:,:]
     grids: [gr]
     long_name: Percentage Crop Cover
+    regrid_method: conservative
     sources: [model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -420,6 +462,7 @@ variables:
 
   dcw_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DCW]
     table: land
     units: kg m-2
@@ -428,6 +471,7 @@ variables:
     cell_methods: 'area: mean'
     grids: [gr]
     long_name: Depth of Lake Below the Surface
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: depth
     table: land
@@ -437,6 +481,7 @@ variables:
     cell_methods: 'area: mean'
     grids: [gr]
     long_name: Total (Cumulative) Thickness of All Soil Layers
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: depth
     table: land
@@ -444,36 +489,42 @@ variables:
 
   dgw_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DGW]
     table: land
     units: kg m-2
 
   drivw_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DRIVW]
     table: land
     units: kg m-2
 
   dslw_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DSLW]
     table: land
     units: kg m-2
 
   dsn_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DSN]
     table: land
     units: kg m-2
 
   dsw_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: DSW]
     table: land
     units: kg m-2
 
   esn_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: ESN]
     table: land
     units: kg m-2
@@ -481,6 +532,7 @@ variables:
   evspsbl_tavg-u-hxy-lnd:
     grids: [gr]
     long_name: Evaporation over land
+    regrid_method: conservative
     sources: [model_var: QVEGT]
     table: land
     units: kg m-2 s-1
@@ -488,6 +540,7 @@ variables:
   evspsblpot_tavg-u-hxy-lnd:
     grids: [gr]
     long_name: Potential Evaporation over Land
+    regrid_method: conservative
     sources: [model_var: QVEGT_POT]
     table: land
     units: kg m-2 s-1
@@ -495,6 +548,7 @@ variables:
   evspsblsoi_tavg-u-hxy-lnd:
     grids: [gr]
     long_name: Water Evaporation from Soil
+    regrid_method: conservative
     sources: [model_var: QSOIL]
     table: land
     units: kg m-2 s-1
@@ -502,6 +556,7 @@ variables:
   evspsblveg_tavg-u-hxy-lnd:
     grids: [gr]
     long_name: Water Evaporation from Vegetation
+    regrid_method: conservative
     sources: [model_var: QVEGE]
     table: land
     units: kg m-2 s-1
@@ -512,6 +567,7 @@ variables:
     grids: [gr]
     long_name: Carbon Mass Flux from Vegetation, Litter or Soil Pools into the Atmosphere
       Due to any Human Activity [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: LAND_USE_FLUX, model_var: CROPPROD1C_LOSS]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_anthropogenic_land_use_or_land_cover_change_excluding_forestry_and_agricultural_products
     table: land
@@ -523,6 +579,7 @@ variables:
       s-1')
     grids: [gr]
     long_name: Biological Nitrogen Fixation
+    regrid_method: conservative
     sources: [model_var: FFIX_TO_SMINN, model_var: NFIX]
     standard_name: tendency_of_soil_and_vegetation_mass_content_of_nitrogen_compounds_expressed_as_nitrogen_due_to_fixation
     table: land
@@ -534,6 +591,7 @@ variables:
     grids: [gr]
     long_name: Lateral Transfer of Carbon out of Grid Cell That Eventually Goes into
       Ocean
+    regrid_method: conservative
     sources: [model_var: SOMC_LEACHED]
     standard_name: mass_flux_of_carbon_into_sea_water_from_rivers
     table: land
@@ -545,6 +603,7 @@ variables:
     grids: [gr]
     long_name: Deforested Biomass That Goes into Atmosphere as a Result of Anthropogenic
       Land-Use Change [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: DWT_CONV_CFLUX]
     standard_name: surface_net_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_anthropogenic_land_use_change
     table: land
@@ -556,6 +615,7 @@ variables:
     grids: [gr]
     long_name: Deforested Biomass That Goes into Product Pool as a Result of Anthropogenic
       Land-Use Change
+    regrid_method: conservative
     sources: [model_var: DWT_WOOD_PRODUCTC_GAIN_PATCH]
     standard_name: carbon_mass_flux_into_forestry_and_agricultural_products_due_to_anthropogenic_land_use_or_land_cover_change
     table: land
@@ -567,6 +627,7 @@ variables:
     grids: [gr]
     long_name: Carbon Mass Flux into Atmosphere Due to CO2 Emission from Fire Including
       All Sources [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: COL_FIRE_CLOSS]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_fires
     table: land
@@ -577,6 +638,7 @@ variables:
     grids: [gr]
     long_name: Carbon Mass Flux into Atmosphere Due to CO2 Emission from Natural Fire
       [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_natural_fires
     table: land
@@ -586,6 +648,7 @@ variables:
     formula: COL_FIRE_CLOSS/1000.0
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: COL_FIRE_CLOSS]
     table: land
     units: kg m-2 s-1
@@ -596,6 +659,7 @@ variables:
     long_name: Harvested Biomass That Goes Straight into Atmosphere as Carbon Mass
       Flux [kgC m-2 s-1]
     positive: up
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_crop_harvesting
     table: land
@@ -606,6 +670,7 @@ variables:
     grids: [gr]
     long_name: Harvested Biomass That Goes into Geological Storage
     positive: down
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: mass_flux_of_carbon_from_biomass_into_geological_storage
     table: land
@@ -616,6 +681,7 @@ variables:
     formula: 'chunits(WOOD_HARVESTC, units=''g m-2 s-1'')  #clm2.h0'
     grids: [gr]
     long_name: Harvested Biomass That Goes into Product Pool
+    regrid_method: conservative
     sources: [model_var: WOOD_HARVESTC]
     standard_name: mass_flux_of_carbon_into_forestry_and_agricultural_products_due_to_crop_harvesting
     table: land
@@ -626,6 +692,7 @@ variables:
     grids: [gr]
     long_name: Carbon Mass Flux from Litter, CWD or any non-Living Pool into Atmosphere
       Due to CO2 Emission from All Fire [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_litter_in_fires
     table: land
@@ -637,6 +704,7 @@ variables:
       m-2 s-1')
     grids: [gr]
     long_name: Total Carbon Mass Flux from Litter to Soil
+    regrid_method: conservative
     sources: [model_var: LITR1C_TO_SOIL1C, model_var: LITR2C_TO_SOIL1C, model_var: LITR3C_TO_SOIL2C]
     standard_name: carbon_mass_flux_into_soil_from_litter
     table: land
@@ -649,6 +717,7 @@ variables:
     long_name: Net Carbon Mass Flux into Atmosphere Due to Land-Use Change [kgC m-2
       s-1]
     positive: up
+    regrid_method: conservative
     sources: [model_var: DWT_CONV_CFLUX, model_var: TOT_WOODPRODC_LOSS]
     standard_name: surface_net_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_anthropogenic_land_use_change
     table: land
@@ -662,6 +731,7 @@ variables:
     long_name: Carbon Transferred Directly to Atmosphere Due to any Land-Use or Land-Cover
       Change Activities [kgC m-2 s-1]
     positive: up
+    regrid_method: conservative
     sources: [model_var: DWT_CONV_CFLUX_PATCH]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_anthropogenic_land_use_or_land_cover_change_excluding_forestry_and_agricultural_products
     table: land
@@ -673,6 +743,7 @@ variables:
     grids: [gr]
     long_name: Total Land N2O Flux
     positive: up
+    regrid_method: conservative
     sources: [model_var: F_N2O_DENIT, model_var: F_N2O_NIT]
     standard_name: surface_upward_mass_flux_of_nitrous_oxide_expressed_as_nitrogen_out_of_vegetation_and_litter_and_soil
     table: land
@@ -682,6 +753,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Nitrogen Mass Flux out of Land Due to any Human Activity
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: tendency_of_atmosphere_mass_content_of_nitrogen_compounds_expressed_as_nitrogen_due_to_anthropogenic_emission
     table: land
@@ -692,6 +764,7 @@ variables:
     grids: [gr]
     long_name: Lateral Transfer of Nitrogen out of Grid Cell That Eventually Goes
       into Ocean
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: mass_flux_of_nitrogen_compounds_expressed_as_nitrogen_into_sea_from_rivers
     table: land
@@ -703,6 +776,7 @@ variables:
       m-2 s-1')
     grids: [gr]
     long_name: Total Nitrogen Mass Flux from Litter to Soil
+    regrid_method: conservative
     sources: [model_var: LITR1N_TO_SOIL1N, model_var: LITR2N_TO_SOIL1N, model_var: LITR3N_TO_SOIL2N]
     standard_name: nitrogen_mass_flux_into_soil_from_litter
     table: land
@@ -713,6 +787,7 @@ variables:
     grids: [gr]
     long_name: Total Land NOx Flux
     positive: up
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_nox_expressed_as_nitrogen_out_of_vegetation_and_litter_and_soil
     table: land
@@ -724,6 +799,7 @@ variables:
     grids: [gr]
     long_name: Deforested or Harvested Biomass as a Result of Anthropogenic Land-Use
       or Change
+    regrid_method: conservative
     sources: [model_var: TOT_WOODPRODN_LOSS]
     standard_name: nitrogen_mass_flux_into_forestry_and_agricultural_products_due_to_anthropogenic_land_use_or_land_cover_change
     table: land
@@ -734,6 +810,7 @@ variables:
     formula: chunits(LITFALL_N, units='g m-2 s-1')
     grids: [gr]
     long_name: Total Nitrogen Mass Flux from Vegetation to Litter
+    regrid_method: conservative
     sources: [model_var: LITFALL_N]
     standard_name: nitrogen_mass_flux_into_litter_from_vegetation
     table: land
@@ -743,6 +820,7 @@ variables:
     formula: NVEG_SOIL_CLOSS/1000.0
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: NVEG_SOIL_CLOSS]
     table: land
     units: kg m-2 s-1
@@ -752,6 +830,7 @@ variables:
     formula: chunits(NDEP_TO_SMINN, units='g m-2 s-1')
     grids: [gr]
     long_name: Dry and Wet Deposition of Reactive Nitrogen onto Land
+    regrid_method: conservative
     sources: [model_var: NDEP_TO_SMINN]
     standard_name: minus_tendency_of_atmosphere_mass_content_of_nitrogen_compounds_expressed_as_nitrogen_due_to_deposition
     table: land
@@ -762,6 +841,7 @@ variables:
     formula: chunits(NFERTILIZATION, units='g m-2 s-1')
     grids: [gr]
     long_name: Total Nitrogen Added for Cropland Fertilisation (Artificial and Manure)
+    regrid_method: conservative
     sources: [model_var: NFERTILIZATION]
     standard_name: tendency_of_soil_mass_content_of_nitrogen_compounds_expressed_as_nitrogen_due_to_fertilization
     table: land
@@ -773,6 +853,7 @@ variables:
     grids: [gr]
     long_name: Total Nitrogen Lost to the Atmosphere (Including NHx, NOx, N2O, N2)
       from Fire
+    regrid_method: conservative
     sources: [model_var: PFT_FIRE_NLOSS]
     standard_name: surface_upward_mass_flux_of_nitrogen_compounds_expressed_as_nitrogen_due_to_emission_from_fires
     table: land
@@ -784,6 +865,7 @@ variables:
     grids: [gr]
     long_name: Total Nitrogen Lost to the Atmosphere (Including NHx, NOx, N2O, N2)
       from All Processes Except Fire
+    regrid_method: conservative
     sources: [model_var: F_N2O_NIT, model_var: F_DENIT]
     standard_name: surface_upward_mass_flux_of_nitrogen_compounds_expressed_as_nitrogen_due_to_all_land_processes_excluding_fires
     table: land
@@ -795,6 +877,7 @@ variables:
       m-2 s-1') + chunits(F_DENIT,units='g m-2 s-1')
     grids: [gr]
     long_name: Total Nitrogen Lost to the Atmosphere (Sum of NHx, NOx, N2O, N2)
+    regrid_method: conservative
     sources: [model_var: PFT_FIRE_NLOSS, model_var: F_N2O_NIT, model_var: F_DENIT]
     standard_name: surface_upward_mass_flux_of_nitrogen_compounds_expressed_as_nitrogen
     table: land
@@ -807,6 +890,7 @@ variables:
     grids: [gr]
     long_name: Total Nitrogen Loss to Leaching or Runoff (Sum of Ammonium, Nitrite
       and Nitrate)
+    regrid_method: conservative
     sources: [model_var: SMIN_NO3_LEACHED, model_var: SMIN_NO3_RUNOFF]
     standard_name: mass_flux_of_carbon_out_of_soil_due_to_leaching_and_runoff
     table: land
@@ -818,6 +902,7 @@ variables:
       units='g m-2 s-1')
     grids: [gr]
     long_name: Total Nitrogen Lost (Including NHx, NOx, N2O, N2 and Leaching)
+    regrid_method: conservative
     sources: [model_var: PFT_FIRE_NLOSS, model_var: F_N2O_NIT, model_var: F_DENIT,
       model_var: SMIN_NO3_LEACHED, model_var: SMIN_NO3_RUNOFF]
     standard_name: surface_upward_mass_flux_of_nitrogen_compounds_expressed_as_nitrogen_out_of_vegetation_and_litter_and_soil
@@ -831,6 +916,7 @@ variables:
     grids: [gr]
     long_name: Net Nitrogen Release from Soil and Litter as the Outcome of Nitrogen
       Immobilisation and Gross Mineralisation
+    regrid_method: conservative
     sources: [model_var: ACTUAL_IMMOB, model_var: NET_NMIN]
     standard_name: mass_flux_of_nitrogen_compounds_expressed_as_nitrogen_out_of_litter_and_soil_due_to_immobilisation_and_remineralization
     table: land
@@ -842,6 +928,7 @@ variables:
     grids: [gr]
     long_name: Total Plant Nitrogen Uptake (Sum of Ammonium and Nitrate) Irrespective
       of the Source of Nitrogen
+    regrid_method: conservative
     sources: [model_var: NUPTAKE]
     standard_name: tendency_of_vegetation_mass_content_of_nitrogen_compounds_expressed_as_nitrogen_due_to_fixation
     table: land
@@ -854,6 +941,7 @@ variables:
     grids: [gr]
     long_name: Decomposition out of Product Pools to CO2 in Atmosphere as Carbon Mass
       Flux [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: TOT_WOODPRODC_LOSS, model_var: CROPPROD1C_LOSS]
     standard_name: tendency_of_atmosphere_mass_content_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_forestry_and_agricultural_products
     table: land
@@ -865,6 +953,7 @@ variables:
     grids: [gr]
     long_name: Carbon Mass Flux from Vegetation into Atmosphere Due to CO2 Emission
       from All Fire [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: PFT_FIRE_CLOS]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_vegetation_in_fires
     table: land
@@ -875,6 +964,7 @@ variables:
     formula: SUM(H928)
     grids: [gr]
     long_name: Total Carbon Mass Flux from Vegetation to Litter as a Result of Mortality
+    regrid_method: conservative
     sources: [model_var: M_LEAFC_TO_LITTER, model_var: M_LEAFC_STORAGE_TO_LITTER,
       model_var: M_LEAFC_XFER_TO_LITTER, model_var: M_FROOTC_TO_LITTER, model_var: M_FROOTC_STORAGE_TO_LITTER,
       model_var: M_FROOTC_XFER_TO_LITTER, model_var: M_LIVESTEMC_TO_LITTER, {
@@ -905,6 +995,7 @@ variables:
     grids: [gr]
     long_name: Total Carbon Mass Flux from Vegetation to Litter as a Result of Leaf,
       Branch, and Root Senescence
+    regrid_method: conservative
     sources: [model_var: LEAFC_TO_LITTER, model_var: FROOTC_TO_LITTER]
     standard_name: mass_flux_of_carbon_into_litter_from_vegetation_due_to_senescence
     table: land
@@ -915,6 +1006,7 @@ variables:
     formula: chunits(LITFALL, units='g m-2 s-1')
     grids: [gr]
     long_name: Total Carbon Mass Flux from Vegetation to Litter
+    regrid_method: conservative
     sources: [model_var: LITFALL]
     standard_name: mass_flux_of_carbon_into_litter_from_vegetation
     table: land
@@ -924,6 +1016,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Total Carbon Mass Flux from Vegetation to Soil as a Result of Mortality
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: mass_flux_of_carbon_into_soil_from_vegetation_due_to_mortality
     table: land
@@ -934,6 +1027,7 @@ variables:
     grids: [gr]
     long_name: Total Carbon Mass Flux from Vegetation to Soil as a Result of Leaf,
       Branch, and Root Senescence
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: mass_flux_of_carbon_into_soil_from_vegetation_due_to_senescence
     table: land
@@ -943,6 +1037,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Total Carbon Mass Flux from Vegetation Directly to Soil
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: carbon_mass_flux_into_soil_from_vegetation_excluding_litter
     table: land
@@ -952,6 +1047,7 @@ variables:
     grids: [gr]
     long_name: Annual Gross Percentage That Was Transferred into This Tile from Other
       Land-Use Tiles
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: area_fraction
     table: land
@@ -962,6 +1058,7 @@ variables:
     formula: reduce_lu(PCT_LANDUNIT,landUse)
     grids: [gr]
     long_name: Percentage of Grid Cell for Each Land-Use Tile
+    regrid_method: conservative
     sources: [model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -971,6 +1068,7 @@ variables:
     grids: [gr]
     long_name: Annual Gross Percentage of Land-Use Tile That Was Transferred into
       Other Land-Use Tiles
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: area_fraction
     table: land
@@ -983,6 +1081,7 @@ variables:
     grids: [gr]
     long_name: Gross Primary Production on Land-Use Tile as Carbon Mass Flux [kgC
       m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: GPP, model_var: landunit, model_var: level]
     standard_name: gross_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -994,6 +1093,7 @@ variables:
     grids: [gr]
     long_name: Gross Primary Production on Vegetation type as Carbon Mass Flux [kgC
       m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: GPP, model_var: pft, model_var: level]
     standard_name: gross_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1002,6 +1102,7 @@ variables:
   gpp_tavg-u-hxy-lnd:
     formula: GPP/1000.0
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: GPP]
     table: land
     units: kg m-2 s-1
@@ -1015,6 +1116,7 @@ variables:
     grids: [gr]
     long_name: Gross Primary Production on Grass Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: GPP, model_var: pft, model_var: level]
     standard_name: gross_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1029,6 +1131,7 @@ variables:
     grids: [gr]
     long_name: Gross Primary Production on Shrub Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: GPP, model_var: pft, model_var: level]
     standard_name: gross_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1043,6 +1146,7 @@ variables:
     grids: [gr]
     long_name: Gross Primary Production on Tree Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: GPP, model_var: pft, model_var: level]
     standard_name: gross_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1054,6 +1158,7 @@ variables:
     grids: [gr]
     long_name: Carbon-13 Mass Flux out of Atmosphere Due to Gross Primary Production
       on Land [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: C13_GPP]
     standard_name: gross_primary_productivity_of_biomass_expressed_as_13C
     table: land
@@ -1065,6 +1170,7 @@ variables:
     grids: [gr]
     long_name: Carbon-14 Mass Flux out of Atmosphere Due to Gross Primary Production
       on Land [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: C14_GPP]
     standard_name: gross_primary_productivity_of_biomass_expressed_as_14C
     table: land
@@ -1076,6 +1182,7 @@ variables:
       lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: C3 Natural Grass Area Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -1087,6 +1194,7 @@ variables:
       time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: C4 Natural Grass Area Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -1098,6 +1206,7 @@ variables:
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon))  #clm2.h3'
     grids: [gr]
     long_name: Natural Grass Area Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -1108,6 +1217,7 @@ variables:
     grids: [gr]
     long_name: Ground heat flux at 3hr
     positive: up
+    regrid_method: conservative
     sources: [model_var: FGR12]
     standard_name: surface_downward_heat_flux_in_air
     table: land
@@ -1119,6 +1229,7 @@ variables:
     grids: [gr]
     long_name: Latent Heat Flux on Land-Use Tile
     positive: up
+    regrid_method: conservative
     sources: [model_var: EFLX_LH_TOT]
     standard_name: surface_upward_latent_heat_flux
     table: land
@@ -1130,6 +1241,7 @@ variables:
     grids: [gr]
     long_name: Sensible Heat Flux on Land-Use Tile
     positive: up
+    regrid_method: conservative
     sources: [model_var: FSH]
     standard_name: surface_upward_sensible_heat_flux
     table: land
@@ -1143,6 +1255,7 @@ variables:
     long_name: Irrigation Flux Including any Irrigation for Crops, Trees, Pasture,
       or Urban Lawns
     positive: down
+    regrid_method: conservative
     sources: [model_var: QIRRIG]
     standard_name: surface_downward_mass_flux_of_water_due_to_irrigation
     table: land
@@ -1153,6 +1266,7 @@ variables:
     formula: 'CLM_landunit_to_CMIP6_Lut(TLAI,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     grids: [gr]
     long_name: Leaf Area Index on Land-Use Tile
+    regrid_method: conservative
     sources: [model_var: TLAI, model_var: landunit, model_var: level]
     standard_name: leaf_area_index
     table: land
@@ -1162,6 +1276,7 @@ variables:
     cell_methods: 'area: time: mean where sector'
     grids: [gr]
     long_name: Leaf Area Index on Vegetation type
+    regrid_method: conservative
     sources: [model_var: TLAI, model_var: pft, model_var: level]
     standard_name: leaf_area_index
     table: land
@@ -1169,6 +1284,7 @@ variables:
 
   lai_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TLAI]
     table: land
     units: '1'
@@ -1177,6 +1293,7 @@ variables:
     cell_methods: 'area: time: mean'
     grids: [gr]
     long_name: Percentage of Area by Vegetation or Land-Cover Category
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: area_fraction
     table: land
@@ -1184,30 +1301,35 @@ variables:
 
   mrro_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: QRUNOFF]
     table: land
     units: kg m-2 s-1
 
   mrrob_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: QBURDRUNOFF]
     table: land
     units: kg m-2 s-1
 
   mrros_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: QOVER]
     table: land
     units: kg m-2 s-1
 
   mrsfl_tavg-sl-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOILMOIST]
     table: land
     units: kg m-2
 
   mrsll_tavg-sl-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOILLIQ]
     table: land
     units: kg m-2
@@ -1215,6 +1337,7 @@ variables:
   mrso_tavg-u-hxy-lnd:
     formula: verticalsum(SOILICE + SOILLIQ, capped_at=5000)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOILICE, model_var: SOILLIQ]
     table: land
     units: kg m-2
@@ -1223,6 +1346,7 @@ variables:
     cell_methods: 'area: mean where land'
     grids: [gr]
     long_name: Capacity of Soil to Store Water (Field Capacity)
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: soil_moisture_content_at_field_capacity
     table: land
@@ -1233,6 +1357,7 @@ variables:
     formula: 'CLM_landunit_to_CMIP6_Lut(SOILWATER_10CM,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     grids: [gr]
     long_name: Moisture in Upper Portion of Soil Column of Land-Use Tile
+    regrid_method: conservative
     sources: [model_var: SOILWATER_10CM]
     standard_name: mass_content_of_water_in_soil_layer
     table: land
@@ -1242,6 +1367,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Soil moisture in the top 1 m of the soil column
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: mass_content_of_water_in_soil_layer
     table: land
@@ -1249,6 +1375,7 @@ variables:
 
   mrsol_tavg-d10cm-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOILWATER_10CM]
     table: land
     units: kg m-2
@@ -1256,6 +1383,7 @@ variables:
   mrsol_tavg-sl-hxy-lnd:
     formula: SOILLIQ + SOILICE
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOILLIQ, model_var: SOILICE]
     table: land
     units: kg m-2
@@ -1264,6 +1392,7 @@ variables:
     cell_methods: 'area: mean where land time: point'
     grids: [gr]
     long_name: Moisture in Upper Portion of Soil Column
+    regrid_method: conservative
     sources: [model_var: SOILWATER_10CM]
     standard_name: mass_content_of_water_in_soil_layer
     table: land
@@ -1273,6 +1402,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Total Soil Wetness
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: volume_fraction_of_condensed_water_in_soil_at_field_capacity
     table: land
@@ -1283,6 +1413,7 @@ variables:
     formula: chunits(TWS, units='kg m-2')
     grids: [gr]
     long_name: Terrestrial Water Storage
+    regrid_method: conservative
     sources: [model_var: TWS]
     standard_name: land_water_amount
     table: land
@@ -1293,6 +1424,7 @@ variables:
     formula: chunits(TOTECOSYSN, units='g m-2')
     grids: [gr]
     long_name: Total Nitrogen in All Terrestrial Nitrogen Pools
+    regrid_method: conservative
     sources: [model_var: TOTECOSYSN]
     standard_name: mass_content_of_nitrogen_in_vegetation_and_litter_and_soil_and_forestry_and_agricultural_products
     table: land
@@ -1303,6 +1435,7 @@ variables:
     formula: chunits(LEAFN, units='g m-2')
     grids: [gr]
     long_name: Nitrogen Mass in Leaves
+    regrid_method: conservative
     sources: [model_var: LEAFN]
     standard_name: leaf_mass_content_of_nitrogen
     table: land
@@ -1313,6 +1446,7 @@ variables:
     formula: chunits(CWDN, units='g m-2')
     grids: [gr]
     long_name: Nitrogen Mass in Coarse Woody Debris
+    regrid_method: conservative
     sources: [model_var: CWDN]
     standard_name: wood_debris_mass_content_of_nitrogen
     table: land
@@ -1322,6 +1456,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Nitrogen Mass in Below-Ground Litter (non CWD)
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: subsurface_litter_mass_content_of_nitrogen
     table: land
@@ -1331,6 +1466,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Nitrogen Mass in Above-Ground Litter (non CWD)
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_litter_mass_content_of_nitrogen
     table: land
@@ -1341,6 +1477,7 @@ variables:
     formula: chunits(TOTLITN, units='g m-2')
     grids: [gr]
     long_name: Nitrogen Mass in Litter Pool
+    regrid_method: conservative
     sources: [model_var: TOTLITN]
     standard_name: litter_mass_content_of_nitrogen
     table: land
@@ -1351,6 +1488,7 @@ variables:
     formula: chunits(SMIN_NH4, units='g m-2')
     grids: [gr]
     long_name: Mineral Ammonium in the Soil
+    regrid_method: conservative
     sources: [model_var: SMIN_NH4]
     standard_name: soil_mass_content_of_inorganic_ammonium_expressed_as_nitrogen
     table: land
@@ -1361,6 +1499,7 @@ variables:
     formula: chunits(SMIN_NO3, units='g m-2')
     grids: [gr]
     long_name: Mineral Nitrate in the Soil
+    regrid_method: conservative
     sources: [model_var: SMIN_NO3]
     standard_name: soil_mass_content_of_inorganic_nitrate_expressed_as_nitrogen
     table: land
@@ -1371,6 +1510,7 @@ variables:
     formula: chunits(SMINN/1000, units='kg/m^2')
     grids: [gr]
     long_name: Mineral Nitrogen in the Soil
+    regrid_method: conservative
     sources: [model_var: SMINN]
     standard_name: soil_mass_content_of_inorganic_nitrogen_expressed_as_nitrogen
     table: land
@@ -1381,6 +1521,7 @@ variables:
     grids: [gr]
     long_name: Nitrogen Mass in Vegetation Components Other than Leaves, Stem and
       Root
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: miscellaneous_living_matter_mass_content_of_nitrogen
     table: land
@@ -1391,6 +1532,7 @@ variables:
     formula: chunits(TOT_WOODPRODN, units='g m-2')
     grids: [gr]
     long_name: Nitrogen Mass in Products of Land-Use Change
+    regrid_method: conservative
     sources: [model_var: TOT_WOODPRODN]
     standard_name: nitrogen_mass_content_of_forestry_and_agricultural_products
     table: land
@@ -1402,6 +1544,7 @@ variables:
       units='g m-2')
     grids: [gr]
     long_name: Nitrogen Mass in Roots
+    regrid_method: conservative
     sources: [model_var: LIVECROOTN, model_var: DEADCROOTN, model_var: FROOTN]
     standard_name: root_mass_content_of_nitrogen
     table: land
@@ -1412,6 +1555,7 @@ variables:
     formula: chunits(TOTSOMN, units='g m-2')
     grids: [gr]
     long_name: Nitrogen Mass in Soil Pool
+    regrid_method: conservative
     sources: [model_var: TOTSOMN]
     standard_name: soil_mass_content_of_nitrogen
     table: land
@@ -1422,6 +1566,7 @@ variables:
     formula: chunits(DEADSTEMN, units='g m-2')+chunits(LIVESTEMN, units='g m-2')
     grids: [gr]
     long_name: Nitrogen Mass in Stem
+    regrid_method: conservative
     sources: [model_var: DEADSTEMN, model_var: LIVESTEMN]
     standard_name: stem_mass_content_of_nitrogen
     table: land
@@ -1430,6 +1575,7 @@ variables:
   nVeg_tavg-u-hxy-lnd:
     formula: (WOOD_C + LEAF_C + ROOT_C)/1000.0
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: WOOD_C, model_var: LEAF_C, model_var: ROOT_C]
     table: land
     units: kg m-2
@@ -1439,6 +1585,7 @@ variables:
     grids: [gr]
     long_name: Net Carbon Mass Flux into Land-Use Tile [kgC m-2 s-1]
     positive: down
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_net_downward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_all_land_processes
     table: land
@@ -1448,6 +1595,7 @@ variables:
     formula: NBP/1000.0
     grids: [gr]
     positive: down
+    regrid_method: conservative
     sources: [model_var: NBP]
     table: land
     units: kg m-2 s-1
@@ -1459,6 +1607,7 @@ variables:
     long_name: Net Carbon Mass Flux out of Atmosphere Due to Net Ecosystem Productivity
       on Land [kgC m-2 s-1]
     positive: down
+    regrid_method: conservative
     sources: [model_var: NEE]
     standard_name: surface_net_downward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_all_land_processes_excluding_anthropogenic_land_use_change
     table: land
@@ -1471,6 +1620,7 @@ variables:
     long_name: Net Mass Flux of 13C Between Atmosphere and Land (Positive into Land)
       as a Result of All Processes [kgC m-2 s-1]
     positive: down
+    regrid_method: conservative
     sources: [model_var: C13_NBP]
     standard_name: surface_net_downward_mass_flux_of_carbon_dioxide_expressed_as_13C_due_to_all_land_processes
     table: land
@@ -1483,6 +1633,7 @@ variables:
     long_name: Net Mass Flux of 14C Between Atmosphere and Land (Positive into Land)
       as a Result of All Processes [kgC m-2 s-1]
     positive: down
+    regrid_method: conservative
     sources: [model_var: C14_NBP]
     standard_name: surface_net_downward_mass_flux_of_carbon_dioxide_expressed_as_14C_due_to_all_land_processes
     table: land
@@ -1495,6 +1646,7 @@ variables:
     long_name: Net Primary Production Allocated to Leaves as Carbon Mass Flux [kgC
       m-2 s-1]
     positive: down
+    regrid_method: conservative
     sources: [model_var: LEAFC_ALLOC]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon_accumulated_in_leaves
     table: land
@@ -1507,6 +1659,7 @@ variables:
     grids: [gr]
     long_name: Net Primary Production on Land-Use Tile as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: NPP]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1517,6 +1670,7 @@ variables:
     grids: [gr]
     long_name: Net Primary Production Allocated to Other Pools (not Leaves Stem or
       Roots) as Carbon Mass Flux [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon_accumulated_in_miscellaneous_living_matter
     table: land
@@ -1529,6 +1683,7 @@ variables:
     long_name: Net Primary Production Allocated to Roots as Carbon Mass Flux [kgC
       m-2 s-1]
     positive: down
+    regrid_method: conservative
     sources: [model_var: FROOTC_ALLOC]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon_accumulated_in_roots
     table: land
@@ -1540,6 +1695,7 @@ variables:
     grids: [gr]
     long_name: Net Primary Production Allocated to Stem as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: WOODC_ALLOC]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon_accumulated_in_stems
     table: land
@@ -1550,6 +1706,7 @@ variables:
     grids: [gr]
     long_name: Net Primary Production on Vegetation type as Carbon Mass Flux [kgC
       m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: NPP, model_var: pft, model_var: level]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1559,6 +1716,7 @@ variables:
     formula: NPP/1000.0
     grids: [gr]
     positive: down
+    regrid_method: conservative
     sources: [model_var: NPP]
     table: land
     units: kg m-2 s-1
@@ -1572,6 +1730,7 @@ variables:
     grids: [gr]
     long_name: Net Primary Production on Grass Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: NPP, model_var: pft, model_var: level]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1586,6 +1745,7 @@ variables:
     grids: [gr]
     long_name: Net Primary Production on Shrub Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: NPP, model_var: pft, model_var: level]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1599,6 +1759,7 @@ variables:
       units=''g m-2 s-1'')  #clm2.h1'
     grids: [gr]
     long_name: Net Primary Production on Tree Tiles as Carbon Mass Flux [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: NPP, model_var: pft, model_var: level]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon
     table: land
@@ -1606,12 +1767,14 @@ variables:
 
   pastureFracC3_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PASTURE_C3_FRAC]
     table: land
     units: '1'
 
   pastureFracC4_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PASTURE_C4_FRAC]
     table: land
     units: '1'
@@ -1620,6 +1783,7 @@ variables:
     cell_methods: 'area: time: mean'
     grids: [gr]
     long_name: Percentage of Land Which Is Anthropogenic Pasture
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: area_fraction
     table: land
@@ -1627,6 +1791,7 @@ variables:
 
   prveg_tavg-u-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: QINTR]
     table: land
     units: kg m-2 s-1
@@ -1635,6 +1800,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Groundwater Recharge from Soil Layer
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: downward_liquid_water_mass_flux_into_groundwater
     table: land
@@ -1645,6 +1811,7 @@ variables:
     formula: chunits(LEAF_MR, units='g m-2 s-1')
     grids: [gr]
     long_name: Total Respiration from Leaves as Carbon Mass Flux [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: LEAF_MR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration_in_leaves
     table: land
@@ -1657,6 +1824,7 @@ variables:
     grids: [gr]
     long_name: Autotrophic Respiration on Land-Use Tile as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: AR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration
     table: land
@@ -1668,6 +1836,7 @@ variables:
     grids: [gr]
     long_name: Total Respiration from Other Pools (not Leaves Stem or Roots) as Carbon
       Mass Flux [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: NPP_NUPTAKE]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration_in_miscellaneous_living_matter
     table: land
@@ -1678,6 +1847,7 @@ variables:
     formula: chunits(RR, units='g m-2 s-1')
     grids: [gr]
     long_name: Total Respiration from Roots as Carbon Mass Flux [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: RR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration_in_roots
     table: land
@@ -1688,6 +1858,7 @@ variables:
     formula: chunits(LIVESTEM_MR + CPOOL_LIVESTEM_GR, units='g m-2 s-1')
     grids: [gr]
     long_name: Total Respiration from Stem as Carbon Mass Flux [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: LIVESTEM_MR, model_var: CPOOL_LIVESTEM_GR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration_in_stems
     table: land
@@ -1698,6 +1869,7 @@ variables:
     grids: [gr]
     long_name: Autotrophic Respiration on Vegetation type as Carbon Mass Flux [kgC
       m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: AR, model_var: pft, model_var: level]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration
     table: land
@@ -1707,6 +1879,7 @@ variables:
     formula: AR/1000.0
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: AR]
     table: land
     units: kg m-2 s-1
@@ -1720,6 +1893,7 @@ variables:
     grids: [gr]
     long_name: Autotrophic Respiration on Grass Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: AR, model_var: pft, model_var: level]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration
     table: land
@@ -1734,6 +1908,7 @@ variables:
     grids: [gr]
     long_name: Autotrophic Respiration on Shrub Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: AR, model_var: pft, model_var: level]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration
     table: land
@@ -1748,6 +1923,7 @@ variables:
     grids: [gr]
     long_name: Autotrophic Respiration on Tree Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: AR, model_var: pft, model_var: level]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_plant_respiration
     table: land
@@ -1759,6 +1935,7 @@ variables:
     grids: [gr]
     long_name: Carbon-13 Mass Flux into Atmosphere Due to Autotrophic (Plant) Respiration
       on Land [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: C13_AR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_13C_due_to_plant_respiration
     table: land
@@ -1770,6 +1947,7 @@ variables:
     grids: [gr]
     long_name: Carbon-14 Mass Flux into Atmosphere Due to Autotrophic (Plant) Respiration
       on Land [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: C14_AR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_14C_due_to_plant_respiration
     table: land
@@ -1781,6 +1959,7 @@ variables:
     grids: [gr]
     long_name: Percentage of Grid Cell That Is Land but neither Vegetation Covered
       nor Bare Soil
+    regrid_method: conservative
     sources: [model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -1792,6 +1971,7 @@ variables:
     grids: [gr]
     long_name: Carbon Mass Flux into Atmosphere Due to Heterotrophic Respiration from
       Litter on Land
+    regrid_method: conservative
     sources: [model_var: LITTERC_HR]
     standard_name: surface_upward_mass_flux_of_carbon_due_to_heterotrophic_respiration_in_litter
     table: land
@@ -1804,6 +1984,7 @@ variables:
     grids: [gr]
     long_name: Heterotrophic Respiration on Land-Use Tile as Carbon Mass Flux [kgC
       m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: HR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_heterotrophic_respiration
     table: land
@@ -1815,6 +1996,7 @@ variables:
     grids: [gr]
     long_name: Carbon Mass Flux into Atmosphere Due to Heterotrophic Respiration from
       Soil on Land
+    regrid_method: conservative
     sources: [model_var: SOILC_HR]
     standard_name: surface_upward_mass_flux_of_carbon_due_to_heterotrophic_respiration_in_soil
     table: land
@@ -1825,6 +2007,7 @@ variables:
     grids: [gr]
     long_name: Heterotrophic Respiration on Vegetation type as Carbon Mass Flux [kgC
       m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_heterotrophic_respiration
     table: land
@@ -1834,6 +2017,7 @@ variables:
     formula: HR/1000.0
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: HR]
     table: land
     units: kg m-2 s-1
@@ -1843,6 +2027,7 @@ variables:
     grids: [gr]
     long_name: Heterotrophic Respiration on Grass Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_heterotrophic_respiration
     table: land
@@ -1853,6 +2038,7 @@ variables:
     grids: [gr]
     long_name: Heterotrophic Respiration on Shrub Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_heterotrophic_respiration
     table: land
@@ -1863,6 +2049,7 @@ variables:
     grids: [gr]
     long_name: Heterotrophic Respiration on Tree Tiles as Carbon Mass Flux [kgC m-2
       s-1]
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_heterotrophic_respiration
     table: land
@@ -1874,6 +2061,7 @@ variables:
     grids: [gr]
     long_name: Carbon-13 Mass Flux into Atmosphere Due to Heterotrophic Respiration
       on Land [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: C13_HR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_13C_due_to_heterotrophic_respiration
     table: land
@@ -1885,6 +2073,7 @@ variables:
     grids: [gr]
     long_name: Carbon-14 Mass Flux into Atmosphere Due to Heterotrophic Respiration
       on Land [kgC m-2 s-1]
+    regrid_method: conservative
     sources: [model_var: C14_HR]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_14C_due_to_heterotrophic_respiration
     table: land
@@ -1894,6 +2083,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: River Inflow
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: incoming_water_volume_transport_along_river_channel
     table: land
@@ -1904,6 +2094,7 @@ variables:
     formula: 'RIVER_DISCHARGE_OVER_LAND_LIQ  #mosart.h1'
     grids: [gr]
     long_name: River Discharge
+    regrid_method: conservative
     sources: [model_var: RIVER_DISCHARGE_OVER_LAND_LIQ]
     standard_name: outgoing_water_volume_transport_along_river_channel
     table: land
@@ -1913,6 +2104,7 @@ variables:
     cell_methods: 'area: mean where land'
     grids: [gr]
     long_name: Maximum Root Depth
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: root_depth
     table: land
@@ -1921,6 +2113,7 @@ variables:
   rsds_tavg-u-hxy-lnd:
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: FSDS]
     table: land
     units: W m-2
@@ -1930,6 +2123,7 @@ variables:
     grids: [gr]
     long_name: Surface Downwelling Shortwave Radiation over Snow
     positive: down
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: surface_downwelling_shortwave_flux_in_air
     table: land
@@ -1940,6 +2134,7 @@ variables:
     grids: [gr]
     long_name: Surface Upwelling Shortwave Radiation over Land
     positive: up
+    regrid_method: conservative
     sources: [model_var: FSR]
     standard_name: surface_upwelling_shortwave_flux_in_air
     table: land
@@ -1951,6 +2146,7 @@ variables:
     grids: [gr]
     long_name: Surface Upwelling Shortwave Radiation over Snow
     positive: up
+    regrid_method: conservative
     sources: [model_var: SSRE_FSRVI, model_var: SSRE_FSRVD]
     standard_name: surface_upwelling_shortwave_flux_in_air
     table: land
@@ -1960,6 +2156,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Root Zone Soil Moisture
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: mass_content_of_water_in_soil_layer_defined_by_root_depth
     table: land
@@ -1970,6 +2167,7 @@ variables:
     formula: 'PCT_LANDUNIT[:,3,:,:]  #clm2.h0'
     grids: [gr]
     long_name: Land Ice Area Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_LANDUNIT]
     standard_name: land_ice_area_fraction
     table: land
@@ -1979,6 +2177,7 @@ variables:
     cell_methods: 'area: mean'
     grids: [gr]
     long_name: Land Ice Area Percentage
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: land_ice_area_fraction
     table: land
@@ -1989,6 +2188,7 @@ variables:
     formula: 'PCT_LANDUNIT[:,4,:,:]  #clm2.h0'
     grids: [gr]
     long_name: Fraction of the Grid Cell Occupied by Lake
+    regrid_method: conservative
     sources: [model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -2000,6 +2200,7 @@ variables:
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: Percentage Cover by Shrub
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -2009,6 +2210,7 @@ variables:
     cell_methods: 'area: mean where land'
     grids: [gr]
     long_name: Thickness of Soil Layers
+    regrid_method: conservative
     sources: [model_var: DZSOI]
     standard_name: cell_thickness
     table: land
@@ -2020,6 +2222,7 @@ variables:
     grids: [gr]
     long_name: Net radiative flux at surface
     positive: down
+    regrid_method: conservative
     sources: [model_var: FSA, model_var: FIRA]
     standard_name: surface_net_downward_radiative_flux
     table: land
@@ -2030,6 +2233,7 @@ variables:
     formula: 'chunits(H2OSFC, units=''kg m-2'')  #clm2.h5'
     grids: [gr]
     long_name: Surface Water Storage
+    regrid_method: conservative
     sources: [model_var: H2OSFC]
     standard_name: land_surface_liquid_water_amount
     table: land
@@ -2040,6 +2244,7 @@ variables:
     formula: 'CLM_landunit_to_CMIP6_Lut(H2OSNO,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     grids: [gr]
     long_name: Snow Water Equivalent on Land-Use Tile
+    regrid_method: conservative
     sources: [model_var: H2OSNO]
     standard_name: lwe_thickness_of_surface_snow_amount
     table: land
@@ -2050,6 +2255,7 @@ variables:
     formula: 'CLM_landunit_to_CMIP6_Lut(TSA,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     grids: [gr]
     long_name: Near-Surface Air Temperature on Land Use Tile
+    regrid_method: conservative
     sources: [model_var: TSA]
     standard_name: air_temperature
     table: land
@@ -2059,6 +2265,7 @@ variables:
     formula: QSOIL + QVEGT
     grids: [gr]
     positive: up
+    regrid_method: conservative
     sources: [model_var: QVEGT, model_var: QSOIL]
     table: land
     units: kg m-2 s-1
@@ -2069,6 +2276,7 @@ variables:
     grids: [gr]
     long_name: Transpiration
     positive: up
+    regrid_method: conservative
     sources: [model_var: QVEGT]
     standard_name: transpiration_flux
     table: land
@@ -2080,6 +2288,7 @@ variables:
       time, lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: Broadleaf Deciduous Tree Area Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -2091,6 +2300,7 @@ variables:
       lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: Broadleaf Evergreen Tree Area Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -2102,6 +2312,7 @@ variables:
       time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: Needleleaf Deciduous Tree Area Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -2113,6 +2324,7 @@ variables:
       lat, lon)*yeartomonth_data(PCT_LANDUNIT[:,0,:,:], time, lat, lon)  #clm2.h3'
     grids: [gr]
     long_name: Needleleaf Evergreen Tree Area Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -2123,6 +2335,7 @@ variables:
     formula: '(PCT_NAT_PFT[:,1,:,:]+PCT_NAT_PFT[:,2,:,:]+PCT_NAT_PFT[:,3,:,:]+PCT_NAT_PFT[:,4,:,:]+PCT_NAT_PFT[:,5,:,:]+PCT_NAT_PFT[:,6,:,:]+PCT_NAT_PFT[:,7,:,:]+PCT_NAT_PFT[:,8,:,:])*PCT_LANDUNIT[:,0,:,:]  #clm2.h3'
     grids: [gr]
     long_name: Tree Cover Percentage
+    regrid_method: conservative
     sources: [model_var: PCT_NAT_PFT, model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -2133,6 +2346,7 @@ variables:
     formula: 'CLM_landunit_to_CMIP6_Lut(TSKIN,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     grids: [gr]
     long_name: Surface Temperature on Landuse Tile
+    regrid_method: conservative
     sources: [model_var: TSKIN]
     standard_name: surface_temperature
     table: land
@@ -2140,6 +2354,7 @@ variables:
 
   tsl_tavg-sl-hxy-lnd:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TSOI]
     table: land
     units: K
@@ -2148,6 +2363,7 @@ variables:
     cell_methods: 'area: time: mean (over land and sea ice)'
     grids: [gr]
     long_name: Surface Temperature Where Land or Sea Ice
+    regrid_method: conservative
     sources: [model_var: TSKIN]
     standard_name: surface_temperature
     table: land
@@ -2157,6 +2373,7 @@ variables:
     cell_methods: 'area: mean (over land and sea ice) time: point'
     grids: [gr]
     long_name: Surface Temperature Where Land or Sea Ice
+    regrid_method: conservative
     sources: [model_var: TSKIN]
     standard_name: surface_temperature
     table: land
@@ -2167,6 +2384,7 @@ variables:
     formula: PCT_LANDUNIT[:,0,:,:]+PCT_LANDUNIT[:,1,:,:]
     grids: [gr]
     long_name: Total Vegetated Percentage Cover
+    regrid_method: conservative
     sources: [model_var: PCT_LANDUNIT]
     standard_name: area_fraction
     table: land
@@ -2179,6 +2397,7 @@ variables:
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit)  #clm2.h1'
     grids: [gr]
     long_name: Height of Grass
+    regrid_method: conservative
     sources: [model_var: HTOP]
     standard_name: canopy_height
     table: land
@@ -2191,6 +2410,7 @@ variables:
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit)  #clm2.h1'
     grids: [gr]
     long_name: Height of Shrubs
+    regrid_method: conservative
     sources: [model_var: HTOP]
     standard_name: canopy_height
     table: land
@@ -2203,6 +2423,7 @@ variables:
       pfts1d_lat, pfts1d_active, pfts1d_itype_veg,pfts1d_wtgcell, pfts1d_wtlunit)  #clm2.h1'
     grids: [gr]
     long_name: Height of Trees
+    regrid_method: conservative
     sources: [model_var: HTOP]
     standard_name: canopy_height
     table: land
@@ -2212,6 +2433,7 @@ variables:
     cell_methods: 'area: time: mean where vegetation (mask=vegFrac)'
     grids: [gr]
     long_name: Height of the Vegetation Canopy
+    regrid_method: conservative
     sources: [model_var: HTOP]
     standard_name: canopy_height
     table: land
@@ -2222,6 +2444,7 @@ variables:
     formula: chunits(FCH4, units='kg/m2/s')
     grids: [gr]
     long_name: Grid Averaged Methane Emissions from Wetlands
+    regrid_method: conservative
     sources: [model_var: FCH4]
     standard_name: surface_net_upward_mass_flux_of_methane_due_to_emission_from_wetland_biological_processes
     table: land
@@ -2232,6 +2455,7 @@ variables:
     formula: chunits(CH4PROD, units='g/m2/s') - chunits(FCH4, units='kg/m2/s')
     grids: [gr]
     long_name: Grid Averaged Methane Consumption (Methanotrophy) from Wetlands
+    regrid_method: conservative
     sources: [model_var: CH4PROD]
     standard_name: surface_downward_mass_flux_of_methane_due_to_wetland_biological_consumption
     table: land
@@ -2242,6 +2466,7 @@ variables:
     formula: chunits(CH4PROD, units='g/m2/s')
     grids: [gr]
     long_name: Grid Averaged Methane Production (Methanogenesis) from Wetlands
+    regrid_method: conservative
     sources: [model_var: CH4PROD]
     standard_name: surface_upward_mass_flux_of_methane_due_to_emission_from_wetland_biological_production
     table: land
@@ -2251,6 +2476,7 @@ variables:
     cell_methods: 'area: time: mean'
     grids: [gr]
     long_name: Wetland Percentage Cover
+    regrid_method: conservative
     sources: [model_var: FINUNDATED]
     standard_name: area_fraction
     table: land
@@ -2260,6 +2486,7 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Water Table Depth
+    regrid_method: conservative
     sources: [model_var: ZWT]
     standard_name: water_table_depth
     table: land

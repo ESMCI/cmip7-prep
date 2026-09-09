@@ -15,7 +15,7 @@ import xarray as xr
 # import warnings
 import numpy as np
 from cmip7_prep.cache_tools import FXCache, RegridderCache
-from cmip7_prep.regrid_maps import get_map_paths, load_intensive_vars
+from cmip7_prep.regrid_maps import get_map_paths
 from cmip7_prep import vertical
 
 logger = logging.getLogger(__name__)
@@ -207,8 +207,8 @@ def _pick_maps(
             return MapSpec("bilinear", bilin)
         return MapSpec("conservative", cons)
 
-    if varname in load_intensive_vars() and bilin and str(bilin):
-        return MapSpec("bilinear", bilin)
+    # No method given: conservative is the safe default, since it is what a
+    # flux or a mass needs.  Variables that want bilinear say so in the mapping.
     return MapSpec("conservative", cons)
 
 

@@ -449,6 +449,9 @@ def _prepare_regridded(
             tables_path=tables_root / "tables",
             regrid_kwargs={
                 "dtype": "float32",
+                # Stated per variable in the mapping YAML rather than looked up
+                # in a shared name list, so an ocean field can ask for bilinear.
+                "method": cfg.get("regrid_method", "conservative"),
             },
             open_kwargs={"decode_timedelta": True},
         )

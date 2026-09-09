@@ -5,6 +5,7 @@ variables:
   agessc_tavg-ol-hxy-sea:
     grids: [gn]
     long_name: Ideal Age of Sea Water
+    regrid_method: conservative
     sources: [model_var: agessc]
     table: ocean
     units: yr
@@ -37,6 +38,7 @@ variables:
   hfds_tavg-u-hxy-sea:
     grids: [gn]
     positive: down
+    regrid_method: conservative
     sources: [model_var: hfds]
     table: ocean
     units: W m-2
@@ -52,6 +54,7 @@ variables:
   mlotst_tavg-u-hxy-sea:
     grids: [gn]
     long_name: Ocean Mixed Layer Thickness Defined by Sigma T
+    regrid_method: conservative
     sources: [model_var: mlotst]
     table: ocean
     units: m
@@ -97,6 +100,7 @@ variables:
   tauuo_tavg-u-hxy-sea:
     grids: [gn]
     positive: down
+    regrid_method: conservative
     sources: [model_var: tauuo]
     table: ocean
     units: N m-2
@@ -104,6 +108,7 @@ variables:
   tauvo_tavg-u-hxy-sea:
     grids: [gn]
     positive: down
+    regrid_method: conservative
     sources: [model_var: tauvo]
     table: ocean
     units: N m-2
@@ -124,12 +129,14 @@ variables:
 
   umo_tavg-ol-hxy-sea:
     grids: [gn]
+    regrid_method: conservative
     sources: [model_var: umo]
     table: ocean
     units: kg s-1
 
   vmo_tavg-ol-hxy-sea:
     grids: [gn]
+    regrid_method: conservative
     sources: [model_var: vmo]
     table: ocean
     units: kg s-1
