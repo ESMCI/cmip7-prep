@@ -666,6 +666,7 @@ variables:
       by the area of the whole grid cell (not just the area of the cloud).
     formula: CMFMC+CMFMCDZM
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: CMFMC, model_var: CMFMCDZM]
     table: atmos
     units: kg m-2 s-1
@@ -676,6 +677,7 @@ variables:
       by the area of the whole grid cell (not just the area of the updrafts).
     formula: CMFMC+CMFMCDZM
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: CMFMC, model_var: CMFMCDZM]
     table: atmos
     units: kg m-2 s-1
@@ -711,6 +713,7 @@ variables:
     description: The atmospheric pressure at the model layer interfaces for all times
       and levels in the associated output variables
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: PINT]
     table: atmos
     units: Pa
@@ -718,6 +721,7 @@ variables:
   phalf_tpt-alh-hs-u:
     description: Air pressure on model half-levels
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: PINT]
     table: atmos
     units: Pa
@@ -910,6 +914,7 @@ variables:
   rld_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FDL]
     table: atmos
     units: W m-2
@@ -918,6 +923,7 @@ variables:
     description: Downwelling Longwave Radiation (includes the fluxes at the surface
       and TOA)
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FDL]
     table: atmos
     units: W m-2
@@ -925,6 +931,7 @@ variables:
   rldcs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FDLC]
     table: atmos
     units: W m-2
@@ -933,6 +940,7 @@ variables:
     description: Downwelling clear-sky longwave radiation (includes the fluxes at
       the surface and TOA)
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FDLC]
     table: atmos
     units: W m-2
@@ -1007,6 +1015,7 @@ variables:
   rlu_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FUL]
     table: atmos
     units: W m-2
@@ -1015,6 +1024,7 @@ variables:
     description: Upwelling longwave radiation (includes the fluxes at the surface
       and TOA)
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FULC]
     table: atmos
     units: W m-2
@@ -1022,6 +1032,7 @@ variables:
   rlucs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FULC]
     table: atmos
     units: W m-2
@@ -1030,6 +1041,7 @@ variables:
     description: Upwelling clear-sky longwave radiation  (includes the fluxes at the
       surface and TOA)
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FULC]
     table: atmos
     units: W m-2
@@ -1121,6 +1133,7 @@ variables:
   rsd_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FDS]
     table: atmos
     units: W m-2
@@ -1129,6 +1142,7 @@ variables:
     description: Downwelling shortwave radiation (includes the fluxes at the surface
       and top-of-atmosphere)
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FDS]
     table: atmos
     units: W m-2
@@ -1136,6 +1150,7 @@ variables:
   rsdcs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FDSC]
     table: atmos
     units: W m-2
@@ -1144,6 +1159,7 @@ variables:
     description: Downwelling clear-sky shortwave radiation (includes the fluxes at
       the surface and top-of-atmosphere)
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FDSC]
     table: atmos
     units: W m-2
@@ -1225,6 +1241,7 @@ variables:
   rsu_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FUS]
     table: atmos
     units: W m-2
@@ -1233,6 +1250,7 @@ variables:
     description: Upwelling shortwave radiation  (includes also the fluxes at the surface
       and top of atmosphere)
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FUS]
     table: atmos
     units: W m-2
@@ -1240,6 +1258,7 @@ variables:
   rsucs_tavg-alh-hxy-u:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FUSC]
     table: atmos
     units: W m-2
@@ -1248,6 +1267,7 @@ variables:
     description: Upwelling clear-sky shortwave radiation  (includes the fluxes at
       the surface and TOA)
     grids: [gr]
+    levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
     sources: [model_var: FUSC]
     table: atmos
     units: W m-2

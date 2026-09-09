@@ -670,6 +670,7 @@ class CmorSession(
         logger.debug("found var_da with name: %s and dims: %s", var_da.name, var_dims)
 
         alev_id = None
+        alevh_id = None
         plev_id = None
         lat_id = None
         lon_id = None
@@ -779,10 +780,97 @@ class CmorSession(
             )
 
         # -------------------------
-        # --- vertical: standard_hybrid_sigma
+        # --- vertical: standard_hybrid_sigma_half
         # -------------------------
+        # Checked before the midpoint case: a half-level variable carries
+        # 'ilev' rather than 'lev', but the midpoint branch also fires on
+        # "lev" in var_dims, and 'ilev' contains 'lev' as a substring only --
+        # keeping this first makes the intent explicit rather than relying on
+        # that.
         levels = getattr(vdef, "levels", {}) or {}
         if (levels.get("name") or "").lower() in {
+            "standard_hybrid_sigma_half",
+            "alevhalf",
+        }:
+            if (self.primarytable or "").lower() not in {
+                "atmos",
+                "atmoschem",
+                "aerosol",
+            }:
+                raise ValueError(
+                    "Hybrid sigma coordinates are only supported for atmospheric tables."
+                )
+            logger.debug("Defining hybrid sigma half-level axis")
+            hyai_name = levels.get("hyai", "hyai")  # A at interfaces
+            hybi_name = levels.get("hybi", "hybi")  # B at interfaces
+            ps_name = levels.get("ps", "PS")
+
+            # 0) sigma interfaces
+            # The coordinate is p = a*p0 + b*ps, so at the reference surface
+            # pressure p0 the axis value is a + b.  Using b alone would give a
+            # run of zeros at the top, where CAM's levels are pure pressure and
+            # hybi is exactly 0.  CAM's own 'ilev' is (a + b) * p0 in hPa,
+            # which pipeline.py divides by 1000 for the same reason.
+            #
+            # 'must_have_bounds: no' in CMIP7_coordinate.json, so the axis
+            # takes coordinate values only -- interfaces are points.
+            sigma_half = np.asarray(ds[hyai_name].values, dtype="f8") + np.asarray(
+                ds[hybi_name].values, dtype="f8"
+            )
+
+            # 1) define axis using sigma
+            alevh_id = cmor.axis(
+                table_entry="standard_hybrid_sigma_half",
+                units="1",
+                coord_vals=sigma_half,
+            )
+            cmor.set_cur_dataset_attribute("vertical_label", "alevhalf")
+
+            # 2) z-factors.  The name is the *formula entry* name, not the term
+            # name in the output file.  CMIP7_formula_terms.json defines
+            # a_half and b_half on dimension 'alevhalf', both with out_name
+            # 'a'/'b'.  Passing "a" attaches an entry declared on 'alevel' and
+            # CMOR rejects the axis type.  p0 and ps have no vertical
+            # dimension, so those are shared with the midpoint case.
+            cmor.zfactor(
+                zaxis_id=alevh_id,
+                zfactor_name="a_half",
+                units="",
+                axis_ids=[alevh_id],
+                zfactor_values=np.asarray(ds[hyai_name].values),
+            )
+            cmor.zfactor(
+                zaxis_id=alevh_id,
+                zfactor_name="b_half",
+                units="",
+                axis_ids=[alevh_id],
+                zfactor_values=np.asarray(ds[hybi_name].values),
+            )
+
+            # p0 scalar
+            cmor.zfactor(
+                zaxis_id=alevh_id, zfactor_name="p0", units="Pa", zfactor_values=1.0e5
+            )
+
+            # ps(time,lat,lon) zfactor must be DEFINED before the main variable
+            ps_zvar_id = cmor.zfactor(
+                zaxis_id=alevh_id,
+                zfactor_name="ps",
+                units="Pa",
+                axis_ids=[
+                    time_id,
+                    lat_id,
+                    lon_id,
+                ],  # order must match var’s non-vertical axes
+            )
+
+            # stash to write before main variable
+            self._pending_ps = (ps_zvar_id, ds[ps_name])
+
+        # -------------------------
+        # --- vertical: standard_hybrid_sigma
+        # -------------------------
+        elif (levels.get("name") or "").lower() in {
             "standard_hybrid_sigma",
             "alevel",
             "alev",
@@ -816,8 +904,8 @@ class CmorSession(
             cmor.set_cur_dataset_attribute(
                 "vertical_label", "alevel"
             )  # or another valid value
-            # 2) z-factors: a(lev), b(lev), p0(scalar), ps(time,lat,lon)
 
+            # 2) z-factors: a(lev), b(lev), p0(scalar), ps(time,lat,lon)
             cmor.zfactor(
                 zaxis_id=alev_id,
                 zfactor_name="a",
@@ -839,6 +927,7 @@ class CmorSession(
             cmor.zfactor(
                 zaxis_id=alev_id, zfactor_name="p0", units="Pa", zfactor_values=1.0e5
             )
+
             # ps(time,lat,lon) zfactor must be DEFINED before the main variable
             ps_da = ds[ps_name]  # ensure units are Pa
             ps_zvar_id = cmor.zfactor(
@@ -851,6 +940,7 @@ class CmorSession(
                     lon_id,
                 ],  # order must match var’s non-vertical axes
             )
+
             # stash to write before main variable
             self._pending_ps = (ps_zvar_id, ps_da)
 
@@ -1028,6 +1118,8 @@ class CmorSession(
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
             "lev": alev_id,  # sometimes used for hybrid
+            "ilev": alevh_id,  # hybrid sigma half levels (interfaces)
+            "alevhalf": alevh_id,
             "sdepth": sdepth_id,
             "z_l": lev_id,
             "olevel": lev_id,
