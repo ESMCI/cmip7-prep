@@ -542,7 +542,7 @@ def process_one_var(
                 open_kwargs=open_kwargs,
             )
             if ds_native is None:
-                logger.warning(f"Source variable(s) not found for {varname}, skipping")
+                logger.debug(f"Source variable(s) not found for {varname}, skipping")
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
             if model == "cesm":
