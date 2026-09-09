@@ -37,8 +37,6 @@ from .cmor_utils import (
 
 # from .mom6_static import compute_cell_bounds_from_corners
 
-# logging.basicConfig(level=logging.INFO)
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -743,7 +741,7 @@ class CmorSession(
                 coord_vals=tvals,
                 cell_bounds=tbnds,
             )
-            logger.info(
+            logger.debug(
                 "Variable %s: time axis '%s' (bounds %s)",
                 lookup_name,
                 time_entry,

@@ -16,7 +16,6 @@ _FILL_DEFAULT = 1.0e20
 _HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
 _UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

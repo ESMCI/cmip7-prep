@@ -18,7 +18,6 @@ from cmip7_prep.cache_tools import FXCache, RegridderCache
 from cmip7_prep.regrid_maps import get_map_paths, load_intensive_vars
 from cmip7_prep import vertical
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
@@ -252,7 +251,6 @@ def regrid_to_latlon_ds(
     out_vars: dict[str, xr.DataArray] = {}
     names = [varnames] if isinstance(varnames, str) else list(varnames)
     for name in names:
-        logger.debug("Regridding var %s", name)
         out_vars[name] = regrid_to_latlon(
             ds_in,
             name,
@@ -442,7 +440,7 @@ def regrid_to_latlon(
         force_method=method,
     )
     logger.info(
-        "Regridding %s using %s map: %s ", varname, spec.method_label, spec.path
+        "     Regridding %s using %s map: %s ", varname, spec.method_label, spec.path
     )
     regridder = RegridderCache.get(spec.path, spec.method_label)
     logger.debug("Regridder ready to use")
