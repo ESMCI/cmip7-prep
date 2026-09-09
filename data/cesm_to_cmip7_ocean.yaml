@@ -36,7 +36,6 @@ variables:
 
   hfds_tavg-u-hxy-sea:
     grids: [gn]
-    positive: down
     sources: [model_var: hfds]
     table: ocean
     units: W m-2
@@ -96,14 +95,12 @@ variables:
 
   tauuo_tavg-u-hxy-sea:
     grids: [gn]
-    positive: down
     sources: [model_var: tauuo]
     table: ocean
     units: N m-2
 
   tauvo_tavg-u-hxy-sea:
     grids: [gn]
-    positive: down
     sources: [model_var: tauvo]
     table: ocean
     units: N m-2

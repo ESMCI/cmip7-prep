@@ -1,0 +1,22 @@
+# Hand-set 'positive' values for CESM variables.
+#
+# 'positive' tells CMOR which direction a flux is measured in.  CMOR checks it
+# against its own tables and flips the sign of the data if they disagree, so a
+# wrong entry here inverts the field.
+#
+# Only variables that differ from the CMOR table need an entry.  Everything
+# else takes the table's value, so this list should stay short.
+
+positive:
+  fNVegSoil_tavg-u-hxy-lnd: up   # not in any CMOR table
+  rlds_tavg-u-hxy-u: up   # table says down
+  rldscs_tavg-u-hxy-u: up   # table says down
+  rsds_tavg-u-hxy-lnd: up   # table says down
+  rsds_tavg-u-hxy-u: up   # table says down
+  rsdscs_tavg-u-hxy-u: up   # table says down
+  rsdt_tavg-u-hxy-u: up   # table says down
+  sisnhc_tavg-u-hxy-si: down   # not in any CMOR table
+  sistrxubot_tavg-u-hxy-si: down   # table says up
+  sistryubot_tavg-u-hxy-si: down   # table says up
+  tauu_tavg-u-hxy-u: up   # table says down
+  tauv_tavg-u-hxy-u: up   # table says down

@@ -281,6 +281,30 @@ class CmorSession(
         return None
 
     @staticmethod
+    def _positive_entry(table_path: str, var_name: str) -> str | None:
+        """Return the 'positive' value the CMOR table gives this variable.
+
+        'positive' says which direction a flux is measured in.  CMOR compares
+        what we declare against the table and flips the sign of the data if
+        they disagree, so this has to match unless we mean to override it.
+
+        None means the table gives no value, which is the case for anything
+        that is not a flux.
+        """
+        try:
+            table = _load_table_json(str(table_path))
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning(
+                "Could not read table %s for the 'positive' value of %s (%s)",
+                table_path,
+                var_name,
+                exc,
+            )
+            return None
+        entry = (table.get("variable_entry") or {}).get(var_name) or {}
+        return entry.get("positive") or None
+
+    @staticmethod
     def table_path(tables_root: Path, key: str) -> str:
         """Resolve the CMOR table file for a key.
 
@@ -1311,7 +1335,14 @@ class CmorSession(
             var_entry,
             units,
             axes_ids,
-            positive=getattr(vdef, "positive", None),
+            # A hand-set value from data/<model>_positive.yaml wins; otherwise
+            # take the table's, which is what CMOR checks against anyway.
+            positive=(
+                getattr(vdef, "positive", None)
+                or self._positive_entry(
+                    self.table_path(self.tables_root, self.primarytable), str(bvn)
+                )
+            ),
             missing_value=fillv,
         )
         logger.debug("Now define time dimension and write data")
