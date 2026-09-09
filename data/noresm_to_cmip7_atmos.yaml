@@ -236,14 +236,6 @@ variables:
     table: atmos
     units: '%'
 
-  cltc_tavg-u-hxy-u:
-    description: Convective cloud fraction
-    formula: CONCLD*100
-    grids: [gr]
-    sources: [model_var: CONCLD]
-    table: atmos
-    units: '%'
-
   cltcalipso_tavg-u-hxy-u:
     description: Total cloud area fraction (reported as a percentage) for the whole
       atmospheric column, as seen by the  Cloud-Aerosol Lidar and Infrared Pathfinder
