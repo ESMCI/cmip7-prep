@@ -128,11 +128,42 @@ def test_instantaneous_output_is_declared(
     assert get_include_patterns(model, realm, frequency) == [averaged]
 
 
-def test_all_include_patterns_spans_frequencies_without_duplicates():
-    """NorESM land shares clm2.h2a between 3hr and yr; it appears once."""
+def test_all_include_patterns_spans_frequencies():
+    """Every frequency's patterns are returned, in file order, with no repeats.
+
+    No NorESM land tape is currently shared between frequencies, so the
+    de-duplication is checked separately by
+    test_all_include_patterns_drops_duplicates, which writes its own small
+    table -- that way renumbering a real tape cannot silently remove the
+    coverage, as it did when 3hr moved from clm2.h2a to clm2.h3a.
+    """
     patterns = all_include_patterns("noresm", "land")
-    assert patterns == ["clm2.h0a", "clm2.h0i", "clm2.h1a", "clm2.h2a"]
+    assert patterns == ["clm2.h0a", "clm2.h0i", "clm2.h1a", "clm2.h3a", "clm2.h2a"]
     assert len(patterns) == len(set(patterns))
+
+
+@pytest.fixture(name="shared_tape_model")
+def shared_tape_fixture(tmp_path, monkeypatch):
+    """A model whose mon and day frequencies are written to the same tape."""
+    (tmp_path / "shared_include_patterns.yaml").write_text(
+        "atmos:\n"
+        "  mon:\n"
+        "    tavg: [cam.h0a]\n"
+        "  day:\n"
+        "    tavg: [cam.h0a]\n"
+        "  3hr:\n"
+        "    tavg: [cam.h1a]\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ip, "DATA_DIR", tmp_path)
+    ip._load_cached.cache_clear()  # pylint: disable=protected-access
+    yield "shared"
+    ip._load_cached.cache_clear()  # pylint: disable=protected-access
+
+
+def test_all_include_patterns_drops_duplicates(shared_tape_model):
+    """A tape used at two frequencies is returned once."""
+    assert all_include_patterns(shared_tape_model, "atmos") == ["cam.h0a", "cam.h1a"]
 
 
 def test_all_include_patterns_needs_an_ice_sheet_too():

@@ -70,7 +70,12 @@ def _collect_required_model_vars(
         levels = cfg.get("levels") or {}
         if "plev" in (levels.get("name") or "").lower():
             needed.update({"PS", "hyam", "hybm", "P0"})
-        elif (levels.get("name") or "").lower() == "standard_hybrid_sigma":
+        elif (levels.get("name") or "").lower() in {
+            "standard_hybrid_sigma",
+            "standard_hybrid_sigma_half",
+        }:
+            # Half levels need the same inputs: the interface coefficients are
+            # the axis values there rather than the bounds of the midpoints.
             needed.update({"PS", "hyam", "hybm", "hyai", "hybi", "P0", "ilev"})
         for varconst in ("area", "landmask", "landfrac", "TLAT"):
             needed.add(varconst)
@@ -289,7 +294,13 @@ def realize_regrid_prepare(
     logger.debug("Obtaining mapping cfg for %s: %s", cmip_var, cfg)
     levels = cfg.get("levels", {}) or {}
     lev_kind = (levels.get("name") or "").lower()
-    is_hybrid = lev_kind in {"standard_hybrid_sigma", "alev", "alevel"}
+    is_hybrid = lev_kind in {
+        "standard_hybrid_sigma",
+        "standard_hybrid_sigma_half",
+        "alev",
+        "alevel",
+        "alevhalf",
+    }
 
     # 4) If hybrid: carry PS in the working dataset (so we can regrid it)
     # and make sure 1-D coefficients are available

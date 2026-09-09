@@ -659,6 +659,15 @@ def _build_entry(row, config):
         entry["levels"] = levels
     elif plev_name:
         entry["levels"] = {"name": plev_name, "units": "Pa"}
+    elif "dims" in entry and "alevhalf" in entry["dims"]:
+        # Half levels: the variable lives on the layer interfaces, so the
+        # interface coefficients are the axis values rather than the bounds of
+        # midpoints.  'src_axis_name' is ilev for the same reason.
+        entry["levels"] = {
+            "name": "standard_hybrid_sigma_half",
+            "units": "1",
+            "src_axis_name": "ilev",
+        }
     elif "dims" in entry and "lev" in entry["dims"]:
         # Fallback for models without explicit levels columns (e.g., NorESM).
         entry["levels"] = {
