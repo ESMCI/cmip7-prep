@@ -13,7 +13,6 @@ The script is intentionally simple: it does a best-effort translation and flags 
 variables that could not be represented cleanly so the user can review them.
 """
 
-import json
 import yaml
 import csv
 import argparse
@@ -25,7 +24,6 @@ CESM_COLUMNS = [
     "Long Name",
     "Standard Name",
     "Units",
-    "Dimensions",
     "CESM Variable Name",  # comma-separated source variable name(s); used by convert_csv_to_yaml.py as skip filter
     "Formula",  # the formula string, present only when original had one
     "Freq",  # comma-separated sampling frequencies, positionally aligned with CESM Variable Name
@@ -98,7 +96,7 @@ def variable_to_rows(name: str, var: dict) -> list:
     and ``Alias`` columns as comma-separated values positionally aligned with
     ``CESM Variable Name``.
 
-    >>> rows = variable_to_rows("tas", {"table": "atmos", "units": "K", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "TREFHT"}]})
+    >>> rows = variable_to_rows("tas", {"table": "atmos", "units": "K", "sources": [{"model_var": "TREFHT"}]})
     >>> len(rows)
     1
     >>> rows[0]["CMIP Branded Variable Name"]
@@ -107,18 +105,16 @@ def variable_to_rows(name: str, var: dict) -> list:
     'TREFHT'
     >>> rows[0]["Formula"]
     ''
-    >>> rows[0]["Dimensions"]
-    '["time", "lat", "lon"]'
     >>> rows[0]["Region"]
     ''
 
-    >>> rows2 = variable_to_rows("pr", {"table": "atmos", "units": "kg m-2 s-1", "dims": ["time", "lat", "lon"], "formula": "PRECC + PRECL", "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}]})
+    >>> rows2 = variable_to_rows("pr", {"table": "atmos", "units": "kg m-2 s-1", "formula": "PRECC + PRECL", "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}]})
     >>> rows2[0]["Formula"]
     'PRECC + PRECL'
     >>> rows2[0]["CESM Variable Name"]
     'PRECC, PRECL'
 
-    >>> var_with_variants = {"table": "seaIce", "units": "m2", "dims": ["time"], "sources": [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}], "variants": [{"long_name": "NH", "region": "nh", "formula": "siconc.where(lat>0)"}, {"long_name": "SH", "region": "sh", "formula": "siconc.where(lat<0)"}]}
+    >>> var_with_variants = {"table": "seaIce", "units": "m2", "sources": [{"model_var": "siconc", "freq": "day"}, {"model_var": "tarea"}], "variants": [{"long_name": "NH", "region": "nh", "formula": "siconc.where(lat>0)"}, {"long_name": "SH", "region": "sh", "formula": "siconc.where(lat<0)"}]}
     >>> rows3 = variable_to_rows("siarea_tavg-u-hm-u", var_with_variants)
     >>> len(rows3)
     2
@@ -140,10 +136,6 @@ def variable_to_rows(name: str, var: dict) -> list:
     variants = var.get("variants")
     levels = var.get("levels", {})
 
-    dims = var.get("dims", [])
-    # Use JSON so that list-of-lists dims round-trip correctly.
-    dims_str = json.dumps(dims)
-
     freq_str, alias_str = sources_to_freq_alias(sources)
 
     base = {
@@ -151,7 +143,6 @@ def variable_to_rows(name: str, var: dict) -> list:
         "Table": var.get("table", ""),
         "Standard Name": var.get("standard_name", ""),
         "Units": var.get("units", ""),
-        "Dimensions": dims_str,
         "Cell Methods": var.get("cell_methods", ""),
         "Regrid Method": var.get("regrid_method", ""),
         "Positive": var.get("positive", ""),
@@ -190,7 +181,7 @@ def yaml_to_csv(yaml_path: str, csv_path: str) -> int:
     """Convert *yaml_path* to *csv_path* and return the number of rows written.
 
     >>> import tempfile, os, yaml
-    >>> data = {"dataset_overrides": {"source_id": "CESM3"}, "variables": {"tas": {"table": "atmos", "units": "K", "dims": ["time", "lat", "lon"], "sources": [{"model_var": "TREFHT"}]}}}
+    >>> data = {"dataset_overrides": {"source_id": "CESM3"}, "variables": {"tas": {"table": "atmos", "units": "K", "sources": [{"model_var": "TREFHT"}]}}}
     >>> with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
     ...     yaml.dump(data, f)
     ...     ypath = f.name

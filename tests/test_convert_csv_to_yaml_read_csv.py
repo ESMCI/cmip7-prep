@@ -199,8 +199,12 @@ class TestReadCsvNorESM:
         assert data["atmos"]["dataset_overrides"]["institution_id"] == "NCC"
         assert data["atmos"]["dataset_overrides"]["source_id"] == "NorESM3"
 
-    def test_dims_normalised(self, tmp_path):
-        """'longitude' and 'latitude' in dims are normalised to 'lon' and 'lat'."""
+    def test_dims_not_written_to_yaml(self, tmp_path):
+        """The Dimensions column is read but not copied into the YAML.
+
+        It is used only to derive 'levels'; nothing in the pipeline reads a
+        'dims' key, so none is written.
+        """
         rows = [
             {
                 "Branded Variable Name": "tas",
@@ -214,7 +218,27 @@ class TestReadCsvNorESM:
             }
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
-        assert data["atmos"]["variables"]["tas"]["dims"] == ["time", "lon", "lat"]
+        entry = data["atmos"]["variables"]["tas"]
+        assert "dims" not in entry
+        assert "levels" not in entry  # no lev or plevN in the dimensions
+
+    def test_lev_dimension_yields_hybrid_levels(self, tmp_path):
+        """A 'lev' dimension still produces a hybrid-sigma levels block."""
+        rows = [
+            {
+                "Branded Variable Name": "ta",
+                "Modelling Realm - Primary": "atmos",
+                "NorESM3 name (dependency)": "T",
+                "Dimensions": "time, lev, longitude, latitude",
+                "CMIP6 Compound Name": "",
+                "Description": "",
+                "Units (from Physical Parameter)": "K",
+                "CMIP7 Freq.": "",
+            }
+        ]
+        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        levels = data["atmos"]["variables"]["ta"]["levels"]
+        assert levels["name"] == "standard_hybrid_sigma"
 
 
 class TestReadCsvCESM:
