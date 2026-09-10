@@ -175,7 +175,7 @@ def open_native_for_cmip_vars(
         {str(p) for p in files if any(_filename_contains_var(p, v) for v in required)}
     )
     if not selected:
-        logger.warning(
+        logger.debug(
             "no native inputs found for requested CMIP variables: %s", cmip_vars
         )
         return None, None

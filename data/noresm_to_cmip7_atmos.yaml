@@ -263,15 +263,6 @@ variables:
     table: atmos
     units: '%'
 
-  cltc_tavg-u-hxy-u:
-    description: Convective cloud fraction
-    formula: CONCLD*100
-    grids: [gr]
-    regrid_method: conservative
-    sources: [model_var: CONCLD]
-    table: atmos
-    units: '%'
-
   cltcalipso_tavg-u-hxy-u:
     description: Total cloud area fraction (reported as a percentage) for the whole
       atmospheric column, as seen by the  Cloud-Aerosol Lidar and Infrared Pathfinder
@@ -440,7 +431,6 @@ variables:
   hfls_tavg-u-hxy-u:
     description: includes both evaporation and sublimation
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: LHFLX]
     table: atmos
@@ -458,7 +448,6 @@ variables:
     description: The surface sensible heat flux, also called turbulent heat flux,
       is the exchange of heat between the surface and the air by motion of air.
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: SHFLX]
     table: atmos
@@ -1066,7 +1055,6 @@ variables:
       sometimes called "vector irradiance". In accordance with common usage in geophysical
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: FLDS]
     table: atmos
@@ -1103,7 +1091,6 @@ variables:
   rldscs_tavg-u-hxy-u:
     description: Surface downwelling clear-sky longwave radiation
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: FLDSC]
     table: atmos
@@ -1128,7 +1115,6 @@ variables:
   rls_tavg-u-hxy-u:
     description: Net longwave surface radiation
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLNS]
     table: atmos
@@ -1182,7 +1168,6 @@ variables:
       "flux" implies per unit area, called "flux density" in physics.
     formula: FLDS+FLNS
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLDS, model_var: FLNS]
     table: atmos
@@ -1216,7 +1201,6 @@ variables:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     formula: FSNTOA-FSNT+FLNT
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
@@ -1244,7 +1228,6 @@ variables:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     formula: FSNTOAC-FSNTC+FLNTC
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
@@ -1309,7 +1292,6 @@ variables:
   rsds_tavg-u-hxy-u:
     description: Surface solar irradiance for UV calculations.
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSDS]
     table: atmos
@@ -1334,7 +1316,6 @@ variables:
   rsdscs_tavg-u-hxy-u:
     description: Surface solar irradiance clear sky for UV calculations
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSDSC]
     table: atmos
@@ -1370,7 +1351,6 @@ variables:
     description: at the top of the atmosphere
     formula: FSNTOA+FSUTOA
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSNTOA, model_var: FSUTOA]
     table: atmos
@@ -1388,7 +1368,6 @@ variables:
   rss_tavg-u-hxy-u:
     description: Net downward shortwave radiation at the surface
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: FSNS]
     table: atmos
@@ -1442,7 +1421,6 @@ variables:
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     formula: FSDS-FSNS
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
@@ -1467,7 +1445,6 @@ variables:
     description: Surface Upwelling Clear-sky Shortwave Radiation
     formula: FSDSC-FSNSC
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
@@ -1485,7 +1462,6 @@ variables:
   rsut_tavg-u-hxy-u:
     description: at the top of the atmosphere
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSUTOA]
     table: atmos
@@ -1511,7 +1487,6 @@ variables:
     description: Calculated in the absence of clouds.
     formula: SOLIN-FSNTOAC
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
@@ -1541,7 +1516,6 @@ variables:
       the net downward radiative flux at the top of the atmosphere.
     formula: FSNT-FLNT
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: FSNT, model_var: FLNT]
     table: atmos
@@ -1709,7 +1683,6 @@ variables:
   tauu_tavg-u-hxy-u:
     description: Downward eastward wind stress at the surface
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: TAUX]
     table: atmos
@@ -1726,7 +1699,6 @@ variables:
   tauv_tavg-u-hxy-u:
     description: Downward northward wind stress at the surface
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: TAUY]
     table: atmos

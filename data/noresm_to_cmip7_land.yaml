@@ -273,7 +273,6 @@ variables:
   evspsblsoi_tavg-u-hxy-u:
     description: Water evaporation from soil
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: QSOIL]
     table: land
@@ -290,7 +289,6 @@ variables:
   evspsblveg_tavg-u-hxy-u:
     description: Evaporation from canopy
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: QVEGE]
     table: land
@@ -354,7 +352,6 @@ variables:
       from Land Use Change).
     formula: (FATES_FIRE_CLOSS - FATES_FIRE_CLOSS_LANDUSECHANGE)*FATES_FRACTION
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FIRE_CLOSS_LANDUSECHANGE,
       model_var: FATES_FRACTION]
@@ -802,7 +799,6 @@ variables:
       fire, harvest, grazing  and land use change. Positive flux  is into the land.
     formula: -FCO2*(12.01/44.01)
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: FCO2]
     table: land
@@ -902,7 +898,6 @@ variables:
       of A.'
     formula: (FATES_NPP)*FATES_FRACTION
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
@@ -1041,7 +1036,6 @@ variables:
       respiration on land (respiration by producers) [see rh for heterotrophic production]
     formula: FATES_AUTORESP*FATES_FRACTION
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTION]
     table: land
@@ -1121,7 +1115,6 @@ variables:
       respiration on land (respiration by consumers)
     formula: HR / 1000
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: HR]
     table: land
@@ -1131,7 +1124,6 @@ variables:
     description: Surface Downwelling Shortwave Radiation over land. Can be used for
       computation of surface albedo.
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: FSDS]
     table: land
@@ -1142,7 +1134,6 @@ variables:
       grid cell covered by snow but not by ice. Can be used for computation of surface
       albedo.
     grids: [gr]
-    positive: down
     regrid_method: conservative
     sources: [model_var: FSDS]
     table: land
@@ -1152,7 +1143,6 @@ variables:
     description: Surface Upwelling Shortwave Radiation over land. Can be used for
       computation of surface albedo.
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSR]
     table: land
@@ -1163,7 +1153,6 @@ variables:
       grid cell covered by snow. Can be used for computation of surface albedo.
     formula: SNOFSRVI+SNOFSRVD+SNOFSRNI+SNOFSRND
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: SNOFSRVI, model_var: SNOFSRVD, model_var: SNOFSRNI,
       model_var: SNOFSRND]
@@ -1237,7 +1226,6 @@ variables:
   tran_tavg-u-hxy-lnd:
     description: Transpiration (may include dew formation as a negative flux).
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: QVEGT]
     table: land

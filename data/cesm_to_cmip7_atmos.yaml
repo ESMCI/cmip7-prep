@@ -235,7 +235,6 @@ variables:
 
   hfls_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: LHFLX]
     table: atmos
@@ -243,7 +242,6 @@ variables:
 
   hfss_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: SHFLX]
     table: atmos
@@ -384,7 +382,6 @@ variables:
 
   rlds_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLDS]
     table: atmos
@@ -393,7 +390,6 @@ variables:
   rldscs_tavg-u-hxy-u:
     formula: FLDS + FLNS - FLNSC
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLDS, model_var: FLNS, model_var: FLNSC]
     table: atmos
@@ -402,7 +398,6 @@ variables:
   rlus_tavg-u-hxy-u:
     formula: FLDS + FLNS
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLDS, model_var: FLNS]
     table: atmos
@@ -410,7 +405,6 @@ variables:
 
   rluscs_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLNSC]
     table: atmos
@@ -418,7 +412,6 @@ variables:
 
   rlut_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLUT]
     table: atmos
@@ -426,7 +419,6 @@ variables:
 
   rlutcs_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLUTC]
     table: atmos
@@ -434,7 +426,6 @@ variables:
 
   rsds_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSDS]
     table: atmos
@@ -442,7 +433,6 @@ variables:
 
   rsdscs_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSDSC]
     table: atmos
@@ -450,7 +440,6 @@ variables:
 
   rsdt_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: SOLIN]
     table: atmos
@@ -459,7 +448,6 @@ variables:
   rsus_tavg-u-hxy-u:
     formula: FSDS - FSNS
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
@@ -468,7 +456,6 @@ variables:
   rsuscs_tavg-u-hxy-u:
     formula: FSDSC - FSNSC
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
@@ -476,7 +463,6 @@ variables:
 
   rsut_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: FLUT]
     table: atmos
@@ -485,7 +471,6 @@ variables:
   rsutcs_tavg-u-hxy-u:
     formula: SOLIN - FSNTOAC
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
@@ -529,7 +514,6 @@ variables:
 
   tauu_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: TAUX]
     table: atmos
@@ -537,7 +521,6 @@ variables:
 
   tauv_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     regrid_method: conservative
     sources: [model_var: TAUY]
     table: atmos

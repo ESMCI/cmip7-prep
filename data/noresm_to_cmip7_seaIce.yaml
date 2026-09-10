@@ -221,7 +221,6 @@ variables:
 
   siflcondbot_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: siflcondbot_d}, {freq: mon, model_var: siflcondbot}]
     table: seaIce
@@ -229,7 +228,6 @@ variables:
 
   siflcondtop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: siflcondtop_d}, {freq: mon, model_var: siflcondtop}]
     table: seaIce
@@ -251,7 +249,6 @@ variables:
 
   sifllattop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: sifllattop_d}, {freq: mon, model_var: sifllattop}]
     table: seaIce
@@ -259,7 +256,6 @@ variables:
 
   siflsensbot_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: siflsensbot_d}, {freq: mon, model_var: siflsensbot}]
     table: seaIce
@@ -267,7 +263,6 @@ variables:
 
   siflsenstop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: siflsenstop_d}, {freq: mon, model_var: siflsenstop}]
     table: seaIce
@@ -528,7 +523,6 @@ variables:
 
   sisnhc_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: sisnhc_d}, {freq: mon, model_var: sisnhc}]
     table: seaIce
@@ -584,7 +578,6 @@ variables:
 
   sistrxdtop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: sistrxdtop_d}, {freq: mon, model_var: sistrxdtop}]
     table: seaIce
@@ -592,7 +585,6 @@ variables:
 
   sistrxubot_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: sistrxubot_d}, {freq: mon, model_var: sistrxubot}]
     table: seaIce
@@ -600,7 +592,6 @@ variables:
 
   sistrydtop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: sistrydtop_d}, {freq: mon, model_var: sistrydtop}]
     table: seaIce
@@ -608,7 +599,6 @@ variables:
 
   sistryubot_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [{freq: day, model_var: sistryubot_d}, {freq: mon, model_var: sistryubot}]
     table: seaIce

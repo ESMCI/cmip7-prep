@@ -37,7 +37,6 @@ variables:
 
   hfds_tavg-u-hxy-sea:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [model_var: hfds]
     table: ocean
@@ -99,7 +98,6 @@ variables:
 
   tauuo_tavg-u-hxy-sea:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [model_var: tauuo]
     table: ocean
@@ -107,7 +105,6 @@ variables:
 
   tauvo_tavg-u-hxy-sea:
     grids: [gn]
-    positive: down
     regrid_method: conservative
     sources: [model_var: tauvo]
     table: ocean
