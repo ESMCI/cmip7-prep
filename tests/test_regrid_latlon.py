@@ -10,7 +10,6 @@ import pytest  # type: ignore
 from cmip7_prep import regrid
 from cmip7_prep.regrid_maps import (
     get_map_paths,
-    load_intensive_vars,
     load_regrid_maps,
 )
 
@@ -207,12 +206,16 @@ def test_regrid_cice_ni_nj_dims(monkeypatch):
 
 
 def test_pick_maps_noresm_ne16_defaults():
-    """noresm/ne16 map defaults and method preference work."""
+    """noresm/ne16 resolves both maps for the requested method.
+
+    The method comes from the caller now -- the variable's regrid_method in
+    the mapping YAML -- not from looking its name up in a shared list.
+    """
     cons = regrid._pick_maps(  # pylint: disable=protected-access
         "pr", resolution="ne16", model="noresm", force_method="conservative"
     )
     bilin = regrid._pick_maps(  # pylint: disable=protected-access
-        "tas", resolution="ne16", model="noresm"
+        "tas", resolution="ne16", model="noresm", force_method="bilinear"
     )
     paths = get_map_paths("noresm", "ne16")
     assert cons.method_label == "conservative"
@@ -229,19 +232,20 @@ def test_pick_maps_unknown_resolution_raises():
         )
 
 
-def test_intensive_vars_loaded_from_yaml():
-    """The bilinear-variable list comes from the shared YAML table."""
-    intensive = load_intensive_vars()
-    assert "tas" in intensive
-    assert "pr" not in intensive
-
-
-def test_pick_maps_uses_intensive_list():
-    """A variable off the intensive list takes the conservative map."""
+def test_pick_maps_defaults_to_conservative():
+    """With no method given, the conservative map is used."""
     spec = regrid._pick_maps(  # pylint: disable=protected-access
         "pr", resolution="ne16", model="noresm"
     )
     assert spec.method_label == "conservative"
+
+
+def test_pick_maps_honours_the_requested_method():
+    """The method comes from the caller, not from the variable name."""
+    spec = regrid._pick_maps(  # pylint: disable=protected-access
+        "pr", resolution="ne16", model="noresm", force_method="bilinear"
+    )
+    assert spec.method_label == "bilinear"
 
 
 def test_tables_cover_driver_resolution_choices():
