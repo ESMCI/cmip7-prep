@@ -716,9 +716,6 @@ def read_csv(filepath, config):
             entry["regrid_method"] = (
                 "bilinear" if name.split("_")[0] in intensive_vars else "conservative"
             )
-            positive = config.get("positive_overrides", {}).get(name)
-            if positive:
-                entry["positive"] = positive
             all_entries.append((name, entry, realm))
 
     if realm_outputs:
