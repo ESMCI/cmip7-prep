@@ -206,12 +206,16 @@ def test_regrid_cice_ni_nj_dims(monkeypatch):
 
 
 def test_pick_maps_noresm_ne16_defaults():
-    """noresm/ne16 map defaults and method preference work."""
+    """noresm/ne16 resolves both maps for the requested method.
+
+    The method comes from the caller now -- the variable's regrid_method in
+    the mapping YAML -- not from looking its name up in a shared list.
+    """
     cons = regrid._pick_maps(  # pylint: disable=protected-access
         "pr", resolution="ne16", model="noresm", force_method="conservative"
     )
     bilin = regrid._pick_maps(  # pylint: disable=protected-access
-        "tas", resolution="ne16", model="noresm"
+        "tas", resolution="ne16", model="noresm", force_method="bilinear"
     )
     paths = get_map_paths("noresm", "ne16")
     assert cons.method_label == "conservative"
