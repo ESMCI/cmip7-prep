@@ -192,14 +192,12 @@ variables:
 
   siflcondbot_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: siflcondbot_d}, {freq: mon, model_var: siflcondbot}]
     table: seaIce
     units: W m-2
 
   siflcondtop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: siflcondtop_d}, {freq: mon, model_var: siflcondtop}]
     table: seaIce
     units: W m-2
@@ -218,21 +216,18 @@ variables:
 
   sifllattop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: sifllattop_d}, {freq: mon, model_var: sifllattop}]
     table: seaIce
     units: W m-2
 
   siflsensbot_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: siflsensbot_d}, {freq: mon, model_var: siflsensbot}]
     table: seaIce
     units: W m-2
 
   siflsenstop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: siflsenstop_d}, {freq: mon, model_var: siflsenstop}]
     table: seaIce
     units: W m-2
@@ -456,7 +451,6 @@ variables:
 
   sisnhc_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: sisnhc_d}, {freq: mon, model_var: sisnhc}]
     table: seaIce
     units: J m-2
@@ -505,28 +499,24 @@ variables:
 
   sistrxdtop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: sistrxdtop_d}, {freq: mon, model_var: sistrxdtop}]
     table: seaIce
     units: N m-2
 
   sistrxubot_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: sistrxubot_d}, {freq: mon, model_var: sistrxubot}]
     table: seaIce
     units: N m-2
 
   sistrydtop_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: sistrydtop_d}, {freq: mon, model_var: sistrydtop}]
     table: seaIce
     units: N m-2
 
   sistryubot_tavg-u-hxy-si:
     grids: [gn]
-    positive: down
     sources: [{freq: day, model_var: sistryubot_d}, {freq: mon, model_var: sistryubot}]
     table: seaIce
     units: N m-2

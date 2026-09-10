@@ -585,7 +585,6 @@ variables:
   fFire_tavg-u-hxy-lnd:
     formula: COL_FIRE_CLOSS/1000.0
     grids: [gr]
-    positive: up
     sources: [model_var: COL_FIRE_CLOSS]
     table: land
     units: kg m-2 s-1
@@ -595,7 +594,6 @@ variables:
     grids: [gr]
     long_name: Harvested Biomass That Goes Straight into Atmosphere as Carbon Mass
       Flux [kgC m-2 s-1]
-    positive: up
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_crop_harvesting
     table: land
@@ -605,7 +603,6 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Harvested Biomass That Goes into Geological Storage
-    positive: down
     sources: [model_var: N, model_var: A]
     standard_name: mass_flux_of_carbon_from_biomass_into_geological_storage
     table: land
@@ -648,7 +645,6 @@ variables:
     grids: [gr]
     long_name: Net Carbon Mass Flux into Atmosphere Due to Land-Use Change [kgC m-2
       s-1]
-    positive: up
     sources: [model_var: DWT_CONV_CFLUX, model_var: TOT_WOODPRODC_LOSS]
     standard_name: surface_net_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_emission_from_anthropogenic_land_use_change
     table: land
@@ -661,7 +657,6 @@ variables:
     grids: [gr]
     long_name: Carbon Transferred Directly to Atmosphere Due to any Land-Use or Land-Cover
       Change Activities [kgC m-2 s-1]
-    positive: up
     sources: [model_var: DWT_CONV_CFLUX_PATCH]
     standard_name: surface_upward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_anthropogenic_land_use_or_land_cover_change_excluding_forestry_and_agricultural_products
     table: land
@@ -672,7 +667,6 @@ variables:
     formula: F_N2O_DENIT + F_N2O_NIT
     grids: [gr]
     long_name: Total Land N2O Flux
-    positive: up
     sources: [model_var: F_N2O_DENIT, model_var: F_N2O_NIT]
     standard_name: surface_upward_mass_flux_of_nitrous_oxide_expressed_as_nitrogen_out_of_vegetation_and_litter_and_soil
     table: land
@@ -712,7 +706,6 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Total Land NOx Flux
-    positive: up
     sources: [model_var: N, model_var: A]
     standard_name: surface_upward_mass_flux_of_nox_expressed_as_nitrogen_out_of_vegetation_and_litter_and_soil
     table: land
@@ -742,7 +735,6 @@ variables:
   fNVegSoil_tavg-u-hxy-lnd:
     formula: NVEG_SOIL_CLOSS/1000.0
     grids: [gr]
-    positive: up
     sources: [model_var: NVEG_SOIL_CLOSS]
     table: land
     units: kg m-2 s-1
@@ -1107,7 +1099,6 @@ variables:
     cell_methods: 'area: mean where land time: mean'
     grids: [gr]
     long_name: Ground heat flux at 3hr
-    positive: up
     sources: [model_var: FGR12]
     standard_name: surface_downward_heat_flux_in_air
     table: land
@@ -1118,7 +1109,6 @@ variables:
     formula: 'CLM_landunit_to_CMIP6_Lut(EFLX_LH_TOT,"all",time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)   #clm2.h2'
     grids: [gr]
     long_name: Latent Heat Flux on Land-Use Tile
-    positive: up
     sources: [model_var: EFLX_LH_TOT]
     standard_name: surface_upward_latent_heat_flux
     table: land
@@ -1129,7 +1119,6 @@ variables:
     formula: 'CLM_landunit_to_CMIP6_Lut(FSH,''all'',time,lat,lon,grid1d_ixy,grid1d_jxy,grid1d_lon,grid1d_lat,land1d_lon,land1d_lat,land1d_ityplunit,land1d_active,land1d_wtgcell,landUse)  #clm2.h2'
     grids: [gr]
     long_name: Sensible Heat Flux on Land-Use Tile
-    positive: up
     sources: [model_var: FSH]
     standard_name: surface_upward_sensible_heat_flux
     table: land
@@ -1142,7 +1131,6 @@ variables:
     grids: [gr]
     long_name: Irrigation Flux Including any Irrigation for Crops, Trees, Pasture,
       or Urban Lawns
-    positive: down
     sources: [model_var: QIRRIG]
     standard_name: surface_downward_mass_flux_of_water_due_to_irrigation
     table: land
@@ -1438,7 +1426,6 @@ variables:
     cell_methods: 'area: time: mean where sector'
     grids: [gr]
     long_name: Net Carbon Mass Flux into Land-Use Tile [kgC m-2 s-1]
-    positive: down
     sources: [model_var: N, model_var: A]
     standard_name: surface_net_downward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_all_land_processes
     table: land
@@ -1447,7 +1434,6 @@ variables:
   nbp_tavg-u-hxy-lnd:
     formula: NBP/1000.0
     grids: [gr]
-    positive: down
     sources: [model_var: NBP]
     table: land
     units: kg m-2 s-1
@@ -1458,7 +1444,6 @@ variables:
     grids: [gr]
     long_name: Net Carbon Mass Flux out of Atmosphere Due to Net Ecosystem Productivity
       on Land [kgC m-2 s-1]
-    positive: down
     sources: [model_var: NEE]
     standard_name: surface_net_downward_mass_flux_of_carbon_dioxide_expressed_as_carbon_due_to_all_land_processes_excluding_anthropogenic_land_use_change
     table: land
@@ -1470,7 +1455,6 @@ variables:
     grids: [gr]
     long_name: Net Mass Flux of 13C Between Atmosphere and Land (Positive into Land)
       as a Result of All Processes [kgC m-2 s-1]
-    positive: down
     sources: [model_var: C13_NBP]
     standard_name: surface_net_downward_mass_flux_of_carbon_dioxide_expressed_as_13C_due_to_all_land_processes
     table: land
@@ -1482,7 +1466,6 @@ variables:
     grids: [gr]
     long_name: Net Mass Flux of 14C Between Atmosphere and Land (Positive into Land)
       as a Result of All Processes [kgC m-2 s-1]
-    positive: down
     sources: [model_var: C14_NBP]
     standard_name: surface_net_downward_mass_flux_of_carbon_dioxide_expressed_as_14C_due_to_all_land_processes
     table: land
@@ -1494,7 +1477,6 @@ variables:
     grids: [gr]
     long_name: Net Primary Production Allocated to Leaves as Carbon Mass Flux [kgC
       m-2 s-1]
-    positive: down
     sources: [model_var: LEAFC_ALLOC]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon_accumulated_in_leaves
     table: land
@@ -1528,7 +1510,6 @@ variables:
     grids: [gr]
     long_name: Net Primary Production Allocated to Roots as Carbon Mass Flux [kgC
       m-2 s-1]
-    positive: down
     sources: [model_var: FROOTC_ALLOC]
     standard_name: net_primary_productivity_of_biomass_expressed_as_carbon_accumulated_in_roots
     table: land
@@ -1558,7 +1539,6 @@ variables:
   npp_tavg-u-hxy-lnd:
     formula: NPP/1000.0
     grids: [gr]
-    positive: down
     sources: [model_var: NPP]
     table: land
     units: kg m-2 s-1
@@ -1706,7 +1686,6 @@ variables:
   ra_tavg-u-hxy-lnd:
     formula: AR/1000.0
     grids: [gr]
-    positive: up
     sources: [model_var: AR]
     table: land
     units: kg m-2 s-1
@@ -1833,7 +1812,6 @@ variables:
   rh_tavg-u-hxy-lnd:
     formula: HR/1000.0
     grids: [gr]
-    positive: up
     sources: [model_var: HR]
     table: land
     units: kg m-2 s-1
@@ -1920,7 +1898,6 @@ variables:
 
   rsds_tavg-u-hxy-lnd:
     grids: [gr]
-    positive: up
     sources: [model_var: FSDS]
     table: land
     units: W m-2
@@ -1929,7 +1906,6 @@ variables:
     cell_methods: 'area: time: mean where snow (mask=snc)'
     grids: [gr]
     long_name: Surface Downwelling Shortwave Radiation over Snow
-    positive: down
     sources: [model_var: N, model_var: A]
     standard_name: surface_downwelling_shortwave_flux_in_air
     table: land
@@ -1939,7 +1915,6 @@ variables:
     cell_methods: 'area: mean where land'
     grids: [gr]
     long_name: Surface Upwelling Shortwave Radiation over Land
-    positive: up
     sources: [model_var: FSR]
     standard_name: surface_upwelling_shortwave_flux_in_air
     table: land
@@ -1950,7 +1925,6 @@ variables:
     formula: SSRE_FSRVI + SSRE_FSRVD (NEED use_SSRE = .true.)
     grids: [gr]
     long_name: Surface Upwelling Shortwave Radiation over Snow
-    positive: up
     sources: [model_var: SSRE_FSRVI, model_var: SSRE_FSRVD]
     standard_name: surface_upwelling_shortwave_flux_in_air
     table: land
@@ -2019,7 +1993,6 @@ variables:
     formula: FSA - FIRA
     grids: [gr]
     long_name: Net radiative flux at surface
-    positive: down
     sources: [model_var: FSA, model_var: FIRA]
     standard_name: surface_net_downward_radiative_flux
     table: land
@@ -2058,7 +2031,6 @@ variables:
   tran_tavg-u-hxy-lnd:
     formula: QSOIL + QVEGT
     grids: [gr]
-    positive: up
     sources: [model_var: QVEGT, model_var: QSOIL]
     table: land
     units: kg m-2 s-1
@@ -2068,7 +2040,6 @@ variables:
     formula: chunits(QVEGT, units='kg m-2 s-1')
     grids: [gr]
     long_name: Transpiration
-    positive: up
     sources: [model_var: QVEGT]
     standard_name: transpiration_flux
     table: land

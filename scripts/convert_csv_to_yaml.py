@@ -41,54 +41,6 @@ GRIDS_OVERRIDES: dict[str, list[str]] = {
     "sivol_tavg-u-hm-u": ["gm"],
 }
 
-# ── NorESM positive attribute overrides ──────────────────────────────────────
-# Maps branded variable name → "up" or "down".
-# Entries here are written as `positive: <value>` in the NorESM output YAML.
-NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
-    # "<branded_variable_name>": "up",
-    # "<branded_variable_name>": "down",
-    "hfls_tavg-u-hxy-u": "up",
-    "hfss_tavg-u-hxy-u": "up",
-    "rlds_tavg-u-hxy-u": "down",
-    "rldscs_tavg-u-hxy-u": "down",
-    "rldsdiff_tavg-u-hxy-u": "down",
-    "rls_tavg-u-hxy-u": "up",
-    "rlut_tavg-u-hxy-u": "up",
-    "rlutcs_tavg-u-hxy-u": "up",
-    "rlutaf_tavg-u-hxy-u": "up",
-    "rlutcsaf_tavg-u-hxy-u": "up",
-    "rsds_tavg-u-hxy-u": "up",
-    "rsdscs_tavg-u-hxy-u": "up",
-    "rsdt_tavg-u-hxy-u": "up",
-    "rss_tavg-u-hxy-u": "down",
-    "rsuscs_tavg-u-hxy-u": "up",
-    "rsutcs_tavg-u-hxy-u": "up",
-    "rsut_tavg-u-hxy-u": "up",
-    "rsutaf_tavg-u-hxy-u": "up",
-    "rsutcsaf_tavg-u-hxy-u": "up",
-    "rlus_tavg-u-hxy-u": "up",
-    "rluscsaf_tavg-u-hxy-u": "up",
-    "rsus_tavg-u-hxy-u": "up",
-    "rtmt_tavg-u-hxy-u": "down",
-    "tauu_tavg-u-hxy-u": "down",
-    "tauv_tavg-u-hxy-u": "down",
-    "fFire_tavg-u-hxy-lnd": "up",
-    "npp_tavg-u-hxy-lnd": "down",
-    "rh_tavg-u-hxy-lnd": "up",
-    "rsds_tavg-u-hxy-lnd": "down",
-    "rsds_tavg-u-hxy-sn": "down",
-    "rsus_tavg-u-hxy-lnd": "up",
-    "rsus_tavg-u-hxy-sn": "up",
-    "tran_tavg-u-hxy-lnd": "up",
-    "tran_tavg-u-hxy-u": "up",
-    "evspsblsoi_tavg-u-hxy-u": "up",
-    "evspsblveg_tavg-u-hxy-u": "up",
-    "ra_tavg-u-hxy-lnd": "up",
-    "fN2O_tavg-u-hxy-lnd": "up",
-    "nbp_tavg-u-hxy-lnd": "down",
-    "srfrad_tavg-u-hxy-u": "down",
-}
-
 # ── model configurations ─────────────────────────────────────────────────────
 # Each config defines how to read a model-specific CSV and what metadata to write.
 #
@@ -145,7 +97,6 @@ MODEL_CONFIGS = {
             "_tminavg-",
             "_tminavg-",
         ],
-        "positive_overrides": NORESM_POSITIVE_OVERRIDES,
     },
     "cesm": {
         "default_input": "cesm_data.csv",
@@ -171,7 +122,6 @@ MODEL_CONFIGS = {
             "Cell Methods": "cell_methods",
             "Regrid Method": "regrid_method",
             "Region": "region",
-            "Positive": "positive",
             "Levels Name": "_levels_name",
             "Levels Units": "_levels_units",
             "Levels Src Axis Name": "_levels_src_axis_name",
@@ -741,9 +691,6 @@ def read_csv(filepath, config):
                     "add it to REALM_GRIDS in convert_csv_to_yaml.py"
                 )
             entry["grids"] = list(grids)
-            positive = config.get("positive_overrides", {}).get(name)
-            if positive:
-                entry["positive"] = positive
             all_entries.append((name, entry, realm))
 
     if realm_outputs:

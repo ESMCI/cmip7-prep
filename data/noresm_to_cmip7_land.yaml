@@ -246,7 +246,6 @@ variables:
   evspsblsoi_tavg-u-hxy-u:
     description: Water evaporation from soil
     grids: [gr]
-    positive: up
     sources: [model_var: QSOIL]
     table: land
     units: kg m-2 s-1
@@ -261,7 +260,6 @@ variables:
   evspsblveg_tavg-u-hxy-u:
     description: Evaporation from canopy
     grids: [gr]
-    positive: up
     sources: [model_var: QVEGE]
     table: land
     units: kg m-2 s-1
@@ -319,7 +317,6 @@ variables:
       from Land Use Change).
     formula: (FATES_FIRE_CLOSS - FATES_FIRE_CLOSS_LANDUSECHANGE)*FATES_FRACTION
     grids: [gr]
-    positive: up
     sources: [model_var: FATES_FIRE_CLOSS, model_var: FATES_FIRE_CLOSS_LANDUSECHANGE,
       model_var: FATES_FRACTION]
     table: land
@@ -723,7 +720,6 @@ variables:
       fire, harvest, grazing  and land use change. Positive flux  is into the land.
     formula: -FCO2*(12.01/44.01)
     grids: [gr]
-    positive: down
     sources: [model_var: FCO2]
     table: land
     units: kg m-2 s-1
@@ -815,7 +811,6 @@ variables:
       of A.'
     formula: (FATES_NPP)*FATES_FRACTION
     grids: [gr]
-    positive: down
     sources: [model_var: FATES_NPP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -940,7 +935,6 @@ variables:
       respiration on land (respiration by producers) [see rh for heterotrophic production]
     formula: FATES_AUTORESP*FATES_FRACTION
     grids: [gr]
-    positive: up
     sources: [model_var: FATES_AUTORESP, model_var: FATES_FRACTION]
     table: land
     units: kg m-2 s-1
@@ -1012,7 +1006,6 @@ variables:
       respiration on land (respiration by consumers)
     formula: HR / 1000
     grids: [gr]
-    positive: up
     sources: [model_var: HR]
     table: land
     units: kg m-2 s-1
@@ -1021,7 +1014,6 @@ variables:
     description: Surface Downwelling Shortwave Radiation over land. Can be used for
       computation of surface albedo.
     grids: [gr]
-    positive: down
     sources: [model_var: FSDS]
     table: land
     units: W m-2
@@ -1031,7 +1023,6 @@ variables:
       grid cell covered by snow but not by ice. Can be used for computation of surface
       albedo.
     grids: [gr]
-    positive: down
     sources: [model_var: FSDS]
     table: land
     units: W m-2
@@ -1040,7 +1031,6 @@ variables:
     description: Surface Upwelling Shortwave Radiation over land. Can be used for
       computation of surface albedo.
     grids: [gr]
-    positive: up
     sources: [model_var: FSR]
     table: land
     units: W m-2
@@ -1050,7 +1040,6 @@ variables:
       grid cell covered by snow. Can be used for computation of surface albedo.
     formula: SNOFSRVI+SNOFSRVD+SNOFSRNI+SNOFSRND
     grids: [gr]
-    positive: up
     sources: [model_var: SNOFSRVI, model_var: SNOFSRVD, model_var: SNOFSRNI,
       model_var: SNOFSRND]
     table: land
@@ -1116,7 +1105,6 @@ variables:
   tran_tavg-u-hxy-lnd:
     description: Transpiration (may include dew formation as a negative flux).
     grids: [gr]
-    positive: up
     sources: [model_var: QVEGT]
     table: land
     units: kg m-2 s-1

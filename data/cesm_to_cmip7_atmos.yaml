@@ -215,14 +215,12 @@ variables:
 
   hfls_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: LHFLX]
     table: atmos
     units: W m-2
 
   hfss_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
@@ -350,7 +348,6 @@ variables:
 
   rlds_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -358,7 +355,6 @@ variables:
   rldscs_tavg-u-hxy-u:
     formula: FLDS + FLNS - FLNSC
     grids: [gr]
-    positive: up
     sources: [model_var: FLDS, model_var: FLNS, model_var: FLNSC]
     table: atmos
     units: W m-2
@@ -366,49 +362,42 @@ variables:
   rlus_tavg-u-hxy-u:
     formula: FLDS + FLNS
     grids: [gr]
-    positive: up
     sources: [model_var: FLDS, model_var: FLNS]
     table: atmos
     units: W m-2
 
   rluscs_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: FLNSC]
     table: atmos
     units: W m-2
 
   rlut_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: FLUT]
     table: atmos
     units: W m-2
 
   rlutcs_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: FLUTC]
     table: atmos
     units: W m-2
 
   rsds_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: FSDS]
     table: atmos
     units: W m-2
 
   rsdscs_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: FSDSC]
     table: atmos
     units: W m-2
 
   rsdt_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: SOLIN]
     table: atmos
     units: W m-2
@@ -416,7 +405,6 @@ variables:
   rsus_tavg-u-hxy-u:
     formula: FSDS - FSNS
     grids: [gr]
-    positive: up
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
     units: W m-2
@@ -424,14 +412,12 @@ variables:
   rsuscs_tavg-u-hxy-u:
     formula: FSDSC - FSNSC
     grids: [gr]
-    positive: up
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
     units: W m-2
 
   rsut_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: FLUT]
     table: atmos
     units: W m-2
@@ -439,7 +425,6 @@ variables:
   rsutcs_tavg-u-hxy-u:
     formula: SOLIN - FSNTOAC
     grids: [gr]
-    positive: up
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
     units: W m-2
@@ -481,14 +466,12 @@ variables:
 
   tauu_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: TAUX]
     table: atmos
     units: N m-2
 
   tauv_tavg-u-hxy-u:
     grids: [gr]
-    positive: up
     sources: [model_var: TAUY]
     table: atmos
     units: N m-2
