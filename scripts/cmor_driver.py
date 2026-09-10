@@ -781,15 +781,26 @@ def main():
         )
         # The data request sometimes returns an extra '30S-90S' regional copy of a
         # variable in addition to the global one. We don't produce that regional
-        # output, so drop those entries. Everything else (global, and any other
-        # regions such as sea-ice hemispheres) is kept as-is.
+        # output, so drop those entries -- but only when a non-regional copy of
+        # the same variable is actually present to fall back to. Some
+        # experiments (e.g. piControl for cltmodis) return the '30S-90S' entry
+        # as the variable's *only* entry; dropping it unconditionally there
+        # would silently lose the variable instead of de-duplicating it.
+        names_with_other_region = {
+            v.branded_variable_name.name
+            for v in cmip_vars
+            if getattr(getattr(v, "region", None), "value", None) != "30S-90S"
+        }
         filtered_vars = []
         for v in cmip_vars:
             region = getattr(v, "region", None)  # region object, or None if missing
             region_value = getattr(
                 region, "value", None
             )  # the text, e.g. 'glb' or '30S-90S'
-            if region_value == "30S-90S":
+            if (
+                region_value == "30S-90S"
+                and v.branded_variable_name.name in names_with_other_region
+            ):
                 logger.debug("Skipping regional duplicate: %s", v)
                 continue  # skip this entry, don't keep it
             filtered_vars.append(v)
