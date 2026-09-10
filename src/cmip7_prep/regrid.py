@@ -203,7 +203,10 @@ def _pick_maps(
             raise ValueError("force_method must be 'conservative' or 'bilinear'")
         if force_method == "bilinear":
             if not bilin or not str(bilin):
-                raise FileNotFoundError("Bilinear map requested but not provided.")
+                raise FileNotFoundError(
+                    f"{varname} asks for bilinear regridding, but no bilinear "
+                    f"map is defined for model={model!r}, resolution={resolution!r}"
+                )
             return MapSpec("bilinear", bilin)
         return MapSpec("conservative", cons)
 
