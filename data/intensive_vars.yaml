@@ -1,9 +1,9 @@
 # Variables regridded with the bilinear map rather than the conservative one.
 #
-# Intensive quantities -- temperature, pressure, wind, humidity, geopotential,
-# cloud fraction -- are point values, so bilinear interpolation is appropriate.
-# Extensive quantities and fluxes must conserve their integral over a cell and
-# use the conservative map, which is the default for anything not listed here.
+# For intensive quantities -- temperature, pressure, wind, humidity, geopotential,
+# cloud fraction - bilinear interpolation is appropriate.
+# Fluxes must conserve their integral over a cell and use the conservative map,
+# which is the default for anything not listed here.
 #
 # Unlike the include-pattern and regrid-map tables, this file is NOT per model:
 # whether a quantity is intensive is a property of the variable, not of the
@@ -14,6 +14,15 @@
 # is regridded by a different method, and the values change.
 
 intensive:
+  # ocean fields:
+  # temperature, salinity, velocity, sea surface height
+  - thetao
+  - tos
+  - vo
+  - wo
+  - zos
+  # atmos fields:
+  # temperature, pressure, wind, humidity, geopotential, cloud fraction
   - tas
   - tasmin
   - tasmax

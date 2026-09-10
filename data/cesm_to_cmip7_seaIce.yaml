@@ -18,6 +18,7 @@ variables:
 
   siarea_tavg-u-hm-u:
     grids: [gm]
+    regrid_method: conservative
     sources: [{alias: siconc, freq: day, model_var: siconc_d}, {freq: mon, model_var: siconc},
       model_var: tarea]
     table: seaIce
@@ -200,6 +201,7 @@ variables:
 
   siextent_tavg-u-hm-u:
     grids: [gm]
+    regrid_method: conservative
     sources: [{alias: siconc, freq: day, model_var: siconc_d}, {freq: mon, model_var: siconc},
       model_var: tarea]
     table: seaIce
@@ -528,6 +530,7 @@ variables:
 
   sisnmass_tavg-u-hm-si:
     grids: [gm]
+    regrid_method: conservative
     sources: [{alias: sisnmass, freq: day, model_var: sisnmass_d}, {freq: mon, model_var: sisnmass},
       model_var: tarea]
     table: seaIce
@@ -666,6 +669,7 @@ variables:
 
   sivol_tavg-u-hm-u:
     grids: [gm]
+    regrid_method: conservative
     sources: [{alias: sivol, freq: day, model_var: sivol_d}, {freq: mon, model_var: sivol},
       model_var: tarea]
     table: seaIce

@@ -7,6 +7,7 @@ variables:
       cloud area)'
     grids: [gr]
     long_name: Air Pressure at Convective Cloud Base
+    regrid_method: conservative
     sources: [model_var: PCLDBOT]
     standard_name: air_pressure_at_convective_cloud_base
     table: atmos
@@ -16,6 +17,7 @@ variables:
     cell_methods: 'area: point time: point'
     grids: [gr]
     long_name: Air Pressure at Convective Cloud Base
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: air_pressure_at_convective_cloud_base
     table: atmos
@@ -26,6 +28,7 @@ variables:
       cloud area)'
     grids: [gr]
     long_name: Air Pressure at Convective Cloud Top
+    regrid_method: conservative
     sources: [model_var: PCLDTOP]
     standard_name: air_pressure_at_convective_cloud_top
     table: atmos
@@ -35,6 +38,7 @@ variables:
     cell_methods: 'area: point time: point'
     grids: [gr]
     long_name: Air Pressure at Convective Cloud Top
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: air_pressure_at_convective_cloud_top
     table: atmos
@@ -47,6 +51,7 @@ variables:
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: Cloud Area Fraction
+    regrid_method: conservative
     sources: [model_var: CLOUD]
     standard_name: cloud_area_fraction
     table: atmos
@@ -57,6 +62,7 @@ variables:
       containing ice topped cloud, as seen from top of atmosphere)'
     grids: [gr]
     long_name: Ice Crystal Number Concentration of Cloud Tops
+    regrid_method: conservative
     sources: [model_var: ACTNI]
     standard_name: number_concentration_of_ice_crystals_in_air_at_ice_cloud_top
     table: atmos
@@ -67,6 +73,7 @@ variables:
       containing liquid topped cloud, as seen from top of atmosphere)'
     grids: [gr]
     long_name: Cloud Droplet Number Concentration of Cloud Tops
+    regrid_method: conservative
     sources: [model_var: ACTNL]
     standard_name: number_concentration_of_cloud_liquid_water_particles_in_air_at_liquid_water_cloud_top
     table: atmos
@@ -76,6 +83,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CLDICE]
     table: atmos
     units: kg kg-1
@@ -84,6 +92,7 @@ variables:
     cell_methods: 'area: time: mean'
     grids: [gr]
     long_name: MODIS Ice Cloud Area Percentage
+    regrid_method: conservative
     sources: [{model_var: 'CLIMODIS [COSP]'}]
     standard_name: modis_ice_topped_cloud_area_fraction
     table: atmos
@@ -91,6 +100,7 @@ variables:
 
   clivi_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDIWP]
     table: atmos
     units: kg m-2
@@ -99,6 +109,7 @@ variables:
     cell_methods: 'area: time: mean'
     grids: [gr]
     long_name: Convective Ice Water Path
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: atmosphere_mass_content_of_convective_cloud_ice
     table: atmos
@@ -108,6 +119,7 @@ variables:
     cell_methods: 'area: time: mean'
     grids: [gr]
     long_name: MODIS Ice Water Path
+    regrid_method: conservative
     sources: [{model_var: 'IWPMODIS [COSP]'}]
     standard_name: atmosphere_mass_content_of_cloud_ice
     table: atmos
@@ -118,6 +130,7 @@ variables:
     grids: [gr]
     levels: {name: plev7c, units: Pa}
     long_name: MODIS Cloud Area Percentage
+    regrid_method: conservative
     sources: [{model_var: 'CLMODIS [COSP]'}]
     standard_name: modis_cloud_area_fraction
     table: atmos
@@ -128,6 +141,7 @@ variables:
     grids: [gr]
     levels: {name: plev7c, units: Pa}
     long_name: MODIS Ice Topped Cloud Area Percentage
+    regrid_method: conservative
     sources: [{model_var: 'CLIMODIS [COSP]'}]
     standard_name: modis_ice_topped_cloud_area_fraction
     table: atmos
@@ -138,6 +152,7 @@ variables:
     grids: [gr]
     levels: {name: plev7c, units: Pa}
     long_name: MODIS Liquid Topped Cloud Area Percentage
+    regrid_method: conservative
     sources: [model_var: N, model_var: A]
     standard_name: modis_liquid_topped_cloud_area_fraction
     table: atmos
@@ -146,6 +161,7 @@ variables:
   clt_tavg-u-hxy-u:
     formula: CLDTOT * 100
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -154,12 +170,14 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CLDLIQ]
     table: atmos
     units: kg kg-1
 
   clwvi_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDLWP]
     table: atmos
     units: kg m-2
@@ -169,6 +187,7 @@ variables:
     formula: IWPMODIS+CLWMODIS
     grids: [gr]
     long_name: MODIS Condensed Water Path
+    regrid_method: conservative
     sources: [{model_var: 'IWPMODIS [COSP], CLWMODIS [COSP]'}]
     standard_name: atmosphere_mass_content_of_cloud_condensed_water
     table: atmos
@@ -180,6 +199,7 @@ variables:
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
     long_name: 3D-Field of Transported CO2
+    regrid_method: conservative
     sources: [model_var: CO2]
     standard_name: mass_fraction_of_carbon_dioxide_tracer_in_air
     table: atmos
@@ -215,12 +235,14 @@ variables:
 
   hfls_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: LHFLX]
     table: atmos
     units: W m-2
 
   hfss_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
@@ -228,6 +250,7 @@ variables:
   hur_tavg-p19-hxy-air:
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: RELHUM]
     table: atmos
     units: '%'
@@ -236,12 +259,14 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: RELHUM]
     table: atmos
     units: '%'
 
   hurs_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RHREFHT]
     table: atmos
     units: '%'
@@ -250,6 +275,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: Q]
     table: atmos
     units: kg kg-1
@@ -257,6 +283,7 @@ variables:
   hus_tavg-p19-hxy-u:
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: Q]
     table: atmos
     units: kg kg-1
@@ -272,6 +299,7 @@ variables:
   irrDem_tavg-u-hxy-u:
     grids: [gr]
     long_name: Irrigation Demand
+    regrid_method: conservative
     sources: [model_var: IRR_DEM]
     table: atmos
     units: kg m-2 s-1
@@ -279,6 +307,7 @@ variables:
   irrGw_tavg-u-hxy-u:
     grids: [gr]
     long_name: Groundwater Irrigation
+    regrid_method: conservative
     sources: [model_var: IRR_GW]
     table: atmos
     units: kg m-2 s-1
@@ -286,6 +315,7 @@ variables:
   irrLut_tavg-u-hxy-u:
     grids: [gr]
     long_name: Surface Water Irrigation
+    regrid_method: conservative
     sources: [model_var: IRR_LUT]
     table: atmos
     units: kg m-2 s-1
@@ -293,6 +323,7 @@ variables:
   irrSurf_tavg-u-hxy-u:
     grids: [gr]
     long_name: Irrigation from Surface Water
+    regrid_method: conservative
     sources: [model_var: IRR_SURF]
     table: atmos
     units: kg m-2 s-1
@@ -311,6 +342,7 @@ variables:
   prc_tavg-u-hxy-u:
     formula: PRECC * 1000.0
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PRECC]
     table: atmos
     units: kg m-2 s-1
@@ -318,12 +350,14 @@ variables:
   prsn_tavg-u-hxy-u:
     formula: (PRECSC + PRECSL) * 1000.0
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PRECSC, model_var: PRECSL]
     table: atmos
     units: kg m-2 s-1
 
   prw_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TMQ]
     table: atmos
     units: kg m-2
@@ -348,6 +382,7 @@ variables:
 
   rlds_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -355,6 +390,7 @@ variables:
   rldscs_tavg-u-hxy-u:
     formula: FLDS + FLNS - FLNSC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDS, model_var: FLNS, model_var: FLNSC]
     table: atmos
     units: W m-2
@@ -362,42 +398,49 @@ variables:
   rlus_tavg-u-hxy-u:
     formula: FLDS + FLNS
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDS, model_var: FLNS]
     table: atmos
     units: W m-2
 
   rluscs_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLNSC]
     table: atmos
     units: W m-2
 
   rlut_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLUT]
     table: atmos
     units: W m-2
 
   rlutcs_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLUTC]
     table: atmos
     units: W m-2
 
   rsds_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDS]
     table: atmos
     units: W m-2
 
   rsdscs_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDSC]
     table: atmos
     units: W m-2
 
   rsdt_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOLIN]
     table: atmos
     units: W m-2
@@ -405,6 +448,7 @@ variables:
   rsus_tavg-u-hxy-u:
     formula: FSDS - FSNS
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
     units: W m-2
@@ -412,12 +456,14 @@ variables:
   rsuscs_tavg-u-hxy-u:
     formula: FSDSC - FSNSC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
     units: W m-2
 
   rsut_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLUT]
     table: atmos
     units: W m-2
@@ -425,12 +471,14 @@ variables:
   rsutcs_tavg-u-hxy-u:
     formula: SOLIN - FSNTOAC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
     units: W m-2
 
   sfcWind_tavg-h10m-hxy-u:
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: U10]
     table: atmos
     units: m s-1
@@ -466,18 +514,21 @@ variables:
 
   tauu_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TAUX]
     table: atmos
     units: N m-2
 
   tauv_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TAUY]
     table: atmos
     units: N m-2
 
   ts_tavg-u-hxy-u:
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TS]
     table: atmos
     units: K
@@ -503,6 +554,7 @@ variables:
 
   uas_tavg-h10m-hxy-u:
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: U10]
     table: atmos
     units: m s-1
@@ -528,6 +580,7 @@ variables:
 
   vas_tavg-h10m-hxy-u:
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: VBOT]
     table: atmos
     units: m s-1
@@ -535,6 +588,7 @@ variables:
   wap_tavg-p19-hxy-air:
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: OMEGA]
     table: atmos
     units: Pa s-1
@@ -542,6 +596,7 @@ variables:
   zg_tavg-p19-hxy-air:
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: Z3]
     table: atmos
     units: m

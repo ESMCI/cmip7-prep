@@ -19,9 +19,8 @@ An unknown resolution raises rather than falling back to another grid: the
 previous fallback silently regridded to the ocean map, which produces output
 that looks fine and is on the wrong grid.
 
-``data/intensive_vars.yaml`` lists the variables that take the bilinear map.
-It is shared by every model, since whether a quantity is intensive is a
-property of the variable rather than of the model that wrote it.
+The regrid method is stated per variable in the mapping YAML, so nothing here
+needs to know which quantities are intensive.
 """
 
 from __future__ import annotations
@@ -78,17 +77,3 @@ def get_map_paths(model: str, resolution: str) -> dict[str, Path]:
             "every resolution needs one, since fx fields are always conservative"
         )
     return {method: root / name for method, name in entry.items()}
-
-
-@lru_cache(maxsize=None)
-def load_intensive_vars() -> frozenset[str]:
-    """Return the variables regridded bilinearly rather than conservatively.
-
-    Shared across models, unlike the per-model map tables.
-    """
-    path = DATA_DIR / "intensive_vars.yaml"
-    if not path.is_file():
-        raise ValueError(f"No intensive-variable table; expected {path}")
-    with open(path, encoding="utf-8") as handle:
-        table = yaml.safe_load(handle) or {}
-    return frozenset(table.get("intensive") or ())

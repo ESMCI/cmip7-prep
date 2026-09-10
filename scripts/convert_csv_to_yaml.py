@@ -6,6 +6,7 @@ import yaml
 import re
 import sys
 import argparse
+from pathlib import Path
 from typing import Optional
 
 from cmip7_prep.mapping_compat import FORMULA_NAMESPACE
@@ -16,6 +17,26 @@ from cmip7_prep.mapping_compat import FORMULA_NAMESPACE
 # NameError when the pipeline evaluates it, which aborts the whole CMOR run --
 # so it is caught here instead.
 FORMULA_FUNCTIONS = frozenset(FORMULA_NAMESPACE)
+
+# ── Regrid method ────────────────────────────────────────────────────────────
+# Intensive quantities -- temperatures, pressures, winds, sea surface height --
+# are point values and interpolate smoothly, so they use the bilinear map.
+# Everything else is a flux or a mass and must conserve its integral, so it
+# uses the conservative map.
+#
+# The list of intensive quantities lives in data/intensive_vars.yaml, keyed by
+# root variable name.
+
+INTENSIVE_VARS_YAML = Path(__file__).parent.parent / "data" / "intensive_vars.yaml"
+
+
+def load_intensive_vars() -> set[str]:
+    """Return the root names that should be regridded bilinearly."""
+    if not INTENSIVE_VARS_YAML.is_file():
+        return set()
+    with open(INTENSIVE_VARS_YAML, encoding="utf-8") as handle:
+        return set((yaml.safe_load(handle) or {}).get("intensive") or ())
+
 
 # ── Grid labels ──────────────────────────────────────────────────────────────
 # Which CMIP grid_label(s) each realm's variables are written on.  'gn' is the
@@ -133,7 +154,6 @@ MODEL_CONFIGS = {
             "Freq": "_freq",
             "Alias": "_alias",
             "Cell Methods": "cell_methods",
-            "Regrid Method": "regrid_method",
             "Region": "region",
             "Levels Name": "_levels_name",
             "Levels Units": "_levels_units",
@@ -764,6 +784,8 @@ def read_csv(filepath, config):
         "realm_outputs"
     )  # optional; None means return a single combined dict
 
+    intensive_vars = load_intensive_vars()
+
     all_entries = []
     flagged = 0
     rows_seen: dict = {}
@@ -794,6 +816,9 @@ def read_csv(filepath, config):
                     "add it to REALM_GRIDS in convert_csv_to_yaml.py"
                 )
             entry["grids"] = list(grids)
+            entry["regrid_method"] = (
+                "bilinear" if name.split("_")[0] in intensive_vars else "conservative"
+            )
             problems = check_entry(
                 name, entry, row.get(config["source_column"], ""), row=rownum
             )

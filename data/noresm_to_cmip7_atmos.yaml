@@ -10,6 +10,7 @@ variables:
       Values will be missing where there are no clouds or no sunlight.
     formula: MEANCLDALB_ISCCP/CLDTOT_ISCCP
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: MEANCLDALB_ISCCP, model_var: CLDTOT_ISCCP]
     table: atmos
     units: '1'
@@ -18,6 +19,7 @@ variables:
     description: This is the monthly averaged aerosol optical thickness at 550 nm
       due to stratospheric volcanic sulphate aerosols
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: AODVVOLC]
     table: atmos
     units: '1.00E-09'
@@ -28,6 +30,7 @@ variables:
       areas should be defined to enable exact calculation of global integrals (e.g.,
       of vertical fluxes of energy at the surface and top of the atmosphere).
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: area]
     table: atmos
     units: m2
@@ -35,6 +38,7 @@ variables:
   bldep_tavg-u-hxy-u:
     description: Boundary layer depth
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PBLH]
     table: atmos
     units: m
@@ -43,6 +47,7 @@ variables:
     description: 'maximum boundary layer height during the day (add cell_methods attribute:
       "time: maximum")'
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PBLHMX]
     table: atmos
     units: m
@@ -51,6 +56,7 @@ variables:
     description: 'minimum boundary layer height during the day (add cell_methods attribute:
       "time: minimum")'
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PBLHMN]
     table: atmos
     units: m
@@ -58,6 +64,7 @@ variables:
   bldep_tpt-u-hxy-u:
     description: Boundary Layer Depth every 3 hours
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PBLH]
     table: atmos
     units: m
@@ -65,6 +72,7 @@ variables:
   cfadDbze94_tavg-h40-hxy-air:
     description: CloudSat Radar Reflectivity
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CFAD_DBZE94_CS]
     table: atmos
     units: '1'
@@ -72,6 +80,7 @@ variables:
   cfadLidarsr532_tavg-h40-hxy-air:
     description: CALIPSO Scattering Ratio
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CFAD_SR532_CAL]
     table: atmos
     units: '1'
@@ -82,6 +91,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CLOUD]
     table: atmos
     units: '%'
@@ -92,6 +102,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CLOUD]
     table: atmos
     units: '%'
@@ -99,6 +110,7 @@ variables:
   clcalipso_tavg-220hPa-hxy-air:
     description: Percentage cloud cover in layer centred on 220hPa
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLDHGH_CAL]
     table: atmos
     units: '%'
@@ -106,6 +118,7 @@ variables:
   clcalipso_tavg-560hPa-hxy-air:
     description: Percentage cloud cover in layer centred on 560hPa
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLDMED_CAL]
     table: atmos
     units: '%'
@@ -113,6 +126,7 @@ variables:
   clcalipso_tavg-840hPa-hxy-air:
     description: Percentage cloud cover in layer centred on 840hPa
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLDLOW_CAL]
     table: atmos
     units: '%'
@@ -120,6 +134,7 @@ variables:
   clcalipsoice_tavg-h40-hxy-air:
     description: CALIPSO Ice Cloud Fraction
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLDTOT_CAL_ICE]
     table: atmos
     units: '%'
@@ -127,6 +142,7 @@ variables:
   clcalipsoliq_tavg-h40-hxy-air:
     description: CALIPSO Liquid Cloud Fraction
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLDTOT_CAL_LIQ]
     table: atmos
     units: '%'
@@ -140,6 +156,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CLDICE]
     table: atmos
     units: kg kg-1
@@ -153,6 +170,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CLDICE]
     table: atmos
     units: kg kg-1
@@ -160,6 +178,7 @@ variables:
   climodis_tavg-u-hxy-u:
     description: MODIS Ice Cloud Fraction
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLIMODIS]
     table: atmos
     units: '%'
@@ -168,6 +187,7 @@ variables:
     description: Percentage cloud cover in optical depth categories.
     grids: [gr]
     levels: {name: plev7c, units: Pa}
+    regrid_method: conservative
     sources: [model_var: FISCCP1_COSP]
     table: atmos
     units: '%'
@@ -178,6 +198,7 @@ variables:
       frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
       of radiative transfer in model.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDIWP]
     table: atmos
     units: kg m-2
@@ -188,6 +209,7 @@ variables:
       frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
       of radiative transfer in model.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDIWP]
     table: atmos
     units: kg m-2
@@ -198,6 +220,7 @@ variables:
       frozen hydrometeors ONLY if the precipitating hydrometeor affects the calculation
       of radiative transfer in model.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDIWP]
     table: atmos
     units: kg m-2
@@ -205,6 +228,7 @@ variables:
   clt_tavg-u-hxy-lnd:
     description: Total cloud fraction
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -214,6 +238,7 @@ variables:
       top of the atmosphere. Includes both large-scale and convective cloud.
     formula: 100*CLDTOT
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -223,6 +248,7 @@ variables:
       top of the atmosphere. Include both large-scale and convective cloud.
     formula: 100*CLDTOT
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -232,6 +258,7 @@ variables:
       top of the atmosphere. Include both large-scale and convective cloud.
     formula: CLDTOT*100
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: CLDTOT]
     table: atmos
     units: '%'
@@ -242,6 +269,7 @@ variables:
       Satellite Observation (CALIPSO) instrument. Includes both large-scale and convective
       cloud.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLDTOT_CAL]
     table: atmos
     units: '%'
@@ -249,6 +277,7 @@ variables:
   cltcalipso_tpt-u-hxy-u:
     description: CALIPSO Total Cloud Fraction
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLDTOT_CAL]
     table: atmos
     units: '%'
@@ -259,6 +288,7 @@ variables:
       Project (ISCCP) analysis. Includes both large-scale and convective cloud.  (MODIS).
       Includes both large-scale and convective cloud.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLDTOT_ISCCP]
     table: atmos
     units: '%'
@@ -266,6 +296,7 @@ variables:
   cltmodis_tavg-u-hxy-u:
     description: Percentage of total cloud cover as seen by the MODIS instrument simulator.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLTMODIS]
     table: atmos
     units: '%'
@@ -279,6 +310,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CLDLIQ]
     table: atmos
     units: kg kg-1
@@ -292,6 +324,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CLDLIQ]
     table: atmos
     units: kg kg-1
@@ -299,6 +332,7 @@ variables:
   clwmodis_tavg-u-hxy-u:
     description: MODIS Liquid Cloud Fraction
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: CLWMODIS]
     table: atmos
     units: '%'
@@ -309,6 +343,7 @@ variables:
       Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
       the calculation of radiative transfer in model.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDCWP]
     table: atmos
     units: kg m-2
@@ -319,6 +354,7 @@ variables:
       Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
       the calculation of radiative transfer in model.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDCWP]
     table: atmos
     units: kg m-2
@@ -329,6 +365,7 @@ variables:
       Includes precipitating hydrometeors ONLY if the precipitating hydrometeor affects
       the calculation of radiative transfer in model.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TGCLDCWP]
     table: atmos
     units: kg m-2
@@ -339,6 +376,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: CO2]
     table: atmos
     units: mol mol-1
@@ -348,6 +386,7 @@ variables:
       where X is a material constituent of Y.
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: CO2]
     table: atmos
     units: mol mol-1
@@ -355,6 +394,7 @@ variables:
   co2mass_tavg-u-hm-u:
     description: Total atmospheric mass of Carbon Dioxide
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TMCO2]
     table: atmos
     units: kg
@@ -365,6 +405,7 @@ variables:
       to vapor (from underlying surface and vegetation)'
     formula: QVEGT+QVEGE+QSOIL
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: QVEGT, model_var: QVEGE, model_var: QSOIL]
     table: atmos
     units: kg m-2 s-1
@@ -373,6 +414,7 @@ variables:
     description: at surface; flux of water into the atmosphere due to conversion of
       both liquid and solid phases to vapor (from underlying surface and vegetation)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: QFLX]
     table: atmos
     units: kg m-2 s-1
@@ -381,6 +423,7 @@ variables:
     description: at surface; flux of water into the atmosphere due to conversion of
       both liquid and solid phases to vapor (from underlying surface and vegetation)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: QFLX]
     table: atmos
     units: kg m-2 s-1
@@ -388,6 +431,7 @@ variables:
   hfls_tavg-u-hxy-u:
     description: includes both evaporation and sublimation
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: LHFLX]
     table: atmos
     units: W m-2
@@ -395,6 +439,7 @@ variables:
   hfls_tpt-u-hs-u:
     description: includes both evaporation and sublimation
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: LHFLX]
     table: atmos
     units: W m-2
@@ -403,6 +448,7 @@ variables:
     description: The surface sensible heat flux, also called turbulent heat flux,
       is the exchange of heat between the surface and the air by motion of air.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
@@ -411,6 +457,7 @@ variables:
     description: The surface sensible heat flux, also called turbulent heat flux,
       is the exchange of heat between the surface and the air by motion of air.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SHFLX]
     table: atmos
     units: W m-2
@@ -421,6 +468,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: RELHUM]
     table: atmos
     units: '%'
@@ -430,6 +478,7 @@ variables:
       0 C, and with respect to ice for T<0 C.
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: RELHUM]
     table: atmos
     units: '%'
@@ -439,6 +488,7 @@ variables:
       0 C, and with respect to ice for T<0 C.
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: RELHUM]
     table: atmos
     units: '%'
@@ -446,6 +496,7 @@ variables:
   hur_tpt-100hPa-hxy-u:
     description: Relative humidity at 100 hPa
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RELHUM100]
     table: atmos
     units: '%'
@@ -453,6 +504,7 @@ variables:
   hur_tpt-500hPa-hxy-air:
     description: Relative humidity at 500 hPa, 6 hourly instantaneous
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RELHUM500]
     table: atmos
     units: '%'
@@ -460,6 +512,7 @@ variables:
   hur_tpt-850hPa-hxy-air:
     description: Relative humidity at 850 hPa
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RELHUM850]
     table: atmos
     units: '%'
@@ -470,6 +523,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: RELHUM, model_var: RHW]
     table: atmos
     units: '%'
@@ -478,6 +532,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RHREFHT]
     table: atmos
     units: '%'
@@ -486,6 +541,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RHREFHTMX]
     table: atmos
     units: '%'
@@ -494,6 +550,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RHREFHTMN]
     table: atmos
     units: '%'
@@ -502,6 +559,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RHREFHT]
     table: atmos
     units: '%'
@@ -510,6 +568,7 @@ variables:
     description: This is the relative humidity with respect to liquid water for T>
       0 C, and with respect to ice for T<0 C.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: RHREFHT]
     table: atmos
     units: '%'
@@ -520,6 +579,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: Q]
     table: atmos
     units: '1'
@@ -529,6 +589,7 @@ variables:
       air.
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: Q]
     table: atmos
     units: '1'
@@ -539,6 +600,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: Q]
     table: atmos
     units: '1'
@@ -548,6 +610,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: Q]
     table: atmos
     units: '1'
@@ -556,6 +619,7 @@ variables:
     description: Extra levels - 925, 700, 600, 300, 50
     grids: [gr]
     levels: {name: plev7h, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: Q]
     table: atmos
     units: '1'
@@ -563,6 +627,7 @@ variables:
   huss_tavg-h2m-hxy-u:
     description: Near-surface (usually, 2 meter) specific humidity.
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: QREFHT]
     table: atmos
     units: '1'
@@ -570,6 +635,7 @@ variables:
   huss_tpt-h2m-hs-u:
     description: Near-surface (usually, 2 meter) specific humidity.
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: QREFHT]
     table: atmos
     units: '1'
@@ -577,6 +643,7 @@ variables:
   huss_tpt-h2m-hxy-u:
     description: This is sampled synoptically.
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: QREFHT]
     table: atmos
     units: '1'
@@ -586,6 +653,7 @@ variables:
       vertical integral of the product of eastward wind by total water mass per unit
       mass)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: uIVT]
     table: atmos
     units: kg m-1 s-1
@@ -595,6 +663,7 @@ variables:
       vertical integral of the product of eastward wind by total water mass per unit
       mass)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: uIVT]
     table: atmos
     units: kg m-1 s-1
@@ -603,6 +672,7 @@ variables:
     description: Vertically integrated northward moisture transport (Mass_weighted_vertical
       integral of the product of northward wind by total water mass per unit mass)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: vIVT]
     table: atmos
     units: kg m-1 s-1
@@ -611,6 +681,7 @@ variables:
     description: Vertically integrated northward moisture transport (Mass_weighted_vertical
       integral of the product of northward wind by total water mass per unit mass)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: vIVT]
     table: atmos
     units: kg m-1 s-1
@@ -618,6 +689,7 @@ variables:
   loadbc_tavg-u-hxy-u:
     description: The total dry mass of black carbon aerosol particles per unit area.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: cb_BC]
     table: atmos
     units: kg m-2
@@ -625,6 +697,7 @@ variables:
   loaddust_tavg-u-hxy-u:
     description: The total dry mass of dust aerosol particles per unit area.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: cb_DUST]
     table: atmos
     units: kg m-2
@@ -634,6 +707,7 @@ variables:
       sum of atmosphere_primary_organic_content and atmosphere_secondary_organic_content
       (see next two table entries).'
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: cb_OM]
     table: atmos
     units: kg m-2
@@ -641,6 +715,7 @@ variables:
   loadso4_tavg-u-hxy-u:
     description: The total dry mass of sulfate aerosol particles per unit area.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: cb_SULFATE]
     table: atmos
     units: kg m-2
@@ -648,6 +723,7 @@ variables:
   loadss_tavg-u-hxy-u:
     description: The total dry mass of sea salt aerosol particles per unit area.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: cb_SALT]
     table: atmos
     units: kg m-2
@@ -659,6 +735,7 @@ variables:
     formula: CMFMC+CMFMCDZM
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: CMFMC, model_var: CMFMCDZM]
     table: atmos
     units: kg m-2 s-1
@@ -670,6 +747,7 @@ variables:
     formula: CMFMC+CMFMCDZM
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: CMFMC, model_var: CMFMCDZM]
     table: atmos
     units: kg m-2 s-1
@@ -678,6 +756,7 @@ variables:
     description: time-means are weighted by the ISCCP Total Cloud Fraction - see  https://www.cfmip.org/tools-and-data/cosp
     formula: MEANPTOP_ISCCP/CLDTOT_ISCCP
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: MEANPTOP_ISCCP, model_var: CLDTOT_ISCCP]
     table: atmos
     units: Pa
@@ -688,6 +767,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: PMID]
     table: atmos
     units: Pa
@@ -697,6 +777,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: PMID]
     table: atmos
     units: Pa
@@ -706,6 +787,7 @@ variables:
       and levels in the associated output variables
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: PINT]
     table: atmos
     units: Pa
@@ -714,6 +796,7 @@ variables:
     description: Air pressure on model half-levels
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: PINT]
     table: atmos
     units: Pa
@@ -722,6 +805,7 @@ variables:
     description: at surface; includes both liquid and solid phases from all types
       of clouds (both large-scale and convective)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PRECT]
     table: atmos
     units: kg m-2 s-1
@@ -730,6 +814,7 @@ variables:
     description: at surface; includes both liquid and solid phases from all types
       of clouds (both large-scale and convective)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PRECT]
     table: atmos
     units: kg m-2 s-1
@@ -737,6 +822,7 @@ variables:
   pr_tpt-u-hxy-u:
     description: Total precipitation rate at the surface
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PRECT]
     table: atmos
     units: kg m-2 s-1
@@ -744,6 +830,7 @@ variables:
   prc_tavg-u-hxy-u:
     description: at surface; includes both liquid and solid phases.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PRECC]
     table: atmos
     units: kg m-2 s-1
@@ -751,6 +838,7 @@ variables:
   prc_tpt-u-hs-u:
     description: at surface; includes both liquid and solid phases.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PRECC]
     table: atmos
     units: kg m-2 s-1
@@ -759,6 +847,7 @@ variables:
     description: rainfall_flux
     formula: PRECT-PRECSC-PRECSL
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: PRECT, model_var: PRECSC, model_var: PRECSL]
     table: atmos
     units: kg m-2 s-1
@@ -768,6 +857,7 @@ variables:
       phase
     formula: PRECSC+PRECSL
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PRECSC, model_var: PRECSL]
     table: atmos
     units: kg m-2 s-1
@@ -777,6 +867,7 @@ variables:
       phase
     formula: PRECSC+PRECSL
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PRECSC, model_var: PRECSL]
     table: atmos
     units: kg m-2 s-1
@@ -785,6 +876,7 @@ variables:
     description: Vertically integrated mass of water vapour through the atmospheric
       column
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TMQ]
     table: atmos
     units: kg m-2
@@ -793,6 +885,7 @@ variables:
     description: Vertically integrated mass of water vapour through the atmospheric
       column
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: Q]
     table: atmos
     units: kg m-2
@@ -801,6 +894,7 @@ variables:
     description: Vertically integrated mass of water vapour through the atmospheric
       column
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: Q]
     table: atmos
     units: kg m-2
@@ -809,6 +903,7 @@ variables:
     description: surface pressure (not mean sea-level pressure), 2-D field to calculate
       the 3-D pressure field from hybrid coordinates
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PS]
     table: atmos
     units: Pa
@@ -816,6 +911,7 @@ variables:
   ps_tpt-u-hs-u:
     description: not, in general, the same as mean sea-level pressure
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PS]
     table: atmos
     units: Pa
@@ -823,6 +919,7 @@ variables:
   ps_tpt-u-hxy-u:
     description: surface pressure, not mean sea level pressure
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PS]
     table: atmos
     units: Pa
@@ -830,6 +927,7 @@ variables:
   psl_tavg-u-hxy-u:
     description: Sea Level Pressure
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PSL]
     table: atmos
     units: Pa
@@ -837,6 +935,7 @@ variables:
   psl_tpt-u-hs-u:
     description: not, in general, the same as surface pressure
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PSL]
     table: atmos
     units: Pa
@@ -844,6 +943,7 @@ variables:
   psl_tpt-u-hxy-u:
     description: Sea Level Pressure
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: PSL]
     table: atmos
     units: Pa
@@ -852,6 +952,7 @@ variables:
     description: 2D monthly mean thermal tropopause calculated using WMO tropopause
       definition on 3d temperature
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TROP_P]
     table: atmos
     units: Pa
@@ -864,6 +965,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: AREI, model_var: FREQI]
     table: atmos
     units: m
@@ -877,6 +979,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
@@ -887,6 +990,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
@@ -899,6 +1003,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: AREL, model_var: FREQL]
     table: atmos
     units: m
@@ -907,6 +1012,7 @@ variables:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FDL]
     table: atmos
     units: W m-2
@@ -916,6 +1022,7 @@ variables:
       and TOA)
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FDL]
     table: atmos
     units: W m-2
@@ -924,6 +1031,7 @@ variables:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FDLC]
     table: atmos
     units: W m-2
@@ -933,6 +1041,7 @@ variables:
       the surface and TOA)
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FDLC]
     table: atmos
     units: W m-2
@@ -946,6 +1055,7 @@ variables:
       sometimes called "vector irradiance". In accordance with common usage in geophysical
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -959,6 +1069,7 @@ variables:
       sometimes called "vector irradiance". In accordance with common usage in geophysical
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -972,6 +1083,7 @@ variables:
       sometimes called "vector irradiance". In accordance with common usage in geophysical
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDS]
     table: atmos
     units: W m-2
@@ -979,6 +1091,7 @@ variables:
   rldscs_tavg-u-hxy-u:
     description: Surface downwelling clear-sky longwave radiation
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDSC]
     table: atmos
     units: W m-2
@@ -986,6 +1099,7 @@ variables:
   rldscs_tpt-u-hs-u:
     description: Surface downwelling clear-sky longwave radiation
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDSC]
     table: atmos
     units: W m-2
@@ -993,6 +1107,7 @@ variables:
   rldscs_tpt-u-hxy-u:
     description: Surface downwelling clear-sky longwave radiation
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDSC]
     table: atmos
     units: W m-2
@@ -1000,6 +1115,7 @@ variables:
   rls_tavg-u-hxy-u:
     description: Net longwave surface radiation
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLNS]
     table: atmos
     units: W m-2
@@ -1008,6 +1124,7 @@ variables:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FUL]
     table: atmos
     units: W m-2
@@ -1017,6 +1134,7 @@ variables:
       and TOA)
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FULC]
     table: atmos
     units: W m-2
@@ -1025,6 +1143,7 @@ variables:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FULC]
     table: atmos
     units: W m-2
@@ -1034,6 +1153,7 @@ variables:
       surface and TOA)
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FULC]
     table: atmos
     units: W m-2
@@ -1048,6 +1168,7 @@ variables:
       "flux" implies per unit area, called "flux density" in physics.
     formula: FLDS+FLNS
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDS, model_var: FLNS]
     table: atmos
     units: W m-2
@@ -1062,6 +1183,7 @@ variables:
       "flux" implies per unit area, called "flux density" in physics.
     formula: FLDS+FLNS
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLDS, model_var: FLNS]
     table: atmos
     units: W m-2
@@ -1070,6 +1192,7 @@ variables:
     description: Surface Upwelling Clear-sky Longwave Radiation
     formula: FLNSC+FLDSC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FLNSC, model_var: FLDSC]
     table: atmos
     units: W m-2
@@ -1078,6 +1201,7 @@ variables:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     formula: FSNTOA-FSNT+FLNT
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
     units: W m-2
@@ -1086,6 +1210,7 @@ variables:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     formula: FSNTOA-FSNT+FLNT
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
     units: W m-2
@@ -1094,6 +1219,7 @@ variables:
     description: at the top of the atmosphere (to be compared with satellite measurements)
     formula: FSNTOA-FSNT+FLNT
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNTOA, model_var: FSNT, model_var: FLNT]
     table: atmos
     units: W m-2
@@ -1102,6 +1228,7 @@ variables:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     formula: FSNTOAC-FSNTC+FLNTC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
     units: W m-2
@@ -1110,6 +1237,7 @@ variables:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     formula: FSNTOAC-FSNTC+FLNTC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
     units: W m-2
@@ -1118,6 +1246,7 @@ variables:
     description: Upwelling clear-sky longwave radiation at top of atmosphere
     formula: FSNTOAC-FSNTC+FLNTC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNTOAC, model_var: FSNTC, model_var: FLNTC]
     table: atmos
     units: W m-2
@@ -1126,6 +1255,7 @@ variables:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FDS]
     table: atmos
     units: W m-2
@@ -1135,6 +1265,7 @@ variables:
       and top-of-atmosphere)
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FDS]
     table: atmos
     units: W m-2
@@ -1143,6 +1274,7 @@ variables:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FDSC]
     table: atmos
     units: W m-2
@@ -1152,6 +1284,7 @@ variables:
       the surface and top-of-atmosphere)
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FDSC]
     table: atmos
     units: W m-2
@@ -1159,6 +1292,7 @@ variables:
   rsds_tavg-u-hxy-u:
     description: Surface solar irradiance for UV calculations.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDS]
     table: atmos
     units: W m-2
@@ -1166,6 +1300,7 @@ variables:
   rsds_tpt-u-hs-u:
     description: Surface solar irradiance for UV calculations.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDS]
     table: atmos
     units: W m-2
@@ -1173,6 +1308,7 @@ variables:
   rsds_tpt-u-hxy-u:
     description: Surface solar irradiance for UV calculations.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDS]
     table: atmos
     units: W m-2
@@ -1180,6 +1316,7 @@ variables:
   rsdscs_tavg-u-hxy-u:
     description: Surface solar irradiance clear sky for UV calculations
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDSC]
     table: atmos
     units: W m-2
@@ -1187,6 +1324,7 @@ variables:
   rsdscs_tpt-u-hs-u:
     description: Surface solar irradiance clear sky for UV calculations
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDSC]
     table: atmos
     units: W m-2
@@ -1194,6 +1332,7 @@ variables:
   rsdscs_tpt-u-hxy-u:
     description: Surface solar irradiance clear sky for UV calculations
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDSC]
     table: atmos
     units: W m-2
@@ -1203,6 +1342,7 @@ variables:
       calculations.
     formula: SOLLD+SOLSD
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOLLD, model_var: SOLSD]
     table: atmos
     units: W m-2
@@ -1211,6 +1351,7 @@ variables:
     description: at the top of the atmosphere
     formula: FSNTOA+FSUTOA
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNTOA, model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -1219,6 +1360,7 @@ variables:
     description: at the top of the atmosphere
     formula: FSNTOA+FSUTOA
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNTOA, model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -1226,6 +1368,7 @@ variables:
   rss_tavg-u-hxy-u:
     description: Net downward shortwave radiation at the surface
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNS]
     table: atmos
     units: W m-2
@@ -1234,6 +1377,7 @@ variables:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FUS]
     table: atmos
     units: W m-2
@@ -1243,6 +1387,7 @@ variables:
       and top of atmosphere)
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FUS]
     table: atmos
     units: W m-2
@@ -1251,6 +1396,7 @@ variables:
     description: Includes also the fluxes at the surface and TOA.
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FUSC]
     table: atmos
     units: W m-2
@@ -1260,6 +1406,7 @@ variables:
       the surface and TOA)
     grids: [gr]
     levels: {name: standard_hybrid_sigma_half, units: '1', src_axis_name: ilev}
+    regrid_method: conservative
     sources: [model_var: FUSC]
     table: atmos
     units: W m-2
@@ -1274,6 +1421,7 @@ variables:
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     formula: FSDS-FSNS
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
     units: W m-2
@@ -1288,6 +1436,7 @@ variables:
       disciplines, "flux" implies per unit area, called "flux density" in physics.
     formula: FSDS-FSNS
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDS, model_var: FSNS]
     table: atmos
     units: W m-2
@@ -1296,6 +1445,7 @@ variables:
     description: Surface Upwelling Clear-sky Shortwave Radiation
     formula: FSDSC-FSNSC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
     units: W m-2
@@ -1304,6 +1454,7 @@ variables:
     description: Surface Upwelling Clear-sky Shortwave Radiation
     formula: FSDSC-FSNSC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSDSC, model_var: FSNSC]
     table: atmos
     units: W m-2
@@ -1311,6 +1462,7 @@ variables:
   rsut_tavg-u-hxy-u:
     description: at the top of the atmosphere
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -1318,6 +1470,7 @@ variables:
   rsut_tpt-u-hs-u:
     description: at the top of the atmosphere
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -1325,6 +1478,7 @@ variables:
   rsut_tpt-u-hxy-u:
     description: at the top of the atmosphere
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSUTOA]
     table: atmos
     units: W m-2
@@ -1333,6 +1487,7 @@ variables:
     description: Calculated in the absence of clouds.
     formula: SOLIN-FSNTOAC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
     units: W m-2
@@ -1341,6 +1496,7 @@ variables:
     description: Calculated in the absence of clouds.
     formula: SOLIN-FSNTOAC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
     units: W m-2
@@ -1349,6 +1505,7 @@ variables:
     description: Calculated in the absence of clouds.
     formula: SOLIN-FSNTOAC
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: SOLIN, model_var: FSNTOAC]
     table: atmos
     units: W m-2
@@ -1359,6 +1516,7 @@ variables:
       the net downward radiative flux at the top of the atmosphere.
     formula: FSNT-FLNT
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNT, model_var: FLNT]
     table: atmos
     units: W m-2
@@ -1369,6 +1527,7 @@ variables:
       the net downward radiative flux at the top of the atmosphere.
     formula: FSNT-FLNT
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: FSNT, model_var: FLNT]
     table: atmos
     units: W m-2
@@ -1376,6 +1535,7 @@ variables:
   sfcWind_tavg-h10m-hxy-u:
     description: near-surface (usually, 10 meters) wind speed.
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: U10]
     table: atmos
     units: m s-1
@@ -1384,6 +1544,7 @@ variables:
     description: This is the mean of the speed, not the speed computed from the mean
       u and v components of wind
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: U10]
     table: atmos
     units: m s-1
@@ -1391,6 +1552,7 @@ variables:
   sftlf_ti-u-hxy-u:
     description: Percentage of horizontal area occupied by land.
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: LANDFRAC]
     table: atmos
     units: '%'
@@ -1398,6 +1560,7 @@ variables:
   ta_tavg-700hPa-hxy-air:
     description: Air temperature at 700hPa
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: T700]
     table: atmos
     units: K
@@ -1405,6 +1568,7 @@ variables:
   ta_tavg-850hPa-hxy-air:
     description: Air temperature at 850hPa
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: T850]
     table: atmos
     units: K
@@ -1414,6 +1578,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: T]
     table: atmos
     units: K
@@ -1422,6 +1587,7 @@ variables:
     description: Air Temperature
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: T]
     table: atmos
     units: K
@@ -1430,6 +1596,7 @@ variables:
     description: Air Temperature
     grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: T]
     table: atmos
     units: K
@@ -1439,6 +1606,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: T]
     table: atmos
     units: K
@@ -1448,6 +1616,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: T]
     table: atmos
     units: K
@@ -1456,6 +1625,7 @@ variables:
     description: Air Temperature
     grids: [gr]
     levels: {name: plev3, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: T]
     table: atmos
     units: K
@@ -1463,6 +1633,7 @@ variables:
   tas_tavg-h2m-hxy-u:
     description: Temperature near surface.
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TREFHT]
     table: atmos
     units: K
@@ -1471,6 +1642,7 @@ variables:
     description: 'maximum near-surface (usually, 2 meter) air temperature (add cell_method
       attribute "time: max")'
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TREFHTMX]
     table: atmos
     units: K
@@ -1478,6 +1650,7 @@ variables:
   tas_tmaxavg-h2m-hxy-u:
     description: monthly mean of the daily-maximum near-surface air temperature.
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TREFMXAV]
     table: atmos
     units: K
@@ -1486,6 +1659,7 @@ variables:
     description: 'minimum near-surface (usually, 2 meter) air temperature (add cell_method
       attribute "time: min")'
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TREFHTMN]
     table: atmos
     units: K
@@ -1493,6 +1667,7 @@ variables:
   tas_tpt-h2m-hs-u:
     description: near-surface (usually, 2 meter) air temperature
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TREFHT]
     table: atmos
     units: K
@@ -1500,6 +1675,7 @@ variables:
   tas_tpt-h2m-hxy-u:
     description: This is sampled synoptically.
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TREFHT]
     table: atmos
     units: K
@@ -1507,6 +1683,7 @@ variables:
   tauu_tavg-u-hxy-u:
     description: Downward eastward wind stress at the surface
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TAUX]
     table: atmos
     units: Pa
@@ -1514,6 +1691,7 @@ variables:
   tauu_tpt-u-hs-u:
     description: Downward eastward wind stress at the surface
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TAUX]
     table: atmos
     units: Pa
@@ -1521,6 +1699,7 @@ variables:
   tauv_tavg-u-hxy-u:
     description: Downward northward wind stress at the surface
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TAUY]
     table: atmos
     units: Pa
@@ -1528,6 +1707,7 @@ variables:
   tauv_tpt-u-hs-u:
     description: Downward northward wind stress at the surface
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TAUY]
     table: atmos
     units: Pa
@@ -1537,6 +1717,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: DTCORE]
     table: atmos
     units: K s-1
@@ -1546,6 +1727,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: QRL]
     table: atmos
     units: K s-1
@@ -1554,6 +1736,7 @@ variables:
     description: zonal mean; hence YZT
     grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: conservative
     sources: [model_var: QRL]
     table: atmos
     units: K s-1
@@ -1563,6 +1746,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: QRS]
     table: atmos
     units: K s-1
@@ -1570,6 +1754,7 @@ variables:
   ts_tavg-u-hxy-u:
     description: Surface temperature (skin for open ocean)
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TS]
     table: atmos
     units: K
@@ -1577,6 +1762,7 @@ variables:
   ts_tpt-u-hs-u:
     description: Surface temperature (skin for open ocean)
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TS]
     table: atmos
     units: K
@@ -1584,6 +1770,7 @@ variables:
   ts_tpt-u-hxy-u:
     description: Temperature of the lower boundary of the atmosphere
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: TS]
     table: atmos
     units: K
@@ -1593,6 +1780,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -1601,6 +1789,7 @@ variables:
     description: Zonal wind (positive in a eastward direction).
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -1609,6 +1798,7 @@ variables:
     description: Zonal wind (positive in a eastward direction).
     grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -1617,6 +1807,7 @@ variables:
     description: Zonal wind (positive in a eastward direction) at 200 hPa, 6hourly
       instantaneous
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: U200]
     table: atmos
     units: m s-1
@@ -1626,6 +1817,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -1635,6 +1827,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -1643,6 +1836,7 @@ variables:
     description: Zonal wind (positive in a eastward direction).
     grids: [gr]
     levels: {name: plev3, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: U]
     table: atmos
     units: m s-1
@@ -1652,6 +1846,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: V]
     table: atmos
     units: m s-1
@@ -1660,6 +1855,7 @@ variables:
     description: Meridional wind (positive in a northward direction).
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: V]
     table: atmos
     units: m s-1
@@ -1668,6 +1864,7 @@ variables:
     description: Meridional wind (positive in a northward direction).
     grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: V]
     table: atmos
     units: m s-1
@@ -1676,6 +1873,7 @@ variables:
     description: Meridional wind (positive in a northward direction) at 200 hPa, 6
       hourly instantaneous
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: V200]
     table: atmos
     units: m s-1
@@ -1685,6 +1883,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: V]
     table: atmos
     units: m s-1
@@ -1694,6 +1893,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: V]
     table: atmos
     units: m s-1
@@ -1702,6 +1902,7 @@ variables:
     description: Meridional wind (positive in a northward direction).
     grids: [gr]
     levels: {name: plev3, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: V]
     table: atmos
     units: m s-1
@@ -1710,6 +1911,7 @@ variables:
     description: at 500 hPa level; commonly referred to as "omega", this represents
       the vertical component of velocity in pressure coordinates (positive down)
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: OMEGA500]
     table: atmos
     units: Pa s-1
@@ -1720,6 +1922,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: OMEGA]
     table: atmos
     units: Pa s-1
@@ -1729,6 +1932,7 @@ variables:
       of velocity in pressure coordinates (positive down)
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: OMEGA]
     table: atmos
     units: Pa s-1
@@ -1738,6 +1942,7 @@ variables:
       of velocity in pressure coordinates (positive down)
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: OMEGA]
     table: atmos
     units: Pa s-1
@@ -1748,6 +1953,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: OMEGA]
     table: atmos
     units: Pa s-1
@@ -1755,6 +1961,7 @@ variables:
   wsg_tmax-h10m-hxy-u:
     description: Wind speed gust maximum at 10m above surface
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: U10WITHGUSTS]
     table: atmos
     units: m s-1
@@ -1762,6 +1969,7 @@ variables:
   zg_tavg-1000hPa-hxy-air:
     description: Geopotential height on the 1000 hPa surface
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: Z1000]
     table: atmos
     units: m
@@ -1769,6 +1977,7 @@ variables:
   zg_tavg-500hPa-hxy-air:
     description: geopotential height on the 500 hPa surface
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: Z500]
     table: atmos
     units: m
@@ -1782,6 +1991,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -1794,6 +2004,7 @@ variables:
       quantity with standard name height, which is relative to the surface.
     grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -1806,6 +2017,7 @@ variables:
       quantity with standard name height, which is relative to the surface.
     grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -1813,6 +2025,7 @@ variables:
   zg_tpt-500hPa-hxy-air:
     description: geopotential height on the 500 hPa surface
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: Z500]
     table: atmos
     units: m
@@ -1820,6 +2033,7 @@ variables:
   zg_tpt-700hPa-hxy-u:
     description: 700 hPa geopotential height at 6 hourly instantaneous frequency
     grids: [gr]
+    regrid_method: bilinear
     sources: [model_var: Z700]
     table: atmos
     units: m
@@ -1833,6 +2047,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -1842,6 +2057,7 @@ variables:
     grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: bilinear
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -1854,6 +2070,7 @@ variables:
       quantity with standard name height, which is relative to the surface.
     grids: [gr]
     levels: {name: plev3, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -1866,6 +2083,7 @@ variables:
       quantity with standard name height, which is relative to the surface.
     grids: [gr]
     levels: {name: plev7h, units: Pa}
+    regrid_method: bilinear
     sources: [model_var: Z3]
     table: atmos
     units: m
@@ -1874,6 +2092,7 @@ variables:
     description: 2D monthly mean thermal tropopause calculated using WMO tropopause
       definition on 3d temperature
     grids: [gr]
+    regrid_method: conservative
     sources: [model_var: TROP_Z]
     table: atmos
     units: m
