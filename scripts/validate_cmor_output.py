@@ -24,6 +24,7 @@ import logging
 import re
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -170,6 +171,19 @@ def parse_args() -> argparse.Namespace:
         help="Maximum number of variables to plot per plot mode",
     )
     parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Rebuild the static HTML interface covering all validation subsets",
+    )
+    parser.add_argument(
+        "--html-dir",
+        default=None,
+        help="Directory for the HTML interface (implies --html); defaults to "
+        "the validation reports directory. When it differs, plot images are "
+        "copied in so the site is self-contained (e.g. for a www-served "
+        "directory).",
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="Exit with code 1 if missing variables or log errors are found",
@@ -188,16 +202,30 @@ def canonical_realm(realm: str) -> str:
     return CANONICAL_REALM_MAP.get(realm, realm)
 
 
+def _looks_like_cmip_root(path: Path) -> bool:
+    """Check whether a directory holds <activity>/<institution> subdirectories."""
+    institutions = {names[0] for names in MODEL_NAMING_MAPS.values()}
+    if not path.is_dir():
+        return False
+    return any(
+        (activity / institution).is_dir()
+        for activity in path.iterdir()
+        if activity.is_dir()
+        for institution in institutions
+    )
+
+
 def resolve_cmip_root(root_output_path: str | Path) -> Path:
     """Resolve the CMIP7 root directory from either a parent or direct path."""
     root = Path(root_output_path).expanduser().resolve()
-    if (root / "CMIP").is_dir():
+    if _looks_like_cmip_root(root):
         return root
     cmip_root = root / "CMIP7"
-    if (cmip_root / "CMIP").is_dir():
+    if _looks_like_cmip_root(cmip_root):
         return cmip_root
     raise FileNotFoundError(
-        f"Could not locate CMIP output under {root}. Expected either {root / 'CMIP7' / 'CMIP'} or {root / 'CMIP'}."
+        f"Could not locate CMIP output under {root}. Expected activity/institution "
+        f"directories under either {root} or {root / 'CMIP7'}."
     )
 
 
@@ -226,8 +254,10 @@ def get_yaml_path(model: str, realm: str, custom_yaml: str | None) -> Path:
             raise FileNotFoundError(path)
         return path
 
-    yaml_realm = canonical_realm(realm)
-    yaml_name = REALM_YAML_MAP.get(model, {}).get(yaml_realm)
+    model_yaml_map = REALM_YAML_MAP.get(model, {})
+    # Prefer a realm-specific YAML (e.g. noresm aerosol) when one is defined;
+    # otherwise fall back to the canonical realm (e.g. atmosChem -> atmos).
+    yaml_name = model_yaml_map.get(realm) or model_yaml_map.get(canonical_realm(realm))
     if yaml_name is None:
         raise ValueError(f"No YAML mapping defined for model={model}, realm={realm}")
     with packaged_mapping_resource(yaml_name) as resource_path:
@@ -270,13 +300,20 @@ def get_requested_variables(
     content_dic = dt.get_transformed_content()
     logger.debug(content_dic)
     data_request = dr.DataRequest.from_separated_inputs(**content_dic)
-    cmip_vars = data_request.find_variables(
-        skip_if_missing=False,
-        operation="all",
-        cmip7_frequency=frequency,
-        modelling_realm=realm,
-        experiment=experiment,
-    )
+    try:
+        cmip_vars = data_request.find_variables(
+            skip_if_missing=False,
+            operation="all",
+            cmip7_frequency=frequency,
+            modelling_realm=realm,
+            experiment=experiment,
+        )
+    except ValueError as exc:
+        logger.warning(
+            "Data request query failed (%s); expected-variable filtering will use YAML only",
+            exc,
+        )
+        return None
     return {var.branded_variable_name.name for var in cmip_vars}
 
 
@@ -292,6 +329,41 @@ def filter_expected_variables(
     if selected_variables:
         yaml_names &= set(selected_variables)
     return sorted(yaml_names)
+
+
+def relative_to_report(path: str | Path, report_dir: Path) -> str:
+    """Return a path relative to the report dir, or unchanged if outside it."""
+    try:
+        return str(Path(path).relative_to(report_dir))
+    except ValueError:
+        return str(path)
+
+
+def build_variable_provenance(
+    yaml_variables: dict[str, dict[str, Any]],
+    expected_variables: list[str],
+) -> dict[str, dict[str, Any]]:
+    """Extract per-variable source/mapping info from the YAML mapping entries."""
+    provenance = {}
+    for variable in expected_variables:
+        entry = yaml_variables.get(variable)
+        if not isinstance(entry, dict):
+            continue
+        sources = entry.get("sources") or []
+        provenance[variable] = {
+            "source_model_vars": [
+                source.get("model_var")
+                for source in sources
+                if isinstance(source, dict) and source.get("model_var")
+            ],
+            "formula": entry.get("formula"),
+            "units": entry.get("units"),
+            "regrid_method": entry.get("regrid_method"),
+            "table": entry.get("table"),
+            "levels": entry.get("levels"),
+            "description": entry.get("description"),
+        }
+    return provenance
 
 
 def parse_log_variable(log_path: Path) -> str | None:
@@ -378,7 +450,7 @@ def scan_output_tree(
     inspection_errors: list[dict[str, str]] = []
     institution_id = MODEL_NAMING_MAPS[model][0]
     pattern = cmip_root.glob(
-        f"CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
+        f"*/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
     )
     for file_path in sorted(pattern):
         relative = file_path.relative_to(cmip_root)
@@ -544,7 +616,9 @@ def _open_variable_timeseries(
     if not file_paths:
         return None
     with xr.open_mfdataset(
-        file_paths, combine="by_coords", decode_times=True
+        file_paths,
+        combine="by_coords",
+        decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
             variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
@@ -565,7 +639,9 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
     if not file_paths:
         return None
     with xr.open_mfdataset(
-        file_paths, combine="by_coords", decode_times=True
+        file_paths,
+        combine="by_coords",
+        decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
             variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
@@ -591,8 +667,8 @@ def create_timeseries_plots(
     produced_files: dict[str, list[Path]],
     plot_dir: Path,
     max_plots: int,
-) -> list[str]:
-    """Create paginated composite mean time-series plots."""
+) -> dict[str, str]:
+    """Create one composite-mean time-series plot per produced variable."""
     try:
         import matplotlib
 
@@ -600,45 +676,31 @@ def create_timeseries_plots(
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping time-series plots")
-        return []
+        return {}
 
-    plotted = []
-    variables = sorted(produced_files)[:max_plots]
-    if not variables:
-        return plotted
-
-    page_size = 9
-    for page_index in range(0, len(variables), page_size):
-        page_variables = variables[page_index : page_index + page_size]
-        fig, axes = plt.subplots(3, 3, figsize=(15, 11), squeeze=False)
-        for axis, variable in zip(axes.flat, page_variables):
+    plotted = {}
+    for variable in sorted(produced_files)[:max_plots]:
+        try:
             series = _open_variable_timeseries(
                 produced_files[variable], variable.split("_")[0]
             )
-            if series is None:
-                axis.set_title(variable)
-                axis.text(
-                    0.5, 0.5, "No plottable time series", ha="center", va="center"
-                )
-                axis.set_axis_off()
-                continue
-            axis.plot(get_plottble_times(series), series.values, linewidth=1.0)
-            axis.set_title(variable)
-            axis.tick_params(axis="x", rotation=30)
-            axis.set_xlabel("Time (years)")
-            axis.set_ylabel(
-                f"{variable.split('_')[0]} ({series.attrs.get('units', 'unknown')})"
-            )
-        for axis in axes.flat[len(page_variables) :]:
-            axis.set_axis_off()
-
-        fig.tight_layout()
-        output_path = (
-            plot_dir / f"timeseries_composite_{page_index // page_size + 1:02d}.png"
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Could not plot time series for %s: %r", variable, exc)
+            continue
+        if series is None:
+            continue
+        fig, axis = plt.subplots(figsize=(8, 4.5))
+        axis.plot(get_plottble_times(series), series.values, linewidth=1.0)
+        axis.set_title(variable)
+        axis.set_xlabel("Time (years)")
+        axis.set_ylabel(
+            f"{variable.split('_')[0]} ({series.attrs.get('units', 'unknown')})"
         )
+        fig.tight_layout()
+        output_path = plot_dir / f"timeseries_{variable}.png"
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
-        plotted.append(str(output_path))
+        plotted[variable] = str(output_path)
     return plotted
 
 
@@ -660,7 +722,7 @@ def create_map_plots(
     produced_files: dict[str, list[Path]],
     plot_dir: Path,
     max_plots: int,
-) -> list[str]:
+) -> dict[str, str]:
     """Create per-variable time-mean map plots where the data shape allows it."""
     try:
         import matplotlib
@@ -669,11 +731,15 @@ def create_map_plots(
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping map plots")
-        return []
+        return {}
 
-    plotted = []
+    plotted = {}
     for variable in sorted(produced_files)[:max_plots]:
-        field = _open_variable_map(produced_files[variable], variable.split("_")[0])
+        try:
+            field = _open_variable_map(produced_files[variable], variable.split("_")[0])
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Could not plot map for %s: %r", variable, exc)
+            continue
         if field is None:
             continue
         fig, axis = plt.subplots(figsize=(8, 4.5))
@@ -682,7 +748,7 @@ def create_map_plots(
         output_path = plot_dir / f"map_{variable}.png"
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
-        plotted.append(str(output_path))
+        plotted[variable] = str(output_path)
     return plotted
 
 
@@ -694,7 +760,8 @@ def build_report(
     produced_files: dict[str, list[Path]],
     dimension_inventory: list[dict[str, Any]],
     inspection_errors: list[dict[str, str]],
-    plot_outputs: dict[str, list[str]],
+    plot_outputs: dict[str, dict[str, str]],
+    variable_provenance: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     """Build the structured validation report payload."""
     variables_with_log_errors = sorted(
@@ -711,6 +778,7 @@ def build_report(
     ]
 
     return {
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "scope": {
             "model": args.model,
             "realm": args.realm,
@@ -733,6 +801,7 @@ def build_report(
         "expected_but_not_produced": expected_but_not_produced,
         "produced_variables": produced_variables,
         "dimension_inventory": dimension_inventory,
+        "variable_provenance": variable_provenance,
         "log_records": flattened_log_records,
         "inspection_errors": inspection_errors,
         "plots": plot_outputs,
@@ -795,7 +864,7 @@ def main() -> int:
     )
     dimension_inventory = summarize_dimension_inventory(inventory_records)
 
-    plot_outputs = {"timeseries": [], "maps": []}
+    plot_outputs = {"timeseries": {}, "maps": {}}
     if args.plot_timeseries or args.plot_maps:
         plot_dir = (
             Path(args.plot_dir).expanduser().resolve()
@@ -811,6 +880,15 @@ def main() -> int:
             plot_outputs["maps"] = create_map_plots(
                 produced_files, plot_dir, args.max_plots
             )
+        # Store paths relative to the report directory so the HTML interface
+        # keeps working when validation_reports/ is copied or synced elsewhere.
+        for plot_kind, paths in plot_outputs.items():
+            plot_outputs[plot_kind] = {
+                variable: relative_to_report(path, report_dir)
+                for variable, path in paths.items()
+            }
+
+    variable_provenance = build_variable_provenance(yaml_variables, expected_variables)
 
     report = build_report(
         args,
@@ -821,6 +899,7 @@ def main() -> int:
         dimension_inventory,
         inspection_errors,
         plot_outputs,
+        variable_provenance,
     )
 
     write_json_report(report, report_dir / "validation_summary.json")
@@ -841,6 +920,12 @@ def main() -> int:
         print(f"Time-series plots written to {plot_dir}")
     if plot_outputs["maps"]:
         print(f"Map plots written to {plot_dir}")
+
+    if args.html or args.html_dir:
+        from build_validation_html import build_site
+
+        index_path = build_site(report_dir.parent, args.html_dir)
+        print(f"HTML interface written to {index_path}")
 
     if args.strict and (
         report["variables_with_log_errors"] or report["expected_but_not_produced"]
