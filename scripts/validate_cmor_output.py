@@ -167,7 +167,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-plots",
         type=int,
-        default=36,
+        default=120,
         help="Maximum number of variables to plot per plot mode",
     )
     parser.add_argument(
@@ -725,6 +725,27 @@ def get_plottble_times(tseries: xr.DataArray) -> np.ndarray:
     return numbers
 
 
+def _map_plot_kwargs(field: xr.DataArray) -> dict[str, Any]:
+    """Choose robust color limits and a colormap for a time-mean map.
+
+    Color limits span the 2nd-98th percentile so a few extreme cells do not
+    wash out the rest of the map. A diverging colormap centered on zero is
+    used only when both signs carry substantial amplitude, so small negative
+    values from regridding noise do not trigger it on non-negative fields.
+    """
+    values = field.values
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return {}
+    low, high = np.percentile(finite, [2.0, 98.0])
+    if low == high:
+        return {}
+    if low < 0.0 < high and min(-low, high) > 0.05 * max(-low, high):
+        limit = max(-low, high)
+        return {"vmin": -limit, "vmax": limit, "cmap": "RdBu_r"}
+    return {"vmin": float(low), "vmax": float(high), "cmap": "viridis"}
+
+
 def create_map_plots(
     produced_files: dict[str, list[Path]],
     plot_dir: Path,
@@ -750,7 +771,7 @@ def create_map_plots(
         if field is None:
             continue
         fig, axis = plt.subplots(figsize=(8, 4.5))
-        field.plot(ax=axis)
+        field.plot(ax=axis, **_map_plot_kwargs(field))
         axis.set_title(f"{variable} time-mean")
         output_path = plot_dir / f"map_{variable}.png"
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
