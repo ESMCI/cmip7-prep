@@ -1,5 +1,6 @@
 """Utility functions for CMOR processing."""
 
+from functools import lru_cache
 from pathlib import Path
 import warnings
 import re
@@ -10,13 +11,35 @@ import logging
 import cmor
 import cftime
 import numpy as np
+import yaml
 import xarray as xr
 
 _FILL_DEFAULT = 1.0e20
+
+_DATA_DIR = Path(__file__).parent.parent.parent / "data"
+
+
+@lru_cache(maxsize=None)
+def load_positive_overrides(model: str) -> dict:
+    """Return the hand-set 'positive' values for *model*, or {} if it has none.
+
+    'positive' tells CMOR which direction a flux is measured in.  CMOR checks
+    it against its own tables and flips the sign of the data if they disagree,
+    so a wrong value inverts the field.
+
+    A variable listed in data/<model>_positive.yaml uses that value.  Anything
+    else takes the value from the CMOR table.
+    """
+    path = _DATA_DIR / f"{model}_positive.yaml"
+    if not path.is_file():
+        return {}
+    with open(path, encoding="utf-8") as handle:
+        return (yaml.safe_load(handle) or {}).get("positive") or {}
+
+
 _HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
 _UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -311,31 +334,44 @@ def is_strictly_monotonic(arr):
 def sigma_mid_and_bounds(ds: xr.Dataset, levels: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Return (mid_sigma, bounds_sigma) in [0,1] for standard_hybrid_sigma.
+
+    The coordinate is ``p = a*p0 + b*ps``, so the level value at the reference
+    surface pressure is ``a + b``.  The A terms matter: over CAM's pure
+    pressure levels at the top of the model, B is exactly zero.
+
     >>> import numpy as np
     >>> import xarray as xr
     >>> ds = xr.Dataset({
-    ...     "hybm": ("mid", [0.2, 0.5, 0.8]),
-    ...     "hybi": ("edge", [0.0, 0.4, 0.6, 1.0])
+    ...     "hyam": ("mid", [0.25, 0.25, 0.0]),
+    ...     "hybm": ("mid", [0.0, 0.25, 0.75]),
+    ...     "hyai": ("edge", [0.25, 0.25, 0.125, 0.0]),
+    ...     "hybi": ("edge", [0.0, 0.125, 0.5, 1.0]),
     ... })
-    >>> levels = {"hybm": "hybm", "hybi": "hybi"}
-    >>> sigma_mid, sigma_bnds = sigma_mid_and_bounds(ds, levels)
-    >>> sigma_mid
-    array([0.2, 0.5, 0.8])
-    >>> sigma_bnds
-    array([[0. , 0.4],
-           [0.4, 0.6],
-           [0.6, 1. ]])
+    >>> sigma_mid, sigma_bnds = sigma_mid_and_bounds(ds, {})
+    >>> sigma_mid.tolist()
+    [0.25, 0.5, 0.75]
+    >>> sigma_bnds.tolist()
+    [[0.25, 0.375], [0.375, 0.625], [0.625, 1.0]]
     """
     lev_name = levels.get("src_axis_name", "lev")
+    hyam_name = levels.get("hyam", "hyam")  # A mid
     hybm_name = levels.get("hybm", "hybm")  # B mid
-    # hyai_name = levels.get("hyai", "hyai")  # A interfaces (optional)
-    hybi_name = levels.get("hybi", "hybi")  # B interfaces (preferred)
+    hyai_name = levels.get("hyai", "hyai")  # A interfaces
+    hybi_name = levels.get("hybi", "hybi")  # B interfaces
     ilev_name = levels.get("src_axis_bnds", "ilev")
 
-    # 1) midpoints: prefer B mid (dimensionless 0..1); fallback to lev if already 0..1
-    if hybm_name in ds:
-        mid = np.asarray(ds[hybm_name].values, dtype="f8")
-        mid = make_strictly_monotonic(mid)
+    # 1) midpoints: sigma is a + b.
+    #
+    # The coordinate is p = a*p0 + b*ps, so at the reference surface pressure
+    # p0 the level value is a + b.  b alone is exactly zero over CAM's pure
+    # pressure levels at the top of the model -- eleven of them in a typical
+    # configuration -- which gives a coordinate that is flat where it should
+    # rise by a factor of thirty.  CAM's own 'lev' is (a + b) * p0 in hPa, for
+    # the same reason.
+    if hyam_name in ds and hybm_name in ds:
+        mid = np.asarray(ds[hyam_name].values, dtype="f8") + np.asarray(
+            ds[hybm_name].values, dtype="f8"
+        )
     elif lev_name in ds:
         mid_candidate = np.asarray(ds[lev_name].values, dtype="f8")
         if np.nanmin(mid_candidate) >= 0.0 and np.nanmax(mid_candidate) <= 1.0:
@@ -343,16 +379,19 @@ def sigma_mid_and_bounds(ds: xr.Dataset, levels: dict) -> tuple[np.ndarray, np.n
         else:
             raise ValueError(f"{lev_name} is not sigma (0..1);")
     else:
-        raise KeyError("No sigma mid-levels found (need hybm or lev in [0,1]).")
+        raise KeyError(
+            "No sigma mid-levels found (need hyam and hybm, or lev in [0,1])."
+        )
 
-    # 2) bounds: prefer B interfaces; else use ilev if 0..1; else synthesize
-    if hybi_name in ds:
-        edges = np.asarray(ds[hybi_name].values, dtype="f8")
-        edges = make_strictly_monotonic(edges)
+    # 2) bounds: the interfaces, a + b again; else ilev if 0..1; else synthesize
+    if hyai_name in ds and hybi_name in ds:
+        edges = np.asarray(ds[hyai_name].values, dtype="f8") + np.asarray(
+            ds[hybi_name].values, dtype="f8"
+        )
         if edges.ndim == 1 and edges.size == mid.size + 1:
             bnds = np.column_stack((edges[:-1], edges[1:]))
         else:
-            raise ValueError(f"{hybi_name} has unexpected shape.")
+            raise ValueError(f"{hyai_name}/{hybi_name} have unexpected shape.")
     elif ilev_name in ds:
         ilev = np.asarray(ds[ilev_name].values, dtype="f8")
         if (

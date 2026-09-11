@@ -89,7 +89,6 @@ class TestVariableToRow:
                 "table": "atmos",
                 "long_name": "Near-Surface Air Temperature",
                 "units": "K",
-                "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "TREFHT"}],
             },
         )
@@ -99,7 +98,6 @@ class TestVariableToRow:
         assert row["Table"] == "atmos"
         assert row["Long Name"] == "Near-Surface Air Temperature"
         assert row["Units"] == "K"
-        assert row["Dimensions"] == '["time", "lat", "lon"]'
         assert row["CESM Variable Name"] == "TREFHT"
 
     def test_cesm_var_name_uses_source_names_not_formula(self):
@@ -109,7 +107,6 @@ class TestVariableToRow:
             {
                 "table": "atmos",
                 "units": "%",
-                "dims": ["time", "lev", "lat", "lon"],
                 "formula": "CLOUD * 100",
                 "sources": [{"model_var": "CLOUD"}],
             },
@@ -124,7 +121,6 @@ class TestVariableToRow:
             {
                 "table": "atmos",
                 "units": "kg m-2 s-1",
-                "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "PRECC"}, {"model_var": "PRECL"}],
             },
         )[0]
@@ -137,7 +133,6 @@ class TestVariableToRow:
             {
                 "table": "seaIce",
                 "units": "m2",
-                "dims": ["time"],
                 "sources": [
                     {"model_var": "siconc", "freq": "day"},
                     {"model_var": "tarea"},
@@ -154,7 +149,6 @@ class TestVariableToRow:
             {
                 "table": "atmos",
                 "units": "K",
-                "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "TREFHT"}],
             },
         )[0]
@@ -172,7 +166,6 @@ class TestVariableToRow:
                 "cell_methods": "time: mean",
                 "regrid_method": "conservative",
                 "units": "kg m-2 s-1",
-                "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "PRECT"}],
             },
         )[0]
@@ -180,30 +173,26 @@ class TestVariableToRow:
         assert row["Cell Methods"] == "time: mean"
         assert row["Regrid Method"] == "conservative"
 
-    def test_dims_as_json(self):
-        """Dims list is serialised as JSON in the output row."""
+    def test_levels_written_to_their_own_columns(self):
+        """A levels block is written to the Levels * columns."""
         row = variable_to_rows(
             "ta",
             {
                 "table": "atmos",
                 "units": "K",
-                "dims": ["time", "lev", "lat", "lon"],
                 "sources": [{"model_var": "T"}],
+                "levels": {
+                    "name": "standard_hybrid_sigma",
+                    "units": "1",
+                    "src_axis_name": "lev",
+                    "src_axis_bnds": "ilev",
+                },
             },
         )[0]
-        assert row["Dimensions"] == '["time", "lev", "lat", "lon"]'
-
-    def test_empty_dims(self):
-        """Missing dims key results in an empty JSON list in Dimensions field."""
-        row = variable_to_rows(
-            "tas",
-            {
-                "table": "atmos",
-                "units": "K",
-                "sources": [{"model_var": "TREFHT"}],
-            },
-        )[0]
-        assert row["Dimensions"] == "[]"
+        assert row["Levels Name"] == "standard_hybrid_sigma"
+        assert row["Levels Units"] == "1"
+        assert row["Levels Src Axis Name"] == "lev"
+        assert row["Levels Src Axis Bnds"] == "ilev"
 
     def test_variants_produce_one_row_each(self):
         """A variable with variants returns one row per variant."""
@@ -212,7 +201,6 @@ class TestVariableToRow:
             {
                 "table": "seaIce",
                 "units": "m2",
-                "dims": ["time"],
                 "sources": [{"model_var": "siconc"}, {"model_var": "tarea"}],
                 "variants": [
                     {"long_name": "NH", "formula": "formula_nh"},
@@ -239,7 +227,6 @@ class TestVariableToRow:
             {
                 "table": "atmos",
                 "units": "K",
-                "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "TREFHT"}],
             },
         )[0]
@@ -277,13 +264,11 @@ class TestYamlToCsv:
                 "tas": {
                     "table": "atmos",
                     "units": "K",
-                    "dims": ["time", "lat", "lon"],
                     "sources": [{"model_var": "TREFHT"}],
                 },
                 "pr": {
                     "table": "atmos",
                     "units": "kg m-2 s-1",
-                    "dims": ["time", "lat", "lon"],
                     "sources": [{"model_var": "PRECT"}],
                 },
             },
@@ -318,7 +303,6 @@ class TestYamlToCsv:
                     "table": "atmos",
                     "long_name": "Near-Surface Air Temperature",
                     "units": "K",
-                    "dims": ["time", "lat", "lon"],
                     "sources": [{"model_var": "TREFHT"}],
                 }
             },
@@ -332,7 +316,6 @@ class TestYamlToCsv:
         assert r["Table"] == "atmos"
         assert r["Long Name"] == "Near-Surface Air Temperature"
         assert r["Units"] == "K"
-        assert r["Dimensions"] == '["time", "lat", "lon"]'
         assert r["CESM Variable Name"] == "TREFHT"
 
     def test_cesm_var_name_is_source_names_not_formula(self, tmp_path):
@@ -343,7 +326,6 @@ class TestYamlToCsv:
                 "clt": {
                     "table": "atmos",
                     "units": "%",
-                    "dims": ["time", "lat", "lon"],
                     "formula": "CLDTOT * 100",
                     "sources": [{"model_var": "CLDTOT"}],
                 }
@@ -363,7 +345,6 @@ class TestYamlToCsv:
                 "cSoil": {
                     "table": "land",
                     "units": "kg m-2",
-                    "dims": ["time", "lat", "lon"],
                     "formula": "(SOIL1C + SOIL2C + SOIL3C)/1000.0",
                     "sources": [
                         {"model_var": "SOIL1C"},
@@ -419,21 +400,24 @@ class TestYamlToCsv:
                 "long_name": "Near-Surface Air Temperature",
                 "standard_name": "air_temperature",
                 "units": "K",
-                "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "TREFHT"}],
             },
             "cl": {
                 "table": "atmos",
                 "units": "%",
-                "dims": ["time", "lev", "lat", "lon"],
                 "formula": "CLOUD * 100",
                 "sources": [{"model_var": "CLOUD"}],
                 "cell_methods": "time: mean",
+                "levels": {
+                    "name": "standard_hybrid_sigma",
+                    "units": "1",
+                    "src_axis_name": "lev",
+                    "src_axis_bnds": "ilev",
+                },
             },
             "evspsbl": {
                 "table": "atmos",
                 "units": "kg m-2 s-1",
-                "dims": ["time", "lat", "lon"],
                 "sources": [{"model_var": "QFLX"}],
             },
         }
@@ -453,7 +437,9 @@ class TestYamlToCsv:
 
         cl = atmos["cl"]
         assert cl["formula"] == "CLOUD * 100"
-        assert "levels" in cl  # lev dim → levels block added
+        # levels survives the round trip through the explicit Levels * columns
+        assert cl["levels"]["name"] == "standard_hybrid_sigma"
+        assert cl["levels"]["src_axis_name"] == "lev"
 
         evspsbl = atmos["evspsbl"]
         assert evspsbl["sources"] == [{"model_var": "QFLX"}]

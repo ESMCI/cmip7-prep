@@ -57,7 +57,6 @@ import numpy as np
 import xarray as xr
 import yaml  # runtime dep
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -154,8 +153,21 @@ class VarConfig:
         Human-readable variable description.
     standard_name:
         CF standard name.
-    dims:
-        Expected output dimension list (e.g. ``["time", "lat", "lon"]``).
+    grids:
+        CMIP grid labels to produce for this variable.  The 'g' is *grid*, not
+        global::
+
+            gn   grid, native      -- written on the grid the data arrives on
+            gr   grid, regridded   -- interpolated to the target grid
+            gm   global mean       -- no horizontal grid at all
+
+        One entry per output, so ``["gn", "gr"]`` writes the variable twice,
+        once on each grid.  Defaults to ``["gr"]``, which is what every
+        variable without the key gets.
+
+        These are the CMIP controlled-vocabulary values that appear as
+        ``grid_label`` in the output path and filename, so they are spelled the
+        same here to avoid a translation step.
     source_aliases:
         Mapping of formula token → native model variable name.  Allows the
         formula to use short alias names that differ from the actual variable
@@ -177,7 +189,7 @@ class VarConfig:
     regrid_method: Optional[str] = None
     long_name: Optional[str] = None
     standard_name: Optional[str] = None
-    dims: Optional[List[str]] = None
+    grids: Optional[List[str]] = None
     source_aliases: Optional[Dict[str, str]] = None  # alias → model_var
     region: Optional[str] = None
 
@@ -202,7 +214,7 @@ class VarConfig:
             "regrid_method": self.regrid_method,
             "long_name": self.long_name,
             "standard_name": self.standard_name,
-            "dims": self.dims,
+            "grids": self.grids,
             "source_aliases": self.source_aliases,
             "region": self.region,
         }
@@ -562,10 +574,13 @@ class Mapping:
             Output frequency token (e.g. 'mon', 'day').
         """
         if cmip_name not in self._vars:
-            warnings.warn(
-                f"[mapping] no mapping found for CMIP variable {cmip_name} — skipping",
-                RuntimeWarning,
-                stacklevel=2,
+            # One channel for both lines: warnings.warn goes to stderr and is
+            # deduplicated per call site, so it would print once however many
+            # variables are unmapped, while the separator printed every time.
+            logger.warning("=" * 60)
+            logger.warning(
+                "[mapping] no mapping found for CMIP variable %s - skipping",
+                cmip_name,
             )
             return []
         effective_freq = freq if freq is not None else self.default_freq
@@ -746,7 +761,7 @@ def _to_varconfig(
         regrid_method=cfg.get("regrid_method"),
         long_name=cfg.get("long_name"),
         standard_name=cfg.get("standard_name"),
-        dims=cfg.get("dims"),
+        grids=cfg.get("grids"),
         source_aliases=aliases if aliases else None,
         region=cfg.get("region"),
     )

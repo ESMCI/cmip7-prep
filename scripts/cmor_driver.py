@@ -18,8 +18,10 @@ import os
 from pathlib import Path
 import logging
 import re
-from typing import Optional, Tuple
+import resource
+from typing import Tuple
 import sys
+import time
 from datetime import datetime, UTC
 import glob
 import json
@@ -28,9 +30,14 @@ import xarray as xr
 from cmor import set_cur_dataset_attribute
 
 from cmip7_prep.cmor_utils import (
+    load_positive_overrides,
     bounds_from_centers_1d,
     roll_for_monotonic_with_bounds,
     packaged_dataset_json,
+)
+from cmip7_prep.include_patterns import (
+    get_include_patterns,
+    patterns_for_variable,
 )
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
@@ -46,26 +53,19 @@ from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 
 from dask import delayed
 
+# The only logging configuration in the package: library modules attach
+# handlers to their own loggers but leave the root config to the entry point.
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
 
 logger = logging.getLogger("cmip7_prep.cmor_driver")
 
-# Regex for date extraction from filenames
-_DATE_RE = re.compile(
-    r"[\.\-](?P<year>\d{4})"  # year
-    r"(?P<sep>-?)"  # optional hyphen
-    r"(?P<month>0[1-9]|1[0-2])"  # month 01–12
-    r"\.nc(?!\S)"  # literal .nc and then end (or whitespace)
-)
-
 # Path for cmor tables
 # TODO: the following TABLES_cesm is no longer valid - can the TABLES_noresm be used?
 # TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
 TABLES_noresm = str(Path(__file__).parent.parent / "cmip7-cmor-tables")
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 REALM_YAML_MAP = {
     "noresm": {
@@ -84,79 +84,17 @@ REALM_YAML_MAP = {
     },
 }
 
-INCLUDE_PATTERN_MAP = {
-    "cesm": {
-        "aerosol": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "atmosChem": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "atmos": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h3a"],
-        },
-        "land": {
-            "mon": ["clm2.h0a"],
-        },
-        "ocnBgchem": {
-            "mon": ["mom6.h.z", "mom6.h.native."],
-            "day": ["mom6.h.sfc"],
-        },
-        "ocean": {
-            "mon": ["mom6.h.z", "mom6.h.native."],
-            "day": ["mom6.h.sfc"],
-        },
-        "seaIce": {
-            "mon": ["cice.h."],
-            "day": ["cice.h1."],
-        },
-    },
-    "noresm": {
-        "atmos": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "atmosChem": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "aerosol": {
-            "mon": ["cam.h0a"],
-            "day": ["cam.h1a"],
-            "6hr": ["cam.h2a"],
-            "3hr": ["cam.h4a"],
-        },
-        "land": {
-            "mon": ["clm2.h0a"],
-            "day": ["clm2.h1a"],
-            "3hr": ["clm2.h2a"],
-            "yr": [
-                "clm2.h2a"
-            ],  # Temporary change for WIEMIP TODO to change back ["clm2.h3a"],
-        },
-        "seaIce": {
-            "mon": ["cice.h."],
-            "day": ["cice.h1."],
-        },
-        # landIce is per ice-sheet: the '{ice_sheet}' placeholder is filled in
-        # from --ice-sheet (gris/ais) so each run targets a single CISM domain.
-        "landIce": {
-            "yr": ["cism.{ice_sheet}.h"],
-        },
-    },
+# If CESM archives time series under a component directory, a realm has to be
+# mapped to the component that wrote it.  Several realms share a component.
+REALM_COMPONENT_MAP = {
+    "atmos": "atm",
+    "aerosol": "atm",
+    "atmosChem": "atm",
+    "land": "lnd",
+    "ocean": "ocn",
+    "ocnBgchem": "ocn",
+    "seaIce": "ice",
+    "landIce": "glc",
 }
 
 
@@ -223,12 +161,6 @@ def parse_args():
         help="input_grid name (Default: ne30)",
     )
     parser.add_argument(
-        "--ocn-grid-file",
-        type=str,
-        default="/glade/campaign/cesm/cesmdata/inputdata/ocn/mom/tx2_3v2/ocean_hgrid_221123.nc",
-        help="Path to ocean grid description file for CESM/MOM (optional)",
-    )
-    parser.add_argument(
         "--ocn-static-file",
         type=str,
         default=None,
@@ -253,8 +185,11 @@ def parse_args():
         "--frequency",
         type=str,
         default="mon",
-        choices=["mon", "day", "6hr", "3hr", "yr"],
-        help="Frequency of data to be translated (mon, day, 6hr, 3hr, yr), (Default: mon)",
+        choices=["mon", "day", "6hr", "3hr", "1hr", "yr"],
+        help=(
+            "Frequency of data to be translated "
+            "(mon, day, 6hr, 3hr, 1hr, yr), (Default: mon)"
+        ),
     )
     parser.add_argument(
         "--outdir",
@@ -367,6 +302,170 @@ def get_experiment_info_from_tables(experiment_id: str, tables_root: Path) -> st
     raise ValueError(f"Experiment ID '{experiment_id}' not found in any CMIP7 table.")
 
 
+def _format_duration(seconds: float) -> str:
+    """Format a duration as h/m/s, dropping units that are zero."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, secs = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h{minutes:02d}m{secs:02d}s" if hours else f"{minutes}m{secs:02d}s"
+
+
+def _peak_memory_gb() -> float:
+    """Peak resident memory of this process so far, in GB.
+
+    ru_maxrss is a high-water mark since the process started: it never falls, so
+    it reports the largest the process has ever been, not what is held now.
+    """
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # Linux reports kilobytes, macOS bytes
+    return peak / 1024**2 if sys.platform != "darwin" else peak / 1024**3
+
+
+def _prepare_native(mapping, ds_native, varname, cfg):
+    """Realize a variable and keep it on the grid it arrives on.
+
+    Formulas and unit conversion are applied; nothing is regridded.  Covers
+    every native realm except sea ice, which needs its hemispheric variants.
+
+    The x0/y0/x1/y1 loop is for CISM land ice, whose projected axes the writer
+    needs to georeference the output.  Only CISM land ice has these variables,
+    so the loop does nothing for the other realms.
+
+    Returns (cmor_items, status).
+    """
+    realized = mapping.realize(ds_native, varname)
+    ds_c = (
+        realized
+        if isinstance(realized, xr.Dataset)
+        else xr.Dataset({varname: realized})
+    )
+    if "time_bounds" in ds_native and "time_bounds" not in ds_c:
+        ds_c = ds_c.assign(time_bounds=ds_native["time_bounds"])
+    for gname in ("x0", "y0", "x1", "y1"):
+        if gname in ds_native and gname not in ds_c.coords and gname not in ds_c:
+            ds_c = ds_c.assign({gname: ds_native[gname]})
+    return [(ds_c, cfg)], "native grid (realize applied)"
+
+
+def _prepare_seaice_native(mapping, ds_native, varname, frequency):
+    """Realize sea ice on the native CICE (nj, ni) grid, one item per variant.
+
+    Unlike the other native realms this uses realize_all, because the global
+    means carry Northern and Southern Hemisphere variants that become separate
+    published datasets.
+
+    TLAT/TLON ride along as coordinates, but the *_bounds variables are data
+    variables and would be dropped by the realize_all projection, so they are
+    reassigned for the 2-D variants that need them.
+
+    Returns (cmor_items, status).
+    """
+    cmor_items = []
+    for da, variant_cfg in mapping.realize_all(ds_native, varname, freq=frequency):
+        ds_v = da if isinstance(da, xr.Dataset) else xr.Dataset({varname: da})
+        if "time_bounds" in ds_native and "time_bounds" not in ds_v:
+            ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
+        if "nj" in da.dims and "ni" in da.dims:
+            for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+                if gname in ds_native and gname not in ds_v:
+                    ds_v = ds_v.assign({gname: ds_native[gname]})
+        cmor_items.append((ds_v, variant_cfg))
+    return (
+        cmor_items,
+        f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
+    )
+
+
+def _prepare_regridded(
+    mapping, ds_native, varname, cfg, resolution, model, tables_root, ocn_fx_fields
+):
+    """Realize a variable and regrid it to the target lat/lon grid.
+
+    plev39 is a special case: it is regridded, then averaged over longitude
+    and interpolated onto the plev39 pressure levels.
+
+    Returns the cmor_items list.  Unlike the native helpers this reports no
+    status: the regridded path records its result after writing, not here.
+    """
+    if cfg.get("levels", {}).get("name") == "plev39":
+        logger.info(
+            "Processing plev39 variable %s: realize → regrid to lat/lon "
+            "→ zonal_mean_on_pressure_grid",
+            varname,
+        )
+        # Realize the variable — handles single-source and formula cases uniformly.
+        realized = mapping.realize(ds_native, varname)
+
+        # normalizes the result to always be a DataArray:
+        #   - If realize returned a DataArray directly → use it as-is
+        #   - If realize returned a Dataset → extract the named variable from it: realized[varname]
+        # After this line, da_realized is always an xr.DataArray containing the CMIP variable
+        # on the native SE/ncol grid — whether it came from a direct mapping or a formula evaluation.
+        da_realized = (
+            realized if isinstance(realized, xr.DataArray) else realized[varname]
+        )
+
+        # Build a dataset with the realized variable plus PS for pressure
+        # computation.  The 1-D coefficients (hyam, hybm, P0, lev) are carried
+        # through unchanged by regrid_to_latlon_ds via _attach_vertical_metadata.
+        ds_to_regrid = xr.Dataset({varname: da_realized})
+        for aux in ("PS", "hyam", "hybm", "P0", "lev"):
+            if aux in ds_native:
+                ds_to_regrid[aux] = ds_native[aux]
+
+        # Regrid variable and PS from the native (SE/ncol) grid to lat/lon.
+        vars_to_regrid = [varname] + [v for v in ("PS",) if v in ds_to_regrid]
+        ds_latlon = regrid_to_latlon_ds(
+            ds_to_regrid,
+            vars_to_regrid,
+            resolution,
+            model,
+            time_from=ds_native,
+            dtype="float32",
+        )
+
+        # Zonal mean over lon then interpolate to plev39 pressure levels.
+        da = zonal_mean_on_pressure_grid(
+            ds_latlon,
+            varname,
+            tables_path=tables_root / "tables",
+            target="plev39",
+        )
+        ds_cmor = xr.Dataset({varname: da})
+        if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
+            ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
+        cmor_items = [(ds_cmor, cfg)]
+    else:
+        # lnd/atm and anything else: regrid to the target grid
+        logger.debug("Processing %s (atm/lnd or other)", varname)
+        # Obtain an xr.Dataset (ds_cmor) with the requested CMIP variable ready for CMOR.
+        # (this will include mapping from SE to lat/lon)
+        ds_cmor = realize_regrid_prepare(
+            resolution,
+            model,
+            mapping,
+            ds_native,
+            varname,
+            tables_path=tables_root / "tables",
+            regrid_kwargs={
+                "dtype": "float32",
+                # Stated per variable in the mapping YAML rather than looked up
+                # in a shared name list, so an ocean field can ask for bilinear.
+                "method": cfg.get("regrid_method", "conservative"),
+            },
+            open_kwargs={"decode_timedelta": True},
+        )
+        logger.debug("ds_cmor is not None")
+
+        # Attach ocn_fx_fields to regridded output for writing
+        if ocn_fx_fields is not None:
+            ds_cmor = ds_cmor.merge(ocn_fx_fields)
+        cmor_items = [(ds_cmor, cfg)]
+
+    return cmor_items
+
+
 def process_one_var(
     cmip_var,
     mapping,
@@ -379,6 +478,8 @@ def process_one_var(
     frequency="mon",
     ripf_index="r1i1p1f1",
     ocn_fx_fields=None,
+    ice_sheet=None,
+    experiment=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.branded_variable_name.name
@@ -388,7 +489,8 @@ def process_one_var(
     )
     # At this point you have a cmip_var (metadata from database query for the target variable)
     # queried a cmor database from the cloud
-    logger.info(f"Starting processing for variable: {varname}")
+    logger.debug(f"Starting processing for variable: {varname}")
+    var_start = time.monotonic()
     results = [(str(varname), "started")]
 
     try:
@@ -404,21 +506,22 @@ def process_one_var(
         results.append((varname, f"ERROR: {e}"))
         return results
 
-    # These are the dims on the destination
-    # (interpolated dims if you WILL do interpolation - have not done it yet)
-    dims_list = cfg.get("dims")
+    # CMIP grid labels to write for this variable.  Most variables are written
+    # once, on the regridded grid; a few MOM6 fields are requested on both the
+    # native tripolar grid and the regridded one, hence the loop.  There is no
+    # default: every variable states its grids, so a missing key is a mapping
+    # error rather than something to guess at.
+    # Hand-set 'positive' values; anything not listed takes the CMOR table's.
+    positive_overrides = load_positive_overrides(model)
 
-    # If dims is a single list (atm/lnd), wrap in a list for uniformity
-    if dims_list and len(dims_list) > 0 and isinstance(dims_list[0], str):
-        dims_list = [dims_list]
+    grids = cfg.get("grids")
+    if not grids:
+        logger.error("no grids specified for %s in the mapping YAML", varname)
+        results.append((str(varname), "ERROR: no grids in mapping YAML"))
+        return results
 
-    # Loop over dims - in most cases there will only be one entry -
-    # but for some variables (like ocean sos) there needs to be an
-    # entry both the native and the interpolated grid - so there will
-    # be two entries - hence the loop below
-
-    for dims in dims_list:
-        logger.info(f"Processing {varname} with dims {dims}")
+    for grid in grids:
+        logger.info(f"Processing {varname} on grid {grid}")
 
         # ---------------------------------------------
         # Read in time series, do the mapping and then regrid if necessary
@@ -442,11 +545,9 @@ def process_one_var(
                 open_kwargs=open_kwargs,
             )
             if ds_native is None:
-                logger.warning(f"Source variable(s) not found for {varname}, skipping")
+                logger.debug(f"Source variable(s) not found for {varname}, skipping")
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
-            if "TLAT" in ds_native:
-                logger.debug("TLAT is present")
             if model == "cesm":
                 # Append ocn_fx_fields to ds_native if available
                 # fx - grid definition like topography, fraction
@@ -456,185 +557,60 @@ def process_one_var(
 
             # Output ds_native keys
             logger.debug(
-                "ds_native keys: %s for var %s with dims %s",
+                "ds_native keys: %s for var %s",
                 list(ds_native.variables.keys()),
                 varname,
-                dims,
             )
-            # TODO: why does this not abort the program?
-            # JPE: because I don't want to abort the whole program
-            # if one variable is missing - I want to log the error and
-            # move on to the next variable
+            # A missing source variable is logged and skipped rather than
+            # raised: one unmappable variable should not cost the whole run.
+            # The result list records it so the summary reports what was lost.
             if var is None:
                 logger.warning(f"Source variable(s) not found for {varname}")
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
 
-            # For ocean realm: distinguish native vs regridded by dims
-            if model == "cesm" and "latitude" in dims and "longitude" in dims:
-                # output ocn on the native grid, but apply realize for formulas/mapping
-                logger.info(
-                    f"Preparing native grid output for mom6 variable {varname}, applying realize"
-                )
-                realized = mapping.realize(ds_native, varname)
-                ds_c = (
-                    realized
-                    if isinstance(realized, xr.Dataset)
-                    else xr.Dataset({varname: realized})
-                )
-                # Ensure time_bounds is included if present
-                if "time_bounds" in ds_native and "time_bounds" not in ds_c:
-                    ds_c = ds_c.assign(time_bounds=ds_native["time_bounds"])
-                cmor_items = [(ds_c, cfg)]
-                results.append(
-                    (str(varname), "analyzed native mom6 grid (realize applied)")
-                )
-            elif realm == "seaIce" and (model == "noresm" or len(dims) == 1):
-                # NorESM seaIce is always kept on the native CICE (nj, ni) grid:
-                # no regridding, regardless of dims. CESM seaIce keeps the prior
-                # behavior (native only for scalar/integrated len(dims) == 1 vars).
-                logger.info(
-                    f"Preparing seaIce field variants via realize_all for {varname}"
-                )
-                for da, variant_cfg in mapping.realize_all(
-                    ds_native, varname, freq=frequency
-                ):
-                    ds_v = (
-                        da if isinstance(da, xr.Dataset) else xr.Dataset({varname: da})
+            # 'gn' and 'gm' both mean "do not regrid": write the data on
+            # the grid it arrives on, or with no horizontal grid at all.  The
+            # realm still decides what has to ride along -- sea ice needs its
+            # NH/SH variants and the CICE grid definition, land ice its
+            # projected axes -- so the realm dispatch sits inside this arm.
+            if grid in ("gn", "gm"):
+                if realm == "seaIce":
+                    cmor_items, status = _prepare_seaice_native(
+                        mapping, ds_native, varname, frequency
                     )
-                    if "time_bounds" in ds_native and "time_bounds" not in ds_v:
-                        ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
-                    # Carry the native CICE grid definition (cell centers + vertex
-                    # bounds) into the trimmed variant dataset, but only for 2D
-                    # (nj, ni) variants that are written on the native grid. TLAT/TLON
-                    # ride along as coords, but the *_bounds vars are data_vars and
-                    # would be dropped by the realize_all projection.
-                    if "nj" in da.dims and "ni" in da.dims:
-                        for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
-                            if gname in ds_native and gname not in ds_v:
-                                ds_v = ds_v.assign({gname: ds_native[gname]})
-                    cmor_items.append((ds_v, variant_cfg))
-                results.append(
-                    (
-                        str(varname),
-                        f"seaIce field ({len(cmor_items)} variant(s), realize_all applied)",
+                else:
+                    # ocean, land ice and anything else on its native grid
+                    cmor_items, status = _prepare_native(
+                        mapping, ds_native, varname, cfg
                     )
-                )
-            elif realm == "landIce":
-                # CISM land-ice is kept on its native projected (x, y) grid: no
-                # regridding, and no NH/SH variants -- a variable is realized once
-                # and simply appears across the different frequency files.  The
-                # projected x/y coordinate axes ride along (dimension coordinates)
-                # so the writer can georeference them via the ice-sheet projection
-                # in _define_cism_grid.
-                logger.info(
-                    f"Preparing native landIce variable {varname}, applying realize"
-                )
-                realized = mapping.realize(ds_native, varname)
-                ds_cmor = (
-                    realized
-                    if isinstance(realized, xr.Dataset)
-                    else xr.Dataset({varname: realized})
-                )
-                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
-                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
-                # Carry the projected coordinate axes if not already present
-                # (defensive; dimension coordinates normally ride along).
-                for gname in ("x0", "y0", "x1", "y1"):
-                    if (
-                        gname in ds_native
-                        and gname not in ds_cmor.coords
-                        and gname not in ds_cmor
-                    ):
-                        ds_cmor = ds_cmor.assign({gname: ds_native[gname]})
-                cmor_items = [(ds_cmor, cfg)]
-                results.append(
-                    (str(varname), "landIce field (native, realize applied)")
-                )
-            elif cfg.get("levels", {}).get("name") == "plev39":
-                logger.info(
-                    "Processing plev39 variable %s: realize → regrid to lat/lon "
-                    "→ zonal_mean_on_pressure_grid",
-                    varname,
-                )
-                # Realize the variable — handles single-source and formula cases uniformly.
-                realized = mapping.realize(ds_native, varname)
-
-                # normalizes the result to always be a DataArray:
-                #   - If realize returned a DataArray directly → use it as-is
-                #   - If realize returned a Dataset → extract the named variable from it: realized[varname]
-                # After this line, da_realized is always an xr.DataArray containing the CMIP variable
-                # on the native SE/ncol grid — whether it came from a direct mapping or a formula evaluation.
-                da_realized = (
-                    realized
-                    if isinstance(realized, xr.DataArray)
-                    else realized[varname]
-                )
-
-                # Build a dataset with the realized variable plus PS for pressure
-                # computation.  The 1-D coefficients (hyam, hybm, P0, lev) are carried
-                # through unchanged by regrid_to_latlon_ds via _attach_vertical_metadata.
-                ds_to_regrid = xr.Dataset({varname: da_realized})
-                for aux in ("PS", "hyam", "hybm", "P0", "lev"):
-                    if aux in ds_native:
-                        ds_to_regrid[aux] = ds_native[aux]
-
-                # Regrid variable and PS from the native (SE/ncol) grid to lat/lon.
-                vars_to_regrid = [varname] + [v for v in ("PS",) if v in ds_to_regrid]
-                ds_latlon = regrid_to_latlon_ds(
-                    ds_to_regrid,
-                    vars_to_regrid,
-                    resolution,
-                    model,
-                    time_from=ds_native,
-                    dtype="float32",
-                )
-
-                # Zonal mean over lon then interpolate to plev39 pressure levels.
-                da = zonal_mean_on_pressure_grid(
-                    ds_latlon,
-                    varname,
-                    tables_path=tables_root / "tables",
-                    target="plev39",
-                )
-                ds_cmor = xr.Dataset({varname: da})
-                if "time_bounds" in ds_native and "time_bounds" not in ds_cmor:
-                    ds_cmor = ds_cmor.assign(time_bounds=ds_native["time_bounds"])
-                cmor_items = [(ds_cmor, cfg)]
-            else:
-                # For lnd/atm or any other dims, use existing logic
-                logger.debug(
-                    "Processing %s for dims %s (atm/lnd or other)", varname, dims
-                )
-                # Obtain an xr.Dataset (ds_cmor) with the requested CMIP variable ready for CMOR.
-                # (this will include mapping from SE to lat/lon)
-                ds_cmor = realize_regrid_prepare(
-                    resolution,
-                    model,
+                results.append((str(varname), status))
+            elif grid == "gr":
+                cmor_items = _prepare_regridded(
                     mapping,
                     ds_native,
                     varname,
-                    tables_path=tables_root / "tables",
-                    regrid_kwargs={
-                        "dtype": "float32",
-                    },
-                    open_kwargs={"decode_timedelta": True},
+                    cfg,
+                    resolution,
+                    model,
+                    tables_root,
+                    ocn_fx_fields,
                 )
-                logger.debug("ds_cmor is not None")
-
-                # Attach ocn_fx_fields to regridded output for writing
-                if ocn_fx_fields is not None:
-                    ds_cmor = ds_cmor.merge(ocn_fx_fields)
-                cmor_items = [(ds_cmor, cfg)]
-
+            else:
+                logger.error(
+                    "unrecognised grid label %r for %s; expected gn, gr or gm",
+                    grid,
+                    varname,
+                )
+                results.append((str(varname), f"ERROR: bad grid label {grid!r}"))
+                continue
         except (FileNotFoundError, KeyError) as e:
             results.append((varname, f"ERROR {model} file not not found: {e}"))
             continue
         except Exception as e:
             logger.error(
-                "Exception during regridding of %s with dims %s: %r",
+                "Exception during regridding of %s: %r",
                 varname,
-                dims,
                 e,
             )
             raise
@@ -661,7 +637,7 @@ def process_one_var(
                     dataset_json=metadata_json,
                     dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
                     outdir=outdir,
-                    ice_sheet=args.ice_sheet,
+                    ice_sheet=ice_sheet,
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
                     set_cur_dataset_attribute("realization_index", realization_index)
@@ -674,7 +650,7 @@ def process_one_var(
                     set_cur_dataset_attribute("region", region)
                     # Updating with correct experiment info from CMIP7 tables
                     experiment_info = get_experiment_info_from_tables(
-                        args.experiment, tables_root
+                        experiment, tables_root
                     )
                     for key, value in experiment_info.items():
                         if isinstance(value, list):
@@ -682,7 +658,7 @@ def process_one_var(
                         set_cur_dataset_attribute(key, value)
 
                     logger.info(
-                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency} and dims {dims}"
+                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
                     )
                     vdef = type(
                         "VDef",
@@ -691,8 +667,7 @@ def process_one_var(
                             "name": shortname,
                             "table": write_cfg.get("table", "atmos"),
                             "units": write_cfg.get("units", ""),
-                            "dims": dims,
-                            "positive": write_cfg.get("positive", None),
+                            "positive": positive_overrides.get(str(cmip7name)),
                             "cell_methods": write_cfg.get("cell_methods", None),
                             "long_name": write_cfg.get("long_name", None),
                             "standard_name": write_cfg.get("standard_name", None),
@@ -704,11 +679,21 @@ def process_one_var(
                     # Now use CMOR utility to write out netcdf variable
                     cm.write_variable(ds_cmor_write, cmip_var, vdef)
 
-                logger.info(f"Finished processing for {varname} with dims {dims}")
+                # A high-water mark for the process, so this is the largest any
+                # variable has needed so far, not this one alone. A jump from the
+                # previous line means this variable exceeded all before it.
+                logger.info(
+                    "Finished processing for %s on grid %s "
+                    "(%s, peak so far %.1f GB)",
+                    varname,
+                    grid,
+                    _format_duration(time.monotonic() - var_start),
+                    _peak_memory_gb(),
+                )
                 results.append((str(cmip7name), "ok"))
             except Exception as e:
                 logger.error(
-                    f"Exception while processing {varname} with dims {dims}: {e!r}"
+                    f"Exception while processing {varname} on grid {grid}: {e!r}"
                 )
                 results.append((str(varname), f"ERROR: {e!r}"))
     logger.debug(f"Completed all processing for variable: {varname}, results {results}")
@@ -718,63 +703,13 @@ def process_one_var(
 process_one_var_delayed = delayed(process_one_var)
 
 
-def latest_monthly_file(
-    directory: Path, *, require_consistent_style: bool = True
-) -> Optional[Tuple[Path, int, int]]:
-    """
-    Find the file in `directory` with the most recent YYYYMM.nc or YYYY-MM.nc date in its name.
-    Returns (path, year, month) or None if no matching files are found.
-    If `require_consistent_style` is True, raises ValueError if both styles are present.
-    """
-    if not directory.is_dir():
-        raise NotADirectoryError(directory)
-    found = []
-    seps = set()
-    logger.debug(f"Looking for files in {str(directory)}")
-    for p in directory.iterdir():
-        if not p.is_file():
-            continue
-        m = _DATE_RE.search(p.name)
-        if not m:
-            continue
-        year = int(m.group("year"))
-        month = int(m.group("month"))
-        sep = m.group("sep")
-        seps.add(sep)
-        found.append((year, month, p))
-    if not found:
-        return None
-    if require_consistent_style and len(seps) > 1:
-        raise ValueError("Mixed date styles detected (YYYYMM.nc and YYYY-MM.nc).")
-    logger.debug(f"Found {len(found)} files in {str(directory)}")
-    found.sort(key=lambda t: (t[0], t[1], t[2].name))
-    year, month, path = found[-1]
-    return path, year, month
-
-
-def get_include_patterns(
-    model: str, realm: str, frequency: str, ice_sheet: str | None = None
-) -> list[str]:
-    try:
-        patterns = INCLUDE_PATTERN_MAP[model][realm][frequency]
-    except KeyError:
-        raise ValueError(
-            f"No include_patterns defined for model={model}, "
-            f"realm={realm}, frequency={frequency}"
-        )
-    # landIce patterns are per ice-sheet; fill in the selected one (gris/ais).
-    if realm == "landIce":
-        if ice_sheet is None:
-            raise ValueError("realm 'landIce' requires --ice-sheet (gris or ais)")
-        patterns = [p.format(ice_sheet=ice_sheet) for p in patterns]
-    logger.info("Looking for pattern: %s", patterns)
-    return patterns
-
-
 def main():
+    run_start = time.monotonic()
     args = parse_args()
 
-    # Set logging level
+    # Set the level package-wide: setting only the driver's logger left
+    # cmor_writer, pipeline and regrid at the root level.
+    logging.getLogger("cmip7_prep").setLevel(getattr(logging, args.log_level))
     logger.setLevel(getattr(logging, args.log_level))
     logger.debug(f"Parsed arguments: {args}")
 
@@ -787,68 +722,23 @@ def main():
     logger.debug("Realm is %s", realm)
     ripf_index = args.realization_initialization_physics_forcing
 
-    # Set ocn_grid and ocn_fx_fields
-    # TODO: it looks like ocn_grid is not used after this - so can it
-    # be removed from the input argument list and from cmor_driver.py
-    ocn_grid = None
+    # Ocean fx fields (areacello, deptho, sftof) are read from the MOM6 static
+    # file and merged into the native data and the CMOR output.  CESM only.
     ocn_fx_fields = None
     if model == "cesm":
         if realm in ["ocean", "seaIce"]:
-            if args.ocn_grid_file:
-                ocn_grid = args.ocn_grid_file
             if args.ocn_static_file:
                 ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
                 logger.info(
                     f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
                 )
 
-    # Determine TSDIR
-    TSDIR = None
-    if args.tsdir:
-        TSDIR = Path(args.tsdir)
-        if not os.path.exists(TSDIR):
-            logger.error(f"Time series directory {str(TSDIR)} does not exist")
-            sys.exit(1)
-        timeseries = latest_monthly_file(TSDIR)
-        logger.info(f"latest monthly time series file is {timeseries}")
-    else:
-        if model == "noresm":
-            logger.error(f"must specify --tsdir as an input argument for noresm model")
-            sys.exit(1)
-        elif model == "cesm":
-            if args.caseroot and args.cimeroot:
-                caseroot = args.caseroot
-                cimeroot = args.cimeroot
-                sys.path.append(cimeroot)
-                _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
-                sys.path.append(_LIBDIR)
-                try:
-                    from CIME.case import Case
-                except ImportError as e:
-                    logger.error(f"Error importing CIME modules: {e}")
-                    sys.exit(1)
-                with Case(caseroot, read_only=True) as case:
-                    inputroot = case.get_value("DOUT_S_ROOT")
-                    casename = case.get_value("CASE")
-                if realm in ("atmos", "aerosol", "atmosChem"):
-                    TSDIR = Path(inputroot) / "atm" / "proc" / "tseries"
-                elif realm == "land":
-                    TSDIR = Path(inputroot) / "lnd" / "proc" / "tseries"
-                elif realm in ("ocean", "ocnBgchem"):
-                    TSDIR = Path(inputroot) / "ocn" / "proc" / "tseries"
-                elif realm == "seaIce":
-                    TSDIR = Path(inputroot) / "ice" / "proc" / "tseries"
-                elif realm == "landIce":
-                    TSDIR = Path(inputroot) / "glc" / "proc" / "tseries"
-                TSDIR = TSDIR / args.frequency
-            else:
-                logger.error(f"no TSDIR found for cesm model model")
-                sys.exit(1)
+    # Determine time series directory (TSDIR)
+    TSDIR = _resolve_tsdir(args, model, realm)
 
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)
-    if not os.path.exists(str(OUTDIR)):
-        os.makedirs(str(OUTDIR))
+    OUTDIR.mkdir(parents=True, exist_ok=True)
 
     # Load and evaluate the CMIP mapping YAML file for this model and realm
     if custom_yaml := args.custom_yaml:
@@ -976,13 +866,13 @@ def main():
 
     # Load requested variables
     if len(cmip_vars) > 0:
+        # Glob the union of every time sampling for this realm and frequency.
+        # Each variable is narrowed to its own sampling inside the loop below,
+        # using the signifier in its branded name -- CMIP7 frequency alone
+        # cannot tell a time-averaged variable from an instantaneous one.
         include_patterns = get_include_patterns(
-            model, realm, frequency, ice_sheet=args.ice_sheet
+            model, realm, frequency, ice_sheet=args.ice_sheet, sampling=None
         )
-        if len(include_patterns) == 1:
-            glob_pattern = f"*{include_patterns[0]}*.nc"
-        else:
-            glob_pattern = "*.nc"
 
         # Determine TABLES directory
         _default_tables = Path(__file__).parent.parent / "cmip7-cmor-tables"
@@ -1003,13 +893,20 @@ def main():
         logger.info(f"Using CMOR tables from: {tables_root}")
 
         # Determine time series files
-        all_ts_files = sorted(Path(TSDIR).glob(glob_pattern))
+        all_ts_files = sorted(
+            {
+                path
+                for pattern in include_patterns
+                for path in Path(TSDIR).glob(f"*{pattern}*.nc")
+            }
+        )
         logger.info(
-            f"Found {len(all_ts_files)} candidate timeseries files matching '{glob_pattern}'"
+            f"Found {len(all_ts_files)} candidate timeseries files "
+            f"matching {include_patterns}"
         )
         if not all_ts_files:
             logger.error(
-                f"No timeseries files found in {TSDIR} matching '{glob_pattern}'"
+                f"No timeseries files found in {TSDIR} matching {include_patterns}"
             )
             sys.exit(1)
 
@@ -1021,11 +918,29 @@ def main():
                 model_vars = _collect_required_model_vars(mapping, [varname])
             except Exception:
                 model_vars = []
+            # Without a mapping there are no source variables to match against,
+            # so the file search below would always come up empty and report a
+            # missing-data problem instead of the missing mapping already
+            # logged by _collect_required_model_vars.
+            if not model_vars:
+                results.append((varname, "ERROR: no mapping in YAML"))
+                continue
+            # Narrow to the history files this variable's sampling lives in.
+            # Without this an instantaneous variable would be built from
+            # time-averaged input: well-formed output, silently wrong values.
+            try:
+                var_patterns = patterns_for_variable(
+                    model, realm, frequency, varname, ice_sheet=args.ice_sheet
+                )
+            except ValueError as exc:
+                logger.warning("Skipping %s: %s", varname, exc)
+                continue
             ts_files = sorted(
                 {
                     p
                     for p in all_ts_files
-                    if any(_filename_contains_var(p, mv) for mv in model_vars)
+                    if any(pattern in p.name for pattern in var_patterns)
+                    and any(_filename_contains_var(p, mv) for mv in model_vars)
                 }
             )
             logger.info("=" * 60)
@@ -1033,7 +948,7 @@ def main():
                 logger.warning(f"No timeseries files found for variable {varname}")
                 continue
             else:
-                logger.info(
+                logger.debug(
                     f"Found {len(ts_files)} timeseries files for variable {varname} "
                     f"(model vars: {model_vars})"
                 )
@@ -1051,6 +966,8 @@ def main():
                         frequency=frequency,
                         ocn_fx_fields=ocn_fx_fields,
                         ripf_index=ripf_index,
+                        ice_sheet=args.ice_sheet,
+                        experiment=args.experiment,
                     )
                     results.extend(res)
                 except Exception as exc:
@@ -1069,6 +986,8 @@ def main():
                     frequency=frequency,
                     ocn_fx_fields=ocn_fx_fields,
                     ripf_index=ripf_index,
+                    ice_sheet=args.ice_sheet,
+                    experiment=args.experiment,
                 )
                 futures = client.compute([fut])
                 from dask.distributed import wait, as_completed
@@ -1089,6 +1008,50 @@ def main():
         client.close()
     if cluster:
         cluster.close()
+    logger.info(
+        "Run complete in %s, peak memory %.1f GB",
+        _format_duration(time.monotonic() - run_start),
+        _peak_memory_gb(),
+    )
+
+
+def _resolve_tsdir(args, model, realm):
+    """Return the time series directory (TSDIR) for this run."""
+    TSDIR = None
+    if args.tsdir:
+        TSDIR = Path(args.tsdir)
+        if not TSDIR.exists():
+            logger.error(f"Time series directory {TSDIR} does not exist")
+            sys.exit(1)
+    else:
+        if model == "noresm":
+            logger.error("must specify --tsdir as an input argument for noresm model")
+            sys.exit(1)
+        elif model == "cesm":
+            if args.caseroot and args.cimeroot:
+                caseroot = args.caseroot
+                cimeroot = args.cimeroot
+                sys.path.append(cimeroot)
+                _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
+                sys.path.append(_LIBDIR)
+                try:
+                    from CIME.case import Case
+                except ImportError as e:
+                    logger.error(f"Error importing CIME modules: {e}")
+                    sys.exit(1)
+                with Case(caseroot, read_only=True) as case:
+                    inputroot = case.get_value("DOUT_S_ROOT")
+                component = REALM_COMPONENT_MAP.get(realm)
+                if component is None:
+                    logger.error(f"no time series directory exists for realm {realm}")
+                    sys.exit(1)
+                TSDIR = (
+                    Path(inputroot) / component / "proc" / "tseries" / args.frequency
+                )
+            else:
+                logger.error("no time series directory found for cesm model")
+                sys.exit(1)
+    return TSDIR
 
 
 if __name__ == "__main__":

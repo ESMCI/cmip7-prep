@@ -1,10 +1,11 @@
 dataset_overrides: {institution_id: NCAR, nominal_resolution: 100 km, source_id: CESM3}
 
-variables:
+variables: {}
 
-  mrfso_tavg-u-hxy-lnd:
-    dims: [time, lat, lon]
-    formula: verticalsum(SOILICE, capped_at=5000)
-    sources: [model_var: SOILICE]
-    table: landIce
-    units: kg m-2
+  # NOTE: the following belongs in the land yaml file and needs to have an entry in the CESM CSV file
+  # mrfso_tavg-u-hxy-lnd:
+  #   dims: [time, lat, lon]
+  #   formula: verticalsum(SOILICE, capped_at=5000)
+  #   sources: [model_var: SOILICE]
+  #   table: landIce
+  #   units: kg m-2
