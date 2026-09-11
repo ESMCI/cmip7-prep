@@ -123,11 +123,14 @@ def build_variable_rows(
     plots = report.get("plots", {})
     timeseries_plots = plots.get("timeseries", {})
     map_plots = plots.get("maps", {})
+    zonal_plots = plots.get("zonal", {})
     # Reports from before per-variable plots stored lists; ignore those.
     if not isinstance(timeseries_plots, dict):
         timeseries_plots = {}
     if not isinstance(map_plots, dict):
         map_plots = {}
+    if not isinstance(zonal_plots, dict):
+        zonal_plots = {}
 
     rows = []
     for variable in sorted(expected | produced):
@@ -165,6 +168,7 @@ def build_variable_rows(
                     subset_prefix, timeseries_plots.get(variable)
                 ),
                 "map_plot": _plot_href(subset_prefix, map_plots.get(variable)),
+                "zonal_plot": _plot_href(subset_prefix, zonal_plots.get(variable)),
             }
         )
     return rows
@@ -609,7 +613,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     }
 
     var plots = el("div", { "class": "plots" });
-    [["timeseries_plot", "Time series"], ["map_plot", "Time-mean map"]].forEach(function (pair) {
+    [["timeseries_plot", "Time series"], ["map_plot", "Time-mean map"], ["zonal_plot", "Zonal mean"]].forEach(function (pair) {
       var href = variable[pair[0]];
       if (!href) { return; }
       var img = el("img", { src: encodeURI(href), loading: "lazy", alt: pair[1] + " for " + variable.name });

@@ -157,7 +157,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--plot-maps",
         action="store_true",
-        help="Create per-variable time-mean maps where possible",
+        help="Create per-variable time-mean maps where possible, plus "
+        "zonal-mean sections for variables with a vertical dimension",
     )
     parser.add_argument(
         "--plot-dir",
@@ -616,10 +617,54 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+VERTICAL_DIM_PREFIXES = ("lev", "plev", "depth", "alt", "olevel", "sdepth", "height")
+
+
+def _find_lat_dim(array: xr.DataArray) -> str | None:
+    """Return the latitude dimension name, if the array has one."""
+    return next((dim for dim in array.dims if dim.lower() in {"lat", "latitude"}), None)
+
+
+def _find_vertical_dim(array: xr.DataArray) -> str | None:
+    """Return the vertical dimension name (non-scalar), if the array has one."""
+    for dim in array.dims:
+        if dim.lower().startswith(VERTICAL_DIM_PREFIXES) and array.sizes[dim] > 1:
+            return dim
+    return None
+
+
+def _reduce_mean(array: xr.DataArray, reduce_dims: list[str]) -> xr.DataArray:
+    """Average over the given dims, weighting by cos(latitude) when present."""
+    if not reduce_dims:
+        return array
+    lat_dim = next(
+        (dim for dim in reduce_dims if dim.lower() in {"lat", "latitude"}), None
+    )
+    if lat_dim is not None:
+        weights = np.cos(np.deg2rad(array[lat_dim]))
+        return array.weighted(weights).mean(dim=reduce_dims, skipna=True)
+    return array.mean(dim=reduce_dims, skipna=True)
+
+
+def _title_units(array: xr.DataArray) -> str:
+    """Units suffix for plot titles; dimensionless '1' is not worth printing."""
+    units = array.attrs.get("units", "")
+    return "" if units == "1" else f" {units}"
+
+
+def _area_weighted_mean(array: xr.DataArray) -> float:
+    """Mean over all dims, weighted by cos(latitude) when a lat dim exists."""
+    return float(_reduce_mean(array, list(array.dims)))
+
+
 def _open_variable_timeseries(
     file_paths: list[Path], variable: str
 ) -> xr.DataArray | None:
-    """Open a variable across files and reduce it to a 1D time series if possible."""
+    """Open a variable across files and reduce it to a 1D time series if possible.
+
+    The spatial reduction is weighted by cos(latitude) when a latitude
+    dimension is present, so the series is an area-weighted global mean.
+    """
     if not file_paths:
         return None
     with xr.open_mfdataset(
@@ -636,8 +681,9 @@ def _open_variable_timeseries(
         reduce_dims = [
             dim for dim in array.dims if dim != "time" and not dim.endswith("bnds")
         ]
-        if reduce_dims:
-            array = array.mean(dim=reduce_dims, skipna=True)
+        attrs = array.attrs
+        array = _reduce_mean(array, reduce_dims)
+        array.attrs = attrs
         return array.load()
 
 
@@ -670,6 +716,38 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
         return array.load()
 
 
+def _open_variable_zonal(file_paths: list[Path], variable: str) -> xr.DataArray | None:
+    """Open a variable and reduce it to a (level, latitude) zonal-mean section.
+
+    Returns None unless the variable has both a latitude dimension and a
+    non-scalar vertical dimension; all other dimensions are averaged away.
+    """
+    if not file_paths:
+        return None
+    with xr.open_mfdataset(
+        file_paths,
+        combine="by_coords",
+        decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
+    ) as dataset:
+        data_var = (
+            variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
+        )
+        array = dataset[data_var]
+        vertical_dim = _find_vertical_dim(array)
+        lat_dim = _find_lat_dim(array)
+        if vertical_dim is None or lat_dim is None:
+            return None
+        reduce_dims = [
+            dim
+            for dim in array.dims
+            if dim not in (vertical_dim, lat_dim) and not dim.endswith("bnds")
+        ]
+        attrs = array.attrs
+        array = array.mean(dim=reduce_dims, skipna=True)
+        array.attrs = attrs
+        return array.transpose(vertical_dim, lat_dim).load()
+
+
 def create_timeseries_plots(
     produced_files: dict[str, list[Path]],
     plot_dir: Path,
@@ -698,7 +776,10 @@ def create_timeseries_plots(
             continue
         fig, axis = plt.subplots(figsize=(8, 4.5))
         axis.plot(get_plottble_times(series), series.values, linewidth=1.0)
-        axis.set_title(variable)
+        mean_value = float(series.mean(skipna=True))
+        axis.set_title(
+            f"{variable}\nglobal mean: {mean_value:.4g}{_title_units(series)}"
+        )
         axis.set_xlabel("Time (years)")
         axis.set_ylabel(
             f"{variable.split('_')[0]} ({series.attrs.get('units', 'unknown')})"
@@ -772,8 +853,50 @@ def create_map_plots(
             continue
         fig, axis = plt.subplots(figsize=(8, 4.5))
         field.plot(ax=axis, **_map_plot_kwargs(field))
-        axis.set_title(f"{variable} time-mean")
+        mean_value = _area_weighted_mean(field)
+        axis.set_title(
+            f"{variable} time-mean — global mean {mean_value:.4g}{_title_units(field)}"
+        )
         output_path = plot_dir / f"map_{variable}.png"
+        fig.savefig(output_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        plotted[variable] = str(output_path)
+    return plotted
+
+
+def create_zonal_plots(
+    produced_files: dict[str, list[Path]],
+    plot_dir: Path,
+    max_plots: int,
+) -> dict[str, str]:
+    """Create time-mean zonal-mean section plots for variables with a vertical dim."""
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        logger.warning("matplotlib is not available; skipping zonal-mean plots")
+        return {}
+
+    plotted = {}
+    for variable in sorted(produced_files)[:max_plots]:
+        try:
+            field = _open_variable_zonal(
+                produced_files[variable], variable.split("_")[0]
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Could not plot zonal mean for %s: %r", variable, exc)
+            continue
+        if field is None:
+            continue
+        fig, axis = plt.subplots(figsize=(8, 4.5))
+        field.plot(ax=axis, **_map_plot_kwargs(field))
+        vertical_dim = field.dims[0]
+        if field[vertical_dim].attrs.get("positive") == "down":
+            axis.invert_yaxis()
+        axis.set_title(f"{variable} zonal time-mean")
+        output_path = plot_dir / f"zonal_{variable}.png"
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
         plotted[variable] = str(output_path)
@@ -892,7 +1015,7 @@ def main() -> int:
     )
     dimension_inventory = summarize_dimension_inventory(inventory_records)
 
-    plot_outputs = {"timeseries": {}, "maps": {}}
+    plot_outputs = {"timeseries": {}, "maps": {}, "zonal": {}}
     if args.plot_timeseries or args.plot_maps:
         plot_dir = (
             Path(args.plot_dir).expanduser().resolve()
@@ -906,6 +1029,9 @@ def main() -> int:
             )
         if args.plot_maps:
             plot_outputs["maps"] = create_map_plots(
+                produced_files, plot_dir, args.max_plots
+            )
+            plot_outputs["zonal"] = create_zonal_plots(
                 produced_files, plot_dir, args.max_plots
             )
         # Store paths relative to the report directory so the HTML interface
