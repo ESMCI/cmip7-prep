@@ -63,9 +63,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_reports_dir(
-    root_output_path: str | None, reports_dir: str | None
-) -> Path:
+def resolve_reports_dir(root_output_path: str | None, reports_dir: str | None) -> Path:
     """Resolve the validation reports directory from the CLI arguments."""
     if reports_dir:
         path = Path(reports_dir).expanduser().resolve()
@@ -116,9 +114,7 @@ def build_variable_rows(
     error_lines: dict[str, list[str]] = {}
     for record in report.get("log_records", []):
         if record.get("error_lines"):
-            error_lines.setdefault(record["variable"], []).extend(
-                record["error_lines"]
-            )
+            error_lines.setdefault(record["variable"], []).extend(record["error_lines"])
 
     inventory_by_short_name = {
         item["variable"]: item for item in report.get("dimension_inventory", [])
@@ -714,17 +710,13 @@ def sync_plots(report: dict[str, Any], reports_dir: Path, html_dir: Path) -> int
 def build_site(reports_dir: str | Path, html_dir: str | Path | None = None) -> Path:
     """Build (or rebuild) the static site; returns the path to index.html."""
     reports_dir = Path(reports_dir).expanduser().resolve()
-    html_dir = (
-        Path(html_dir).expanduser().resolve() if html_dir else reports_dir
-    )
+    html_dir = Path(html_dir).expanduser().resolve() if html_dir else reports_dir
     html_dir.mkdir(parents=True, exist_ok=True)
     subsets = collect_reports(reports_dir)
     if not subsets:
         logger.warning("No validation_summary.json files found under %s", reports_dir)
     if html_dir != reports_dir:
-        copied = sum(
-            sync_plots(report, reports_dir, html_dir) for report in subsets
-        )
+        copied = sum(sync_plots(report, reports_dir, html_dir) for report in subsets)
         logger.info("Copied %d plot file(s) into %s", copied, html_dir)
     data = build_site_data(subsets)
     write_site_data(data, html_dir / DATA_FILENAME)
