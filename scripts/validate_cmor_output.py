@@ -203,10 +203,17 @@ def canonical_realm(realm: str) -> str:
 
 
 def _looks_like_cmip_root(path: Path) -> bool:
-    """Check whether a directory holds <activity>/<institution> subdirectories."""
-    institutions = {names[0] for names in MODEL_NAMING_MAPS.values()}
+    """Check whether a directory holds CMIP-style activity subdirectories.
+
+    A ``CMIP`` subdirectory is accepted on its own (even when still empty);
+    other activities (e.g. ``AeroCom``) are recognized by containing a known
+    institution directory.
+    """
     if not path.is_dir():
         return False
+    if (path / "CMIP").is_dir():
+        return True
+    institutions = {names[0] for names in MODEL_NAMING_MAPS.values()}
     return any(
         (activity / institution).is_dir()
         for activity in path.iterdir()
