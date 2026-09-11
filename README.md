@@ -119,6 +119,33 @@ python scripts/cmor_driver.py --realm land --tsdir /path/to/timeseries/
 qcmd -- python scripts/cmor_driver.py --realm atmos --tsdir /path/to/timeseries/
 ```
 
+## Validating CMOR output
+
+After running the driver, `validate_cmor_output.py` checks one subset (model /
+realm / experiment / frequency) of the output tree: it reports variables with
+CMOR log errors, expected variables that were not produced, and a dimension
+inventory, and can plot a mean time series and a time-mean map per variable.
+
+```bash
+python scripts/validate_cmor_output.py \
+    --model noresm --realm aerosol --experiment piControl --frequency mon \
+    --root-output-path /path/to/output/root \
+    --plot-timeseries --plot-maps --html
+```
+
+Reports land in `<root>/validation_reports/<model>_<realm>_<experiment>_<frequency>/`.
+The `--html` flag (or running `scripts/build_validation_html.py --root-output-path
+/path/to/output/root` directly) builds a static browsing interface at
+`<root>/validation_reports/index.html` covering **all** subsets validated so far —
+each new validation run adds to it. The page has an overview of failures per
+subset and a browse view with filters (experiment, frequency, realm, status,
+variable) showing per-variable source mapping info, error messages and plots.
+It needs no web server; open `index.html` directly, and the whole
+`validation_reports/` folder can be copied or synced as one self-contained unit.
+To publish the site elsewhere (e.g. a www-served directory), pass `--html-dir
+/path/to/site`: the plot images are then copied into that directory so it is
+self-contained.
+
 ## Variable mapping files
 
 The mapping YAML files live in `data/`. Each entry describes how a native model variable maps to a CMIP variable.

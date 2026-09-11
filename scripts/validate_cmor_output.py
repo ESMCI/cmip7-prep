@@ -24,6 +24,7 @@ import logging
 import re
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -156,7 +157,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--plot-maps",
         action="store_true",
-        help="Create per-variable time-mean maps where possible",
+        help="Create per-variable time-mean maps where possible, plus "
+        "zonal-mean sections for variables with a vertical dimension",
     )
     parser.add_argument(
         "--plot-dir",
@@ -166,8 +168,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-plots",
         type=int,
-        default=36,
+        default=120,
         help="Maximum number of variables to plot per plot mode",
+    )
+    parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Rebuild the static HTML interface covering all validation subsets",
+    )
+    parser.add_argument(
+        "--html-dir",
+        default=None,
+        help="Directory for the HTML interface (implies --html); defaults to "
+        "the validation reports directory. When it differs, plot images are "
+        "copied in so the site is self-contained (e.g. for a www-served "
+        "directory).",
     )
     parser.add_argument(
         "--strict",
@@ -188,16 +203,37 @@ def canonical_realm(realm: str) -> str:
     return CANONICAL_REALM_MAP.get(realm, realm)
 
 
+def _looks_like_cmip_root(path: Path) -> bool:
+    """Check whether a directory holds CMIP-style activity subdirectories.
+
+    A ``CMIP`` subdirectory is accepted on its own (even when still empty);
+    other activities (e.g. ``AeroCom``) are recognized by containing a known
+    institution directory.
+    """
+    if not path.is_dir():
+        return False
+    if (path / "CMIP").is_dir():
+        return True
+    institutions = {names[0] for names in MODEL_NAMING_MAPS.values()}
+    return any(
+        (activity / institution).is_dir()
+        for activity in path.iterdir()
+        if activity.is_dir()
+        for institution in institutions
+    )
+
+
 def resolve_cmip_root(root_output_path: str | Path) -> Path:
     """Resolve the CMIP7 root directory from either a parent or direct path."""
     root = Path(root_output_path).expanduser().resolve()
-    if (root / "CMIP").is_dir():
+    if _looks_like_cmip_root(root):
         return root
     cmip_root = root / "CMIP7"
-    if (cmip_root / "CMIP").is_dir():
+    if _looks_like_cmip_root(cmip_root):
         return cmip_root
     raise FileNotFoundError(
-        f"Could not locate CMIP output under {root}. Expected either {root / 'CMIP7' / 'CMIP'} or {root / 'CMIP'}."
+        f"Could not locate CMIP output under {root}. Expected activity/institution "
+        f"directories under either {root} or {root / 'CMIP7'}."
     )
 
 
@@ -226,8 +262,10 @@ def get_yaml_path(model: str, realm: str, custom_yaml: str | None) -> Path:
             raise FileNotFoundError(path)
         return path
 
-    yaml_realm = canonical_realm(realm)
-    yaml_name = REALM_YAML_MAP.get(model, {}).get(yaml_realm)
+    model_yaml_map = REALM_YAML_MAP.get(model, {})
+    # Prefer a realm-specific YAML (e.g. noresm aerosol) when one is defined;
+    # otherwise fall back to the canonical realm (e.g. atmosChem -> atmos).
+    yaml_name = model_yaml_map.get(realm) or model_yaml_map.get(canonical_realm(realm))
     if yaml_name is None:
         raise ValueError(f"No YAML mapping defined for model={model}, realm={realm}")
     with packaged_mapping_resource(yaml_name) as resource_path:
@@ -270,13 +308,20 @@ def get_requested_variables(
     content_dic = dt.get_transformed_content()
     logger.debug(content_dic)
     data_request = dr.DataRequest.from_separated_inputs(**content_dic)
-    cmip_vars = data_request.find_variables(
-        skip_if_missing=False,
-        operation="all",
-        cmip7_frequency=frequency,
-        modelling_realm=realm,
-        experiment=experiment,
-    )
+    try:
+        cmip_vars = data_request.find_variables(
+            skip_if_missing=False,
+            operation="all",
+            cmip7_frequency=frequency,
+            modelling_realm=realm,
+            experiment=experiment,
+        )
+    except ValueError as exc:
+        logger.warning(
+            "Data request query failed (%s); expected-variable filtering will use YAML only",
+            exc,
+        )
+        return None
     return {var.branded_variable_name.name for var in cmip_vars}
 
 
@@ -292,6 +337,41 @@ def filter_expected_variables(
     if selected_variables:
         yaml_names &= set(selected_variables)
     return sorted(yaml_names)
+
+
+def relative_to_report(path: str | Path, report_dir: Path) -> str:
+    """Return a path relative to the report dir, or unchanged if outside it."""
+    try:
+        return str(Path(path).relative_to(report_dir))
+    except ValueError:
+        return str(path)
+
+
+def build_variable_provenance(
+    yaml_variables: dict[str, dict[str, Any]],
+    expected_variables: list[str],
+) -> dict[str, dict[str, Any]]:
+    """Extract per-variable source/mapping info from the YAML mapping entries."""
+    provenance = {}
+    for variable in expected_variables:
+        entry = yaml_variables.get(variable)
+        if not isinstance(entry, dict):
+            continue
+        sources = entry.get("sources") or []
+        provenance[variable] = {
+            "source_model_vars": [
+                source.get("model_var")
+                for source in sources
+                if isinstance(source, dict) and source.get("model_var")
+            ],
+            "formula": entry.get("formula"),
+            "units": entry.get("units"),
+            "regrid_method": entry.get("regrid_method"),
+            "table": entry.get("table"),
+            "levels": entry.get("levels"),
+            "description": entry.get("description"),
+        }
+    return provenance
 
 
 def parse_log_variable(log_path: Path) -> str | None:
@@ -378,7 +458,7 @@ def scan_output_tree(
     inspection_errors: list[dict[str, str]] = []
     institution_id = MODEL_NAMING_MAPS[model][0]
     pattern = cmip_root.glob(
-        f"CMIP/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
+        f"*/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
     )
     for file_path in sorted(pattern):
         relative = file_path.relative_to(cmip_root)
@@ -537,14 +617,60 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+VERTICAL_DIM_PREFIXES = ("lev", "plev", "depth", "alt", "olevel", "sdepth", "height")
+
+
+def _find_lat_dim(array: xr.DataArray) -> str | None:
+    """Return the latitude dimension name, if the array has one."""
+    return next((dim for dim in array.dims if dim.lower() in {"lat", "latitude"}), None)
+
+
+def _find_vertical_dim(array: xr.DataArray) -> str | None:
+    """Return the vertical dimension name (non-scalar), if the array has one."""
+    for dim in array.dims:
+        if dim.lower().startswith(VERTICAL_DIM_PREFIXES) and array.sizes[dim] > 1:
+            return dim
+    return None
+
+
+def _reduce_mean(array: xr.DataArray, reduce_dims: list[str]) -> xr.DataArray:
+    """Average over the given dims, weighting by cos(latitude) when present."""
+    if not reduce_dims:
+        return array
+    lat_dim = next(
+        (dim for dim in reduce_dims if dim.lower() in {"lat", "latitude"}), None
+    )
+    if lat_dim is not None:
+        weights = np.cos(np.deg2rad(array[lat_dim]))
+        return array.weighted(weights).mean(dim=reduce_dims, skipna=True)
+    return array.mean(dim=reduce_dims, skipna=True)
+
+
+def _title_units(array: xr.DataArray) -> str:
+    """Units suffix for plot titles; dimensionless '1' is not worth printing."""
+    units = array.attrs.get("units", "")
+    return "" if units == "1" else f" {units}"
+
+
+def _area_weighted_mean(array: xr.DataArray) -> float:
+    """Mean over all dims, weighted by cos(latitude) when a lat dim exists."""
+    return float(_reduce_mean(array, list(array.dims)))
+
+
 def _open_variable_timeseries(
     file_paths: list[Path], variable: str
 ) -> xr.DataArray | None:
-    """Open a variable across files and reduce it to a 1D time series if possible."""
+    """Open a variable across files and reduce it to a 1D time series if possible.
+
+    The spatial reduction is weighted by cos(latitude) when a latitude
+    dimension is present, so the series is an area-weighted global mean.
+    """
     if not file_paths:
         return None
     with xr.open_mfdataset(
-        file_paths, combine="by_coords", decode_times=True
+        file_paths,
+        combine="by_coords",
+        decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
             variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
@@ -555,8 +681,9 @@ def _open_variable_timeseries(
         reduce_dims = [
             dim for dim in array.dims if dim != "time" and not dim.endswith("bnds")
         ]
-        if reduce_dims:
-            array = array.mean(dim=reduce_dims, skipna=True)
+        attrs = array.attrs
+        array = _reduce_mean(array, reduce_dims)
+        array.attrs = attrs
         return array.load()
 
 
@@ -565,7 +692,9 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
     if not file_paths:
         return None
     with xr.open_mfdataset(
-        file_paths, combine="by_coords", decode_times=True
+        file_paths,
+        combine="by_coords",
+        decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
             variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
@@ -587,12 +716,44 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
         return array.load()
 
 
+def _open_variable_zonal(file_paths: list[Path], variable: str) -> xr.DataArray | None:
+    """Open a variable and reduce it to a (level, latitude) zonal-mean section.
+
+    Returns None unless the variable has both a latitude dimension and a
+    non-scalar vertical dimension; all other dimensions are averaged away.
+    """
+    if not file_paths:
+        return None
+    with xr.open_mfdataset(
+        file_paths,
+        combine="by_coords",
+        decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
+    ) as dataset:
+        data_var = (
+            variable if variable in dataset.data_vars else list(dataset.data_vars)[0]
+        )
+        array = dataset[data_var]
+        vertical_dim = _find_vertical_dim(array)
+        lat_dim = _find_lat_dim(array)
+        if vertical_dim is None or lat_dim is None:
+            return None
+        reduce_dims = [
+            dim
+            for dim in array.dims
+            if dim not in (vertical_dim, lat_dim) and not dim.endswith("bnds")
+        ]
+        attrs = array.attrs
+        array = array.mean(dim=reduce_dims, skipna=True)
+        array.attrs = attrs
+        return array.transpose(vertical_dim, lat_dim).load()
+
+
 def create_timeseries_plots(
     produced_files: dict[str, list[Path]],
     plot_dir: Path,
     max_plots: int,
-) -> list[str]:
-    """Create paginated composite mean time-series plots."""
+) -> dict[str, str]:
+    """Create one composite-mean time-series plot per produced variable."""
     try:
         import matplotlib
 
@@ -600,45 +761,34 @@ def create_timeseries_plots(
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping time-series plots")
-        return []
+        return {}
 
-    plotted = []
-    variables = sorted(produced_files)[:max_plots]
-    if not variables:
-        return plotted
-
-    page_size = 9
-    for page_index in range(0, len(variables), page_size):
-        page_variables = variables[page_index : page_index + page_size]
-        fig, axes = plt.subplots(3, 3, figsize=(15, 11), squeeze=False)
-        for axis, variable in zip(axes.flat, page_variables):
+    plotted = {}
+    for variable in sorted(produced_files)[:max_plots]:
+        try:
             series = _open_variable_timeseries(
                 produced_files[variable], variable.split("_")[0]
             )
-            if series is None:
-                axis.set_title(variable)
-                axis.text(
-                    0.5, 0.5, "No plottable time series", ha="center", va="center"
-                )
-                axis.set_axis_off()
-                continue
-            axis.plot(get_plottble_times(series), series.values, linewidth=1.0)
-            axis.set_title(variable)
-            axis.tick_params(axis="x", rotation=30)
-            axis.set_xlabel("Time (years)")
-            axis.set_ylabel(
-                f"{variable.split('_')[0]} ({series.attrs.get('units', 'unknown')})"
-            )
-        for axis in axes.flat[len(page_variables) :]:
-            axis.set_axis_off()
-
-        fig.tight_layout()
-        output_path = (
-            plot_dir / f"timeseries_composite_{page_index // page_size + 1:02d}.png"
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Could not plot time series for %s: %r", variable, exc)
+            continue
+        if series is None:
+            continue
+        fig, axis = plt.subplots(figsize=(8, 4.5))
+        axis.plot(get_plottble_times(series), series.values, linewidth=1.0)
+        mean_value = float(series.mean(skipna=True))
+        axis.set_title(
+            f"{variable}\nglobal mean: {mean_value:.4g}{_title_units(series)}"
         )
+        axis.set_xlabel("Time (years)")
+        axis.set_ylabel(
+            f"{variable.split('_')[0]} ({series.attrs.get('units', 'unknown')})"
+        )
+        fig.tight_layout()
+        output_path = plot_dir / f"timeseries_{variable}.png"
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
-        plotted.append(str(output_path))
+        plotted[variable] = str(output_path)
     return plotted
 
 
@@ -656,11 +806,32 @@ def get_plottble_times(tseries: xr.DataArray) -> np.ndarray:
     return numbers
 
 
+def _map_plot_kwargs(field: xr.DataArray) -> dict[str, Any]:
+    """Choose robust color limits and a colormap for a time-mean map.
+
+    Color limits span the 2nd-98th percentile so a few extreme cells do not
+    wash out the rest of the map. A diverging colormap centered on zero is
+    used only when both signs carry substantial amplitude, so small negative
+    values from regridding noise do not trigger it on non-negative fields.
+    """
+    values = field.values
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return {}
+    low, high = np.percentile(finite, [2.0, 98.0])
+    if low == high:
+        return {}
+    if low < 0.0 < high and min(-low, high) > 0.05 * max(-low, high):
+        limit = max(-low, high)
+        return {"vmin": -limit, "vmax": limit, "cmap": "RdBu_r"}
+    return {"vmin": float(low), "vmax": float(high), "cmap": "viridis"}
+
+
 def create_map_plots(
     produced_files: dict[str, list[Path]],
     plot_dir: Path,
     max_plots: int,
-) -> list[str]:
+) -> dict[str, str]:
     """Create per-variable time-mean map plots where the data shape allows it."""
     try:
         import matplotlib
@@ -669,20 +840,66 @@ def create_map_plots(
         import matplotlib.pyplot as plt
     except ImportError:
         logger.warning("matplotlib is not available; skipping map plots")
-        return []
+        return {}
 
-    plotted = []
+    plotted = {}
     for variable in sorted(produced_files)[:max_plots]:
-        field = _open_variable_map(produced_files[variable], variable.split("_")[0])
+        try:
+            field = _open_variable_map(produced_files[variable], variable.split("_")[0])
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Could not plot map for %s: %r", variable, exc)
+            continue
         if field is None:
             continue
         fig, axis = plt.subplots(figsize=(8, 4.5))
-        field.plot(ax=axis)
-        axis.set_title(f"{variable} time-mean")
+        field.plot(ax=axis, **_map_plot_kwargs(field))
+        mean_value = _area_weighted_mean(field)
+        axis.set_title(
+            f"{variable} time-mean — global mean {mean_value:.4g}{_title_units(field)}"
+        )
         output_path = plot_dir / f"map_{variable}.png"
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close(fig)
-        plotted.append(str(output_path))
+        plotted[variable] = str(output_path)
+    return plotted
+
+
+def create_zonal_plots(
+    produced_files: dict[str, list[Path]],
+    plot_dir: Path,
+    max_plots: int,
+) -> dict[str, str]:
+    """Create time-mean zonal-mean section plots for variables with a vertical dim."""
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        logger.warning("matplotlib is not available; skipping zonal-mean plots")
+        return {}
+
+    plotted = {}
+    for variable in sorted(produced_files)[:max_plots]:
+        try:
+            field = _open_variable_zonal(
+                produced_files[variable], variable.split("_")[0]
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Could not plot zonal mean for %s: %r", variable, exc)
+            continue
+        if field is None:
+            continue
+        fig, axis = plt.subplots(figsize=(8, 4.5))
+        field.plot(ax=axis, **_map_plot_kwargs(field))
+        vertical_dim = field.dims[0]
+        if field[vertical_dim].attrs.get("positive") == "down":
+            axis.invert_yaxis()
+        axis.set_title(f"{variable} zonal time-mean")
+        output_path = plot_dir / f"zonal_{variable}.png"
+        fig.savefig(output_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        plotted[variable] = str(output_path)
     return plotted
 
 
@@ -694,7 +911,8 @@ def build_report(
     produced_files: dict[str, list[Path]],
     dimension_inventory: list[dict[str, Any]],
     inspection_errors: list[dict[str, str]],
-    plot_outputs: dict[str, list[str]],
+    plot_outputs: dict[str, dict[str, str]],
+    variable_provenance: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     """Build the structured validation report payload."""
     variables_with_log_errors = sorted(
@@ -711,6 +929,7 @@ def build_report(
     ]
 
     return {
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "scope": {
             "model": args.model,
             "realm": args.realm,
@@ -733,6 +952,7 @@ def build_report(
         "expected_but_not_produced": expected_but_not_produced,
         "produced_variables": produced_variables,
         "dimension_inventory": dimension_inventory,
+        "variable_provenance": variable_provenance,
         "log_records": flattened_log_records,
         "inspection_errors": inspection_errors,
         "plots": plot_outputs,
@@ -795,7 +1015,7 @@ def main() -> int:
     )
     dimension_inventory = summarize_dimension_inventory(inventory_records)
 
-    plot_outputs = {"timeseries": [], "maps": []}
+    plot_outputs = {"timeseries": {}, "maps": {}, "zonal": {}}
     if args.plot_timeseries or args.plot_maps:
         plot_dir = (
             Path(args.plot_dir).expanduser().resolve()
@@ -811,6 +1031,18 @@ def main() -> int:
             plot_outputs["maps"] = create_map_plots(
                 produced_files, plot_dir, args.max_plots
             )
+            plot_outputs["zonal"] = create_zonal_plots(
+                produced_files, plot_dir, args.max_plots
+            )
+        # Store paths relative to the report directory so the HTML interface
+        # keeps working when validation_reports/ is copied or synced elsewhere.
+        for plot_kind, paths in plot_outputs.items():
+            plot_outputs[plot_kind] = {
+                variable: relative_to_report(path, report_dir)
+                for variable, path in paths.items()
+            }
+
+    variable_provenance = build_variable_provenance(yaml_variables, expected_variables)
 
     report = build_report(
         args,
@@ -821,6 +1053,7 @@ def main() -> int:
         dimension_inventory,
         inspection_errors,
         plot_outputs,
+        variable_provenance,
     )
 
     write_json_report(report, report_dir / "validation_summary.json")
@@ -841,6 +1074,12 @@ def main() -> int:
         print(f"Time-series plots written to {plot_dir}")
     if plot_outputs["maps"]:
         print(f"Map plots written to {plot_dir}")
+
+    if args.html or args.html_dir:
+        from build_validation_html import build_site
+
+        index_path = build_site(report_dir.parent, args.html_dir)
+        print(f"HTML interface written to {index_path}")
 
     if args.strict and (
         report["variables_with_log_errors"] or report["expected_but_not_produced"]
