@@ -17,6 +17,7 @@ from typing import Any, Optional, Union
 import datetime as dt
 
 import logging
+from functools import lru_cache
 import cmor
 
 import numpy as np
@@ -36,9 +37,14 @@ from .cmor_utils import (
 
 # from .mom6_static import compute_cell_bounds_from_corners
 
-# logging.basicConfig(level=logging.INFO)
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=None)
+def _load_table_json(path: str) -> dict:
+    """Read and cache a CMOR table JSON, so it is parsed once per table."""
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 DatasetJsonLike = Union[str, Path, AbstractContextManager]
@@ -232,11 +238,88 @@ class CmorSession(
     # -------------------------
     # internal helpers
     # -------------------------
+    @staticmethod
+    def _time_axis_entry(table_path: str, var_name: str) -> str | None:
+        """Return the time axis CMOR requires for this variable, or None if it has none.
+
+        CMIP tables use several time axes and they are not interchangeable:
+        ``time`` for period means, ``time1`` for instantaneous values,
+        ``time2``/``time3`` for climatologies, ``time4`` for daily statistics.
+        Only ``time1`` is defined without bounds.
+
+        Read from the table rather than inferred from the branded name, since
+        the table is what CMOR validates against.  None means the variable has
+        no time axis.
+        """
+        try:
+            table = _load_table_json(str(table_path))
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning(
+                "Could not read table %s to determine the time axis for %s (%s); "
+                "falling back to 'time'",
+                table_path,
+                var_name,
+                exc,
+            )
+            return "time"
+
+        entry = (table.get("variable_entry") or {}).get(var_name)
+        if entry is None:
+            logger.warning(
+                "Variable %s not found in table %s; falling back to a 'time' axis",
+                var_name,
+                table_path,
+            )
+            return "time"
+
+        dims = entry.get("dimensions") or []
+        if isinstance(dims, str):
+            dims = dims.split()
+        for dim in dims:
+            if dim.startswith("time"):
+                return dim
+        return None
+
+    @staticmethod
+    def _positive_entry(table_path: str, var_name: str) -> str | None:
+        """Return the 'positive' value the CMOR table gives this variable.
+
+        'positive' says which direction a flux is measured in.  CMOR compares
+        what we declare against the table and flips the sign of the data if
+        they disagree, so this has to match unless we mean to override it.
+
+        None means the table gives no value, which is the case for anything
+        that is not a flux.
+        """
+        try:
+            table = _load_table_json(str(table_path))
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning(
+                "Could not read table %s for the 'positive' value of %s (%s)",
+                table_path,
+                var_name,
+                exc,
+            )
+            return None
+        entry = (table.get("variable_entry") or {}).get(var_name) or {}
+        return entry.get("positive") or None
+
+    @staticmethod
+    def table_path(tables_root: Path, key: str) -> str:
+        """Resolve the CMOR table file for a key.
+
+        The single place that decides where tables live.  Both the load into
+        CMOR and any reading of the JSON ourselves go through here, so the two
+        cannot end up looking at different files and disagreeing about what a
+        variable requires.
+        """
+        return resolve_table_filename(Path(tables_root) / "tables", key)
+
     def load_table(self, tables_root: Path, key: str) -> dict:
         """Load CMOR table JSON for a given key by searching common patterns."""
         if key == self.currenttable:
             return {}  # already loaded
-        table_filename = resolve_table_filename(tables_root / "tables", key)
+        table_filename = self.table_path(tables_root, key)
         self.currenttable = key
         logger.debug("Loading CMOR table for key '%s': %s", key, table_filename)
         return cmor.load_table(table_filename)
@@ -464,7 +547,9 @@ class CmorSession(
             longitude_vertices=grid.lon_vertices,
         )
 
-    def _define_axes(self, ds: xr.Dataset, vdef: any) -> list[int]:
+    def _define_axes(
+        self, ds: xr.Dataset, vdef: any, branded_name: str = ""
+    ) -> list[int]:
         """Define CMOR axis IDs for the variable in ds according to the CMOR tables.
 
         Rules:
@@ -476,7 +561,9 @@ class CmorSession(
         """
 
         # ---- helpers ----
-        def _get_time_and_bounds(dsi: xr.Dataset):
+        def _get_time_and_bounds(dsi: xr.Dataset, want_bounds: bool = True):
+            # want_bounds is False for 'time1', which takes no bounds; reading
+            # or synthesizing them would only be to discard them.
             logger.debug("Defining time axis")
             time_da = (
                 dsi.coords["time"]
@@ -534,6 +621,8 @@ class CmorSession(
                     else (dsi["time_bnds"] if "time_bnds" in dsi else None)
                 )
             )
+            if not want_bounds:
+                return tvals, None, str(units)
             tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
 
             # Some model output (e.g. CISM land-ice) carries no time bounds, but
@@ -581,6 +670,7 @@ class CmorSession(
         logger.debug("found var_da with name: %s and dims: %s", var_da.name, var_dims)
 
         alev_id = None
+        alevh_id = None
         plev_id = None
         lat_id = None
         lon_id = None
@@ -656,21 +746,131 @@ class CmorSession(
         time_id = None
         self.load_table(self.tables_root, self.primarytable)
         logger.debug("Define time axis (if present)")
-        tvals, tbnds, t_units = _get_time_and_bounds(ds)
-        if tvals is not None:
+        # Ask the table which time axis this variable needs, before reading the
+        # coordinate, so bounds are not gathered for an axis that cannot take them.
+        # The CMOR table is keyed by the branded variable name
+        # (e.g. 'hur_tpt-100hPa-hxy-u'), not the short CMIP name ('hur'), so the
+        # branded name has to be what we look up.
+        lookup_name = branded_name or getattr(vdef, "name", "")
+        time_entry = self._time_axis_entry(
+            self.table_path(self.tables_root, self.primarytable), lookup_name
+        )
+        tvals, tbnds, t_units = _get_time_and_bounds(
+            ds, want_bounds=(time_entry != "time1")
+        )
+
+        if tvals is not None and time_entry is not None:
             time_id = cmor.axis(
-                table_entry="time",
+                table_entry=time_entry,
                 units=t_units,
                 coord_vals=tvals,
-                cell_bounds=tbnds if tbnds is not None else None,
+                cell_bounds=tbnds,
             )
-            logger.debug("time axis id: %s var_dims=%s", time_id, var_dims)
+            logger.debug(
+                "Variable %s: time axis '%s' (bounds %s)",
+                lookup_name,
+                time_entry,
+                "yes" if tbnds is not None else "no",
+            )
+        elif time_entry is None:
+            logger.info(
+                "Variable %s has no time axis in table %s (time-independent)",
+                lookup_name,
+                self.primarytable,
+            )
+
+        # -------------------------
+        # --- vertical: standard_hybrid_sigma_half
+        # -------------------------
+        # Checked before the midpoint case: a half-level variable carries
+        # 'ilev' rather than 'lev', but the midpoint branch also fires on
+        # "lev" in var_dims, and 'ilev' contains 'lev' as a substring only --
+        # keeping this first makes the intent explicit rather than relying on
+        # that.
+        levels = getattr(vdef, "levels", {}) or {}
+        if (levels.get("name") or "").lower() in {
+            "standard_hybrid_sigma_half",
+            "alevhalf",
+        }:
+            if (self.primarytable or "").lower() not in {
+                "atmos",
+                "atmoschem",
+                "aerosol",
+            }:
+                raise ValueError(
+                    "Hybrid sigma coordinates are only supported for atmospheric tables."
+                )
+            logger.debug("Defining hybrid sigma half-level axis")
+            hyai_name = levels.get("hyai", "hyai")  # A at interfaces
+            hybi_name = levels.get("hybi", "hybi")  # B at interfaces
+            ps_name = levels.get("ps", "PS")
+
+            # 0) sigma interfaces
+            # The coordinate is p = a*p0 + b*ps, so at the reference surface
+            # pressure p0 the axis value is a + b.  Using b alone would give a
+            # run of zeros at the top, where CAM's levels are pure pressure and
+            # hybi is exactly 0.  CAM's own 'ilev' is (a + b) * p0 in hPa,
+            # which pipeline.py divides by 1000 for the same reason.
+            #
+            # 'must_have_bounds: no' in CMIP7_coordinate.json, so the axis
+            # takes coordinate values only -- interfaces are points.
+            sigma_half = np.asarray(ds[hyai_name].values, dtype="f8") + np.asarray(
+                ds[hybi_name].values, dtype="f8"
+            )
+
+            # 1) define axis using sigma
+            alevh_id = cmor.axis(
+                table_entry="standard_hybrid_sigma_half",
+                units="1",
+                coord_vals=sigma_half,
+            )
+            cmor.set_cur_dataset_attribute("vertical_label", "alevhalf")
+
+            # 2) z-factors.  The name is the *formula entry* name, not the term
+            # name in the output file.  CMIP7_formula_terms.json defines
+            # a_half and b_half on dimension 'alevhalf', both with out_name
+            # 'a'/'b'.  Passing "a" attaches an entry declared on 'alevel' and
+            # CMOR rejects the axis type.  p0 and ps have no vertical
+            # dimension, so those are shared with the midpoint case.
+            cmor.zfactor(
+                zaxis_id=alevh_id,
+                zfactor_name="a_half",
+                units="",
+                axis_ids=[alevh_id],
+                zfactor_values=np.asarray(ds[hyai_name].values),
+            )
+            cmor.zfactor(
+                zaxis_id=alevh_id,
+                zfactor_name="b_half",
+                units="",
+                axis_ids=[alevh_id],
+                zfactor_values=np.asarray(ds[hybi_name].values),
+            )
+
+            # p0 scalar
+            cmor.zfactor(
+                zaxis_id=alevh_id, zfactor_name="p0", units="Pa", zfactor_values=1.0e5
+            )
+
+            # ps(time,lat,lon) zfactor must be DEFINED before the main variable
+            ps_zvar_id = cmor.zfactor(
+                zaxis_id=alevh_id,
+                zfactor_name="ps",
+                units="Pa",
+                axis_ids=[
+                    time_id,
+                    lat_id,
+                    lon_id,
+                ],  # order must match var’s non-vertical axes
+            )
+
+            # stash to write before main variable
+            self._pending_ps = (ps_zvar_id, ds[ps_name])
 
         # -------------------------
         # --- vertical: standard_hybrid_sigma
         # -------------------------
-        levels = getattr(vdef, "levels", {}) or {}
-        if (levels.get("name") or "").lower() in {
+        elif (levels.get("name") or "").lower() in {
             "standard_hybrid_sigma",
             "alevel",
             "alev",
@@ -704,8 +904,8 @@ class CmorSession(
             cmor.set_cur_dataset_attribute(
                 "vertical_label", "alevel"
             )  # or another valid value
-            # 2) z-factors: a(lev), b(lev), p0(scalar), ps(time,lat,lon)
 
+            # 2) z-factors: a(lev), b(lev), p0(scalar), ps(time,lat,lon)
             cmor.zfactor(
                 zaxis_id=alev_id,
                 zfactor_name="a",
@@ -727,6 +927,7 @@ class CmorSession(
             cmor.zfactor(
                 zaxis_id=alev_id, zfactor_name="p0", units="Pa", zfactor_values=1.0e5
             )
+
             # ps(time,lat,lon) zfactor must be DEFINED before the main variable
             ps_da = ds[ps_name]  # ensure units are Pa
             ps_zvar_id = cmor.zfactor(
@@ -739,6 +940,7 @@ class CmorSession(
                     lon_id,
                 ],  # order must match var’s non-vertical axes
             )
+
             # stash to write before main variable
             self._pending_ps = (ps_zvar_id, ps_da)
 
@@ -916,6 +1118,8 @@ class CmorSession(
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
             "lev": alev_id,  # sometimes used for hybrid
+            "ilev": alevh_id,  # hybrid sigma half levels (interfaces)
+            "alevhalf": alevh_id,
             "sdepth": sdepth_id,
             "z_l": lev_id,
             "olevel": lev_id,
@@ -961,7 +1165,11 @@ class CmorSession(
         logger.debug("Setting FX variable %s dims: %s", name, da.dims)
         if set(da.dims) == {"xh", "yh"}:
             self.load_table(self.tables_root, "ocean")
-            geo_path = Path(__file__).parent / "data" / "ocean_geometry.nc"
+            geo_path = (
+                Path(__file__).parent.parent.parent / "data" / "ocean_geometry.nc"
+            )
+            if not geo_path.exists():
+                raise FileNotFoundError(f"Expected geometry file not found: {geo_path}")
             ds_geo = xr.open_dataset(geo_path)
             lat = ds_geo["lath"].values
             lon_raw = np.mod(ds_geo["lonh"].values, 360.0)
@@ -1172,10 +1380,34 @@ class CmorSession(
 
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_root, self.primarytable)
+
+        # The slabbed write below needs time leading, and _define_axes builds
+        # axes_ids in the data's dimension order, so transpose before both.
+        if "time" in ds[str(bvn)].dims and ds[str(bvn)].dims[0] != "time":
+            logger.info(
+                "Transposing %s from %s to put time first for a slabbed write",
+                bvn,
+                ds[str(bvn)].dims,
+            )
+            ds = ds.assign({str(bvn): ds[str(bvn)].transpose("time", ...)})
+            data = ds[str(bvn)]
+
         logger.debug("Define CMOR axes for variable %s", bvn)
-        axes_ids = self._define_axes(ds, vdef)
+        axes_ids = self._define_axes(ds, vdef, branded_name=str(bvn))
+        logger.debug(
+            "[mem] axes defined: dims=%s chunks=%s dtype=%s",
+            data.dims,
+            getattr(data, "chunks", None),
+            data.dtype,
+        )
         logger.debug("Prepare data for CMOR %s", data.dtype)
         data_filled, fillv = filled_for_cmor(data)
+        logger.debug(
+            "[mem] after filled_for_cmor: dims=%s chunks=%s dtype=%s",
+            data_filled.dims,
+            getattr(data_filled, "chunks", None),
+            data_filled.dtype,
+        )
         if "zl" in data_filled.dims:
             data_filled = data_filled.rename({"zl": "olevel"})
         elif "zi" in data_filled.dims:
@@ -1195,7 +1427,14 @@ class CmorSession(
             var_entry,
             units,
             axes_ids,
-            positive=getattr(vdef, "positive", None),
+            # A hand-set value from data/<model>_positive.yaml wins; otherwise
+            # take the table's, which is what CMOR checks against anyway.
+            positive=(
+                getattr(vdef, "positive", None)
+                or self._positive_entry(
+                    self.table_path(self.tables_root, self.primarytable), str(bvn)
+                )
+            ),
             missing_value=fillv,
         )
         logger.debug("Now define time dimension and write data")
@@ -1221,6 +1460,11 @@ class CmorSession(
         # so slabbing bounds peak memory to a single slab.  Only applied when
         # 'time' is the leading axis (matching the CMOR axis order); otherwise
         # fall back to the original single write.
+        logger.debug(
+            "[mem] cmor.variable done, about to write: dims=%s chunks=%s",
+            data_filled.dims,
+            getattr(data_filled, "chunks", None),
+        )
         logger.debug("Writing CMOR variable %s", var_id)  # debug
         if data_filled.dims and data_filled.dims[0] == "time":
             ntime = int(data_filled.sizes["time"])
@@ -1229,8 +1473,18 @@ class CmorSession(
             for d in data_filled.dims:
                 if d != "time":
                     rec_bytes *= int(data_filled.sizes[d])
-            # target ~512 MB per slab (at least one time step)
-            slab = max(1, min(ntime, int((512 * 1024 * 1024) // max(rec_bytes, 1))))
+            # Follow the array's own chunking.  Sizing from output bytes is
+            # misleading: producing one small output record pulls the much
+            # larger native field behind it.
+            time_chunks = None
+            chunks = getattr(data_filled, "chunks", None)
+            if chunks:
+                time_chunks = chunks[0]
+            if time_chunks:
+                slab = max(1, min(ntime, max(time_chunks)))
+            else:
+                # not dask-backed: fall back to a byte target on the output
+                slab = max(1, min(ntime, int((512 * 1024 * 1024) // max(rec_bytes, 1))))
             logger.debug(
                 "Slabbed CMOR write: ntime=%d, slab=%d (%.1f MB/record)",
                 ntime,
@@ -1239,7 +1493,14 @@ class CmorSession(
             )
             for start in range(0, ntime, slab):
                 stop = min(start + slab, ntime)
+                logger.debug("[mem] materializing slab %d:%d of %d", start, stop, ntime)
                 block = np.asarray(data_filled.isel(time=slice(start, stop)))
+                logger.debug(
+                    "[mem] slab %d:%d materialized, %.1f MB; writing",
+                    start,
+                    stop,
+                    block.nbytes / (1024 * 1024),
+                )
                 cmor.write(var_id, block, ntimes_passed=stop - start)
         else:
             cmor.write(

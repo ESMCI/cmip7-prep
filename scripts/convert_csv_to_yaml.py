@@ -6,6 +6,7 @@ import yaml
 import re
 import sys
 import argparse
+from pathlib import Path
 from typing import Optional
 
 from cmip7_prep.mapping_compat import FORMULA_NAMESPACE
@@ -17,50 +18,59 @@ from cmip7_prep.mapping_compat import FORMULA_NAMESPACE
 # so it is caught here instead.
 FORMULA_FUNCTIONS = frozenset(FORMULA_NAMESPACE)
 
-# ── NorESM positive attribute overrides ──────────────────────────────────────
-# Maps branded variable name → "up" or "down".
-# Entries here are written as `positive: <value>` in the NorESM output YAML.
-NORESM_POSITIVE_OVERRIDES: dict[str, str] = {
-    # "<branded_variable_name>": "up",
-    # "<branded_variable_name>": "down",
-    "hfls_tavg-u-hxy-u": "up",
-    "hfss_tavg-u-hxy-u": "up",
-    "rlds_tavg-u-hxy-u": "down",
-    "rldscs_tavg-u-hxy-u": "down",
-    "rldsdiff_tavg-u-hxy-u": "down",
-    "rls_tavg-u-hxy-u": "up",
-    "rlut_tavg-u-hxy-u": "up",
-    "rlutcs_tavg-u-hxy-u": "up",
-    "rlutaf_tavg-u-hxy-u": "up",
-    "rlutcsaf_tavg-u-hxy-u": "up",
-    "rsds_tavg-u-hxy-u": "up",
-    "rsdscs_tavg-u-hxy-u": "up",
-    "rsdt_tavg-u-hxy-u": "up",
-    "rss_tavg-u-hxy-u": "down",
-    "rsuscs_tavg-u-hxy-u": "up",
-    "rsutcs_tavg-u-hxy-u": "up",
-    "rsut_tavg-u-hxy-u": "up",
-    "rsutaf_tavg-u-hxy-u": "up",
-    "rsutcsaf_tavg-u-hxy-u": "up",
-    "rlus_tavg-u-hxy-u": "up",
-    "rluscsaf_tavg-u-hxy-u": "up",
-    "rsus_tavg-u-hxy-u": "up",
-    "rtmt_tavg-u-hxy-u": "down",
-    "tauu_tavg-u-hxy-u": "down",
-    "tauv_tavg-u-hxy-u": "down",
-    "fFire_tavg-u-hxy-lnd": "up",
-    "npp_tavg-u-hxy-lnd": "down",
-    "rh_tavg-u-hxy-lnd": "up",
-    "rsds_tavg-u-hxy-lnd": "down",
-    "rsds_tavg-u-hxy-sn": "down",
-    "rsus_tavg-u-hxy-lnd": "up",
-    "rsus_tavg-u-hxy-sn": "up",
-    "tran_tavg-u-hxy-lnd": "up",
-    "evspsblsoi_tavg-u-hxy-u": "up",
-    "evspsblveg_tavg-u-hxy-u": "up",
-    "ra_tavg-u-hxy-lnd": "up",
-    "fN2O_tavg-u-hxy-lnd": "up",
-    "nbp_tavg-u-hxy-lnd": "down",
+# ── Regrid method ────────────────────────────────────────────────────────────
+# Intensive quantities -- temperatures, pressures, winds, sea surface height --
+# are point values and interpolate smoothly, so they use the bilinear map.
+# Everything else is a flux or a mass and must conserve its integral, so it
+# uses the conservative map.
+#
+# The list of intensive quantities lives in data/intensive_vars.yaml, keyed by
+# root variable name.
+
+INTENSIVE_VARS_YAML = Path(__file__).parent.parent / "data" / "intensive_vars.yaml"
+
+
+def load_intensive_vars() -> set[str]:
+    """Return the root names that should be regridded bilinearly."""
+    if not INTENSIVE_VARS_YAML.is_file():
+        return set()
+    with open(INTENSIVE_VARS_YAML, encoding="utf-8") as handle:
+        return set((yaml.safe_load(handle) or {}).get("intensive") or ())
+
+
+# ── Grid labels ──────────────────────────────────────────────────────────────
+# Which CMIP grid_label(s) each realm's variables are written on.  'gn' is the
+# model's native grid, 'gr' the regridded target grid, 'gm' a global mean with
+# no horizontal grid.  Realms whose output is regridded from an unstructured
+# grid get 'gr'; those kept on their native grid get 'gn'.
+#
+# Realm spellings differ between the two model CSVs, so both are listed.
+REALM_GRIDS: dict[str, list[str]] = {
+    "atmos": ["gr"],
+    "atmosChem": ["gr"],
+    "aerosol": ["gr"],
+    "land": ["gr"],
+    "seaIce": ["gn"],
+    "seaice": ["gn"],
+    "landIce": ["gn"],
+    "landice": ["gn"],
+    "ocean": ["gn"],
+    "fx": ["gn"],
+}
+
+# Per-variable exceptions to REALM_GRIDS, keyed by branded variable name.
+# The MOM6 fields below are published on both grids; the sea-ice entries are
+# global means with no horizontal grid.
+GRIDS_OVERRIDES: dict[str, list[str]] = {
+    "sos_tavg-u-hxy-sea": ["gn", "gr"],
+    "thetao_tavg-ol-hxy-sea": ["gn", "gr"],
+    "tos_tavg-u-hxy-sea": ["gn", "gr"],
+    "vo_tavg-ol-hxy-sea": ["gn", "gr"],
+    "wo_tavg-ol-hxy-sea": ["gn", "gr"],
+    "siarea_tavg-u-hm-u": ["gm"],
+    "siextent_tavg-u-hm-u": ["gm"],
+    "sisnmass_tavg-u-hm-si": ["gm"],
+    "sivol_tavg-u-hm-u": ["gm"],
 }
 
 # ── model configurations ─────────────────────────────────────────────────────
@@ -120,7 +130,6 @@ MODEL_CONFIGS = {
             "_tminavg-",
             "_tminavg-",
         ],
-        "positive_overrides": NORESM_POSITIVE_OVERRIDES,
     },
     "cesm": {
         "default_input": "cesm_data.csv",
@@ -145,9 +154,7 @@ MODEL_CONFIGS = {
             "Freq": "_freq",
             "Alias": "_alias",
             "Cell Methods": "cell_methods",
-            "Regrid Method": "regrid_method",
             "Region": "region",
-            "Positive": "positive",
             "Levels Name": "_levels_name",
             "Levels Units": "_levels_units",
             "Levels Src Axis Name": "_levels_src_axis_name",
@@ -395,6 +402,8 @@ def clean_string(value, normalize_dim_names=False):
             value = "lev"
         #  It is possible that this would also be needed for CESM, and that it could even be
         # applied to all timex dimensions where x is a number, but we apply it like this for now
+        elif value == "time1":
+            value = "time"
         elif value == "time4":
             value = "time"
     return value
@@ -711,6 +720,15 @@ def _build_entry(row, config):
         entry["levels"] = levels
     elif plev_name:
         entry["levels"] = {"name": plev_name, "units": "Pa"}
+    elif "dims" in entry and "alevhalf" in entry["dims"]:
+        # Half levels: the variable lives on the layer interfaces, so the
+        # interface coefficients are the axis values rather than the bounds of
+        # midpoints.  'src_axis_name' is ilev for the same reason.
+        entry["levels"] = {
+            "name": "standard_hybrid_sigma_half",
+            "units": "1",
+            "src_axis_name": "ilev",
+        }
     elif "dims" in entry and "lev" in entry["dims"]:
         # Fallback for models without explicit levels columns (e.g., NorESM).
         entry["levels"] = {
@@ -719,6 +737,12 @@ def _build_entry(row, config):
             "src_axis_name": "lev",
             "src_axis_bnds": "ilev",
         }
+
+    # 'dims' is parsed only to derive 'levels' above; it is not written to the
+    # YAML.  Nothing in the pipeline reads it -- the output dimension names come
+    # from the CMOR tables, and the data request CSV is the record of what a
+    # variable's dimensions should be.
+    entry.pop("dims", None)
 
     # Merge Freq/Alias columns into the per-source dicts.
     freq_str = entry.pop("_freq", None)
@@ -760,6 +784,8 @@ def read_csv(filepath, config):
         "realm_outputs"
     )  # optional; None means return a single combined dict
 
+    intensive_vars = load_intensive_vars()
+
     all_entries = []
     flagged = 0
     rows_seen: dict = {}
@@ -783,9 +809,16 @@ def read_csv(filepath, config):
                 continue
             rows_kept[realm] = rows_kept.get(realm, 0) + 1
             entry = _build_entry(row, config)
-            positive = config.get("positive_overrides", {}).get(name)
-            if positive:
-                entry["positive"] = positive
+            grids = GRIDS_OVERRIDES.get(name) or REALM_GRIDS.get(realm)
+            if grids is None:
+                raise ValueError(
+                    f"no grid label known for realm {realm!r}; "
+                    "add it to REALM_GRIDS in convert_csv_to_yaml.py"
+                )
+            entry["grids"] = list(grids)
+            entry["regrid_method"] = (
+                "bilinear" if name.split("_")[0] in intensive_vars else "conservative"
+            )
             problems = check_entry(
                 name, entry, row.get(config["source_column"], ""), row=rownum
             )

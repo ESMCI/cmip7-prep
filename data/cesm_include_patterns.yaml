@@ -1,0 +1,74 @@
+# History-file name patterns for CESM, keyed by realm, frequency, then time
+# sampling.
+#
+# Each entry lists the substrings that identify the history files holding a
+# realm's output.  gen_timeseries.py globs for "*<pattern>*" when collecting raw
+# history files; cmor_driver.py uses the same patterns to locate the time-series
+# files it CMORizes.
+#
+# The sampling level distinguishes time-averaged from instantaneous output,
+# which CMIP7 frequency does not: both a "tavg" and a "tpt" variable can be
+# monthly.  The branded variable name carries it (e.g. tas_tavg-u-hxy-u), and
+# CAM encodes it in the file name -- '%c.cam.h%t%f.%y-%m.nc', where %t is the
+# tape number and %f the tape's averaging flag, 'a' for average and 'i' for
+# instantaneous.
+#
+#   tavg: time-averaged output
+#   tpt:  instantaneous output; omit where the model writes none
+#
+# A realm/frequency/sampling combination that is absent here is not produced by
+# the model and raises "No include_patterns defined for ...".
+
+aerosol:
+  mon:
+    tavg: [cam.h0a]
+  day:
+    tavg: [cam.h1a]
+  6hr:
+    tavg: [cam.h2a]
+  3hr:
+    tavg: [cam.h3a]
+
+atmosChem:
+  mon:
+    tavg: [cam.h0a]
+  day:
+    tavg: [cam.h1a]
+  6hr:
+    tavg: [cam.h2a]
+  3hr:
+    tavg: [cam.h3a]
+
+atmos:
+  mon:
+    tavg: [cam.h0a]
+    tpt: [cam.h0i]
+  day:
+    tavg: [cam.h1a]
+  6hr:
+    tavg: [cam.h2a]
+  3hr:
+    tavg: [cam.h3a]
+
+land:
+  mon:
+    tavg: [clm2.h0a]
+    tpt: [clm2.h0i]
+
+ocnBgchem:
+  mon:
+    tavg: [mom6.h.z, mom6.h.native.]
+  day:
+    tavg: [mom6.h.sfc]
+
+ocean:
+  mon:
+    tavg: [mom6.h.z, mom6.h.native.]
+  day:
+    tavg: [mom6.h.sfc]
+
+seaIce:
+  mon:
+    tavg: [cice.h.]
+  day:
+    tavg: [cice.h1.]

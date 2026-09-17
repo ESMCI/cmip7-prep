@@ -103,48 +103,77 @@ class TestSigmaMidAndBounds:
     """Tests for sigma_mid_and_bounds covering normal and synthesized-bounds cases."""
 
     def _make_ds(self):
-        """Return a minimal dataset with hybm and hybi."""
+        """A minimal dataset with both hybrid coefficient pairs.
+
+        The coordinate is p = a*p0 + b*ps, so the level value is a + b.  Values
+        are binary fractions so the sums are exact: mid is
+        [0.125, 0.25, 0.5, 0.875] and the interfaces are
+        [0.0, 0.1875, 0.375, 0.75, 1.0].
+        """
         return xr.Dataset(
             {
-                "hybm": ("mid", [0.1, 0.3, 0.6, 0.9]),
-                "hybi": ("edge", [0.0, 0.2, 0.4, 0.7, 1.0]),
+                "hyam": ("mid", [0.125, 0.125, 0.0, 0.0]),
+                "hybm": ("mid", [0.0, 0.125, 0.5, 0.875]),
+                "hyai": ("edge", [0.0, 0.125, 0.125, 0.0, 0.0]),
+                "hybi": ("edge", [0.0, 0.0625, 0.25, 0.75, 1.0]),
             }
         )
 
     def test_output_shapes(self):
         """mid has shape (n,) and bounds has shape (n, 2)."""
         ds = self._make_ds()
-        mid, bnds = sigma_mid_and_bounds(ds, {"hybm": "hybm", "hybi": "hybi"})
+        mid, bnds = sigma_mid_and_bounds(ds, {})
         assert mid.shape == (4,)
         assert bnds.shape == (4, 2)
 
     def test_bounds_within_zero_one(self):
         """All sigma bounds are within [0, 1]."""
         ds = self._make_ds()
-        _mid, bnds = sigma_mid_and_bounds(ds, {"hybm": "hybm", "hybi": "hybi"})
+        _mid, bnds = sigma_mid_and_bounds(ds, {})
         assert np.all(bnds >= 0.0)
         assert np.all(bnds <= 1.0)
 
-    def test_synthesizes_bounds_without_hybi(self):
-        """When hybi is absent, bounds are synthesized with 0 and 1 as endpoints."""
-        ds = xr.Dataset({"hybm": ("mid", [0.1, 0.3, 0.6, 0.9])})
-        _mid, bnds = sigma_mid_and_bounds(ds, {"hybm": "hybm"})
+    def test_a_term_is_included(self):
+        """The A coefficient contributes, not just B.
+
+        Over CAM's pure pressure levels at the top of the model B is exactly
+        zero, so using B alone would collapse them to a single value.
+        """
+        ds = self._make_ds()
+        mid, _ = sigma_mid_and_bounds(ds, {})
+        assert mid.tolist() == [0.125, 0.25, 0.5, 0.875]
+        # B alone would have given 0.0 for the top level
+        assert mid[0] > 0.0
+
+    def test_synthesizes_bounds_without_interfaces(self):
+        """Without hyai/hybi, bounds are synthesized with 0 and 1 as endpoints."""
+        ds = xr.Dataset(
+            {
+                "hyam": ("mid", [0.125, 0.125, 0.0, 0.0]),
+                "hybm": ("mid", [0.0, 0.125, 0.5, 0.875]),
+            }
+        )
+        _mid, bnds = sigma_mid_and_bounds(ds, {})
         assert bnds.shape == (4, 2)
         assert bnds[0, 0] == pytest.approx(0.0)
         assert bnds[-1, 1] == pytest.approx(1.0)
 
     def test_raises_on_out_of_range(self):
         """Values outside [0, 1] raise ValueError."""
-        ds = xr.Dataset({"hybm": ("mid", [0.1, 0.3, 1.5])})
+        ds = xr.Dataset(
+            {
+                "hyam": ("mid", [0.0, 0.0, 0.0]),
+                "hybm": ("mid", [0.125, 0.25, 1.5]),
+            }
+        )
         with pytest.raises(ValueError, match="sigma"):
-            sigma_mid_and_bounds(ds, {"hybm": "hybm"})
+            sigma_mid_and_bounds(ds, {})
 
-    def test_monotonic_on_nonmonotonic_input(self):
-        """Non-monotonic hybm values are made strictly monotonic."""
-        ds = xr.Dataset({"hybm": ("mid", [0.1, 0.3, 0.2, 0.9])})
-        mid, _ = sigma_mid_and_bounds(ds, {"hybm": "hybm"})
-        # Check that mid is strictly monotonic
-        assert np.all(np.diff(mid) > 0)
+    def test_falls_back_to_lev_when_coefficients_absent(self):
+        """With no coefficients, a lev already in [0, 1] is used as sigma."""
+        ds = xr.Dataset({"lev": ("lev", [0.125, 0.25, 0.5, 0.875])})
+        mid, _ = sigma_mid_and_bounds(ds, {})
+        assert mid.tolist() == [0.125, 0.25, 0.5, 0.875]
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,8 @@ variables:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.  The chemical formula of CFC11 is CFCl3.  The
       IUPAC name for CFC11 is trichloro-fluoro-methane.
-    dims: [time]
+    grids: [gr]
+    regrid_method: conservative
     sources: [model_var: f11vmr]
     table: atmosChem
     units: '1.00E-12'
@@ -18,7 +19,8 @@ variables:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.  The chemical formula of CFC12 is CF2Cl2.  The
       IUPAC name for CFC12 is dichloro-difluoro-methane.
-    dims: [time]
+    grids: [gr]
+    regrid_method: conservative
     sources: [model_var: f12vmr]
     table: atmosChem
     units: '1.00E-12'
@@ -26,9 +28,10 @@ variables:
   ch4_tavg-al-hxy-u:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
-    dims: [lon, lat, lev, time]
+    grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: ch4vmr]
     table: atmosChem
     units: mol mol-1
@@ -36,8 +39,9 @@ variables:
   ch4_tavg-p19-hxy-air:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
-    dims: [time, plev, lat, lon]
+    grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: ch4vmr]
     table: atmosChem
     units: mol mol-1
@@ -45,15 +49,17 @@ variables:
   ch4_tavg-p39-hy-air:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
-    dims: [time, plev, lat]
+    grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: conservative
     sources: [model_var: ch4vmr]
     table: atmosChem
     units: mol mol-1
 
   ch4_tavg-u-hm-air:
     description: Global Mean Mole Fraction of CH4
-    dims: [time]
+    grids: [gr]
+    regrid_method: conservative
     sources: [model_var: ch4vmr]
     table: atmosChem
     units: '1.00E-09'
@@ -61,9 +67,10 @@ variables:
   dms_tavg-al-hxy-u:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
-    dims: [lon, lat, lev, time]
+    grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: DMS]
     table: atmosChem
     units: mol mol-1
@@ -72,9 +79,10 @@ variables:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.   The chemical formula of  nitrous oxide
       is N2O.
-    dims: [lon, lat, lev, time]
+    grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: n2ovmr]
     table: atmosChem
     units: mol mol-1
@@ -83,8 +91,9 @@ variables:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.   The chemical formula of  nitrous oxide
       is N2O.
-    dims: [time, plev, lat, lon]
+    grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: n2ovmr]
     table: atmosChem
     units: mol mol-1
@@ -93,15 +102,17 @@ variables:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.   The chemical formula of  nitrous oxide
       is N2O.
-    dims: [time, plev, lat]
+    grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: conservative
     sources: [model_var: n2ovmr]
     table: atmosChem
     units: mol mol-1
 
   n2o_tavg-u-hm-air:
     description: Global mean Nitrous Oxide (N2O)
-    dims: [time]
+    grids: [gr]
+    regrid_method: conservative
     sources: [model_var: n2ovmr]
     table: atmosChem
     units: '1.00E-09'
@@ -109,9 +120,10 @@ variables:
   o3_tavg-al-hxy-u:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
-    dims: [lon, lat, lev, time]
+    grids: [gr]
     levels: {name: standard_hybrid_sigma, src_axis_bnds: ilev, src_axis_name: lev,
       units: '1'}
+    regrid_method: conservative
     sources: [model_var: ozone]
     table: atmosChem
     units: mol mol-1
@@ -119,8 +131,9 @@ variables:
   o3_tavg-p19-hxy-air:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
-    dims: [time, plev, lat, lon]
+    grids: [gr]
     levels: {name: plev19, units: Pa}
+    regrid_method: conservative
     sources: [model_var: ozone]
     table: atmosChem
     units: mol mol-1
@@ -128,8 +141,9 @@ variables:
   o3_tavg-p39-hy-air:
     description: Mole fraction is used in the construction mole_fraction_of_X_in_Y,
       where X is a material constituent of Y.
-    dims: [time, plev, lat]
+    grids: [gr]
     levels: {name: plev39, units: Pa}
+    regrid_method: conservative
     sources: [model_var: ozone]
     table: atmosChem
     units: mol mol-1
