@@ -410,11 +410,11 @@ class CmorSession(
                     return dsi[nm]
             return None
 
-        tlat = _coord(ds, "TLAT", "tlat", "lat", "latitude")
-        tlon = _coord(ds, "TLON", "tlon", "lon", "longitude")
+        tlat = _coord(ds, "ULAT", "ulat", "TLAT", "tlat", "lat", "latitude")
+        tlon = _coord(ds, "ULON", "ulon", "TLON", "tlon", "lon", "longitude")
         if tlat is None or tlon is None:
             raise KeyError(
-                "CICE native grid requires TLAT/TLON cell-center coordinates "
+                "CICE native grid requires TLAT/TLON or ULAT/ULON cell-center coordinates "
                 f"in the dataset for variable '{var_name}'."
             )
 
@@ -427,9 +427,9 @@ class CmorSession(
         if isinstance(bname, str) and bname in ds:
             lon_bnds_da = ds[bname]
         if lat_bnds_da is None:
-            lat_bnds_da = _coord(ds, "latt_bounds", "lat_bounds", "TLAT_bnds")
+            lat_bnds_da = _coord(ds, "latu_bounds","latt_bounds", "lat_bounds", "TLAT_bnds")
         if lon_bnds_da is None:
-            lon_bnds_da = _coord(ds, "lont_bounds", "lon_bounds", "TLON_bnds")
+            lon_bnds_da = _coord(ds, "lonu_bounds","lont_bounds", "lon_bounds", "TLON_bnds")
         if lat_bnds_da is None or lon_bnds_da is None:
             raise KeyError(
                 "CICE native grid requires latitude/longitude vertex bounds "
