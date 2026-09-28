@@ -18,7 +18,7 @@ python = ">=3.10.13,<3.14"
 # Dependency management is handled by your conda environment.
 # Example setup (Python 3.12 is required for conda cmor 3.15):
 #   conda create -n cmip7-prep -c conda-forge python=3.12 cmor=3.15 xarray numpy \
-#     dask xesmf cftime pyyaml click pandas tqdm geocat-comp
+#     dask xesmf cftime pyyaml jsonschema click pandas tqdm geocat-comp
 #   conda activate cmip7-prep
 #   pip install -e . --no-deps
 #   pip install gents dulwich cmip7-data-request-api
