@@ -35,6 +35,25 @@ so in your summary.
 | A fix or a new bug, gap or question | `issues.md`, plus the "Top gotchas" table below |
 | A fact about this machine, sandbox or local data only | `SESSION.md` (not `docs/llm/`) |
 
+## Writing code: the minimal-solution ladder
+
+Before you write code, go down this list and stop at the first step that
+fits:
+
+| Step | Question | If yes | In this repo |
+|---|---|---|---|
+| 1 | Does this need to exist? | No: skip it (YAGNI). | Do not add options, abstractions or config keys that no caller uses. `issues.md` lists dead code (GAP-11, DEBT-*); do not grow it. |
+| 2 | Is it already in this codebase? | Reuse it; do not rewrite it. | Look in `layout.md` first. Common ones: `cmor_utils` (`bounds_from_centers_1d`, `roll_for_monotonic_with_bounds`, `filled_for_cmor`, `encode_time_to_num`); the `data/` YAML loaders in `include_patterns` and `regrid_maps`; `FORMULA_NAMESPACE` functions; the `RegridderCache` and `FXCache` caches; the `fake_cmor` test fixture. |
+| 3 | Does the stdlib do it? | Use it. | `pathlib`, `re`, `json`, `functools.lru_cache`, `dataclasses`, `argparse`, `logging`. |
+| 4 | Is there a native platform feature? | Use it. | Vectorised xarray/numpy operations instead of Python loops. Let CMOR and its tables decide what they already know (time axis, `positive`, CV checks). Put data in the `data/` YAML tables instead of hard-coding Python constants. |
+| 5 | Does an installed dependency do it? | Use it. | xarray, numpy, dask, cftime, xesmf/ESMF, geocat-comp, pyyaml, cmor, `data_request_api`, gents. A new dependency must be available on conda-forge or pip, be added to `Dockerfile`, `requirements.txt` and `INSTALL.md`, and needs the user's sign-off. |
+| 6 | Is it one line? | Write one line. | |
+| 7 | Only then | Write the minimum that works. | Add a doctest or a small pytest alongside it. |
+
+"Minimal" never overrides correctness of published values. Keep the unit,
+sign, grid, bounds and metadata handling that CMOR output needs, and follow
+rule 3 before you simplify any of it.
+
 ## Project in brief
 
 `cmip7-prep` converts CESM3 and NorESM3 output into CMOR 3.15 NetCDF for CMIP7.
