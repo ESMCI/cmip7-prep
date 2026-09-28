@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 # cmip7_prep/mapping_compat.py
 """
 Mapping loader and evaluator for CMIP7-style YAML variable mapping files.
@@ -46,16 +47,22 @@ the raw YAML dicts are not exposed publicly.
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
+from functools import lru_cache
 from importlib.resources import as_file
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Mapping as TMapping, Optional
+import re
 import warnings
 import logging
 
 import numpy as np
 import xarray as xr
 import yaml  # runtime dep
+
+from cmip7_prep.schema import mapping_errors
 
 logger = logging.getLogger(__name__)
 
@@ -223,10 +230,9 @@ class VarConfig:
 
 # ── formula namespace ────────────────────────────────────────────────────────
 # The functions below, plus ``np`` and ``xr``, are the complete set of names a
-# mapping formula may call.  They are exposed as FORMULA_NAMESPACE so that
-# scripts/convert_csv_to_yaml.py can validate formulas against the same list
-# the evaluator actually uses -- adding a function here makes it available to
-# formulas and known to the CSV validator in one edit.
+# mapping formula may call.  formula_names relies on FORMULA_NAMESPACE too:
+# a name listed here is never taken for a native variable, so adding a
+# function makes it callable and keeps it out of the file search in one edit.
 
 
 def verticalsum(arr, capped_at=None, dim="levsoi"):
@@ -371,6 +377,186 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     return eval(expr, safe_globals, safe_locals)
 
 
+# ── minimal mapping form ─────────────────────────────────────────────────────
+# Mapping files (schema: data/schemas/mapping.schema.yaml) hold a formula and
+# only what cannot be looked up elsewhere.  expand_entry spells such an entry
+# out in the form the rest of this module works with; the CMOR table supplies
+# table, units and levels (Mapping._add_table_fields).
+
+INTENSIVE_VARS_YAML = (
+    Path(__file__).parent.parent.parent / "data" / "intensive_vars.yaml"
+)
+
+_IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
+
+# Vertical axes in a CMOR table's 'dimensions', as the level names the pipeline
+# and writer dispatch on.  plevNN keeps its own name.
+_HYBRID_LEVELS = {
+    "alevel": "standard_hybrid_sigma",
+    "alevhalf": "standard_hybrid_sigma_half",
+}
+
+
+@lru_cache(maxsize=None)
+def load_intensive_vars() -> frozenset:
+    """Return the root names that should be regridded bilinearly."""
+    if not INTENSIVE_VARS_YAML.is_file():
+        return frozenset()
+    with open(INTENSIVE_VARS_YAML, encoding="utf-8") as handle:
+        return frozenset((yaml.safe_load(handle) or {}).get("intensive") or ())
+
+
+def formula_names(formula: str) -> List[str]:
+    """Return the native variables a formula reads, sorted.
+
+    That is every name in the expression except the functions it calls and
+    the names in :data:`FORMULA_NAMESPACE`.
+
+    >>> formula_names("(PRECC + PRECL) * 1.e6")
+    ['PRECC', 'PRECL']
+    >>> formula_names("verticalsum(SOILICE, capped_at=5000)")
+    ['SOILICE']
+    >>> formula_names("(siconc * tarea).where(siconc.coords['TLAT'] > 0).sum(dim=['nj'])")
+    ['siconc', 'tarea']
+    """
+    try:
+        tree = ast.parse(formula, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError(f"formula is not a valid expression: {formula!r}") from exc
+    called = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    return sorted(names - called - set(FORMULA_NAMESPACE))
+
+
+def expand_entry(name: str, entry: Any, grids: List[str]) -> Any:
+    """Spell a mapping entry out with ``sources``, the form the loader works with.
+
+    A formula written per frequency becomes frequency-tagged sources; where the
+    frequencies share one formula, the other frequencies' variable names become
+    aliases of the monthly (or first) frequency's.  Entries that already list
+    ``sources`` (the previous file format) are returned unchanged.
+
+    >>> expand_entry("tas_tavg-h2m-hxy-u", "TREFHT", ["gr"])
+    {'grids': ['gr'], 'regrid_method': 'bilinear', 'sources': [{'model_var': 'TREFHT'}]}
+    >>> expand_entry("siu", {"formula": {"day": "siu_d", "mon": "siu"}}, ["gn"])["sources"]
+    [{'model_var': 'siu_d', 'freq': 'day'}, {'model_var': 'siu', 'freq': 'mon'}]
+    >>> e = expand_entry("x", {"formula": {"day": "A_d * B", "mon": "A * B"}}, ["gr"])
+    >>> e["formula"]
+    'A * B'
+    >>> e["sources"][0]
+    {'model_var': 'A_d', 'freq': 'day', 'alias': 'A'}
+    """
+    if isinstance(entry, str):
+        entry = {"formula": entry}
+    if not isinstance(entry, dict) or "sources" in entry:
+        return entry
+    per_freq = (entry.get("variants") or [entry])[0]["formula"]
+    if not isinstance(per_freq, dict):
+        per_freq = {None: per_freq}
+    main_freq = "mon" if "mon" in per_freq else next(iter(per_freq))
+    main = per_freq[main_freq]
+
+    # A plain rename at every frequency needs no formula.
+    rename = not entry.get("variants") and all(
+        _IDENTIFIER.fullmatch(text.strip()) for text in per_freq.values()
+    )
+    if rename:
+        sources = [
+            (
+                {"model_var": text.strip(), "freq": freq}
+                if freq
+                else {"model_var": text.strip()}
+            )
+            for freq, text in per_freq.items()
+        ]
+    else:
+        sources, aliased = [], set()
+        for freq, text in per_freq.items():
+            if freq == main_freq:
+                continue
+            if _IDENTIFIER.sub("_", text) != _IDENTIFIER.sub("_", main):
+                raise ValueError(
+                    f"{name}: per-frequency formulas may differ only in variable names"
+                )
+            for model_var, alias in zip(
+                _IDENTIFIER.findall(text), _IDENTIFIER.findall(main)
+            ):
+                source = {"model_var": model_var, "freq": freq, "alias": alias}
+                if model_var != alias and source not in sources:
+                    sources.append(source)
+                    aliased.add(alias)
+        try:
+            names = formula_names(main)
+        except ValueError:
+            # Not valid Python: keep the file loadable; evaluating it will fail.
+            names = [
+                n
+                for n in dict.fromkeys(_IDENTIFIER.findall(main))
+                if n not in FORMULA_NAMESPACE
+            ]
+        for model_var in names:
+            source = {"model_var": model_var}
+            if model_var in aliased:
+                source["freq"] = main_freq
+            sources.append(source)
+
+    expanded = {k: v for k, v in entry.items() if k not in ("formula", "variants")}
+    expanded.setdefault("grids", list(grids))
+    expanded.setdefault(
+        "regrid_method",
+        "bilinear" if name.split("_")[0] in load_intensive_vars() else "conservative",
+    )
+    expanded["sources"] = sources
+    if entry.get("variants"):
+        expanded["variants"] = [
+            {
+                **variant,
+                "formula": (
+                    variant["formula"][main_freq]
+                    if isinstance(variant["formula"], dict)
+                    else variant["formula"]
+                ),
+            }
+            for variant in entry["variants"]
+        ]
+    elif not rename:
+        expanded["formula"] = main
+    return expanded
+
+
+@lru_cache(maxsize=None)
+def _table_entries(tables_root: str, table: str) -> Dict[str, dict]:
+    """Return the variable_entry of ``<tables_root>/tables/CMIP7_<table>.json``, or {}."""
+    path = Path(tables_root) / "tables" / f"CMIP7_{table}.json"
+    if not path.is_file():
+        return {}
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle).get("variable_entry") or {}
+
+
+def _levels(table_entry: dict) -> Optional[Dict[str, str]]:
+    """Return the levels the pipeline needs, from a table entry's dimensions.
+
+    >>> _levels({"dimensions": "longitude latitude plev19 time"})
+    {'name': 'plev19'}
+    >>> _levels({"dimensions": ["longitude", "latitude", "alevel", "time"]})
+    {'name': 'standard_hybrid_sigma'}
+    >>> _levels({"dimensions": "longitude latitude time"}) is None
+    True
+    """
+    dims = table_entry.get("dimensions") or []
+    if isinstance(dims, str):
+        dims = dims.split()
+    for dim in dims:
+        if dim.startswith("plev") or dim in _HYBRID_LEVELS:
+            return {"name": _HYBRID_LEVELS.get(dim, dim)}
+    return None
+
+
 class Mapping:
     """Load and evaluate a CMIP7 variable mapping YAML file.
 
@@ -403,6 +589,10 @@ class Mapping:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.default_freq: Optional[str] = None
+        # Set by cmor_driver.py, so configs get table, units and levels from
+        # the CMOR table (see _add_table_fields).
+        self.tables_root: Optional[Path] = None
+        self.realm: Optional[str] = None
         self._vars, self._raw, self._variant_keys = self._load_yaml(self.path)
 
     @classmethod
@@ -437,7 +627,14 @@ class Mapping:
                 "Unsupported YAML structure: expected top-level 'variables:' dict."
             )
 
-        data = data["variables"]
+        # Warn rather than raise, so one malformed entry does not stop a run.
+        for message in mapping_errors(data):
+            logger.warning("%s does not match the mapping schema: %s", path, message)
+        grids = data.get("grids") or ["gr"]
+        data = {
+            name: expand_entry(name, cfg, grids)
+            for name, cfg in data["variables"].items()
+        }
         result: Dict[str, VarConfig] = {}
         raw: Dict[str, Any] = {}
         variant_keys: Dict[str, List[str]] = {}
@@ -483,8 +680,26 @@ class Mapping:
         effective_freq = freq if freq is not None else self.default_freq
         raw = self._raw.get(cmip_name)
         if effective_freq is not None and raw is not None:
-            return _to_varconfig(cmip_name, raw, freq=effective_freq).as_cfg()
-        return self._vars[cmip_name].as_cfg()
+            return self._add_table_fields(
+                _to_varconfig(cmip_name, raw, freq=effective_freq).as_cfg()
+            )
+        return self._add_table_fields(self._vars[cmip_name].as_cfg())
+
+    def _add_table_fields(self, cfg: Dict[str, Any]) -> Dict[str, Any]:
+        """Fill table, units and levels from the CMOR table, unless cfg sets them.
+
+        Needs tables_root and realm; without them cfg is returned unchanged.
+        """
+        if self.tables_root is None:
+            return cfg
+        entry = _table_entries(str(self.tables_root), self.realm).get(cfg["name"], {})
+        cfg.setdefault("table", self.realm)
+        if "units" in entry:
+            cfg.setdefault("units", entry["units"])
+        levels = _levels(entry)
+        if levels:
+            cfg.setdefault("levels", levels)
+        return cfg
 
     def timeseries_source_vars(
         self, cmip_name: str, freq: Optional[str] = None
@@ -604,7 +819,7 @@ class Mapping:
                     da.attrs.setdefault("long_name", vc.long_name)
                 if vc.standard_name:
                     da.attrs.setdefault("standard_name", vc.standard_name)
-                results.append((da, vc.as_cfg()))
+                results.append((da, self._add_table_fields(vc.as_cfg())))
         return results
 
     # No public access to _vars or _raw outside this file.

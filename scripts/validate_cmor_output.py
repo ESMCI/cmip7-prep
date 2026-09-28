@@ -33,7 +33,7 @@ import numpy as np
 import xarray as xr
 import yaml
 
-from cmip7_prep.mapping_compat import packaged_mapping_resource
+from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
 
 from cmor_driver import REALM_YAML_MAP
 
@@ -354,7 +354,7 @@ def build_variable_provenance(
     """Extract per-variable source/mapping info from the YAML mapping entries."""
     provenance = {}
     for variable in expected_variables:
-        entry = yaml_variables.get(variable)
+        entry = expand_entry(variable, yaml_variables.get(variable), [])
         if not isinstance(entry, dict):
             continue
         sources = entry.get("sources") or []

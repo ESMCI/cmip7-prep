@@ -1,0 +1,113 @@
+# JSON Schema (draft 2020-12), written in YAML, for the variable mapping files
+# data/<model>_to_cmip7_<realm>.yaml.  A mapping entry holds only what cannot
+# be derived from the CMOR tables, the run's command line or the data/ lookup
+# tables.
+#
+# Checked by cmip7_prep.schema.mapping_errors: when a Mapping is loaded (as
+# warnings), by scripts/convert_csv_to_yaml.py before it writes, and by
+# tests/test_schema.py for every mapping file in data/.  Changing this file
+# changes what the pipeline accepts: update cmip7_prep.mapping_compat in the
+# same change.
+#
+# Derived by cmip7_prep.mapping_compat instead of stored:
+#   sources        names used in `formula` (parsed with ast), minus
+#                  mapping_compat.FORMULA_NAMESPACE
+#   table          the run's --realm table if it has the variable, else the one
+#                  table that does (11 names are in more than one table)
+#   levels         the variable's `dimensions` in the CMOR table (plevNN,
+#                  alevel, alevhalf)
+#   regrid_method  data/intensive_vars.yaml, looked up at run time
+#   metadata       long_name, standard_name, cell_methods: CMOR writes them
+#                  from the table
+#
+# Example file:
+#   grids: [gn]
+#   variables:
+#     tas_tavg-h2m-hxy-u: TREFHT
+#     clt_tavg-u-hxy-u: {formula: CLDTOT, units: "1"}   # CMOR converts 1 -> %
+#     siconc_tavg-u-hxy-si: {formula: {mon: siconc, day: siconc_d}}
+#
+# A formula is a Python expression over native variable names, evaluated with
+# no builtins.  A bare name is a rename.  It is written either as one string,
+# or as one string per output frequency.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+title: cmip7-prep variable mapping
+type: object
+required: [variables]
+additionalProperties: false
+
+properties:
+
+  grids:
+    description: >-
+      Default output grids for every entry in this file: gn keeps the native
+      grid, gr regrids to lat/lon.  Default [gr].
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items: {enum: [gn, gr]}
+
+  variables:
+    description: Keyed by the variable's name in the CMOR table.
+    type: object
+    additionalProperties:
+      # Short form: the whole entry is the formula.  Long form: an object.
+      if: {type: string}
+      then: {minLength: 1}
+      else:
+        type: object
+        additionalProperties: false
+        # Either one formula, or a list of variants each with its own.
+        if: {required: [variants]}
+        then: {not: {required: [formula]}}
+        else: {required: [formula]}
+        properties:
+
+          formula:
+            if: {type: string}
+            then: {minLength: 1}
+            else:
+              type: object
+              minProperties: 1
+              propertyNames: {enum: [1hr, 3hr, 6hr, day, mon, yr]}
+              additionalProperties: {type: string, minLength: 1}
+
+          units:
+            description: >-
+              Units of the formula result, if they differ from the table's.
+              CMOR converts compatible units (1 -> %, degC -> K) and rejects
+              incompatible ones.
+            type: string
+
+          positive:
+            description: >-
+              Sign convention of the formula result, if it differs from the
+              table's.  CMOR flips the sign to match the table.
+            enum: [up, down]
+
+          grids:
+            description: Overrides the file's default grids.
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items: {enum: [gn, gr]}
+
+          variants:
+            description: One output per region, e.g. NH and SH sea-ice totals.
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: [region, formula]
+              additionalProperties: false
+              properties:
+                region: {type: string}
+                formula:
+                  if: {type: string}
+                  then: {minLength: 1}
+                  else:
+                    type: object
+                    minProperties: 1
+                    propertyNames: {enum: [1hr, 3hr, 6hr, day, mon, yr]}
+                    additionalProperties: {type: string, minLength: 1}
