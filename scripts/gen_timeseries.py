@@ -53,6 +53,12 @@ def parse_arguments():
         required=True,
     )
     parser.add_argument(
+        "--varlist",
+        type=str,
+        help="Comma separated list of variables to process",
+        default=None,
+    )
+    parser.add_argument(
         "--realm",
         choices=["atmos", "land", "seaIce", "landIce"],
         help="Realm to process - sets include patterns for time series (required)",
@@ -200,8 +206,13 @@ def main():
             f"No input files to process in {inputdir} with {include_patterns}"
         )
         sys.exit(0)
-    logger.info(f"include patterns are {include_patterns}")
+    logger.info(f"include patterns are {include_patterns}")            
 
+    varlist = (
+        [variable.strip() for variable in args.varlist.split(",") if variable.strip()]
+        if args.varlist
+        else None
+        )
     # Determine how time series will be created
     if not args.years_spec:
 
@@ -215,6 +226,10 @@ def main():
         logger.info("Starting ts_collection")
         ts_collection = TSCollection(hf_collection, outputdir, num_processes=workers)
         ts_collection = ts_collection.apply_overwrite("*")
+        if varlist:
+            ts_collection = ts_collection.include("*", var_glob=varlist)
+        if len(ts_collection) == 0:
+            raise RuntimeError("No matching variables/files found for time series generation")          
         ts_collection.execute()
         logger.info("Finished ts_collection")
 
@@ -258,6 +273,13 @@ def main():
                     ts_collection = ts_collection.apply_overwrite("*")
 
                 # Perform the time series generation for this pattern
+                if varlist:
+                    ts_collection = ts_collection.include("*", var_glob=varlist)
+                if len(ts_collection) == 0:
+                    raise RuntimeError("No matching variables/files found for time series generation")  
+                   
+                logger.info("Variables scheduled: %s", [order["primary_var"] for order in ts_collection])
+                
                 ts_collection.execute()
                 logger.info("Timeseries processing complete")
 
