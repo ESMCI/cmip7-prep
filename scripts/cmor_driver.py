@@ -367,7 +367,8 @@ def _prepare_seaice_native(mapping, ds_native, varname, frequency):
         if "time_bounds" in ds_native and "time_bounds" not in ds_v:
             ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
         if "nj" in da.dims and "ni" in da.dims:
-            for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+            for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds",\
+                          "ULAT", "ULON", "latu_bounds", "lonu_bounds"):
                 if gname in ds_native and gname not in ds_v:
                     ds_v = ds_v.assign({gname: ds_native[gname]})
         cmor_items.append((ds_v, variant_cfg))
