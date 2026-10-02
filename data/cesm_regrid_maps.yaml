@@ -20,3 +20,20 @@ resolutions:
   regular:
     conservative: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_aave.251023.nc
     bilinear: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc
+
+
+grid_names_per_realm:
+  ne16:
+    atmos: g123
+    aerosol: g123
+    atmosChem: g123
+    land: g123
+    seaIce: g202
+    landIce: g194
+  ne30:
+    atmos: g106
+    aerosol: g106
+    atmosChem: g106
+    land: g106
+    seaIce: g106
+    landIce: g106

@@ -82,7 +82,7 @@ MODEL_CONFIGS = {
         "normalize_dim_names": True,
         "dataset_overrides": {
             "institution_id": "NCC",
-            "source_id": "NorESM3",
+            "source_id": "NorESM3-LM",
             "nominal_resolution": "200 km",
             "yaml_coax_dummy": [0, 1, 2],
         },

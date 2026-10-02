@@ -8,10 +8,14 @@ Usage:
 
 Preserves all comments and error handling from both atm_monthly.py and lnd_monthly.py.
 """
-
 from __future__ import annotations
 import argparse
 from concurrent.futures import as_completed
+
+
+import inspect
+
+print(inspect.getframeinfo(inspect.getouterframes(inspect.currentframe())[0][0])[0])
 
 
 import os
@@ -27,6 +31,14 @@ import glob
 import json
 import numpy as np
 import xarray as xr
+
+# Load all possible cmip vars for this realm and this experiment
+# The data_request_api is a CMIP7-specific Python package that is
+# separate from CMOR itself but closely related to it.
+# It produce lists of variables requested for each CMIP7 experiment
+from data_request_api.query import data_request as dr
+from data_request_api.content import dump_transformation as dt
+
 from cmor import set_cur_dataset_attribute
 
 from cmip7_prep.cmor_utils import (
@@ -50,8 +62,13 @@ from cmip7_prep.pipeline import (
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
+from cmip7_prep.regrid_maps import get_grid_names
+
 
 from dask import delayed
+
+
+
 
 # The only logging configuration in the package: library modules attach
 # handlers to their own loggers but leave the root config to the entry point.
@@ -628,8 +645,17 @@ def process_one_var(
                 # Initialize CMOR class
                 metadata_json = None
                 if model == "noresm":
-                    metadata_json = packaged_dataset_json("cmor_dataset_noresm.json")
-
+                    metadata_json = packaged_dataset_json(
+                        "cmor_dataset_noresm.json",
+                    )
+                    if resolution == "ne16":
+                        metadata_json = packaged_dataset_json(
+                        "cmor_dataset_noresm3-lm.json",
+                    )
+                    elif resolution == "ne30":
+                        metadata_json = packaged_dataset_json(
+                        "cmor_dataset_noresm3-mm.json",
+                    )
                 with CmorSession(
                     tables_root=tables_root,
                     log_dir=log_dir,
@@ -648,6 +674,13 @@ def process_one_var(
                     set_cur_dataset_attribute("forcing_index", forcing_index)
                     region = write_cfg.get("region", "glb")
                     set_cur_dataset_attribute("region", region)
+                    try:
+                        grid_name = get_grid_names(model, resolution, realm)
+                        
+                    except ValueError as e:
+                        logger.error(f"Error setting grid attribute: {e}")
+                        grid_name = grid
+                    set_cur_dataset_attribute("grid", grid_name)
                     # Updating with correct experiment info from CMIP7 tables
                     experiment_info = get_experiment_info_from_tables(
                         experiment, tables_root
@@ -673,11 +706,12 @@ def process_one_var(
                             "standard_name": write_cfg.get("standard_name", None),
                             "levels": write_cfg.get("levels", None),
                             "branded_variable_name": cmip7name,
+                            "grid_label": grid_name,
                         },
                     )()
-
                     # Now use CMOR utility to write out netcdf variable
                     cm.write_variable(ds_cmor_write, cmip_var, vdef)
+
 
                 # A high-water mark for the process, so this is the largest any
                 # variable has needed so far, not this one alone. A jump from the
@@ -757,13 +791,6 @@ def main():
         logger.info(f"Loading mapping YAML: {yaml_filename}")
         mapping = Mapping.from_packaged_default(filename=yaml_filename)
     mapping.default_freq = frequency
-
-    # Load all possible cmip vars for this realm and this experiment
-    # The data_request_api is a CMIP7-specific Python package that is
-    # separate from CMOR itself but closely related to it.
-    # It produce lists of variables requested for each CMIP7 experiment
-    from data_request_api.query import data_request as dr
-    from data_request_api.content import dump_transformation as dt
 
     logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
