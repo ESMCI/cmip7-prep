@@ -14,6 +14,7 @@ import sys
 import glob
 import argparse
 import logging
+from concurrent.futures import ProcessPoolExecutor
 
 # Determine local directory path:
 _LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -21,10 +22,72 @@ _LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
 from pathlib import Path
 
 # Time series generation imports
+import netCDF4
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 
 from cmip7_prep.include_patterns import all_include_patterns
+
+# ++++++++++++++++++++++++++++++
+# Unusable history file detection
+# ++++++++++++++++++++++++++++++
+
+
+def time_record_count(path):
+    """
+    Returns the number of time records in a history file: 0 if it holds none,
+    None if it has no time dimension, or -1 if it will not open.
+    """
+    try:
+        with netCDF4.Dataset(path) as ds:
+            time_dim = ds.dimensions.get("time")
+            if time_dim is None:
+                return None
+            return time_dim.size
+    except OSError:
+        return -1
+
+
+def find_unusable_files(inputdir, include_patterns, workers, logger):
+    """
+    Returns the history files GenTS cannot derive time bounds from: those with
+    zero time records, and those that will not open.
+
+    GenTS takes a minimum over each file's time coordinate to order the files
+    into a series, so a file with no records raises a zero-size reduction in
+    gents.meta.  Files like that are written when a run segment opens a history
+    stream but ends before any sample reaches it.  They hold no data, so they
+    are dropped here instead of being left for GenTS to warn about one logged
+    traceback at a time.
+    """
+    candidates = sorted(
+        {
+            path
+            for pattern in include_patterns
+            for path in glob.glob(os.path.join(inputdir, pattern))
+        }
+    )
+    if not candidates:
+        return []
+
+    unusable = []
+    with ProcessPoolExecutor(max_workers=min(workers, len(candidates))) as executor:
+        for path, count in zip(candidates, executor.map(time_record_count, candidates)):
+            if count == 0:
+                logger.warning("Skipping %s: zero time records", path)
+                unusable.append(path)
+            elif count == -1:
+                logger.warning("Skipping %s: cannot be opened", path)
+                unusable.append(path)
+
+    if unusable:
+        logger.warning(
+            "Excluding %d of %d history file(s) from time series generation",
+            len(unusable),
+            len(candidates),
+        )
+    return unusable
+
 
 # ++++++++++++++++++++++++++++++
 # Input argument parser function
@@ -208,11 +271,17 @@ def main():
         sys.exit(0)
     logger.info(f"include patterns are {include_patterns}")            
 
+<<<<<<< HEAD
     varlist = (
         [variable.strip() for variable in args.varlist.split(",") if variable.strip()]
         if args.varlist
         else None
         )
+=======
+    # Drop files GenTS cannot read time bounds from before they reach it
+    unusable_files = find_unusable_files(inputdir, include_patterns, workers, logger)
+
+>>>>>>> 92bd470 (Skip empty history files before GenTS metadata pull)
     # Determine how time series will be created
     if not args.years_spec:
 
@@ -220,6 +289,8 @@ def main():
         logger.info("Starting hf_collection")
         hf_collection = HFCollection(inputdir, num_processes=workers)
         hf_collection = hf_collection.include(include_patterns)
+        if unusable_files:
+            hf_collection = hf_collection.exclude(unusable_files)
         logger.info("Finished hf_collection")
 
         # Create base TSCollection
@@ -244,12 +315,14 @@ def main():
         logger.info("Year increment for time series generation is %s", nyears)
 
         hf_collection = HFCollection(inputdir, num_processes=workers)
+        if unusable_files:
+            hf_collection = hf_collection.exclude(unusable_files)
         for include_pattern in include_patterns:
             logger.info("Processing files with pattern: %s", include_pattern)
 
             for year in range(year_first, year_last + 1, nyears):
                 logger.info(f"Processing from year {year} to year {year+nyears-1}")
-                hfp_collection = hf_collection.include_patterns([include_pattern])
+                hfp_collection = hf_collection.include([include_pattern])
                 hfp_collection = hfp_collection.include_years(year, year + nyears - 1)
 
                 logger.info(f"files to process for year {year} are")
