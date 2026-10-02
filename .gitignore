@@ -208,3 +208,6 @@ __marimo__/
 
 # Plots
 *.png
+
+# Local, session-specific agent context (see CLAUDE.md)
+SESSION.md
