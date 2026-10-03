@@ -22,7 +22,7 @@ _LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
 from pathlib import Path
 
 # Time series generation imports
-import netCDF4
+import xarray as xr
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 
@@ -37,14 +37,18 @@ def time_record_count(path):
     """
     Returns the number of time records in a history file: 0 if it holds none,
     None if it has no time dimension, or -1 if it will not open.
+
+    No decoding: only the length of the time dimension is needed, and decoding
+    a broken time coordinate would fail on the very files this is looking for.
+    engine="netcdf4": naming it skips xarray's backend search, which imports
+    every installed plugin.
     """
     try:
-        with netCDF4.Dataset(path) as ds:
-            time_dim = ds.dimensions.get("time")
-            if time_dim is None:
-                return None
-            return time_dim.size
-    except OSError:
+        with xr.open_dataset(
+            path, engine="netcdf4", decode_times=False, decode_cf=False
+        ) as ds:
+            return ds.sizes.get("time")
+    except (OSError, ValueError):
         return -1
 
 
