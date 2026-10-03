@@ -98,3 +98,20 @@ def get_grid_names(model: str, resolution: str, realm: str) -> dict[str, str]:
         )
     
     return grid_names[resolution][realm] or {}
+
+def get_grid_desc(model: str, resolution: str, realm: str) -> str:
+    """Return the grid description for one model and resolution."""
+    table = _load_cached(model)
+    grid_descs = table.get("grid_descs_per_realm") or {}
+    if resolution not in grid_descs:
+        raise ValueError(
+            f"No grid descriptions defined for model={model}, resolution={resolution}; "
+            f"available: {sorted(grid_descs)}"
+        )
+    realm_descs = grid_descs.get(resolution) or {}
+    if realm not in realm_descs:
+        raise ValueError(
+            f"No grid descriptions defined for model={model}, resolution={resolution}, realm={realm}; "
+            f"available: {sorted(realm_descs)}"
+        )
+    return grid_descs[resolution][realm] or ""

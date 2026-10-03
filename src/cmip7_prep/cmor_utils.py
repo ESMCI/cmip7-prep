@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+import json
 import warnings
 import re
 import datetime as dt
@@ -47,6 +48,176 @@ def packaged_dataset_json(filename: str = "cmor_dataset.json"):
     """Context manager yielding a real filesystem path to the packaged mapping file."""
     res = Path(__file__).parent.parent.parent / "data" / filename
     return as_file(res)
+
+
+# ---------------------------------------------------------------------
+# CMOR dataset JSON builder
+# ---------------------------------------------------------------------
+# institution_id per model, matching the CV source_id entries.  Used as a
+# fallback only, when the CV lookup by base_source_id yields nothing.
+_INSTITUTION_ID_BY_MODEL = {"noresm": "NCC", "cesm": "NCAR"}
+
+# DRS path/filename templates; structural, so they live here rather than in the
+# CV or the per-model config.
+_OUTPUT_PATH_TEMPLATE = (
+    "<mip_era><activity_id><institution_id><source_id><experiment_id>"
+    "<variant_label><region><frequency><variable_id><branding_suffix><grid_label>"
+)
+_OUTPUT_FILE_TEMPLATE = (
+    "<variable_id><branding_suffix><frequency><region><grid_label>"
+    "<source_id><experiment_id><variant_label>"
+)
+
+
+@lru_cache(maxsize=None)
+def _load_controlled_vocabulary(tables_root: str) -> dict:
+    """Read and cache the CV block of cmor-cvs.json for a tables root."""
+    path = Path(tables_root) / "tables-cvs" / "cmor-cvs.json"
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle).get("CV", {})
+
+
+def _first(value, default=None):
+    """Return value[0] for a list/tuple, the value itself otherwise, else default."""
+    if isinstance(value, (list, tuple)):
+        return value[0] if value else default
+    return value if value is not None else default
+
+
+def _resolve_by_resolution(mapping, resolution: str, default):
+    """Return mapping[resolution] when mapping is a dict with that key, else default."""
+    if isinstance(mapping, dict):
+        return mapping.get(resolution, default)
+    return default
+
+
+def _format_license(license_cv: dict, license_id: str, institution_id: str) -> str:
+    """Expand the CV license_template for one license_id and institution."""
+    template = license_cv.get("license_template", "")
+    entry = (license_cv.get("license_id") or {}).get(license_id, {})
+    return (
+        template.replace("<license_id>", license_id)
+        .replace("<institution_id>", institution_id or "")
+        .replace("<license_type>", entry.get("license_type", ""))
+        .replace("<license_url>", entry.get("license_url", ""))
+    )
+
+
+def _parse_ripf(ripf: str) -> tuple[str, str, str, str]:
+    """Split 'rXiYpZfW' into its ('rX', 'iY', 'pZ', 'fW') CMIP7 index strings."""
+    match = re.fullmatch(r"r(\d+)i(\d+)p(\d+)f(\d+)", ripf.strip())
+    if not match:
+        raise ValueError(
+            f"Invalid realization-initialization-physics-forcing string {ripf!r}; "
+            "expected rXiYpZfW (e.g. r1i1p1f1)"
+        )
+    realization, initialization, physics, forcing = match.groups()
+    return f"r{realization}", f"i{initialization}", f"p{physics}", f"f{forcing}"
+
+
+def build_dataset_cfg(
+    *,
+    model: str,
+    resolution: str,
+    experiment: str,
+    frequency: str,
+    ripf: str,
+    tables_root,
+    license_id: str = "CC-BY-4.0",
+) -> dict:
+    """Assemble the CMOR dataset-attribute dict for one run.
+
+    Institutional, source, license and experiment metadata are read from the
+    controlled vocabulary (cmor-cvs.json); the branded source_id and nominal
+    resolution come from the per-model ``dataset`` block in
+    ``data/<model>_regrid_maps.yaml``.  Replaces the packaged cmor_dataset*.json.
+    """
+    from .regrid_maps import load_regrid_maps  # local import avoids import cycle
+
+    cv = _load_controlled_vocabulary(str(tables_root))
+    meta = load_regrid_maps(model).get("dataset") or {}
+    base_source_id = meta.get("base_source_id")
+
+    # Branded source_id/nominal_resolution written to the output, by resolution.
+    source_id = _resolve_by_resolution(
+        meta.get("source_ids"), resolution, meta.get("default_source_id", base_source_id)
+    )
+    nominal_resolution = _resolve_by_resolution(
+        meta.get("nominal_resolution"),
+        resolution,
+        meta.get("default_nominal_resolution"),
+    )
+
+    # institution/source derived from the CV via the base (CV-valid) source_id.
+    source_entry = (cv.get("source_id") or {}).get(base_source_id, {})
+    institution_id = _first(
+        source_entry.get("institution_id"), _INSTITUTION_ID_BY_MODEL.get(model)
+    )
+    institution = (cv.get("institution_id") or {}).get(institution_id, "")
+    source = source_entry.get("source", base_source_id)
+    license_str = _format_license(cv.get("license") or {}, license_id, institution_id)
+
+    # experiment metadata (activity_id, parentage) straight from the CV.
+    experiment_entry = (cv.get("experiment_id") or {}).get(experiment, {})
+    activity_id = _first(experiment_entry.get("activity_id"), "CMIP")
+    parent_experiment_id = _first(
+        experiment_entry.get("parent_experiment_id"), "no parent"
+    )
+    parent_activity_id = _first(experiment_entry.get("parent_activity_id"), activity_id)
+
+    realization_index, initialization_index, physics_index, forcing_index = _parse_ripf(
+        ripf
+    )
+    mip_era = cv.get("mip_era", "CMIP7")
+
+    return {
+        "mip_era": mip_era,
+        "activity_id": activity_id,
+        "drs_specs": cv.get("drs_specs", "MIP-DRS7"),
+        "data_specs_version": cv.get("data_specs_version"),
+        "Conventions": _first(cv.get("Conventions"), "CF-1.12"),
+        "product": "model-output",
+        "_cmip7_option": True,
+        "institution_id": institution_id,
+        "institution": institution,
+        "source_id": source_id,
+        "source": source,
+        "source_type": meta.get("source_type", "AOGCM"),
+        "nominal_resolution": nominal_resolution,
+        "license_id": license_id,
+        "license": license_str,
+        "calendar": meta.get("calendar", "noleap"),
+        "frequency": frequency,
+        "experiment_id": experiment,
+        "experiment": experiment_entry.get("experiment", experiment),
+        "sub_experiment_id": "none",
+        "sub_experiment": "none",
+        "realization_index": realization_index,
+        "initialization_index": initialization_index,
+        "physics_index": physics_index,
+        "forcing_index": forcing_index,
+        "variant_label": ripf,
+        "member_id": ripf,
+        "branch_method": "no parent",
+        "branch_time_in_parent": 0.0,
+        "branch_time_in_child": 0.0,
+        "parent_mip_era": mip_era,
+        "parent_activity_id": parent_activity_id,
+        "parent_experiment_id": parent_experiment_id,
+        "parent_source_id": base_source_id,
+        "parent_variant_label": ripf,
+        "parent_time_units": "days since 1850-01-01",
+        "horizontal_label": "hxy",
+        "vertical_label": "l",
+        "temporal_label": "tavg",
+        "area_label": "u",
+        "branding_suffix": "tavg-l-hxy-u",
+        "grid_label": "gr",
+        "region": "glb",
+        "tracking_prefix": cv.get("tracking_prefix", "hdl:21.14107"),
+        "output_path_template": _OUTPUT_PATH_TEMPLATE,
+        "output_file_template": _OUTPUT_FILE_TEMPLATE,
+    }
 
 
 def filled_for_cmor(

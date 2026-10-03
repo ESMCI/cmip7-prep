@@ -45,7 +45,7 @@ from cmip7_prep.cmor_utils import (
     load_positive_overrides,
     bounds_from_centers_1d,
     roll_for_monotonic_with_bounds,
-    packaged_dataset_json,
+    build_dataset_cfg,
 )
 from cmip7_prep.include_patterns import (
     get_include_patterns,
@@ -501,9 +501,6 @@ def process_one_var(
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
     varname = cmip_var.branded_variable_name.name
 
-    realization_index, initialization_index, physics_index, forcing_index = (
-        parse_realization_initialization_physics_forcing(ripf_index)
-    )
     # At this point you have a cmip_var (metadata from database query for the target variable)
     # queried a cmor database from the cloud
     logger.debug(f"Starting processing for variable: {varname}")
@@ -641,54 +638,36 @@ def process_one_var(
             try:
                 log_dir = outdir / "logs"
 
-                # TODO: add NorESM institution_id below
-                # Initialize CMOR class
-                metadata_json = None
-                if model == "noresm":
-                    metadata_json = packaged_dataset_json(
-                        "cmor_dataset_noresm.json",
-                    )
-                    if resolution == "ne16":
-                        metadata_json = packaged_dataset_json(
-                        "cmor_dataset_noresm3-lm.json",
-                    )
-                    elif resolution == "ne30":
-                        metadata_json = packaged_dataset_json(
-                        "cmor_dataset_noresm3-mm.json",
-                    )
+                # Global/dataset attributes assembled from the CV plus the
+                # per-model dataset config; replaces the packaged cmor_dataset
+                # JSON files.  frequency, variant indices and experiment
+                # metadata are already baked in, so only the per-variable
+                # region/grid are set below.
+                dataset_cfg = build_dataset_cfg(
+                    model=model,
+                    resolution=resolution,
+                    experiment=experiment,
+                    frequency=frequency,
+                    ripf=ripf_index,
+                    tables_root=tables_root,
+                )
                 with CmorSession(
                     tables_root=tables_root,
                     log_dir=log_dir,
                     log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
-                    dataset_json=metadata_json,
-                    dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
+                    dataset_attrs=dataset_cfg,
                     outdir=outdir,
                     ice_sheet=ice_sheet,
                 ) as cm:
-                    set_cur_dataset_attribute("frequency", frequency)
-                    set_cur_dataset_attribute("realization_index", realization_index)
-                    set_cur_dataset_attribute(
-                        "initialization_index", initialization_index
-                    )
-                    set_cur_dataset_attribute("physics_index", physics_index)
-                    set_cur_dataset_attribute("forcing_index", forcing_index)
                     region = write_cfg.get("region", "glb")
                     set_cur_dataset_attribute("region", region)
                     try:
                         grid_name = get_grid_names(model, resolution, realm)
-                        
+
                     except ValueError as e:
                         logger.error(f"Error setting grid attribute: {e}")
                         grid_name = grid
                     set_cur_dataset_attribute("grid", grid_name)
-                    # Updating with correct experiment info from CMIP7 tables
-                    experiment_info = get_experiment_info_from_tables(
-                        experiment, tables_root
-                    )
-                    for key, value in experiment_info.items():
-                        if isinstance(value, list):
-                            value = value[0]
-                        set_cur_dataset_attribute(key, value)
 
                     logger.info(
                         f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"

@@ -37,3 +37,15 @@ grid_names_per_realm:
     land: g106
     seaIce: g106
     landIce: g106
+
+# Static dataset (global attribute) metadata for the CMOR dataset JSON builder;
+# see noresm_regrid_maps.yaml for the schema. CESM writes CESM3 at every
+# resolution for now (placeholder).
+dataset:
+  base_source_id: CESM3
+  source_type: AOGCM
+  calendar: noleap
+  source_ids: {}
+  default_source_id: CESM3
+  nominal_resolution: {}
+  default_nominal_resolution: 100 km
