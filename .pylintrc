@@ -1,6 +1,6 @@
 [MASTER]
 ignore-paths=build,dist,.venv,.eggs,scripts
-extension-pkg-allow-list=cmor,netCDF4
+extension-pkg-allow-list=cmor
 init-hook='import sys, os; src = os.path.join(os.getcwd(), "src"); sys.path.insert(0, src) if src not in sys.path else None'
 
 [MESSAGES CONTROL]
@@ -17,5 +17,5 @@ disable=
 max-line-length=100
 
 [TYPECHECK]
-ignored-modules=xarray,xesmf,cmor,numpy,geocat.comp,yaml,cftime,pytest,dask,netCDF4
+ignored-modules=xarray,xesmf,cmor,numpy,geocat.comp,yaml,cftime,pytest,dask,gents
 ignored-classes=cmor
