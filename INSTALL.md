@@ -16,7 +16,7 @@ CMOR 3.15 is the version that validates against the CMIP7 controlled vocabulary
 
 ```bash
 conda create --prefix /projects/NS9560K/diagnostics/cmordev_env_312 -c conda-forge \
-  python=3.12 cmor=3.15 xarray numpy dask xesmf cftime pyyaml click pandas geocat-comp
+  python=3.12 cmor=3.15 xarray numpy dask xesmf cftime pyyaml jsonschema click pandas geocat-comp
 ```
 
 When conda prints its plan, confirm the `cmor` line shows `3.15.x` with a `py312`

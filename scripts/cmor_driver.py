@@ -30,7 +30,6 @@ import xarray as xr
 from cmor import set_cur_dataset_attribute
 
 from cmip7_prep.cmor_utils import (
-    load_positive_overrides,
     bounds_from_centers_1d,
     roll_for_monotonic_with_bounds,
     packaged_dataset_json,
@@ -511,9 +510,6 @@ def process_one_var(
     # native tripolar grid and the regridded one, hence the loop.  There is no
     # default: every variable states its grids, so a missing key is a mapping
     # error rather than something to guess at.
-    # Hand-set 'positive' values; anything not listed takes the CMOR table's.
-    positive_overrides = load_positive_overrides(model)
-
     grids = cfg.get("grids")
     if not grids:
         logger.error("no grids specified for %s in the mapping YAML", varname)
@@ -667,7 +663,7 @@ def process_one_var(
                             "name": shortname,
                             "table": write_cfg.get("table", "atmos"),
                             "units": write_cfg.get("units", ""),
-                            "positive": positive_overrides.get(str(cmip7name)),
+                            "positive": write_cfg.get("positive"),
                             "cell_methods": write_cfg.get("cell_methods", None),
                             "long_name": write_cfg.get("long_name", None),
                             "standard_name": write_cfg.get("standard_name", None),
@@ -902,6 +898,9 @@ def main():
                 logger.error(f"default_tables path {tables_root} does not exist")
                 sys.exit(1)
         logger.info(f"Using CMOR tables from: {tables_root}")
+        # Lets the mapping fill each variable's table, units and levels.
+        mapping.tables_root = tables_root
+        mapping.realm = realm
 
         # Determine time series files
         all_ts_files = sorted(

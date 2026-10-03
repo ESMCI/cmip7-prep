@@ -4,8 +4,9 @@ import yaml
 import re
 import sys
 import argparse
-from pathlib import Path
 from typing import Optional
+
+from cmip7_prep.mapping_compat import load_intensive_vars
 
 # ── Regrid method ────────────────────────────────────────────────────────────
 # Intensive quantities -- temperatures, pressures, winds, sea surface height --
@@ -14,17 +15,7 @@ from typing import Optional
 # uses the conservative map.
 #
 # The list of intensive quantities lives in data/intensive_vars.yaml, keyed by
-# root variable name.
-
-INTENSIVE_VARS_YAML = Path(__file__).parent.parent / "data" / "intensive_vars.yaml"
-
-
-def load_intensive_vars() -> set[str]:
-    """Return the root names that should be regridded bilinearly."""
-    if not INTENSIVE_VARS_YAML.is_file():
-        return set()
-    with open(INTENSIVE_VARS_YAML, encoding="utf-8") as handle:
-        return set((yaml.safe_load(handle) or {}).get("intensive") or ())
+# root variable name, and read by cmip7_prep.mapping_compat.load_intensive_vars.
 
 
 # ── Grid labels ──────────────────────────────────────────────────────────────

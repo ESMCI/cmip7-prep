@@ -1,160 +1,73 @@
-dataset_overrides: {institution_id: NCAR, nominal_resolution: 100 km, source_id: CESM3}
+grids: [gn]
 
 variables:
 
-  agessc_tavg-ol-hxy-sea:
-    grids: [gn]
-    long_name: Ideal Age of Sea Water
-    regrid_method: conservative
-    sources: [model_var: agessc]
-    table: ocean
-    units: yr
+  agessc_tavg-ol-hxy-sea: agessc
 
-  deptho_ti-u-hxy-sea:
-    grids: [gn]
-    long_name: Sea Floor Depth
-    regrid_method: conservative
-    sources: [model_var: deptho]
-    standard_name: depth_below_sea_level
-    table: fx
-    units: m
+  deptho_ti-u-hxy-sea: deptho
 
-  evspsbl_tavg-u-hxy-ifs:
-    grids: [gn]
-    long_name: Evaporation over ice free ocean
-    regrid_method: conservative
-    sources: [model_var: evs]
-    table: ocean
-    units: kg m-2 s-1
+  evspsbl_tavg-u-hxy-ifs: evs
 
-  ficeberg_tavg-u-hxy-sea:
-    grids: [gn]
-    long_name: Iceberg Freshwater Flux
-    regrid_method: conservative
-    sources: [model_var: ficeberg]
-    table: ocean
-    units: kg m-2 s-1
+  ficeberg_tavg-u-hxy-sea: ficeberg
 
-  hfds_tavg-u-hxy-sea:
-    grids: [gn]
-    regrid_method: conservative
-    sources: [model_var: hfds]
-    table: ocean
-    units: W m-2
+  hfds_tavg-u-hxy-sea: hfds
 
-  hfsnthermds_tavg-u-hxy-sea:
-    grids: [gn]
-    long_name: Latent Heat to melt frozen Precipitation
-    regrid_method: conservative
-    sources: [model_var: hfsnthermds]
-    table: ocean
-    units: W m-2
+  hfsnthermds_tavg-u-hxy-sea: hfsnthermds
 
-  mlotst_tavg-u-hxy-sea:
-    grids: [gn]
-    long_name: Ocean Mixed Layer Thickness Defined by Sigma T
-    regrid_method: conservative
-    sources: [model_var: mlotst]
-    table: ocean
-    units: m
+  mlotst_tavg-u-hxy-sea: mlotst
 
   siareaacrossline_tavg-u-ht-u:
-    grids: [gn]
-    long_name: Sea Ice Area Across Line
-    regrid_method: conservative
-    sources: [{freq: day, model_var: siareaacrossline_d}, {freq: mon, model_var: siareaacrossline}]
-    table: ocean
+    formula:
+      day: siareaacrossline_d
+      mon: siareaacrossline
     units: m
 
   siflfwbot_tavg-u-hxy-sea:
-    grids: [gn]
-    long_name: Freshwater Flux from Sea Ice to Ocean
-    regrid_method: conservative
-    sources: [{freq: day, model_var: siflfwbot_d}, {freq: mon, model_var: siflfwbot}]
-    table: ocean
-    units: kg m-2 s-1
+    formula:
+      day: siflfwbot_d
+      mon: siflfwbot
 
   sig1_tavg-u-hxy-sea:
-    grids: [gn]
-    regrid_method: conservative
-    sources: [{freq: day, model_var: sigl_d}, {freq: mon, model_var: sigl}]
-    table: ocean
+    formula:
+      day: sigl_d
+      mon: sigl
     units: m s-1
 
   sihc_tavg-u-hxy-sea:
-    grids: [gn]
-    long_name: Sea Ice Surface Freshwater Flux to Ocean
-    regrid_method: conservative
-    sources: [{freq: day, model_var: sihc_d}, {freq: mon, model_var: sihc}]
-    table: ocean
+    formula:
+      day: sihc_d
+      mon: sihc
     units: kg m-2 s-1
 
   sos_tavg-u-hxy-sea:
+    formula: sos
     grids: [gn, gr]
-    regrid_method: conservative
-    sources: [model_var: sos]
-    table: ocean
     units: 100E-03
 
-  tauuo_tavg-u-hxy-sea:
-    grids: [gn]
-    regrid_method: conservative
-    sources: [model_var: tauuo]
-    table: ocean
-    units: N m-2
+  tauuo_tavg-u-hxy-sea: tauuo
 
-  tauvo_tavg-u-hxy-sea:
-    grids: [gn]
-    regrid_method: conservative
-    sources: [model_var: tauvo]
-    table: ocean
-    units: N m-2
+  tauvo_tavg-u-hxy-sea: tauvo
 
   thetao_tavg-ol-hxy-sea:
+    formula: thetao
     grids: [gn, gr]
-    regrid_method: bilinear
-    sources: [model_var: thetao]
-    table: ocean
     units: K
 
   tos_tavg-u-hxy-sea:
+    formula: tos
     grids: [gn, gr]
-    regrid_method: bilinear
-    sources: [model_var: tos]
-    table: ocean
     units: K
 
-  umo_tavg-ol-hxy-sea:
-    grids: [gn]
-    regrid_method: conservative
-    sources: [model_var: umo]
-    table: ocean
-    units: kg s-1
+  umo_tavg-ol-hxy-sea: umo
 
-  vmo_tavg-ol-hxy-sea:
-    grids: [gn]
-    regrid_method: conservative
-    sources: [model_var: vmo]
-    table: ocean
-    units: kg s-1
+  vmo_tavg-ol-hxy-sea: vmo
 
   vo_tavg-ol-hxy-sea:
+    formula: vo
     grids: [gn, gr]
-    regrid_method: bilinear
-    sources: [model_var: vo]
-    table: ocean
-    units: m s-1
 
   wo_tavg-ol-hxy-sea:
+    formula: wo
     grids: [gn, gr]
-    regrid_method: bilinear
-    sources: [model_var: wo]
-    table: ocean
-    units: m s-1
 
-  zos_tavg-u-hxy-sea:
-    grids: [gn]
-    regrid_method: bilinear
-    sources: [model_var: zos]
-    table: ocean
-    units: m
+  zos_tavg-u-hxy-sea: zos
