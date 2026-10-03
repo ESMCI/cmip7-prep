@@ -204,7 +204,7 @@ def roll_for_monotonic_with_bounds(lon, lon_bnds):
     >>> lon
     array([  0.,  90., 180., 270.])
     >>> shift
-    np.int64(-2)
+    -2
     >>> lon2 = np.array([0., 90., 180., 270.])
     >>> lon2_bnds = np.array([[-45., 45.], [45., 135.], [135., 225.], [225., 315.]])
     >>> _, _, shift2 = roll_for_monotonic_with_bounds(lon2, lon2_bnds)
@@ -217,7 +217,7 @@ def roll_for_monotonic_with_bounds(lon, lon_bnds):
         shift = k[0] + 1
         lon = np.roll(lon, -shift)
         lon_bnds = np.roll(lon_bnds, -shift, axis=0)
-        return lon, lon_bnds, -shift
+        return lon, lon_bnds, int(-shift)
     return lon, lon_bnds, 0
 
 
