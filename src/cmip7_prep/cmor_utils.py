@@ -123,6 +123,7 @@ def build_dataset_cfg(
     frequency: str,
     ripf: str,
     tables_root,
+    realm: str = "atmos",
     license_id: str = "CC-BY-4.0",
 ) -> dict:
     """Assemble the CMOR dataset-attribute dict for one run.
@@ -132,11 +133,27 @@ def build_dataset_cfg(
     resolution come from the per-model ``dataset`` block in
     ``data/<model>_regrid_maps.yaml``.  Replaces the packaged cmor_dataset*.json.
     """
-    from .regrid_maps import load_regrid_maps  # local import avoids import cycle
+    # Local imports avoid an import cycle with regrid_maps.
+    from .regrid_maps import load_regrid_maps, get_grid_names
 
     cv = _load_controlled_vocabulary(str(tables_root))
     meta = load_regrid_maps(model).get("dataset") or {}
     base_source_id = meta.get("base_source_id")
+
+    # grid_label is the per-realm grid code from the regrid-map table; its
+    # human-readable description comes from the CV keyed by that same code.
+    try:
+        grid_label = get_grid_names(model, resolution, realm)
+    except ValueError:
+        logger.warning(
+            "No grid name for model=%s resolution=%s realm=%s; defaulting "
+            "grid_label to 'gr'",
+            model,
+            resolution,
+            realm,
+        )
+        grid_label = "gr"
+    grid_desc = (cv.get("grid_label") or {}).get(grid_label, "")
 
     # Branded source_id/nominal_resolution written to the output, by resolution.
     source_id = _resolve_by_resolution(
@@ -204,7 +221,7 @@ def build_dataset_cfg(
         "parent_mip_era": mip_era,
         "parent_activity_id": parent_activity_id,
         "parent_experiment_id": parent_experiment_id,
-        "parent_source_id": base_source_id,
+        "parent_source_id": source_id,
         "parent_variant_label": ripf,
         "parent_time_units": "days since 1850-01-01",
         "horizontal_label": "hxy",
@@ -212,7 +229,8 @@ def build_dataset_cfg(
         "temporal_label": "tavg",
         "area_label": "u",
         "branding_suffix": "tavg-l-hxy-u",
-        "grid_label": "gr",
+        "grid_label": grid_label,
+        "grid": grid_desc,
         "region": "glb",
         "tracking_prefix": cv.get("tracking_prefix", "hdl:21.14107"),
         "output_path_template": _OUTPUT_PATH_TEMPLATE,

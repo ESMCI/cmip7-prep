@@ -1444,14 +1444,14 @@ class CmorSession(
             missing_value=fillv,
         )
         logger.debug("Now define time dimension and write data")
-        if "lat" in data.dims and "lon" in data.dims:
-            # These should be pulled fromt he grid in the tables
-            cmor.set_cur_dataset_attribute("grid", "1x1 degree")
-            cmor.set_cur_dataset_attribute("grid_label", vdef.get("grid_label", "gr"))
-        else:
-            # These should be pulled fromt he grid in the tables
-            cmor.set_cur_dataset_attribute("grid", "curvilinear")
-            cmor.set_cur_dataset_attribute("grid_label", vdef.get("grid_label", "gn"))
+        # if "lat" in data.dims and "lon" in data.dims:
+        #     # These should be pulled fromt he grid in the tables
+        #     cmor.set_cur_dataset_attribute("grid", "1x1 degree")
+        #     cmor.set_cur_dataset_attribute("grid_label", vdef.get("grid_label", "gr"))
+        # else:
+        #     # These should be pulled fromt he grid in the tables
+        #     cmor.set_cur_dataset_attribute("grid", "curvilinear")
+        #     cmor.set_cur_dataset_attribute("grid_label", vdef.get("grid_label", "gn"))
         # ---- Prepare time info for this write (local, not cached) ----
         time_da = ds.coords.get("time")
         if time_da is None:

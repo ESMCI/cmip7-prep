@@ -62,7 +62,6 @@ from cmip7_prep.pipeline import (
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
-from cmip7_prep.regrid_maps import get_grid_names
 
 
 from dask import delayed
@@ -640,9 +639,9 @@ def process_one_var(
 
                 # Global/dataset attributes assembled from the CV plus the
                 # per-model dataset config; replaces the packaged cmor_dataset
-                # JSON files.  frequency, variant indices and experiment
-                # metadata are already baked in, so only the per-variable
-                # region/grid are set below.
+                # JSON files.  frequency, variant indices, experiment metadata
+                # and the per-realm grid_label are already baked in, so only the
+                # per-variable region is set below.
                 dataset_cfg = build_dataset_cfg(
                     model=model,
                     resolution=resolution,
@@ -650,6 +649,7 @@ def process_one_var(
                     frequency=frequency,
                     ripf=ripf_index,
                     tables_root=tables_root,
+                    realm=realm,
                 )
                 with CmorSession(
                     tables_root=tables_root,
@@ -661,13 +661,6 @@ def process_one_var(
                 ) as cm:
                     region = write_cfg.get("region", "glb")
                     set_cur_dataset_attribute("region", region)
-                    try:
-                        grid_name = get_grid_names(model, resolution, realm)
-
-                    except ValueError as e:
-                        logger.error(f"Error setting grid attribute: {e}")
-                        grid_name = grid
-                    set_cur_dataset_attribute("grid", grid_name)
 
                     logger.info(
                         f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
@@ -685,7 +678,7 @@ def process_one_var(
                             "standard_name": write_cfg.get("standard_name", None),
                             "levels": write_cfg.get("levels", None),
                             "branded_variable_name": cmip7name,
-                            "grid_label": grid_name,
+                            "grid_label": dataset_cfg.get("grid_label"),
                         },
                     )()
                     # Now use CMOR utility to write out netcdf variable
