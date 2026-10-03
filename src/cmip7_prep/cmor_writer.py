@@ -2,10 +2,10 @@
 """Thin CMOR wrapper used by cmip7_prep.
 
 This module centralizes CMOR session setup and writing so that the rest of the
-pipeline can stay xarray-first. It supports either a dataset JSON file (preferred)
-or directly injected global attributes, and creates axes based on the coordinates
-present in the provided dataset. It also supports a packaged default
-`cmor_dataset.json` living under `cmip7_prep/data/`.
+pipeline can stay xarray-first. It takes the global/dataset attributes as an
+in-memory dict (built by ``cmor_utils.build_dataset_cfg``), or, as a fallback, a
+dataset JSON path, and creates axes based on the coordinates present in the
+provided dataset.
 """
 
 from pathlib import Path
@@ -23,7 +23,6 @@ import cmor
 import numpy as np
 import xarray as xr
 from .cmor_utils import (
-    packaged_dataset_json,
     get_cmor_attr,
     set_cmor_attr,
     encode_time_to_num,
@@ -78,17 +77,19 @@ class CmorSession(
     tables_root : str or Path
         Directory containing CMOR tables and tables-csv directories with JSONs
            (e.g., CMIP6_*.json or CMIP7_*.json).
-    dataset_json : str or Path, optional
-        Path to a cmor_dataset.json with the experiment/source metadata.
     dataset_attrs : dict, optional
-        Alternative to `dataset_json`, allowing direct attribute injection.
+        Global/dataset attributes to write, typically produced by
+        ``cmor_utils.build_dataset_cfg``.  Preferred over ``dataset_json``.
+    dataset_json : str or Path, optional
+        Path to a cmor_dataset.json with the experiment/source metadata; a
+        fallback for callers that still carry a file.
     """
 
     def __init__(
         self,
         *,
         tables_root: Path | str,
-        dataset_attrs: dict[str, str] | None = None,
+        dataset_attrs: dict[str, Any] | None = None,
         dataset_json: Optional[DatasetJsonLike] = None,
         tracking_prefix: str | None = None,
         # NEW: one log per run (session)
@@ -166,22 +167,27 @@ class CmorSession(
                     getattr(cmor, name)(str(self._log_path))
                     break
 
-        # Resolve dataset_json to a real filesystem path
-        dj = self.dataset_json
-        if dj is None:
-            # packaged file → returns a context manager
-            cm = packaged_dataset_json("cmor_dataset.json")
-            self._dataset_json_cm = cm
-            p = cm.__enter__()  # ← ENTER the CM, get a Path
-        elif isinstance(dj, (str, Path)):
-            p = Path(dj)
+        # Resolve the dataset attributes: the in-memory dict is preferred; a
+        # dataset_json path remains as a fallback for callers that still have a
+        # file.  Either way CMOR is fed a temp JSON, since cmor.dataset_json
+        # must be called to load the CV before any variable is defined.
+        if self.dataset_attrs:
+            cfg = dict(self.dataset_attrs)
+        elif self.dataset_json is not None:
+            dj = self.dataset_json
+            if isinstance(dj, (str, Path)):
+                p = Path(dj)
+            else:
+                # caller passed a context manager directly
+                self._dataset_json_cm = dj
+                p = dj.__enter__()  # ← ENTER the CM, get a Path
+            logger.debug("CMOR JSON dataset: %s", p)
+            with open(p, encoding="utf-8") as f:
+                cfg = json.load(f)
         else:
-            # caller passed a context manager directly
-            self._dataset_json_cm = dj
-            p = dj.__enter__()  # ← ENTER the CM, get a Path
-        logger.debug("CMOR JSON dataset: %s", p)
-        with open(p, encoding="utf-8") as f:
-            cfg = json.load(f)
+            raise ValueError(
+                "CmorSession requires either dataset_attrs or dataset_json"
+            )
         cfg["outpath"] = str(self._outdir)
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         json.dump(cfg, tmp)
@@ -1206,12 +1212,12 @@ class CmorSession(
             logger.debug("FX variable %s define lon_id %s", name, lon_id)
             logger.debug("Writing fx variable %s on curvilinear grid", name)
             cmor.set_cur_dataset_attribute("grid", "curvilinear")
-            cmor.set_cur_dataset_attribute("grid_label", "gn")
+            #cmor.set_cur_dataset_attribute("grid_label", "gn")
             if name == "deptho":
                 name = "deptho_ti-u-hxy-sea"
         else:
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
-            cmor.set_cur_dataset_attribute("grid_label", "gr")
+            #cmor.set_cur_dataset_attribute("grid_label", "gr")
             if name in ("areacella_ti-u-hxy-u", "sftlf_ti-u-hxy-u"):
                 self.load_table(self.tables_root, "land")
             elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
@@ -1439,11 +1445,13 @@ class CmorSession(
         )
         logger.debug("Now define time dimension and write data")
         if "lat" in data.dims and "lon" in data.dims:
+            # These should be pulled fromt he grid in the tables
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
-            cmor.set_cur_dataset_attribute("grid_label", "gr")
+            cmor.set_cur_dataset_attribute("grid_label", vdef.get("grid_label", "gr"))
         else:
+            # These should be pulled fromt he grid in the tables
             cmor.set_cur_dataset_attribute("grid", "curvilinear")
-            cmor.set_cur_dataset_attribute("grid_label", "gn")
+            cmor.set_cur_dataset_attribute("grid_label", vdef.get("grid_label", "gn"))
         # ---- Prepare time info for this write (local, not cached) ----
         time_da = ds.coords.get("time")
         if time_da is None:
