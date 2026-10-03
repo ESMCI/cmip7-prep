@@ -14,6 +14,7 @@ import sys
 import glob
 import argparse
 import logging
+from concurrent.futures import ProcessPoolExecutor
 
 # Determine local directory path:
 _LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -21,10 +22,76 @@ _LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
 from pathlib import Path
 
 # Time series generation imports
+import xarray as xr
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 
 from cmip7_prep.include_patterns import all_include_patterns
+
+# ++++++++++++++++++++++++++++++
+# Unusable history file detection
+# ++++++++++++++++++++++++++++++
+
+
+def time_record_count(path):
+    """
+    Returns the number of time records in a history file: 0 if it holds none,
+    None if it has no time dimension, or -1 if it will not open.
+
+    No decoding: only the length of the time dimension is needed, and decoding
+    a broken time coordinate would fail on the very files this is looking for.
+    engine="netcdf4": naming it skips xarray's backend search, which imports
+    every installed plugin.
+    """
+    try:
+        with xr.open_dataset(
+            path, engine="netcdf4", decode_times=False, decode_cf=False
+        ) as ds:
+            return ds.sizes.get("time")
+    except (OSError, ValueError):
+        return -1
+
+
+def find_unusable_files(inputdir, include_patterns, workers, logger):
+    """
+    Returns the history files GenTS cannot derive time bounds from: those with
+    zero time records, and those that will not open.
+
+    GenTS takes a minimum over each file's time coordinate to order the files
+    into a series, so a file with no records raises a zero-size reduction in
+    gents.meta.  Files like that are written when a run segment opens a history
+    stream but ends before any sample reaches it.  They hold no data, so they
+    are dropped here instead of being left for GenTS to warn about one logged
+    traceback at a time.
+    """
+    candidates = sorted(
+        {
+            path
+            for pattern in include_patterns
+            for path in glob.glob(os.path.join(inputdir, pattern))
+        }
+    )
+    if not candidates:
+        return []
+
+    unusable = []
+    with ProcessPoolExecutor(max_workers=min(workers, len(candidates))) as executor:
+        for path, count in zip(candidates, executor.map(time_record_count, candidates)):
+            if count == 0:
+                logger.warning("Skipping %s: zero time records", path)
+                unusable.append(path)
+            elif count == -1:
+                logger.warning("Skipping %s: cannot be opened", path)
+                unusable.append(path)
+
+    if unusable:
+        logger.warning(
+            "Excluding %d of %d history file(s) from time series generation",
+            len(unusable),
+            len(candidates),
+        )
+    return unusable
+
 
 # ++++++++++++++++++++++++++++++
 # Input argument parser function
@@ -206,13 +273,17 @@ def main():
             f"No input files to process in {inputdir} with {include_patterns}"
         )
         sys.exit(0)
-    logger.info(f"include patterns are {include_patterns}")            
+    logger.info(f"include patterns are {include_patterns}")
 
     varlist = (
         [variable.strip() for variable in args.varlist.split(",") if variable.strip()]
         if args.varlist
         else None
-        )
+    )
+
+    # Drop files GenTS cannot read time bounds from before they reach it
+    unusable_files = find_unusable_files(inputdir, include_patterns, workers, logger)
+
     # Determine how time series will be created
     if not args.years_spec:
 
@@ -220,6 +291,8 @@ def main():
         logger.info("Starting hf_collection")
         hf_collection = HFCollection(inputdir, num_processes=workers)
         hf_collection = hf_collection.include(include_patterns)
+        if unusable_files:
+            hf_collection = hf_collection.exclude(unusable_files)
         logger.info("Finished hf_collection")
 
         # Create base TSCollection
@@ -229,7 +302,9 @@ def main():
         if varlist:
             ts_collection = ts_collection.include("*", var_glob=varlist)
         if len(ts_collection) == 0:
-            raise RuntimeError("No matching variables/files found for time series generation")          
+            raise RuntimeError(
+                "No matching variables/files found for time series generation"
+            )
         ts_collection.execute()
         logger.info("Finished ts_collection")
 
@@ -244,12 +319,14 @@ def main():
         logger.info("Year increment for time series generation is %s", nyears)
 
         hf_collection = HFCollection(inputdir, num_processes=workers)
+        if unusable_files:
+            hf_collection = hf_collection.exclude(unusable_files)
         for include_pattern in include_patterns:
             logger.info("Processing files with pattern: %s", include_pattern)
 
             for year in range(year_first, year_last + 1, nyears):
                 logger.info(f"Processing from year {year} to year {year+nyears-1}")
-                hfp_collection = hf_collection.include_patterns([include_pattern])
+                hfp_collection = hf_collection.include([include_pattern])
                 hfp_collection = hfp_collection.include_years(year, year + nyears - 1)
 
                 logger.info(f"files to process for year {year} are")
@@ -276,10 +353,15 @@ def main():
                 if varlist:
                     ts_collection = ts_collection.include("*", var_glob=varlist)
                 if len(ts_collection) == 0:
-                    raise RuntimeError("No matching variables/files found for time series generation")  
-                   
-                logger.info("Variables scheduled: %s", [order["primary_var"] for order in ts_collection])
-                
+                    raise RuntimeError(
+                        "No matching variables/files found for time series generation"
+                    )
+
+                logger.info(
+                    "Variables scheduled: %s",
+                    [order["primary_var"] for order in ts_collection],
+                )
+
                 ts_collection.execute()
                 logger.info("Timeseries processing complete")
 
