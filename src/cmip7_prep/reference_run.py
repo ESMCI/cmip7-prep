@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
+from .grids import ATM_RESOLUTIONS, needs_atmos_res
 from .include_patterns import load_include_patterns
 
 # Which component directory holds each realm's history files.  Mirrors
@@ -38,29 +39,6 @@ REALM_COMPONENT = {
 
 # The ice sheet to process when a realm is per-ice-sheet and none was named.
 DEFAULT_ICE_SHEET = "gris"
-
-# Grids the atmosphere and land may be run on.  'regular' means the output
-# already carries lat/lon and is not regridded.
-ATM_RESOLUTIONS = ("ne30", "ne16", "regular")
-
-# Realms whose input grid is the atmosphere/land grid the case was run on.
-ATM_GRID_REALMS = frozenset({"atmos", "atmosChem", "aerosol", "land"})
-
-# Realms written on their native grid, with no ESMF regridding.  CISM land-ice
-# output carries projected x/y coordinates which cmor_writer georeferences with
-# the ice sheet's own map projection (see cism_grid.project_xy_to_latlon), so no
-# weight files are involved and the resolution would be ignored.  The value
-# below is a pass-through: it names the entry that builds a regridder and
-# discards it, which is what the unregridded path expects.
-NATIVE_GRID_REALMS = frozenset({"landIce"})
-NATIVE_GRID = "regular"
-
-# The ocean/sea-ice grid each model writes on.  These realms never share the
-# atmosphere's grid, so passing one an atmosphere resolution would regrid
-# through the wrong weights and produce plausible but wrong output.
-OCEAN_GRID = {"noresm": "tnx1v4", "cesm": "tx2_3v2"}
-
-OCEAN_GRID_REALMS = frozenset({"ocean", "ocnBgchem", "seaIce"})
 
 STAGES = ("timeseries", "cmor", "validate")
 
@@ -109,35 +87,6 @@ def frequencies_for(model: str, realm: str) -> list[str]:
     return sorted(load_include_patterns(model)[realm])
 
 
-def resolution_for(model: str, realm: str, atm_resolution: str) -> str:
-    """Return the input grid name for one realm.
-
-    Every realm's grid is derived, so no caller has to know the model's grid
-    layout.  ``atm_resolution`` is the grid the atmosphere and land were run on
-    and applies only to those realms; ocean and sea ice are always on the
-    model's tripolar grid; land ice is written on its native projected grid and
-    is not regridded at all.
-    """
-    if atm_resolution not in ATM_RESOLUTIONS:
-        raise ValueError(
-            f"Unknown atmosphere resolution {atm_resolution!r}; "
-            f"choose from {list(ATM_RESOLUTIONS)}"
-        )
-    if realm in ATM_GRID_REALMS:
-        return atm_resolution
-    if realm in OCEAN_GRID_REALMS:
-        try:
-            return OCEAN_GRID[model]
-        except KeyError:
-            raise ValueError(
-                f"No ocean grid known for model={model!r}; "
-                f"known models: {sorted(OCEAN_GRID)}"
-            ) from None
-    if realm in NATIVE_GRID_REALMS:
-        return NATIVE_GRID
-    raise ValueError(f"No input grid known for realm {realm!r}")
-
-
 def history_dir(case_dir: os.PathLike | str, realm: str) -> Path:
     """Return the history directory holding one realm's output."""
     component = REALM_COMPONENT[realm]
@@ -153,7 +102,7 @@ def build_plan(
     frequencies: Sequence[str] | None = None,
     years: str | None = None,
     stages: Sequence[str] = STAGES,
-    atmos_resolution: str,
+    atmos_res: str | None = None,
     experiment: str,
     workers: int = 4,
     ice_sheet: str | None = None,
@@ -165,7 +114,7 @@ def build_plan(
     history directory is absent is recorded in ``Plan.skipped`` rather than
     failing the run, since an archived case need not hold every component.
 
-    ``atmos_resolution`` is the grid the atmosphere and land were run on; every
+    ``atmos_res`` is the grid the atmosphere and land were run on; every
     other realm's grid is derived from it or from the model.
 
     ``years`` is passed through to gen_timeseries.py as ``--years-spec`` and so
@@ -174,6 +123,18 @@ def build_plan(
     unknown = [stage for stage in stages if stage not in STAGES]
     if unknown:
         raise ValueError(f"Unknown stage(s) {unknown}; choose from {list(STAGES)}")
+    wanted_realms = list(realms) if realms else realms_for(model)
+    on_atmos_grid = [realm for realm in wanted_realms if needs_atmos_res(realm)]
+    if on_atmos_grid and atmos_res is None:
+        raise ValueError(
+            "An atmosphere resolution is needed for "
+            f"{on_atmos_grid}; the other realms derive their own grid"
+        )
+    if atmos_res is not None and atmos_res not in ATM_RESOLUTIONS:
+        raise ValueError(
+            f"Unknown atmosphere resolution {atmos_res!r}; "
+            f"choose from {list(ATM_RESOLUTIONS)}"
+        )
 
     case_dir = Path(case_dir)
     outdir = Path(outdir)
@@ -182,7 +143,6 @@ def build_plan(
     cmor_root = outdir / "cmor"
 
     plan = Plan(timeseries_root=timeseries_root, cmor_root=cmor_root)
-    wanted_realms = list(realms) if realms else realms_for(model)
 
     for realm in wanted_realms:
         if realm not in REALM_COMPONENT:
@@ -204,8 +164,6 @@ def build_plan(
 
         sheet = ice_sheet or DEFAULT_ICE_SHEET if realm == "landIce" else None
         ts_dir = timeseries_root / realm
-
-        realm_resolution = resolution_for(model, realm, atmos_resolution)
 
         if "timeseries" in stages:
             plan.steps.append(
@@ -232,7 +190,7 @@ def build_plan(
                         ts_dir=ts_dir,
                         cmor_root=cmor_root,
                         model=model,
-                        resolution=realm_resolution,
+                        atmos_res=(atmos_res if needs_atmos_res(realm) else None),
                         experiment=experiment,
                         workers=workers,
                         sheet=sheet,
@@ -300,7 +258,7 @@ def _cmor_step(
     ts_dir,
     cmor_root,
     model,
-    resolution,
+    atmos_res,
     experiment,
     workers,
     sheet,
@@ -319,13 +277,13 @@ def _cmor_step(
         str(cmor_root),
         "--model",
         model,
-        "--resolution",
-        resolution,
         "--experiment",
         experiment,
         "--workers",
         str(workers),
     ]
+    if atmos_res:
+        command += ["--atmos-res", atmos_res]
     if sheet:
         command += ["--ice-sheet", sheet]
     return Step(

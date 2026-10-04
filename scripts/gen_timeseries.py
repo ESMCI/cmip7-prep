@@ -26,7 +26,15 @@ import xarray as xr
 from gents.hfcollection import HFCollection
 from gents.timeseries import TSCollection
 
-from cmip7_prep.include_patterns import all_include_patterns
+from cmip7_prep.include_patterns import all_include_patterns, load_include_patterns
+
+MODELS = ["cesm", "noresm"]
+
+# Realms come from the include-pattern tables rather than a list kept here, so
+# a realm added to a table is immediately runnable.
+DECLARED_REALMS = sorted(
+    {realm for model in MODELS for realm in load_include_patterns(model)}
+)
 
 # ++++++++++++++++++++++++++++++
 # Unusable history file detection
@@ -52,6 +60,19 @@ def time_record_count(path):
         return -1
 
 
+def _time_record_counts(paths, workers):
+    """Return each path's time record count, in order.
+
+    A pool is only started when there is more than one worker and more than one
+    file to look at: asking for one worker should not cost a pool, and some
+    environments refuse to create one at all.
+    """
+    if workers > 1 and len(paths) > 1:
+        with ProcessPoolExecutor(max_workers=min(workers, len(paths))) as executor:
+            return list(executor.map(time_record_count, paths))
+    return [time_record_count(path) for path in paths]
+
+
 def find_unusable_files(inputdir, include_patterns, workers, logger):
     """
     Returns the history files GenTS cannot derive time bounds from: those with
@@ -75,14 +96,13 @@ def find_unusable_files(inputdir, include_patterns, workers, logger):
         return []
 
     unusable = []
-    with ProcessPoolExecutor(max_workers=min(workers, len(candidates))) as executor:
-        for path, count in zip(candidates, executor.map(time_record_count, candidates)):
-            if count == 0:
-                logger.warning("Skipping %s: zero time records", path)
-                unusable.append(path)
-            elif count == -1:
-                logger.warning("Skipping %s: cannot be opened", path)
-                unusable.append(path)
+    for path, count in zip(candidates, _time_record_counts(candidates, workers)):
+        if count == 0:
+            logger.warning("Skipping %s: zero time records", path)
+            unusable.append(path)
+        elif count == -1:
+            logger.warning("Skipping %s: cannot be opened", path)
+            unusable.append(path)
 
     if unusable:
         logger.warning(
@@ -104,53 +124,35 @@ def parse_arguments():
     python module and outputs the final argument object.
     """
 
-    # Create parser object:
     parser = argparse.ArgumentParser(
         description="Utility to create time series for all time slice files in a directory"
     )
 
-    parser.add_argument(
-        "--debug", action="store_true", help="Turn on debug output (False by default)."
-    )
-
-    parser.add_argument(
+    required = parser.add_argument_group("required arguments")
+    required.add_argument(
         "--inputdir",
         type=str,
-        help="Comma separated full pathnames of directories containing input spectral element data files (required)",
         required=True,
+        help="Full pathname of the directory containing the input history files",
     )
-    parser.add_argument(
-        "--varlist",
-        type=str,
-        help="Comma separated list of variables to process",
-        default=None,
+    required.add_argument(
+        "--model",
+        choices=MODELS,
+        required=True,
+        help=(
+            "Model whose include patterns to use. The wrong one selects the "
+            "wrong history streams, so there is no default."
+        ),
     )
-    parser.add_argument(
+    required.add_argument(
         "--realm",
-        choices=["atmos", "land", "seaIce", "landIce"],
-        help="Realm to process - sets include patterns for time series (required)",
+        choices=DECLARED_REALMS,
         required=True,
+        help="Realm to process; sets the include patterns for the time series",
     )
-    parser.add_argument(
-        "--ice-sheet",
-        choices=["gris", "ais"],
-        default=None,
-        help=(
-            "Ice sheet for the landIce realm: 'gris' (Greenland) or 'ais' "
-            "(Antarctica). Required when --realm landIce; ignored otherwise."
-        ),
-    )
-    parser.add_argument(
-        "--sampling",
-        choices=["tavg", "tpt"],
-        default=None,
-        help=(
-            "Restrict to time-averaged ('tavg') or instantaneous ('tpt') history "
-            "files. Default: collect both, since which is needed depends on the "
-            "CMIP7 variable being produced later."
-        ),
-    )
-    parser.add_argument(
+
+    selection = parser.add_argument_group("selecting what to process")
+    selection.add_argument(
         "--frequency",
         nargs="+",
         default=None,
@@ -162,42 +164,64 @@ def parse_arguments():
             "(Default: every frequency the realm defines.)"
         ),
     )
-    parser.add_argument(
-        "--outputdir",
+    selection.add_argument(
+        "--sampling",
+        choices=["tavg", "tpt"],
+        default=None,
+        help=(
+            "Restrict to time-averaged ('tavg') or instantaneous ('tpt') history "
+            "files. Default: collect both, since which is needed depends on the "
+            "CMIP7 variable being produced later."
+        ),
+    )
+    selection.add_argument(
+        "--varlist",
         type=str,
-        help="Full path to directory where output time series data will be placed (optional) "
-        "(default: inputdir/../time_series)",
+        default=None,
+        help="Comma separated list of variables to process (default: all of them)",
     )
-    parser.add_argument(
-        "--overwrite_timeseries",
-        action="store_true",
-        help="Overwrite existing timeseries outputs (default: False)",
+    selection.add_argument(
+        "--ice-sheet",
+        choices=["gris", "ais"],
+        default=None,
+        help=(
+            "Ice sheet for the landIce realm: 'gris' (Greenland) or 'ais' "
+            "(Antarctica). Required when --realm landIce; ignored otherwise."
+        ),
     )
-    parser.add_argument(
+    selection.add_argument(
         "--years-spec",
         help="colon separated specification of years to process \n"
         " in format of year-first,year-last,year-increments \n "
         " where year-increments specifies how many years to user for each time series file \n"
         " (default: all files in inputdir are placed in one time series file)",
     )
-    parser.add_argument(
+
+    output = parser.add_argument_group("output")
+    output.add_argument(
+        "--outputdir",
+        type=str,
+        help="Full path to directory where output time series data will be placed "
+        "(default: inputdir/../time_series)",
+    )
+    output.add_argument(
+        "--overwrite_timeseries",
+        action="store_true",
+        help="Overwrite existing timeseries outputs (default: False)",
+    )
+
+    behaviour = parser.add_argument_group("how to run")
+    behaviour.add_argument(
         "--workers",
         type=int,
         default=32,
         help="Number of workers (default: 32)",
     )
-    parser.add_argument(
-        "--model",
-        choices=["cesm", "noresm"],
-        default="cesm",
-        help="Model to use, default: cesm",
+    behaviour.add_argument(
+        "--debug", action="store_true", help="Turn on debug output (False by default)."
     )
 
-    # Parse Argument inputs
-    args = parser.parse_args()
-
-    # Error checks
-    return args
+    return parser.parse_args()
 
 
 # ++++++++++++++++++++++++++++++

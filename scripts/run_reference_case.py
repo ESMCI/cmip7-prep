@@ -30,13 +30,8 @@ sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 
 # pylint: disable=wrong-import-position
 from cmip7_prep.cv_lookup import validate as validate_cv
-from cmip7_prep.reference_run import (
-    ATM_RESOLUTIONS,
-    STAGES,
-    Plan,
-    Step,
-    build_plan,
-)
+from cmip7_prep.grids import ATM_RESOLUTIONS
+from cmip7_prep.reference_run import STAGES, Plan, Step, build_plan
 
 logger = logging.getLogger("run_reference_case")
 
@@ -74,16 +69,6 @@ def parse_arguments():
         ),
     )
     required.add_argument(
-        "--atmos-resolution",
-        choices=list(ATM_RESOLUTIONS),
-        required=True,
-        help=(
-            "Grid the atmosphere and land were run on. Ocean and sea ice are "
-            "always on the model's own tripolar grid, and land ice is written "
-            "on its native projected grid, so those are derived from this."
-        ),
-    )
-    required.add_argument(
         "--experiment",
         required=True,
         help=(
@@ -93,6 +78,16 @@ def parse_arguments():
     )
 
     selection = parser.add_argument_group("selecting what to run")
+    selection.add_argument(
+        "--atmos-res",
+        choices=list(ATM_RESOLUTIONS),
+        default=None,
+        help=(
+            "Grid the atmosphere and land were run on. Required unless the "
+            "realms being processed are all ocean, sea ice or land ice, which "
+            "derive their own grid."
+        ),
+    )
     selection.add_argument(
         "--realms",
         nargs="+",
@@ -264,20 +259,24 @@ def main():
         logger.error("%s", exc)
         sys.exit(2)
 
-    plan = build_plan(
-        case_dir=case_dir,
-        outdir=args.outdir,
-        model=args.model,
-        realms=args.realms,
-        frequencies=args.frequencies,
-        years=args.years,
-        stages=args.stages,
-        atmos_resolution=args.atmos_resolution,
-        experiment=args.experiment,
-        workers=args.workers,
-        ice_sheet=args.ice_sheet,
-        scripts_dir=_LOCAL_PATH,
-    )
+    try:
+        plan = build_plan(
+            case_dir=case_dir,
+            outdir=args.outdir,
+            model=args.model,
+            realms=args.realms,
+            frequencies=args.frequencies,
+            years=args.years,
+            stages=args.stages,
+            atmos_res=args.atmos_res,
+            experiment=args.experiment,
+            workers=args.workers,
+            ice_sheet=args.ice_sheet,
+            scripts_dir=_LOCAL_PATH,
+        )
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(2)
 
     if not plan.steps:
         logger.error("Nothing to do. Skipped: %s", plan.skipped or "(nothing)")

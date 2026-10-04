@@ -3,16 +3,12 @@
 import pytest
 
 from cmip7_prep.reference_run import (
-    ATM_RESOLUTIONS,
-    NATIVE_GRID,
-    OCEAN_GRID,
     REALM_COMPONENT,
     STAGES,
     build_plan,
     frequencies_for,
     history_dir,
     realms_for,
-    resolution_for,
 )
 
 
@@ -31,7 +27,7 @@ def _plan(case_dir, outdir, **kwargs):
     wrong output, so a caller must say which it means.
     """
     kwargs.setdefault("model", "noresm")
-    kwargs.setdefault("atmos_resolution", "ne16")
+    kwargs.setdefault("atmos_res", "ne16")
     kwargs.setdefault("experiment", "piControl")
     return build_plan(case_dir, outdir, **kwargs)
 
@@ -223,20 +219,21 @@ class TestCommands:
         assert "--strict" in _command_of(plan, "validate-seaIce-mon")
 
     def test_resolution_and_experiment_reach_cmor(self, case_dir, tmp_path):
-        """Resolution and experiment are passed to the CMOR step.
+        """The atmosphere resolution and experiment are passed to the CMOR step.
 
-        Resolution is checked on an atmosphere realm, since that is the only
-        kind that takes the value given; see TestResolutionPerRealm.
+        The CMOR step is given the atmosphere resolution rather than the grid
+        it will regrid from: cmor_driver.py derives that itself from --model
+        and --realm, so the derivation has one home. See test_grids.py.
         """
         plan = _plan(
             case_dir,
             tmp_path / "out",
             realms=["atmos"],
-            atmos_resolution="ne30",
+            atmos_res="ne30",
             experiment="historical",
         )
         command = _command_of(plan, "cmor-atmos-mon")
-        assert command[command.index("--resolution") + 1] == "ne30"
+        assert command[command.index("--atmos-res") + 1] == "ne30"
         assert command[command.index("--experiment") + 1] == "historical"
 
     def test_every_step_has_a_distinct_log_name(self, case_dir, tmp_path):
@@ -246,16 +243,18 @@ class TestCommands:
         assert len(names) == len(set(names))
 
 
-@pytest.mark.parametrize("omitted", ["model", "atmos_resolution", "experiment"])
+@pytest.mark.parametrize("omitted", ["model", "experiment"])
 def test_case_properties_are_required(omitted):
     """build_plan refuses to guess a property of the case.
 
-    Model, resolution and experiment each change what the output means while
-    leaving it looking valid, so none of them may be defaulted.
+    Model and experiment change what the output means while leaving it looking
+    valid, so neither may be defaulted.  The atmosphere resolution is not here
+    because it is only needed by some realms; see
+    TestAtmosResolutionIsConditional.
     """
     supplied = {
         "model": "noresm",
-        "atmos_resolution": "ne16",
+        "atmos_res": "ne16",
         "experiment": "piControl",
     }
     del supplied[omitted]
@@ -263,58 +262,73 @@ def test_case_properties_are_required(omitted):
         build_plan("case", "out", **supplied)
 
 
-# ----------------------------------------------------------- input grid names
+class TestAtmosResolutionIsConditional:
+    """The atmosphere resolution is asked for only when a realm uses it."""
 
+    def test_not_needed_for_realms_with_their_own_grid(self, case_dir, tmp_path):
+        """Sea ice and land ice plan fully without one."""
+        plan = build_plan(
+            case_dir,
+            tmp_path / "out",
+            model="noresm",
+            experiment="piControl",
+            realms=["seaIce", "landIce"],
+        )
+        assert plan.steps
+        for step in plan.for_stage("cmor"):
+            assert "--atmos-res" not in step.command
 
-class TestResolutionPerRealm:
-    """Tests for choosing each realm's input grid.
+    @pytest.mark.parametrize("realm", ["atmos", "land"])
+    def test_needed_for_realms_on_the_atmosphere_grid(self, case_dir, tmp_path, realm):
+        """A realm on that grid refuses to plan without one, and names itself."""
+        with pytest.raises(ValueError, match=f"needed for \\['{realm}'\\]"):
+            build_plan(
+                case_dir,
+                tmp_path / "out",
+                model="noresm",
+                experiment="piControl",
+                realms=[realm],
+            )
 
-    The grid is not a free choice: sea ice is on the model's tripolar grid
-    whatever the atmosphere was run on, so passing one realm another's grid
-    would regrid through the wrong weights and yield plausible wrong output.
-    """
+    def test_the_whole_matrix_names_every_realm_that_needs_it(self, case_dir, tmp_path):
+        """Planning every realm without one lists the four that require it."""
+        with pytest.raises(ValueError, match="atmos.*atmosChem.*aerosol.*land"):
+            build_plan(
+                case_dir, tmp_path / "out", model="noresm", experiment="piControl"
+            )
 
-    @pytest.mark.parametrize("realm", ["atmos", "atmosChem", "aerosol", "land"])
-    @pytest.mark.parametrize("atm", ATM_RESOLUTIONS)
-    def test_atmosphere_realms_take_the_given_grid(self, realm, atm):
-        """Atmosphere and land use the resolution the case was run at."""
-        assert resolution_for("noresm", realm, atm) == atm
-
-    @pytest.mark.parametrize("realm", ["seaIce", "ocean", "ocnBgchem"])
-    @pytest.mark.parametrize("model", ["noresm", "cesm"])
-    def test_ocean_realms_take_the_model_grid(self, realm, model):
-        """Ocean and sea ice ignore the atmosphere resolution entirely."""
-        assert resolution_for(model, realm, "ne16") == OCEAN_GRID[model]
-
-    def test_unknown_atmosphere_resolution_is_rejected(self):
-        """A resolution with no weight files fails before any run starts."""
-        with pytest.raises(ValueError, match="Unknown atmosphere resolution"):
-            resolution_for("noresm", "atmos", "ne120")
-
-    @pytest.mark.parametrize("model", ["noresm", "cesm"])
-    @pytest.mark.parametrize("atm", ATM_RESOLUTIONS)
-    def test_landice_is_never_regridded(self, model, atm):
-        """land ice takes the pass-through grid whatever else was asked for.
-
-        CISM output is written on its native projected grid, georeferenced from
-        its x/y coordinates, so no weight files apply and the atmosphere's
-        resolution is irrelevant to it.
-        """
-        assert resolution_for(model, "landIce", atm) == NATIVE_GRID
-
-    def test_cmor_step_carries_the_realm_grid(self, case_dir, tmp_path):
-        """Each CMOR step is told its own realm's grid, not the atmosphere's."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce", "atmos"])
-        sea = _command_of(plan, "cmor-seaIce-mon")
+    def test_only_atmosphere_realms_carry_the_flag(self, case_dir, tmp_path):
+        """With one supplied, only the realms that use it are given it."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["atmos", "seaIce"])
         atm = _command_of(plan, "cmor-atmos-mon")
-        assert sea[sea.index("--resolution") + 1] == "tnx1v4"
-        assert atm[atm.index("--resolution") + 1] == "ne16"
+        sea = _command_of(plan, "cmor-seaIce-mon")
+        assert atm[atm.index("--atmos-res") + 1] == "ne16"
+        assert "--atmos-res" not in sea
+
+
+# ------------------------------------------- forwarding the grid decision
+
+
+class TestGridIsNotDecidedHere:
+    """The plan never decides which grid a run regrids from."""
+
+    def test_no_step_carries_a_derived_grid(self, case_dir, tmp_path):
+        """No command names an input grid such as tnx1v4.
+
+        cmor_driver.py derives that from --model and --realm, so a plan that
+        passed one would mean two places deciding the same thing.
+        """
+        plan = _plan(case_dir, tmp_path / "out")
+        for step in plan.steps:
+            assert "--resolution" not in step.command
+            assert "tnx1v4" not in step.command
+            assert "tx2_3v2" not in step.command
 
     def test_landice_runs_every_stage_without_extra_input(self, case_dir, tmp_path):
-        """land ice needs nothing beyond the atmosphere resolution."""
+        """land ice needs no grid input of its own."""
         plan = _plan(case_dir, tmp_path / "out", realms=["landIce"])
         assert {step.stage for step in plan.steps} == set(STAGES)
         assert not plan.skipped
         command = _command_of(plan, "cmor-landIce-yr")
-        assert command[command.index("--resolution") + 1] == NATIVE_GRID
+        assert "--atmos-res" not in command
         assert command[command.index("--ice-sheet") + 1] == "gris"
