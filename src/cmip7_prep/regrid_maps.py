@@ -113,7 +113,8 @@ def get_grid_desc(model: str, resolution: str, realm: str) -> str:
     realm_descs = grid_descs.get(resolution) or {}
     if realm not in realm_descs:
         raise ValueError(
-            f"No grid descriptions defined for model={model}, resolution={resolution}, realm={realm}; "
+            f"No grid descriptions defined for model={model}, "
+            f"resolution={resolution}, realm={realm}; "
             f"available: {sorted(realm_descs)}"
         )
     return grid_descs[resolution][realm] or ""

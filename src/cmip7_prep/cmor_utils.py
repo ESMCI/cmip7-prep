@@ -15,6 +15,9 @@ import numpy as np
 import yaml
 import xarray as xr
 
+# Local imports avoid an import cycle with regrid_maps.
+from .regrid_maps import load_regrid_maps, get_grid_names
+
 _FILL_DEFAULT = 1.0e20
 
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
@@ -108,8 +111,8 @@ def _parse_ripf(ripf: str) -> tuple[str, str, str, str]:
     match = re.fullmatch(r"r(\d+)i(\d+)p(\d+)f(\d+)", ripf.strip())
     if not match:
         raise ValueError(
-            f"Invalid realization-initialization-physics-forcing string {ripf!r}; "
-            "expected rXiYpZfW (e.g. r1i1p1f1)"
+            "Invalid realization-initialization-physics-forcing; "
+            f"expected rXiYpZfW (e.g. r1i1p1f1) got {ripf}"
         )
     realization, initialization, physics, forcing = match.groups()
     return f"r{realization}", f"i{initialization}", f"p{physics}", f"f{forcing}"
@@ -133,9 +136,6 @@ def build_dataset_cfg(
     resolution come from the per-model ``dataset`` block in
     ``data/<model>_regrid_maps.yaml``.  Replaces the packaged cmor_dataset*.json.
     """
-    # Local imports avoid an import cycle with regrid_maps.
-    from .regrid_maps import load_regrid_maps, get_grid_names
-
     cv = _load_controlled_vocabulary(str(tables_root))
     meta = load_regrid_maps(model).get("dataset") or {}
     base_source_id = meta.get("base_source_id")
