@@ -247,15 +247,20 @@ def run_step(step: Step, log_dir: Path) -> dict:
 
 
 def print_plan(plan: Plan) -> None:
-    """Print the commands a run would issue, without running them."""
-    for stage in STAGES:
-        steps = plan.for_stage(stage)
-        if not steps:
-            continue
-        print(f"\n=== {stage} ({len(steps)} step(s)) ===")
-        for step in steps:
-            print(f"  {step.key}")
-            print(f"    {' '.join(step.command)}")
+    """Print the commands a run would issue, in the order it would issue them.
+
+    Grouped by realm, because that is how a run proceeds: one realm's time
+    series, CMORization and validation complete before the next realm starts.
+    """
+    realm = None
+    for step in plan.steps:
+        if step.realm != realm:
+            realm = step.realm
+            count = sum(1 for s in plan.steps if s.realm == realm)
+            print(f"\n=== {realm} ({count} step(s)) ===")
+        print(f"  {step.key}")
+        print(f"    {' '.join(step.command)}")
+    print(f"\n{len(plan.steps)} step(s) in total")
     if plan.skipped:
         print("\n=== skipped ===")
         for reason in plan.skipped:

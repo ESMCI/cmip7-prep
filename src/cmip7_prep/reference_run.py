@@ -44,6 +44,11 @@ DEFAULT_ICE_SHEET = "gris"
 
 STAGES = ("timeseries", "cmor", "validate")
 
+# Frequencies are processed coarsest first, so the cheapest and most used
+# output exists soonest.  Alphabetical order would put 'day' before 'mon' and
+# '1hr' first of all, leaving the monthly output until last.
+FREQUENCY_ORDER = ("yr", "mon", "day", "6hr", "3hr", "1hr")
+
 # The steps run with the interpreter running this, not whatever "python" means
 # on PATH: that keeps every stage in the environment the run was started from,
 # and works when the runner was invoked as python3 or by absolute path.
@@ -96,8 +101,15 @@ def realms_for(model: str) -> list[str]:
 
 
 def frequencies_for(model: str, realm: str) -> list[str]:
-    """Return the frequencies declared for one model and realm."""
-    return sorted(load_include_patterns(model)[realm])
+    """Return the frequencies declared for one model and realm, coarsest first.
+
+    The order is the order a run will process them in, so it is chosen rather
+    than alphabetical: see FREQUENCY_ORDER.
+    """
+    declared = load_include_patterns(model)[realm]
+    known = [f for f in FREQUENCY_ORDER if f in declared]
+    rest = sorted(f for f in declared if f not in FREQUENCY_ORDER)
+    return known + rest
 
 
 def written_frequencies(

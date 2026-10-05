@@ -124,12 +124,28 @@ class TestPlanShape:
         """CMOR and validation run once per realm and frequency."""
         plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
         assert [step.key for step in plan.for_stage("cmor")] == [
-            "cmor-seaIce-day",
             "cmor-seaIce-mon",
+            "cmor-seaIce-day",
         ]
         assert [step.key for step in plan.for_stage("validate")] == [
-            "validate-seaIce-day",
             "validate-seaIce-mon",
+            "validate-seaIce-day",
+        ]
+
+    def test_coarse_frequencies_are_processed_first(self, case_dir, tmp_path):
+        """Monthly output is produced before daily, and daily before hourly.
+
+        A run that stops partway should have produced the most useful output,
+        and CMORizing daily data took 24 minutes on a real two-year case while
+        monthly took a fraction of that.
+        """
+        plan = _plan(case_dir, tmp_path / "out", realms=["atmos"])
+        assert [step.frequency for step in plan.for_stage("cmor")] == [
+            "mon",
+            "day",
+            "6hr",
+            "3hr",
+            "1hr",
         ]
 
     def test_realms_can_be_narrowed(self, case_dir, tmp_path):
@@ -142,7 +158,7 @@ class TestPlanShape:
         plan = _plan(
             case_dir, tmp_path / "out", realms=["atmos"], frequencies=["mon", "day"]
         )
-        assert [step.frequency for step in plan.for_stage("cmor")] == ["day", "mon"]
+        assert [step.frequency for step in plan.for_stage("cmor")] == ["mon", "day"]
 
     def test_frequency_a_realm_does_not_declare_is_skipped(self, case_dir, tmp_path):
         """Asking seaIce for 1hr skips it rather than planning a doomed step."""
