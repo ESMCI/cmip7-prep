@@ -282,21 +282,30 @@ def main():
     # Determine number of files used in time series creation
     cnt = 0
     filtered = []
+    all_patterns = list(include_patterns)
     for include_pattern in include_patterns:
         num = len(glob.glob(os.path.join(inputdir, include_pattern)))
-        logger.info(f"include pattern {include_pattern} has num {num}")
         if num == 0:
-            logger.info(f"removing {include_pattern}")
+            logger.info(
+                "No files match %s; this stream was not written, skipping it",
+                include_pattern,
+            )
         else:
             cnt += num
-            logger.info(f"Processing {num} files with {include_pattern}")
+            logger.info("Processing %d file(s) matching %s", num, include_pattern)
             filtered.append(include_pattern)
     include_patterns = filtered
     if cnt == 0:
-        logger.warning(
-            f"No input files to process in {inputdir} with {include_patterns}"
+        # Being asked to process a realm and finding nothing is a failure, not
+        # a no-op: the caller named this realm, so an empty result means the
+        # input directory, the realm or the frequencies were wrong.
+        logger.error(
+            "No input files in %s for realm %s with patterns %s",
+            inputdir,
+            args.realm,
+            all_patterns,
         )
-        sys.exit(0)
+        sys.exit(1)
     logger.info(f"include patterns are {include_patterns}")
 
     varlist = (
