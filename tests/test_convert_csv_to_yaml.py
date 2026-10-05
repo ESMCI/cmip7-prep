@@ -578,7 +578,7 @@ class TestReadCsvNorESM:
         ]
         data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
         assert data["atmos"]["dataset_overrides"]["institution_id"] == "NCC"
-        assert data["atmos"]["dataset_overrides"]["source_id"] == "NorESM3"
+        assert data["atmos"]["dataset_overrides"]["source_id"] == "NorESM3-LM"
 
     def test_dims_not_written_to_yaml(self, tmp_path):
         """The Dimensions column is read but not copied into the YAML.

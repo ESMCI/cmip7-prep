@@ -63,7 +63,7 @@ def test_scan_output_tree_inventories_dims(tmp_path):
         / "CMIP7"
         / "CMIP"
         / "NCC"
-        / "NorESM3"
+        / "NorESM3-LM"
         / "piControl"
         / "r1i1p1f1"
         / "glb"
@@ -97,7 +97,7 @@ def test_scan_output_tree_inventories_dims(tmp_path):
         expected_variables={"tas_hxy"},
         ensemble_member=None,
     )
-
+    print(produced)
     assert sorted(produced) == ["tas_hxy"]
     assert not errors
     summary = summarize_dimension_inventory(inventory)
