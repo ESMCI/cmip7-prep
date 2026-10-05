@@ -157,7 +157,9 @@ def build_dataset_cfg(
 
     # Branded source_id/nominal_resolution written to the output, by resolution.
     source_id = _resolve_by_resolution(
-        meta.get("source_ids"), resolution, meta.get("default_source_id", base_source_id)
+        meta.get("source_ids"),
+        resolution,
+        meta.get("default_source_id", base_source_id),
     )
     nominal_resolution = _resolve_by_resolution(
         meta.get("nominal_resolution"),

@@ -8,6 +8,7 @@ Usage:
 
 Preserves all comments and error handling from both atm_monthly.py and lnd_monthly.py.
 """
+
 from __future__ import annotations
 import argparse
 from concurrent.futures import as_completed
@@ -65,9 +66,6 @@ from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 
 
 from dask import delayed
-
-
-
 
 # The only logging configuration in the package: library modules attach
 # handlers to their own loggers but leave the root config to the entry point.
@@ -683,7 +681,6 @@ def process_one_var(
                     )()
                     # Now use CMOR utility to write out netcdf variable
                     cm.write_variable(ds_cmor_write, cmip_var, vdef)
-
 
                 # A high-water mark for the process, so this is the largest any
                 # variable has needed so far, not this one alone. A jump from the

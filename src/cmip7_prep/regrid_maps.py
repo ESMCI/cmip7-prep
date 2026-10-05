@@ -78,6 +78,7 @@ def get_map_paths(model: str, resolution: str) -> dict[str, Path]:
         )
     return {method: root / name for method, name in entry.items()}
 
+
 def get_grid_names(model: str, resolution: str, realm: str) -> dict[str, str]:
     """Return the grid names for one model and resolution.
 
@@ -96,8 +97,9 @@ def get_grid_names(model: str, resolution: str, realm: str) -> dict[str, str]:
             f"No grid names defined for model={model}, resolution={resolution}, realm={realm}; "
             f"available: {sorted(realm_grids)}"
         )
-    
+
     return grid_names[resolution][realm] or {}
+
 
 def get_grid_desc(model: str, resolution: str, realm: str) -> str:
     """Return the grid description for one model and resolution."""

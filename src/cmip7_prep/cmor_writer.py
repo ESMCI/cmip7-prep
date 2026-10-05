@@ -1212,12 +1212,12 @@ class CmorSession(
             logger.debug("FX variable %s define lon_id %s", name, lon_id)
             logger.debug("Writing fx variable %s on curvilinear grid", name)
             cmor.set_cur_dataset_attribute("grid", "curvilinear")
-            #cmor.set_cur_dataset_attribute("grid_label", "gn")
+            # cmor.set_cur_dataset_attribute("grid_label", "gn")
             if name == "deptho":
                 name = "deptho_ti-u-hxy-sea"
         else:
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
-            #cmor.set_cur_dataset_attribute("grid_label", "gr")
+            # cmor.set_cur_dataset_attribute("grid_label", "gr")
             if name in ("areacella_ti-u-hxy-u", "sftlf_ti-u-hxy-u"):
                 self.load_table(self.tables_root, "land")
             elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
