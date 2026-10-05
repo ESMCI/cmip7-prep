@@ -173,10 +173,19 @@ def parse_args():
         ),
     )
     case.add_argument(
+        "--variant-label",
         "--realization-initialization-physics-forcing",
+        dest="variant_label",
         type=str,
         default="r1i1p1f1",
-        help="Variant indices in the format rXiYpZfW (default: r1i1p1f1)",
+        metavar="rXiYpZfW",
+        help=(
+            "Ensemble member this output belongs to: realization, "
+            "initialization, physics and forcing indices, e.g. r1i1p1f1. This "
+            "is the CMIP variant_label, and appears in the output paths and "
+            "file names. The longer spelling is accepted as an alias. "
+            "(default: r1i1p1f1)"
+        ),
     )
 
     selection = parser.add_argument_group("which variables to produce")
@@ -722,7 +731,7 @@ def main():
     frequency = args.frequency
     realm = args.realm
     logger.debug("Realm is %s", realm)
-    ripf_index = args.realization_initialization_physics_forcing
+    ripf_index = args.variant_label
 
     # Ocean only: ocean fx fields (deptho, areacello, sftof) are read
     # from the MOM6 static file and merged into the native data and

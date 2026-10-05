@@ -73,6 +73,37 @@ def _time_record_counts(paths, workers):
     return [time_record_count(path) for path in paths]
 
 
+def _overwrite_or_resume(ts_collection, overwrite, logger):
+    """Return the collection set either to overwrite output or to resume.
+
+    Asked to overwrite, GenTS rewrites every time series.  Otherwise the
+    collection is narrowed to the timesteps no output covers yet, so a rerun
+    after an interrupted run continues instead of repeating work.
+    """
+    if overwrite:
+        logger.info("Overwriting any existing time series")
+        return ts_collection.apply_overwrite("*")
+    resumed = ts_collection.skip_existing()
+    logger.info(
+        "Skipping time series that already exist; pass --overwrite_timeseries "
+        "to rewrite them"
+    )
+    return resumed
+
+
+def _execute_or_report_complete(ts_collection, logger):
+    """Generate the time series, or report that there is nothing left to do.
+
+    Narrowing a finished run to its missing timesteps leaves nothing, and GenTS
+    treats an empty collection as an error.  Having already produced everything
+    asked for is a success, so it is reported as one.
+    """
+    if len(ts_collection) == 0:
+        logger.info("Every requested time series already exists; nothing to generate")
+        return
+    ts_collection.execute()
+
+
 def find_unusable_files(inputdir, include_patterns, workers, logger):
     """
     Returns the history files GenTS cannot derive time bounds from: those with
@@ -207,7 +238,11 @@ def parse_arguments():
     output.add_argument(
         "--overwrite_timeseries",
         action="store_true",
-        help="Overwrite existing timeseries outputs (default: False)",
+        help=(
+            "Rewrite time series that already exist. Without this, existing "
+            "output is kept and only the missing timesteps are produced, so "
+            "an interrupted run can simply be repeated."
+        ),
     )
 
     behaviour = parser.add_argument_group("how to run")
@@ -331,14 +366,19 @@ def main():
         # Create base TSCollection
         logger.info("Starting ts_collection")
         ts_collection = TSCollection(hf_collection, outputdir, num_processes=workers)
-        ts_collection = ts_collection.apply_overwrite("*")
         if varlist:
             ts_collection = ts_collection.include("*", var_glob=varlist)
+        # Empty here means nothing matched at all, which is a mistake worth
+        # stopping for.  Empty only after narrowing below means the work was
+        # already done, which is not.
         if len(ts_collection) == 0:
             raise RuntimeError(
                 "No matching variables/files found for time series generation"
             )
-        ts_collection.execute()
+        ts_collection = _overwrite_or_resume(
+            ts_collection, args.overwrite_timeseries, logger
+        )
+        _execute_or_report_complete(ts_collection, logger)
         logger.info("Finished ts_collection")
 
     else:
@@ -377,11 +417,6 @@ def main():
                 )
                 logger.info("Finished ts_collection")
 
-                # Apply overwrite if requested:
-                # If --overwrite flag was passed, tells GenTS to overwrite existing time series files
-                if args.overwrite_timeseries:
-                    ts_collection = ts_collection.apply_overwrite("*")
-
                 # Perform the time series generation for this pattern
                 if varlist:
                     ts_collection = ts_collection.include("*", var_glob=varlist)
@@ -390,12 +425,16 @@ def main():
                         "No matching variables/files found for time series generation"
                     )
 
-                logger.info(
-                    "Variables scheduled: %s",
-                    [order["primary_var"] for order in ts_collection],
+                ts_collection = _overwrite_or_resume(
+                    ts_collection, args.overwrite_timeseries, logger
                 )
+                if len(ts_collection):
+                    logger.info(
+                        "Variables scheduled: %s",
+                        [order["primary_var"] for order in ts_collection],
+                    )
 
-                ts_collection.execute()
+                _execute_or_report_complete(ts_collection, logger)
                 logger.info("Timeseries processing complete")
 
 

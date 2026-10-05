@@ -9,6 +9,10 @@ cmor_driver.py and validate_cmor_output.py for each of that realm's
 frequencies, and prints one table at the end saying what succeeded, what
 failed, and how much was produced.
 
+Steps that succeed are recorded in the output directory, so repeating the
+command after an interruption continues rather than starting over; --force
+runs everything again.
+
 It is meant to be run on the machine holding the data, interactively -- there
 is no batch submission here.  A full run takes a while, so start it under
 ``tmux`` or ``screen`` if the connection might drop.  Use ``--dry-run`` first to
@@ -19,6 +23,7 @@ invoked with --strict, so a missing variable or a CMOR log error fails the run.
 """
 
 import argparse
+import json
 import logging
 import subprocess
 import sys
@@ -118,6 +123,17 @@ def parse_arguments():
         help="Stages to run (default: all three)",
     )
     selection.add_argument(
+        "--variant-label",
+        default=None,
+        metavar="rXiYpZfW",
+        help=(
+            "Ensemble member to label the output with, e.g. r1i1p1f1 "
+            "(cmor_driver.py's --realization-initialization-physics-forcing). "
+            "Needed when producing output for submission rather than just "
+            "exercising the chain, since it distinguishes members."
+        ),
+    )
+    selection.add_argument(
         "--ice-sheet",
         choices=["gris", "ais"],
         default=None,
@@ -130,8 +146,18 @@ def parse_arguments():
         type=int,
         default=4,
         help=(
-            "Worker processes per stage (default: 4, chosen to be polite on a "
-            "shared interactive node rather than to be fast)"
+            "Worker processes for time series generation (default: 4, chosen "
+            "to be polite on a shared interactive node). CMORization always "
+            "runs with one worker."
+        ),
+    )
+    behaviour.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Run every step again, including those a previous run in this "
+            "output directory already completed, and rewrite time series "
+            "that already exist"
         ),
     )
     behaviour.add_argument(
@@ -148,12 +174,39 @@ def parse_arguments():
         "--tables-root",
         default=None,
         help=(
-            "cmip7-cmor-tables checkout, used to check --experiment against the "
-            "controlled vocabulary (default: the one beside this repo)"
+            "cmip7-cmor-tables checkout. Used to check --experiment against "
+            "the controlled vocabulary before starting, and passed on to "
+            "CMORization (default: the one beside this repo)"
         ),
     )
     behaviour.add_argument("--log-level", default="INFO", help="Default: INFO")
     return parser.parse_args()
+
+
+# Steps that finished are recorded here so a repeated run continues instead of
+# starting over.  One file per output directory, next to the logs.
+COMPLETED_NAME = "completed_steps.json"
+
+
+def read_completed(outdir: Path) -> set[str]:
+    """Return the keys of steps a previous run completed in this directory."""
+    path = outdir / COMPLETED_NAME
+    if not path.is_file():
+        return set()
+    try:
+        return set(json.loads(path.read_text(encoding="utf-8")))
+    except (ValueError, OSError) as exc:
+        logger.warning("Ignoring %s: %s", path, exc)
+        return set()
+
+
+def record_completed(outdir: Path, done: set[str]) -> None:
+    """Write the set of completed step keys, sorted so the file diffs cleanly."""
+    path = outdir / COMPLETED_NAME
+    try:
+        path.write_text(json.dumps(sorted(done), indent=2) + "\n", encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Could not record progress in %s: %s", path, exc)
 
 
 def run_step(step: Step, log_dir: Path) -> dict:
@@ -272,6 +325,9 @@ def main():
             experiment=args.experiment,
             workers=args.workers,
             ice_sheet=args.ice_sheet,
+            overwrite_timeseries=args.force,
+            variant_label=args.variant_label,
+            tables_root=args.tables_root,
             scripts_dir=_LOCAL_PATH,
         )
     except ValueError as exc:
@@ -296,14 +352,33 @@ def main():
     log_dir = outdir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
+    completed = set() if args.force else read_completed(outdir)
+    if completed:
+        logger.info(
+            "%d step(s) already completed in %s; pass --force to run them again",
+            len(completed),
+            outdir,
+        )
+
     outcomes = []
     for step in plan.steps:
+        if step.key in completed:
+            logger.info("[%s] already done, skipping", step.key)
+            continue
         outcome = run_step(step, log_dir)
         outcomes.append(outcome)
-        if outcome["returncode"] != 0 and not args.keep_going:
+        if outcome["returncode"] == 0:
+            completed.add(step.key)
+            # Written after every step, so an interrupted run still knows what
+            # it finished.
+            record_completed(outdir, completed)
+        elif not args.keep_going:
             logger.error("Stopping at the first failure; pass --keep-going to continue")
             break
 
+    if not outcomes:
+        logger.info("Nothing left to do: every planned step was already completed")
+        return
     print_report(outcomes, plan)
 
     failed = any(outcome["returncode"] != 0 for outcome in outcomes)

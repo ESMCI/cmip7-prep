@@ -1,7 +1,11 @@
 """Tests for planning a full-chain reference-case run."""
 
+import sys
+from pathlib import Path
+
 import pytest
 
+from cmip7_prep.include_patterns import all_include_patterns
 from cmip7_prep.reference_run import (
     REALM_COMPONENT,
     STAGES,
@@ -12,11 +16,42 @@ from cmip7_prep.reference_run import (
 )
 
 
+def _write_history_files(case_dir, model, realms=None, frequencies=None):
+    """Create empty history files for the streams a case would have written.
+
+    Only the names matter here: the plan is built by matching include patterns
+    against file names, never by opening them.
+    """
+    for realm in realms or realms_for(model):
+        component = REALM_COMPONENT[realm]
+        inputdir = Path(case_dir) / component / "hist"
+        inputdir.mkdir(parents=True, exist_ok=True)
+        sheet = "gris" if realm == "landIce" else None
+        for frequency in frequencies_for(model, realm):
+            if frequencies and frequency not in frequencies:
+                continue
+            for pattern in all_include_patterns(model, realm, sheet, None, [frequency]):
+                name = f"case.{pattern.strip('.')}.1526-01.nc"
+                (inputdir / name).touch()
+
+
+def _write_history_files_for_ice_sheet(case_dir, ice_sheet):
+    """Create land-ice history files for one ice sheet."""
+    inputdir = Path(case_dir) / REALM_COMPONENT["landIce"] / "hist"
+    inputdir.mkdir(parents=True, exist_ok=True)
+    for frequency in frequencies_for("noresm", "landIce"):
+        for pattern in all_include_patterns(
+            "noresm", "landIce", ice_sheet, None, [frequency]
+        ):
+            (inputdir / f"case.{pattern.strip('.')}.1526-01.nc").touch()
+
+
 @pytest.fixture(name="case_dir")
 def case_dir_fixture(tmp_path):
-    """Return a case directory with every component's history directory."""
+    """Return a case that wrote every stream its tables declare."""
     for component in sorted(set(REALM_COMPONENT.values())):
-        (tmp_path / component / "hist").mkdir(parents=True)
+        (tmp_path / component / "hist").mkdir(parents=True, exist_ok=True)
+    _write_history_files(tmp_path, "noresm")
     return tmp_path
 
 
@@ -134,11 +169,38 @@ class TestPlanShape:
         is reported rather than ending the run.
         """
         case = tmp_path / "case"
-        (case / "ice" / "hist").mkdir(parents=True)
+        _write_history_files(case, "noresm", realms=["seaIce"])
         plan = _plan(case, tmp_path / "out")
         assert {step.realm for step in plan.steps} == {"seaIce"}
         assert len(plan.skipped) == 5
         assert all("no history directory" in reason for reason in plan.skipped)
+
+    def test_only_frequencies_the_case_wrote_are_planned(self, tmp_path):
+        """A case that wrote only monthly output gets only monthly steps.
+
+        A table lists every frequency a realm can produce, but a run writes
+        only the streams it was configured for.  Planning the rest guarantees
+        a CMORization failure saying nothing about the code -- which is what
+        happened on a real ne30 case with no hourly output.
+        """
+        case = tmp_path / "case"
+        _write_history_files(case, "noresm", realms=["atmos"], frequencies=["mon"])
+        plan = _plan(case, tmp_path / "out", realms=["atmos"])
+        assert [step.frequency for step in plan.for_stage("cmor")] == ["mon"]
+        assert any("no history files" in reason for reason in plan.skipped)
+
+    def test_the_absent_frequencies_are_named(self, tmp_path):
+        """The report says which streams the case did not write."""
+        case = tmp_path / "case"
+        _write_history_files(
+            case, "noresm", realms=["atmos"], frequencies=["mon", "day"]
+        )
+        plan = _plan(case, tmp_path / "out", realms=["atmos"])
+        reason = next(r for r in plan.skipped if "no history files" in r)
+        for absent in ("1hr", "3hr", "6hr"):
+            assert absent in reason
+        for present in ("'mon'", "'day'"):
+            assert present not in reason
 
     def test_all_stages_present_by_default(self, case_dir, tmp_path):
         """The default plan runs all three stages."""
@@ -188,7 +250,13 @@ class TestCommands:
         assert "--ice-sheet" not in _command_of(plan, "timeseries-seaIce")
 
     def test_ice_sheet_can_be_chosen(self, case_dir, tmp_path):
-        """The ice sheet given is the one passed on."""
+        """The ice sheet given is the one passed on.
+
+        The Antarctic files must exist for the plan to include them: the
+        patterns carry the ice sheet name, so a Greenland-only case offers no
+        Antarctic streams to process.
+        """
+        _write_history_files_for_ice_sheet(case_dir, "ais")
         plan = _plan(case_dir, tmp_path / "out", realms=["landIce"], ice_sheet="ais")
         command = _command_of(plan, "timeseries-landIce")
         assert command[command.index("--ice-sheet") + 1] == "ais"
@@ -235,6 +303,80 @@ class TestCommands:
         command = _command_of(plan, "cmor-atmos-mon")
         assert command[command.index("--atmos-res") + 1] == "ne30"
         assert command[command.index("--experiment") + 1] == "historical"
+
+    def test_variant_label_reaches_both_later_stages(self, case_dir, tmp_path):
+        """The ensemble member labels the output and the validation of it.
+
+        Without it every member would be written to the same path, so a real
+        cmorisation run needs it passed through rather than defaulted.
+        """
+        plan = _plan(
+            case_dir, tmp_path / "out", realms=["seaIce"], variant_label="r2i1p1f1"
+        )
+        cmor = _command_of(plan, "cmor-seaIce-mon")
+        validate = _command_of(plan, "validate-seaIce-mon")
+        assert cmor[cmor.index("--variant-label") + 1] == "r2i1p1f1"
+        assert validate[validate.index("--ensemble-member") + 1] == "r2i1p1f1"
+
+    def test_variant_label_is_absent_when_not_given(self, case_dir, tmp_path):
+        """Without one, the flag is omitted so each script's default applies."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+        assert "--variant-label" not in _command_of(plan, "cmor-seaIce-mon")
+        assert "--ensemble-member" not in _command_of(plan, "validate-seaIce-mon")
+
+    def test_tables_root_reaches_cmorization(self, case_dir, tmp_path):
+        """A chosen tables checkout is used for the writing, not just the check."""
+        plan = _plan(
+            case_dir,
+            tmp_path / "out",
+            realms=["seaIce"],
+            tables_root="/some/cmip7-cmor-tables",
+        )
+        command = _command_of(plan, "cmor-seaIce-mon")
+        assert command[command.index("--tables-root") + 1] == "/some/cmip7-cmor-tables"
+
+    def test_cmorization_always_gets_one_worker(self, case_dir, tmp_path):
+        """Time series generation is parallel; CMORization is not.
+
+        The two --workers mean different things -- processes reading files
+        versus Dask workers -- so a single number cannot serve both.
+        """
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], workers=16)
+        timeseries = _command_of(plan, "timeseries-seaIce")
+        cmor = _command_of(plan, "cmor-seaIce-mon")
+        assert timeseries[timeseries.index("--workers") + 1] == "16"
+        assert cmor[cmor.index("--workers") + 1] == "1"
+
+    def test_timeseries_resumes_unless_overwriting_was_asked_for(
+        self, case_dir, tmp_path
+    ):
+        """Overwriting is requested explicitly, so a repeat run resumes.
+
+        gen_timeseries.py keeps existing output and produces only the missing
+        timesteps unless told otherwise, which is what makes repeating an
+        interrupted run cheap.
+        """
+        resuming = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+        rewriting = _plan(
+            case_dir,
+            tmp_path / "out2",
+            realms=["seaIce"],
+            overwrite_timeseries=True,
+        )
+        assert "--overwrite_timeseries" not in _command_of(
+            resuming, "timeseries-seaIce"
+        )
+        assert "--overwrite_timeseries" in _command_of(rewriting, "timeseries-seaIce")
+
+    def test_steps_run_with_the_interpreter_running_the_plan(self, case_dir, tmp_path):
+        """Every step uses this interpreter, not whatever 'python' means.
+
+        The stages have to run in the environment the run was started from,
+        and 'python' may not be on PATH at all.
+        """
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+        for step in plan.steps:
+            assert step.command[0] == sys.executable
 
     def test_every_step_has_a_distinct_log_name(self, case_dir, tmp_path):
         """Logs cannot overwrite one another."""
