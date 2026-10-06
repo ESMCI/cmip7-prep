@@ -160,6 +160,9 @@ def build_plan(
     overwrite_timeseries: bool = False,
     variant_label: str | None = None,
     tables_root: os.PathLike | str | None = None,
+    plots: bool = False,
+    html: bool = False,
+    max_plots: int | None = None,
     scripts_dir: os.PathLike | str = "scripts",
 ) -> Plan:
     """Return the full plan for one reference-case run.
@@ -176,7 +179,9 @@ def build_plan(
 
     ``variant_label`` and ``tables_root`` are passed to CMORization unchanged,
     so the same command can produce output for submission rather than only
-    exercising the chain.
+    exercising the chain.  ``plots`` and ``html`` ask validation for figures
+    and a browsable index of them, which is how a person judges whether the
+    output is sensible rather than merely complete.
 
     ``years`` is passed through to gen_timeseries.py as ``--years-spec`` and so
     uses its format, ``first:last:increment``.
@@ -284,6 +289,9 @@ def build_plan(
                         model=model,
                         experiment=experiment,
                         variant_label=variant_label,
+                        plots=plots,
+                        html=html,
+                        max_plots=max_plots,
                     )
                 )
 
@@ -400,6 +408,9 @@ def _validate_step(
     model,
     experiment,
     variant_label=None,
+    plots=False,
+    html=False,
+    max_plots=None,
 ) -> Step:
     """Return the validate_cmor_output.py step for one realm and frequency."""
     command = [
@@ -419,6 +430,14 @@ def _validate_step(
     ]
     if variant_label:
         command += ["--ensemble-member", variant_label]
+    if plots:
+        # Both kinds: a time series per variable says whether the values are
+        # plausible over time, a map says whether they are in the right place.
+        command += ["--plot-timeseries", "--plot-maps"]
+    if max_plots is not None:
+        command += ["--max-plots", str(max_plots)]
+    if html:
+        command.append("--html")
     return Step(
         key=f"validate-{realm}-{frequency}",
         stage="validate",
