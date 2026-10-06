@@ -12,12 +12,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Checkout cmip7-cmor-tables from CESM-Development fork and cesm-dev branch
-        uses: actions/checkout@v4
         with:
-          repository: CESM-Development/cmip7-cmor-tables
-          ref: cesm-dev
-          path: cmip7-cmor-tables
+          # The CMOR tables come from the submodule.
+          submodules: recursive
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
