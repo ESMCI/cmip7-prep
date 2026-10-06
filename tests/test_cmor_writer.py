@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import numpy as np
+import pytest
 import xarray as xr
 
 from cmip7_prep.cmor_writer import CmorSession
@@ -232,3 +233,79 @@ def test_cmor_session_zonal_mean_plev39(tmp_path):
         log_name="cmor_test_zonal_mean.log",
     ) as session:
         session.write_variable(ds, CMIPVar(), VDef())
+
+
+def _dataset_without_time_bounds():
+    """Return a dataset whose time coordinate carries no bounds."""
+    data = np.random.rand(2, 4, 8)
+    ds = xr.Dataset(
+        {
+            "tas_tmin-h2m-hxy-u": (("time", "lat", "lon"), data),
+            "lat": ("lat", np.linspace(-90, 90, 4)),
+            "lon": ("lon", np.linspace(0, 360, 8, endpoint=False)),
+            "time": ("time", np.array([15, 45])),
+        }
+    )
+    ds["lat"].attrs["units"] = "degrees_north"
+    ds["lon"].attrs["units"] = "degrees_east"
+    ds["time"].attrs["units"] = "days since 2000-01-01"
+    ds["time"].attrs["calendar"] = "noleap"
+    ds.attrs["branded_variable"] = "tas_tmin-h2m-hxy-u"
+    return ds
+
+
+class _VDef:  # pylint: disable=too-few-public-methods
+    """Minimal variable definition."""
+
+    name = "tas"
+    branded_variable_name = "tas_tmin-h2m-hxy-u"
+    units = "K"
+    table = "atmos"
+    levels: dict = {}
+
+
+class _CMIPVar:  # pylint: disable=too-few-public-methods
+    """Minimal CMIP variable wrapper."""
+
+    class BrandedName:  # pylint: disable=too-few-public-methods
+        """Branded variable name wrapper."""
+
+        name = "tas_tmin-h2m-hxy-u"
+
+    branded_variable_name = BrandedName()
+
+
+def _session(tmp_path, realm):
+    """Return a CmorSession for one realm, writing into tmp_path."""
+    return CmorSession(
+        tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        dataset_json=Path(__file__).parent.parent / "data" / "cmor_dataset.json",
+        dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
+        log_dir=tmp_path,
+        log_name=f"cmor_{realm}.log",
+        realm=realm,
+    )
+
+
+def test_missing_time_bounds_are_an_error_outside_land_ice(tmp_path):
+    """A realm expected to write time bounds fails loudly without them.
+
+    Only CISM land-ice output lacks bounds, so their absence anywhere else
+    means something went wrong before CMORization and should be reported, not
+    replaced with a plausible guess.
+    """
+    with _session(tmp_path, "atmos") as session:
+        with pytest.raises(ValueError, match="expected to write them"):
+            session.write_variable(_dataset_without_time_bounds(), _CMIPVar(), _VDef())
+
+
+def test_missing_time_bounds_are_synthesized_for_land_ice(tmp_path):
+    """Land ice is the exception: its bounds are built from the time values."""
+    with _session(tmp_path, "landIce") as session:
+        try:
+            session.write_variable(_dataset_without_time_bounds(), _CMIPVar(), _VDef())
+        except Exception as exc:  # pylint: disable=broad-except
+            # Getting as far as CMOR's own checks means the bounds were built.
+            # What CMOR then makes of an atmosphere variable in the land-ice
+            # table is not what this test is about.
+            assert "expected to write them" not in str(exc)

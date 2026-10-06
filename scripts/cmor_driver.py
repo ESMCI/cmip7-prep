@@ -638,6 +638,7 @@ def process_one_var(
                     dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
                     outdir=outdir,
                     ice_sheet=ice_sheet,
+                    realm=realm,
                 ) as cm:
                     set_cur_dataset_attribute("frequency", frequency)
                     set_cur_dataset_attribute("realization_index", realization_index)

@@ -140,6 +140,31 @@ def parse_arguments():
         help="Ice sheet for the landIce realm (default: gris)",
     )
 
+    reporting = parser.add_argument_group("what to report")
+    reporting.add_argument(
+        "--plots",
+        action="store_true",
+        help=(
+            "Have validation plot each variable: a mean time series, and a "
+            "time-mean map where the data are on a plottable grid"
+        ),
+    )
+    reporting.add_argument(
+        "--html",
+        action="store_true",
+        help=(
+            "Have validation rebuild its static HTML index, so the reports "
+            "and plots for every realm can be browsed in one place"
+        ),
+    )
+    reporting.add_argument(
+        "--max-plots",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Plot at most N variables per plot type (default: no limit)",
+    )
+
     behaviour = parser.add_argument_group("how to run")
     behaviour.add_argument(
         "--workers",
@@ -331,6 +356,9 @@ def main():
             workers=args.workers,
             ice_sheet=args.ice_sheet,
             overwrite_timeseries=args.force,
+            plots=args.plots,
+            html=args.html,
+            max_plots=args.max_plots,
             variant_label=args.variant_label,
             tables_root=args.tables_root,
             scripts_dir=_LOCAL_PATH,

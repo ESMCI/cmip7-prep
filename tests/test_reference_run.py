@@ -394,6 +394,34 @@ class TestCommands:
         for step in plan.steps:
             assert step.command[0] == sys.executable
 
+    def test_plots_are_not_produced_unless_asked_for(self, case_dir, tmp_path):
+        """Plotting every variable is expensive, so it is opt-in."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+        command = _command_of(plan, "validate-seaIce-mon")
+        for flag in ("--plot-timeseries", "--plot-maps", "--html", "--max-plots"):
+            assert flag not in command
+
+    def test_plots_are_requested_when_asked_for(self, case_dir, tmp_path):
+        """Both kinds of plot are asked for together."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], plots=True)
+        command = _command_of(plan, "validate-seaIce-mon")
+        assert "--plot-timeseries" in command
+        assert "--plot-maps" in command
+
+    def test_html_and_plot_limit_are_forwarded(self, case_dir, tmp_path):
+        """The browsable index and the plot limit reach validation."""
+        plan = _plan(
+            case_dir,
+            tmp_path / "out",
+            realms=["seaIce"],
+            plots=True,
+            html=True,
+            max_plots=12,
+        )
+        command = _command_of(plan, "validate-seaIce-mon")
+        assert "--html" in command
+        assert command[command.index("--max-plots") + 1] == "12"
+
     def test_every_step_has_a_distinct_log_name(self, case_dir, tmp_path):
         """Logs cannot overwrite one another."""
         plan = _plan(case_dir, tmp_path / "out")
