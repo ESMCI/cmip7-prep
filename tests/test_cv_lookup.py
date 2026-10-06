@@ -1,6 +1,7 @@
 """Tests for reading the controlled vocabulary to reject bad values early."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -50,15 +51,27 @@ class TestAgainstTheRepoVocabulary:
         """A registered experiment validates silently."""
         cv_lookup.validate(TABLES_ROOT, "experiment_id", "piControl")
 
-    def test_the_license_we_fixed_is_registered(self):
-        """CC-BY-4.0 is the registered spelling, not CC-BY-4-0.
+    @pytest.mark.parametrize(
+        "dataset_file", ["cmor_dataset.json", "cmor_dataset_noresm.json"]
+    )
+    def test_the_license_we_request_is_registered(self, dataset_file):
+        """Whatever a dataset file asks for must be in the vocabulary.
 
-        A typo here is what stopped CMOR writing anything at all, so it is
-        worth asserting the vocabulary still agrees with data/cmor_dataset.json.
+        CMOR refuses to write anything at all when it is not, and the message
+        it gives names only the value, not the file it came from.  The spelling
+        itself is not asserted: it has differed between tables versions
+        ("CC-BY-4.0" against "CC-BY-4-0"), so pinning one here would fail on a
+        tables update rather than on a real mismatch.
         """
-        licenses = cv_lookup.allowed_values(TABLES_ROOT, "license.license_id")
-        assert "CC-BY-4.0" in licenses
-        assert "CC-BY-4-0" not in licenses
+        path = Path(__file__).parent.parent / "data" / dataset_file
+        if not path.is_file():
+            pytest.skip(f"{dataset_file} is not part of this branch")
+        requested = json.loads(path.read_text(encoding="utf-8"))["license_id"]
+        registered = cv_lookup.allowed_values(TABLES_ROOT, "license.license_id")
+        assert requested in registered, (
+            f"{dataset_file} asks for license_id {requested!r}, which the "
+            f"controlled vocabulary does not register; it allows {registered}"
+        )
 
 
 # --------------------------------------------------------- the stand-in tables
@@ -80,10 +93,14 @@ class TestLookup:
         assert cv_lookup.allowed_values(fake_tables, "license") == ["CC-BY-4.0"]
 
     def test_a_dotted_path_walks_into_nested_keys(self):
-        """The licences nest under license.license_id in the real vocabulary."""
-        assert "CC-BY-4.0" in cv_lookup.allowed_values(
-            TABLES_ROOT, "license.license_id"
-        )
+        """The licences nest under license.license_id in the real vocabulary.
+
+        What they are called is not this test's business -- only that the path
+        reaches them and returns something.
+        """
+        licenses = cv_lookup.allowed_values(TABLES_ROOT, "license.license_id")
+        assert licenses
+        assert all(isinstance(name, str) and name for name in licenses)
 
     def test_a_dotted_path_that_goes_nowhere_raises(self):
         """A wrong path says what is controlled at the level it reached."""
