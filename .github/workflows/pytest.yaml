@@ -51,14 +51,14 @@ jobs:
             /home/runner/cmor
             /home/runner/cmor3-source
             /home/runner/.cache/pip
-          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}-cmor3.14.0
+          key: cmor-${{ runner.os }}-${{ hashFiles('requirements.txt') }}-${{ hashFiles('**/cmor_version.txt') }}-cmor3.15.3
           restore-keys: |
-            cmor-${{ runner.os }}-3.14.0
+            cmor-${{ runner.os }}-3.15.3
 
       - name: build and install cmor
         run: |
           if [ ! -d "$HOME/cmor" ]; then
-            git clone https://github.com/PCMDI/cmor.git $HOME/cmor3-source -b 3.14.0
+            git clone https://github.com/PCMDI/cmor.git $HOME/cmor3-source -b 3.15.3
             cd $HOME/cmor3-source
             ./configure --prefix=$HOME/cmor --with-netcdf=/usr/local --with-udunits2=/usr/local
             make
