@@ -67,6 +67,60 @@ def _horizontal_only(da_coord: xr.DataArray, keep) -> xr.DataArray:
 # ---------------------------------------------------------------------
 # CMOR session
 # ---------------------------------------------------------------------
+
+# One unit of time is written differently in different places: a year is
+# "common_year" in a CISM units string but "year" in a time_period_freq
+# attribute.  Each variant maps to a single name below, so that the unit a
+# period is given in can be compared with the unit an axis counts in.
+_TIME_UNIT_NAMES = {
+    "common_year": "year",
+    "common_years": "year",
+    "year": "year",
+    "years": "year",
+    "month": "month",
+    "months": "month",
+    "day": "day",
+    "days": "day",
+    "hour": "hour",
+    "hours": "hour",
+}
+
+
+def _time_unit_name(word: str) -> str | None:
+    """Return the one name for a unit of time, or None if it is unrecognised."""
+    return _TIME_UNIT_NAMES.get(str(word).strip().lower())
+
+
+def period_in_axis_units(dataset, units: str) -> float | None:
+    """Return the averaging period, in the unit the time axis counts in.
+
+    The model records its averaging period in a ``time_period_freq``
+    attribute, written as a unit and a count: ``"year_1"`` for an annual mean,
+    ``"month_1"`` for a monthly one.  The time axis counts in a unit of its
+    own, named at the start of its units string -- ``"common_year since
+    0000-01-01"`` counts in years.
+
+    The period is returned only when those two units are the same, since
+    converting between them is not always possible: a year is 360, 365 or
+    365.25 days depending on the calendar, and a month has no fixed length at
+    all.  Anything else returns None, leaving the caller to say so rather than
+    record a period the data does not have.
+    """
+    period = getattr(dataset, "attrs", {}).get("time_period_freq")
+    if not period or not units:
+        return None
+
+    name, separator, count = str(period).strip().rpartition("_")
+    if not separator or not count.isdigit():
+        return None
+
+    period_unit = _time_unit_name(name)
+    axis_unit = _time_unit_name(str(units).split()[0])
+    if period_unit is None or period_unit != axis_unit:
+        return None
+    return float(count)
+
+
 class CmorSession(
     AbstractContextManager
 ):  # pylint: disable=too-many-instance-attributes
@@ -97,6 +151,7 @@ class CmorSession(
         log_name: str | None = None,
         outdir: Path | str | None = None,
         ice_sheet: str | None = None,
+        realm: str | None = None,
     ) -> None:
         self.tables_root = tables_root
         self.dataset_attrs = dict(dataset_attrs or {})
@@ -106,6 +161,7 @@ class CmorSession(
         # Ice sheet ('gris'/'ais') selecting the CISM map projection; only used
         # for the native land-ice grid (see _define_cism_grid).
         self._ice_sheet = ice_sheet
+        self._realm = realm
         # logging config
         self._log_dir = Path(log_dir) if log_dir is not None else None
         self._log_name = log_name
@@ -631,25 +687,47 @@ class CmorSession(
                 return tvals, None, str(units)
             tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
 
-            # Some model output (e.g. CISM land-ice) carries no time bounds, but
-            # CMOR requires them for time-averaged variables.  When absent,
-            # synthesize bounds from the numeric time centers using the midpoints
-            # between consecutive steps (edges extrapolated).  For evenly-spaced
-            # data this reproduces the averaging period (e.g. the calendar year
-            # for annual means).
-            if tbnum is None and tvals is not None and np.size(tvals) >= 2:
-                t = np.asarray(tvals, dtype="f8").reshape(-1)
-                mids = 0.5 * (t[:-1] + t[1:])
-                tbnum = np.empty((t.size, 2), dtype="f8")
-                tbnum[1:, 0] = mids
-                tbnum[:-1, 1] = mids
-                tbnum[0, 0] = t[0] - (mids[0] - t[0])
-                tbnum[-1, 1] = t[-1] + (t[-1] - mids[-1])
-                logger.info(
-                    "time coordinate had no bounds; synthesized %d bounds from "
-                    "centers",
-                    tbnum.shape[0],
+            # If CISM land-ice output carries no time bounds, it is built
+            # from the time values: each period is taken to END at its own time
+            # value, which is how the output is labelled -- a file stamped 1527
+            # holds the mean for 1526.
+            #
+            # Only land ice is treated this way.  Every other component writes
+            # bounds, so their absence means something went wrong earlier and is
+            # reported rather than papered over.
+            if tbnum is None and tvals is not None and self._realm != "landIce":
+                raise ValueError(
+                    f"Time coordinate has no bounds and realm is "
+                    f"{self._realm!r}, which is expected to write them. "
+                    "Check the history files and the time series built from "
+                    "them; bounds are only synthesized for landIce."
                 )
+            if tbnum is None and tvals is not None and np.size(tvals) >= 1:
+                t = np.asarray(tvals, dtype="f8").reshape(-1)
+                left = None
+                if t.size >= 2:
+                    # Each period starts where the previous one ended; the
+                    # first is extrapolated back by its own length.
+                    left = np.empty_like(t)
+                    left[1:] = t[:-1]
+                    left[0] = t[0] - (t[1] - t[0])
+                else:
+                    period = period_in_axis_units(dsi, units)
+                    if period is None:
+                        logger.warning(
+                            "time coordinate has no bounds, a single step, and "
+                            "no usable time_period_freq attribute; CMOR will "
+                            "reject the axis if the table requires bounds"
+                        )
+                    else:
+                        left = np.array([t[0] - period], dtype="f8")
+                if left is not None:
+                    tbnum = np.column_stack([left, t])
+                    logger.info(
+                        "time coordinate had no bounds; synthesized %d, each "
+                        "ending at its time value",
+                        tbnum.shape[0],
+                    )
 
             return tvals, tbnum, str(units)
 
