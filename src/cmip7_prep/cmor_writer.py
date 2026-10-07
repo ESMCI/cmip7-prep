@@ -22,6 +22,7 @@ import cmor
 
 import numpy as np
 import xarray as xr
+from .grids import CICE_BOUNDS_BY_COORD
 from .cmor_utils import (
     get_cmor_attr,
     set_cmor_attr,
@@ -119,6 +120,80 @@ def period_in_axis_units(dataset, units: str) -> float | None:
     if period_unit is None or period_unit != axis_unit:
         return None
     return float(count)
+
+
+def is_latitude(da) -> bool:
+    """Return whether a variable is a latitude coordinate."""
+    attrs = getattr(da, "attrs", {})
+    return attrs.get("standard_name") == "latitude" or str(
+        attrs.get("units", "")
+    ).startswith("degrees_north")
+
+
+def is_longitude(da) -> bool:
+    """Return whether a variable is a longitude coordinate."""
+    attrs = getattr(da, "attrs", {})
+    return attrs.get("standard_name") == "longitude" or str(
+        attrs.get("units", "")
+    ).startswith("degrees_east")
+
+
+def horizontal_coords_of(dataset, var_da, fallback_lat, fallback_lon):
+    """Return the latitude and longitude a variable is actually defined on.
+
+    This matters on a staggered grid: CICE writes velocities on the B-grid
+    velocity point, so siu and siv are on ULAT/ULON while the thermodynamic
+    fields are on TLAT/TLON.  Taking the centre for everything put the
+    velocities in the wrong place.
+
+    The variable's own coordinates are used, wherever they are to be found --
+    attached to it, or named in a ``coordinates`` attribute.  Which of the two
+    depends on how the file was opened.  They are identified by their CF
+    attributes rather than by name, so the names need not be known here, and
+    the given fallback is used when neither yields a pair.
+    """
+    # The 'coordinates' attribute is what distinguishes the grid points.  The
+    # coordinates xarray attaches cannot: TLAT and ULAT have the same dimensions,
+    # so every variable on (nj, ni) carries both.  xarray moves the attribute
+    # into encoding when it decodes coordinates, so look in both places.
+    named = str(
+        getattr(var_da, "attrs", {}).get("coordinates")
+        or getattr(var_da, "encoding", {}).get("coordinates")
+        or ""
+    ).split()
+    candidates = [dataset[name] for name in named if name in dataset]
+
+    # Only if the variable names none: anything attached will at least be a
+    # coordinate of the right shape.
+    if not candidates:
+        candidates = list(getattr(var_da, "coords", {}).values())
+
+    lat = next((da for da in candidates if is_latitude(da)), None)
+    lon = next((da for da in candidates if is_longitude(da)), None)
+    if lat is None or lon is None:
+        return fallback_lat, fallback_lon
+    return lat, lon
+
+
+def vertex_bounds_of(dataset, coord, coord_name: str):
+    """Return the vertex bounds of a coordinate, or None if the file has none.
+
+    The coordinate's own ``bounds`` attribute is used when present.  Otherwise a
+    name built from the coordinate is tried -- CICE writes ULAT's bounds as
+    ``latu_bounds`` -- and nothing else: bounds from another grid point would
+    pair cell corners with the wrong cell centres.
+    """
+    named = getattr(coord, "attrs", {}).get("bounds")
+    if isinstance(named, str) and named in dataset:
+        return dataset[named]
+    for candidate in (
+        CICE_BOUNDS_BY_COORD.get(coord_name.upper()),
+        f"{coord_name}_bnds",
+        f"{coord_name.lower()}_bounds",
+    ):
+        if candidate and candidate in dataset:
+            return dataset[candidate]
+    return None
 
 
 class CmorSession(
@@ -452,10 +527,16 @@ class CmorSession(
     def _define_cice_grid(self, ds, var_name, var_da):
         """Register a native CICE (nj, ni) tripole grid via cmor.grid().
 
-        The CICE grid is logically-rectangular: it carries TLAT/TLON cell centers
-        and vertex bounds (latt_bounds/lont_bounds, shape (nj, ni, nvertices))
-        inline. Defines i_index/j_index axes from the CMIP7 grids table and returns
-        the resulting grid id, which stands in for both the nj and ni dimensions.
+        The CICE grid is logically-rectangular and staggered: each point carries
+        its own latitude, longitude and vertex bounds inline -- TLAT/TLON with
+        latt_bounds/lont_bounds at the cell centre, ULAT/ULON with
+        latu_bounds/lonu_bounds at the velocity point, all of shape
+        (nj, ni, nvertices) for the bounds.  The variable's own 'coordinates'
+        attribute says which point it is on, and that pair is what the grid is
+        defined from.
+
+        Defines i_index/j_index axes from the CMIP7 grids table and returns the
+        resulting grid id, which stands in for both the nj and ni dimensions.
         """
         logger.debug(
             "[CMOR axis debug] Defining native CICE (nj, ni) grid for %s.",
@@ -472,30 +553,35 @@ class CmorSession(
                     return dsi[nm]
             return None
 
-        tlat = _coord(ds, "TLAT", "tlat", "lat", "latitude")
-        tlon = _coord(ds, "TLON", "tlon", "lon", "longitude")
-        if tlat is None or tlon is None:
-            raise KeyError(
-                "CICE native grid requires TLAT/TLON cell-center coordinates "
-                f"in the dataset for variable '{var_name}'."
-            )
+        centre_lat = _coord(ds, "TLAT", "tlat", "lat", "latitude")
+        centre_lon = _coord(ds, "TLON", "tlon", "lon", "longitude")
 
-        lat_bnds_da = None
-        lon_bnds_da = None
-        bname = tlat.attrs.get("bounds")
-        if isinstance(bname, str) and bname in ds:
-            lat_bnds_da = ds[bname]
-        bname = tlon.attrs.get("bounds")
-        if isinstance(bname, str) and bname in ds:
-            lon_bnds_da = ds[bname]
-        if lat_bnds_da is None:
-            lat_bnds_da = _coord(ds, "latt_bounds", "lat_bounds", "TLAT_bnds")
-        if lon_bnds_da is None:
-            lon_bnds_da = _coord(ds, "lont_bounds", "lon_bounds", "TLON_bnds")
+        # Which point of the staggered grid this variable is on comes from its
+        # own 'coordinates' attribute: the velocities are on the B-grid velocity
+        # point (ULAT/ULON), the thermodynamic fields on the centre (TLAT/TLON).
+        # Taking the centre for everything put siu and siv in the wrong place.
+        grid_lat, grid_lon = horizontal_coords_of(ds, var_da, centre_lat, centre_lon)
+        if grid_lat is None or grid_lon is None:
+            raise KeyError(
+                "CICE native grid requires latitude/longitude coordinates in "
+                f"the dataset for variable '{var_name}'."
+            )
+        logger.debug(
+            "[CMOR axis debug] %s is on %s/%s",
+            var_name,
+            getattr(grid_lat, "name", "?"),
+            getattr(grid_lon, "name", "?"),
+        )
+
+        lat_bnds_da = vertex_bounds_of(ds, grid_lat, str(getattr(grid_lat, "name", "")))
+        lon_bnds_da = vertex_bounds_of(ds, grid_lon, str(getattr(grid_lon, "name", "")))
         if lat_bnds_da is None or lon_bnds_da is None:
             raise KeyError(
                 "CICE native grid requires latitude/longitude vertex bounds "
-                f"(e.g. latt_bounds/lont_bounds) for variable '{var_name}'."
+                f"for {getattr(grid_lat, 'name', '?')}/{getattr(grid_lon, 'name', '?')} "
+                f"(e.g. latt_bounds/lont_bounds) for variable '{var_name}'. "
+                "Bounds from another grid point are not substituted: they would "
+                "pair cell corners with the wrong cell centres."
             )
 
         # The horizontal grid is static.  During the multi-file merge, xarray
@@ -506,8 +592,8 @@ class CmorSession(
         # rank does not match number of axes passed via axis_ids".  Collapse any
         # non-horizontal dimension (e.g. time) by taking the first index, since
         # the grid geometry does not vary in time.
-        tlat = _horizontal_only(tlat, ("nj", "ni"))
-        tlon = _horizontal_only(tlon, ("nj", "ni"))
+        grid_lat = _horizontal_only(grid_lat, ("nj", "ni"))
+        grid_lon = _horizontal_only(grid_lon, ("nj", "ni"))
         # vertex bounds keep their trailing vertices dim in addition to nj, ni
         lat_bnds_da = _horizontal_only(
             lat_bnds_da, ("nj", "ni") + lat_bnds_da.dims[-1:]
@@ -516,8 +602,8 @@ class CmorSession(
             lon_bnds_da, ("nj", "ni") + lon_bnds_da.dims[-1:]
         )
 
-        lat_vals = np.asarray(tlat.values, dtype="f8")
-        lon_vals = np.mod(np.asarray(tlon.values, dtype="f8"), 360.0)
+        lat_vals = np.asarray(grid_lat.values, dtype="f8")
+        lon_vals = np.mod(np.asarray(grid_lon.values, dtype="f8"), 360.0)
         lat_vert = np.asarray(lat_bnds_da.values, dtype="f8")
         lon_vert = np.mod(np.asarray(lon_bnds_da.values, dtype="f8"), 360.0)
 

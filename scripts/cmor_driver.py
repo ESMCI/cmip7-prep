@@ -53,7 +53,7 @@ from cmip7_prep.include_patterns import (
     patterns_for_variable,
 )
 from cmip7_prep.mapping_compat import Mapping
-from cmip7_prep.grids import ATM_RESOLUTIONS, resolution_for
+from cmip7_prep.grids import ATM_RESOLUTIONS, CICE_GRID_VARS, resolution_for
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
     realize_regrid_prepare,
@@ -369,9 +369,15 @@ def _prepare_seaice_native(mapping, ds_native, varname, frequency):
     means carry Northern and Southern Hemisphere variants that become separate
     published datasets.
 
-    TLAT/TLON ride along as coordinates, but the *_bounds variables are data
-    variables and would be dropped by the realize_all projection, so they are
-    reassigned for the 2-D variants that need them.
+    realize_all hands back one variable at a time, and a new dataset is built
+    around it.  The lat/lon arrays come along, because xarray carries
+    coordinates with a variable.  The bounds arrays are ordinary variables
+    rather than coordinates, so they stay behind in the original dataset and
+    have to be copied over here.  Only variants that are still maps need them;
+    the hemispheric sums are single numbers.
+
+    All of CICE's lat/lon and bounds arrays are copied, not just the T ones, so
+    that for example siu and siv keep ULAT/ULON.
 
     Returns (cmor_items, status).
     """
@@ -381,9 +387,19 @@ def _prepare_seaice_native(mapping, ds_native, varname, frequency):
         if "time_bounds" in ds_native and "time_bounds" not in ds_v:
             ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
         if "nj" in da.dims and "ni" in da.dims:
-            for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+            for gname in CICE_GRID_VARS:
                 if gname in ds_native and gname not in ds_v:
                     ds_v = ds_v.assign({gname: ds_native[gname]})
+            # realize_all need not preserve attributes, and without this the
+            # writer cannot tell which grid point the variable is on.
+            native = ds_native.get(varname)
+            # xarray moves this attribute into encoding when it decodes
+            # coordinates, so both places are checked.
+            coords_attr = getattr(native, "attrs", {}).get("coordinates") or getattr(
+                native, "encoding", {}
+            ).get("coordinates")
+            if coords_attr and "coordinates" not in ds_v[varname].attrs:
+                ds_v[varname].attrs["coordinates"] = coords_attr
         cmor_items.append((ds_v, variant_cfg))
     return (
         cmor_items,

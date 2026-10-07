@@ -82,3 +82,26 @@ def resolution_for(model: str, realm: str, atmos_res: str | None = None) -> str:
     if realm in NATIVE_GRID_REALMS:
         return NATIVE_GRID
     raise ValueError(f"No input grid known for realm {realm!r}")
+
+
+# CICE staggers its grid: the thermodynamic fields sit at the cell centre (T),
+# the velocities at the B-grid velocity point (U), and CICE6 adds the N and E
+# points of the C grid.  Each point has its own latitude, longitude and vertex
+# bounds, and a variable says which it is on through its 'coordinates'
+# attribute.
+CICE_BOUNDS_BY_COORD = {
+    "TLAT": "latt_bounds",
+    "TLON": "lont_bounds",
+    "ULAT": "latu_bounds",
+    "ULON": "lonu_bounds",
+    "NLAT": "latn_bounds",
+    "NLON": "lonn_bounds",
+    "ELAT": "late_bounds",
+    "ELON": "lone_bounds",
+}
+
+# Every coordinate and bounds variable of that grid.  Realizing a variable
+# builds a new dataset around it, which leaves the bounds behind, so these are
+# copied over -- all of them, so a velocity variable keeps ULAT/ULON and not
+# just the centre (issue #115).
+CICE_GRID_VARS = tuple(CICE_BOUNDS_BY_COORD) + tuple(CICE_BOUNDS_BY_COORD.values())
