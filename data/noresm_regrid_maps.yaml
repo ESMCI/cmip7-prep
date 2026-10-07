@@ -30,3 +30,37 @@ resolutions:
   regular:
     conservative: map_tnx1v4_to_1x1_aave_c260531.nc
     bilinear: map_tnx1v4_to_1x1_blin_c260531.nc
+
+grid_names_per_realm:
+  ne16:
+    atmos: g123
+    aerosol: g123
+    atmosChem: g123
+    land: g123
+    seaIce: g202
+    landIce: g194
+  ne30:
+    atmos: g106
+    aerosol: g106
+    atmosChem: g106
+    land: g106
+    seaIce: g106
+    landIce: g106
+
+# Static dataset (global attribute) metadata for the CMOR dataset JSON builder.
+# base_source_id is the key looked up in cmor-cvs.json for institution_id and
+# source text; it must be a CV source_id entry. source_ids/nominal_resolution
+# are the branded, per-resolution values actually written to the output; the
+# default_* keys catch any resolution not listed (e.g. non-CMIP test runs).
+dataset:
+  base_source_id: NorESM3
+  source_type: AOGCM
+  calendar: noleap
+  source_ids:
+    ne16: NorESM3-LM
+    ne30: NorESM3-MM
+  default_source_id: NorESM3
+  nominal_resolution:
+    ne16: 250 km
+    ne30: 100 km
+  default_nominal_resolution: 100 km

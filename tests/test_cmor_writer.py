@@ -7,6 +7,7 @@ import pytest
 import xarray as xr
 
 from cmip7_prep.cmor_writer import CmorSession
+from cmip7_prep.cmor_utils import build_dataset_cfg
 
 
 def test_cmor_session_basic(tmp_path):
@@ -57,22 +58,19 @@ def test_cmor_session_basic(tmp_path):
 
         branded_variable_name = BrandedName()
 
-    dataset_json_path = Path(__file__).parent.parent / "data" / "cmor_dataset.json"
+    dataset_cfg = build_dataset_cfg(
+        model="cesm",
+        resolution="ne30",
+        experiment="piControl",
+        frequency="mon",
+        ripf="r1i1p1f1",
+        tables_root=tables_root,
+    )
     log_dir = tmp_path
     log_name = "cmor_test.log"
     with CmorSession(
         tables_root=tables_root,
-        dataset_json=dataset_json_path,
-        dataset_attrs={
-            "institution_id": "NCAR",
-            "GLOBAL_IS_CMIP7": True,
-            "branded_variable": {
-                "variable_id": "tas",
-                "table_id": "atmos",
-                "plev": 50000,
-                "description": "Vertical velocity at 500 hPa",
-            },
-        },
+        dataset_attrs=dataset_cfg,
         log_dir=log_dir,
         log_name=log_name,
     ) as session:
@@ -140,22 +138,19 @@ def test_cmor_session_multiple_timeseries(tmp_path):
 
         branded_variable_name = BrandedName()
 
-    dataset_json_path = Path(__file__).parent.parent / "data" / "cmor_dataset.json"
+    dataset_cfg = build_dataset_cfg(
+        model="cesm",
+        resolution="ne30",
+        experiment="piControl",
+        frequency="mon",
+        ripf="r1i1p1f1",
+        tables_root=tables_root,
+    )
     log_dir = tmp_path
     log_name = "cmor_test_multi.log"
     with CmorSession(
         tables_root=tables_root,
-        dataset_json=dataset_json_path,
-        dataset_attrs={
-            "institution_id": "NCAR",
-            "GLOBAL_IS_CMIP7": True,
-            "branded_variable": {
-                "variable_id": "tas",
-                "table_id": "atmos",
-                "plev": 50000,
-                "description": "Vertical velocity at 500 hPa",
-            },
-        },
+        dataset_attrs=dataset_cfg,
         log_dir=log_dir,
         log_name=log_name,
     ) as session:
@@ -216,19 +211,17 @@ def test_cmor_session_zonal_mean_plev39(tmp_path):
 
         branded_variable_name = BrandedName()
 
-    dataset_json_path = Path(__file__).parent.parent / "data" / "cmor_dataset.json"
+    dataset_cfg = build_dataset_cfg(
+        model="cesm",
+        resolution="ne30",
+        experiment="piControl",
+        frequency="mon",
+        ripf="r1i1p1f1",
+        tables_root=tables_root,
+    )
     with CmorSession(
         tables_root=tables_root,
-        dataset_json=dataset_json_path,
-        dataset_attrs={
-            "institution_id": "NCAR",
-            "GLOBAL_IS_CMIP7": True,
-            "branded_variable": {
-                "variable_id": "ta",
-                "table_id": "atmos",
-                "description": "Air Temperature",
-            },
-        },
+        dataset_attrs=dataset_cfg,
         log_dir=tmp_path,
         log_name="cmor_test_zonal_mean.log",
     ) as session:
@@ -277,10 +270,18 @@ class _CMIPVar:  # pylint: disable=too-few-public-methods
 
 def _session(tmp_path, realm):
     """Return a CmorSession for one realm, writing into tmp_path."""
+    dataset_cfg = build_dataset_cfg(
+        model="cesm",
+        resolution="ne30",
+        experiment="piControl",
+        frequency="month",
+        ripf="r1i1p1f1",
+        tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        realm=realm,
+    )
     return CmorSession(
         tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
-        dataset_json=Path(__file__).parent.parent / "data" / "cmor_dataset.json",
-        dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
+        dataset_attrs=dataset_cfg,
         log_dir=tmp_path,
         log_name=f"cmor_{realm}.log",
         realm=realm,
