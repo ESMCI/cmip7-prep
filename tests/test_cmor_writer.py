@@ -270,10 +270,18 @@ class _CMIPVar:  # pylint: disable=too-few-public-methods
 
 def _session(tmp_path, realm):
     """Return a CmorSession for one realm, writing into tmp_path."""
+    dataset_cfg = build_dataset_cfg(
+            model="cesm",
+            resolution="ne30",
+            experiment="piControl",
+            frequency="month",
+            ripf="r1i1p1f1",
+            tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+            realm=realm,
+        )
     return CmorSession(
         tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
-        dataset_json=Path(__file__).parent.parent / "data" / "cmor_dataset.json",
-        dataset_attrs={"institution_id": "NCAR", "GLOBAL_IS_CMIP7": True},
+        dataset_attrs=dataset_cfg,
         log_dir=tmp_path,
         log_name=f"cmor_{realm}.log",
         realm=realm,
