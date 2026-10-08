@@ -503,6 +503,7 @@ def process_one_var(
     tables_root,
     outdir,
     resolution,
+    case_resolution,
     model,
     realm="atmos",
     frequency="mon",
@@ -511,7 +512,12 @@ def process_one_var(
     ice_sheet=None,
     experiment=None,
 ) -> list[tuple[str, str]]:
-    """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
+    """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples.
+
+    ``resolution`` is the grid this realm regrids from; ``case_resolution`` is
+    the resolution the case was run at, which identifies it for the metadata.
+    They are the same string only for the atmosphere and land realms.
+    """
     varname = cmip_var.branded_variable_name.name
 
     # At this point you have a cmip_var (metadata from database query for the target variable)
@@ -656,15 +662,15 @@ def process_one_var(
                 # JSON files.  frequency, variant indices, experiment metadata
                 # and the per-realm grid_label are already baked in, so only the
                 # per-variable region is set below.
-                # The resolution the case was run at, not the grid this realm
-                # regrids from.  source_id, nominal_resolution and grid_label
-                # are all keyed by the case resolution -- ne16 is NorESM3-LM at
-                # 250 km, ne30 is NorESM3-MM at 100 km -- so passing a realm's
-                # input grid here (tnx1v4 for sea ice) matches nothing and the
-                # dataset is labelled with the fallbacks instead.
+                # case_resolution, not resolution: source_id,
+                # nominal_resolution and grid_label are keyed by the resolution
+                # the case was run at (ne16 is NorESM3-LM at 250 km, ne30 is
+                # NorESM3-MM at 100 km), while resolution is the grid this realm
+                # regrids from.  Passing the latter (tnx1v4 for sea ice) matches
+                # nothing, and the dataset is labelled with the fallbacks.
                 dataset_cfg = build_dataset_cfg(
                     model=model,
-                    resolution=args.atmos_res,
+                    resolution=case_resolution,
                     experiment=experiment,
                     frequency=frequency,
                     ripf=ripf_index,
@@ -1014,6 +1020,7 @@ def main():
                         tables_root,
                         OUTDIR,
                         resolution,
+                        args.atmos_res,
                         model,
                         realm=realm,
                         frequency=frequency,
@@ -1034,6 +1041,7 @@ def main():
                     tables_root,
                     OUTDIR,
                     resolution,
+                    args.atmos_res,
                     model,
                     realm=realm,
                     frequency=frequency,
