@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
-from .grids import ATM_RESOLUTIONS, needs_atmos_res
+from .grids import ATM_RESOLUTIONS
 from .include_patterns import all_include_patterns, load_include_patterns
 
 # Which component directory holds each realm's history files.  Mirrors
@@ -171,8 +171,9 @@ def build_plan(
     history directory is absent is recorded in ``Plan.skipped`` rather than
     failing the run, since an archived case need not hold every component.
 
-    ``atmos_res`` is the grid the atmosphere and land were run on; every
-    other realm's grid is derived from it or from the model.
+    ``atmos_res`` is the resolution the case was run at, named by its
+    atmosphere grid.  Every realm needs it, because it identifies the case;
+    the grid a realm regrids from is derived from it.
 
     ``workers`` applies to time series generation only; CMORization always runs
     with one worker (see CMOR_WORKERS).
@@ -190,13 +191,15 @@ def build_plan(
     if unknown:
         raise ValueError(f"Unknown stage(s) {unknown}; choose from {list(STAGES)}")
     wanted_realms = list(realms) if realms else realms_for(model)
-    on_atmos_grid = [realm for realm in wanted_realms if needs_atmos_res(realm)]
-    if on_atmos_grid and atmos_res is None:
+    # Needed whatever the realms, because it identifies the case rather than
+    # only the grid the atmosphere realms regrid from: source_id,
+    # nominal_resolution and every realm's grid label are keyed by it.
+    if atmos_res is None:
         raise ValueError(
-            "An atmosphere resolution is needed for "
-            f"{on_atmos_grid}; the other realms derive their own grid"
+            "The resolution the case was run at must be given; it identifies "
+            "the case, not only the grid the atmosphere realms regrid from"
         )
-    if atmos_res is not None and atmos_res not in ATM_RESOLUTIONS:
+    if atmos_res not in ATM_RESOLUTIONS:
         raise ValueError(
             f"Unknown atmosphere resolution {atmos_res!r}; "
             f"choose from {list(ATM_RESOLUTIONS)}"
@@ -272,7 +275,7 @@ def build_plan(
                         ts_dir=ts_dir,
                         cmor_root=cmor_root,
                         model=model,
-                        atmos_res=(atmos_res if needs_atmos_res(realm) else None),
+                        atmos_res=atmos_res,
                         experiment=experiment,
                         sheet=sheet,
                         variant_label=variant_label,

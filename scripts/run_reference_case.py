@@ -74,6 +74,16 @@ def parse_arguments():
         ),
     )
     required.add_argument(
+        "--atmos-res",
+        choices=list(ATM_RESOLUTIONS),
+        required=True,
+        help=(
+            "Resolution the case was run at, named by its atmosphere grid. "
+            "Every realm needs it, because it identifies the case: ne16 is "
+            "NorESM3-LM at 250 km, ne30 is NorESM3-MM at 100 km."
+        ),
+    )
+    required.add_argument(
         "--experiment",
         required=True,
         help=(
@@ -83,16 +93,6 @@ def parse_arguments():
     )
 
     selection = parser.add_argument_group("selecting what to run")
-    selection.add_argument(
-        "--atmos-res",
-        choices=list(ATM_RESOLUTIONS),
-        default=None,
-        help=(
-            "Grid the atmosphere and land were run on. Required unless the "
-            "realms being processed are all ocean, sea ice or land ice, which "
-            "derive their own grid."
-        ),
-    )
     selection.add_argument(
         "--realms",
         nargs="+",

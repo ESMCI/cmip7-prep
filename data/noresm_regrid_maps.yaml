@@ -44,8 +44,11 @@ grid_names_per_realm:
     aerosol: g106
     atmosChem: g106
     land: g106
-    seaIce: g106
-    landIce: g106
+    # Sea ice and land ice do not change with the atmosphere resolution: both
+    # configurations run CICE on the tripolar ocean grid and CISM on its own
+    # projection, so these match ne16 rather than following atmos.
+    seaIce: g202
+    landIce: g194
 
 # Static dataset (global attribute) metadata for the CMOR dataset JSON builder.
 # base_source_id is the key looked up in cmor-cvs.json for institution_id and

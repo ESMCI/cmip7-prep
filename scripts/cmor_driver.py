@@ -159,12 +159,12 @@ def parse_args():
         "--atmos-res",
         type=str,
         choices=list(ATM_RESOLUTIONS),
-        default=None,
+        required=True,
         help=(
-            "Grid the atmosphere and land were run on. Required when --realm "
-            "is atmos, atmosChem, aerosol or land; ignored otherwise, since "
-            "ocean and sea ice are on the model's own tripolar grid and land "
-            "ice is written on its native projected grid."
+            "Resolution the case was run at, named by its atmosphere grid. "
+            "Every realm needs it, because it identifies the case: ne16 is "
+            "NorESM3-LM at 250 km, ne30 is NorESM3-MM at 100 km. The grid a "
+            "realm regrids from is derived from it and from --realm."
         ),
     )
     case.add_argument(
@@ -656,9 +656,15 @@ def process_one_var(
                 # JSON files.  frequency, variant indices, experiment metadata
                 # and the per-realm grid_label are already baked in, so only the
                 # per-variable region is set below.
+                # The resolution the case was run at, not the grid this realm
+                # regrids from.  source_id, nominal_resolution and grid_label
+                # are all keyed by the case resolution -- ne16 is NorESM3-LM at
+                # 250 km, ne30 is NorESM3-MM at 100 km -- so passing a realm's
+                # input grid here (tnx1v4 for sea ice) matches nothing and the
+                # dataset is labelled with the fallbacks instead.
                 dataset_cfg = build_dataset_cfg(
                     model=model,
-                    resolution=resolution,
+                    resolution=args.atmos_res,
                     experiment=experiment,
                     frequency=frequency,
                     ripf=ripf_index,
