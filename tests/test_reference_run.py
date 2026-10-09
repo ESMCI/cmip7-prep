@@ -62,7 +62,7 @@ def _plan(case_dir, outdir, **kwargs):
     wrong output, so a caller must say which it means.
     """
     kwargs.setdefault("model", "noresm")
-    kwargs.setdefault("atmos_res", "ne16")
+    kwargs.setdefault("model_res", "NorESM3-LM")
     kwargs.setdefault("experiment", "piControl")
     return build_plan(case_dir, outdir, **kwargs)
 
@@ -313,11 +313,11 @@ class TestCommands:
             case_dir,
             tmp_path / "out",
             realms=["atmos"],
-            atmos_res="ne30",
+            model_res="NorESM3-MM",
             experiment="historical",
         )
         command = _command_of(plan, "cmor-atmos-mon")
-        assert command[command.index("--atmos-res") + 1] == "ne30"
+        assert command[command.index("--model-res") + 1] == "NorESM3-MM"
         assert command[command.index("--experiment") + 1] == "historical"
 
     def test_variant_label_reaches_both_later_stages(self, case_dir, tmp_path):
@@ -434,13 +434,13 @@ def test_case_properties_are_required(omitted):
     """build_plan refuses to guess a property of the case.
 
     Model and experiment change what the output means while leaving it looking
-    valid, so neither may be defaulted.  The atmosphere resolution is not here
-    because it is only needed by some realms; see
-    TestAtmosResolutionIsConditional.
+    valid, so neither may be defaulted.  The resolution is not here only
+    because it is accepted as a keyword and refused later; see
+    TestAtmosResolutionIsAlwaysRequired.
     """
     supplied = {
         "model": "noresm",
-        "atmos_res": "ne16",
+        "model_res": "NorESM3-LM",
         "experiment": "piControl",
     }
     del supplied[omitted]
@@ -448,48 +448,49 @@ def test_case_properties_are_required(omitted):
         build_plan("case", "out", **supplied)
 
 
-class TestAtmosResolutionIsConditional:
-    """The atmosphere resolution is asked for only when a realm uses it."""
+class TestAtmosResolutionIsAlwaysRequired:
+    """Every realm needs the resolution the case was run at.
 
-    def test_not_needed_for_realms_with_their_own_grid(self, case_dir, tmp_path):
-        """Sea ice and land ice plan fully without one."""
-        plan = build_plan(
-            case_dir,
-            tmp_path / "out",
-            model="noresm",
-            experiment="piControl",
-            realms=["seaIce", "landIce"],
-        )
-        assert plan.steps
-        for step in plan.for_stage("cmor"):
-            assert "--atmos-res" not in step.command
+    It names the atmosphere grid, but it identifies the case rather than only
+    the grid a realm regrids from: source_id, nominal_resolution and every
+    realm's grid label are keyed by it.  Leaving it out of a sea-ice run
+    labelled the output with fallbacks instead of the case's own identity.
+    """
 
-    @pytest.mark.parametrize("realm", ["atmos", "land"])
-    def test_needed_for_realms_on_the_atmosphere_grid(self, case_dir, tmp_path, realm):
-        """A realm on that grid refuses to plan without one, and names itself."""
-        with pytest.raises(ValueError, match=f"needed for \\['{realm}'\\]"):
+    def test_planning_without_one_refuses(self, case_dir, tmp_path):
+        """No realm plans without it, whatever grid its input is on."""
+        with pytest.raises(ValueError, match="resolution the case was run at"):
             build_plan(
                 case_dir,
                 tmp_path / "out",
                 model="noresm",
                 experiment="piControl",
-                realms=[realm],
+                realms=["seaIce", "landIce"],
             )
 
-    def test_the_whole_matrix_names_every_realm_that_needs_it(self, case_dir, tmp_path):
-        """Planning every realm without one lists the four that require it."""
-        with pytest.raises(ValueError, match="atmos.*atmosChem.*aerosol.*land"):
+    def test_an_unknown_resolution_is_rejected(self, case_dir, tmp_path):
+        """A resolution outside the known set is named back.
+
+        cmor_driver.py would reject it too, but only after the timeseries
+        stage has already run.
+        """
+        with pytest.raises(ValueError, match="ne99"):
             build_plan(
-                case_dir, tmp_path / "out", model="noresm", experiment="piControl"
+                case_dir,
+                tmp_path / "out",
+                model="noresm",
+                experiment="piControl",
+                model_res="ne99",
             )
 
-    def test_only_atmosphere_realms_carry_the_flag(self, case_dir, tmp_path):
-        """With one supplied, only the realms that use it are given it."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["atmos", "seaIce"])
-        atm = _command_of(plan, "cmor-atmos-mon")
-        sea = _command_of(plan, "cmor-seaIce-mon")
-        assert atm[atm.index("--atmos-res") + 1] == "ne16"
-        assert "--atmos-res" not in sea
+    @pytest.mark.parametrize("realm", realms_for("noresm"))
+    def test_every_realm_is_given_it(self, case_dir, tmp_path, realm):
+        """Each realm's CMOR steps carry it, not just the atmosphere's."""
+        plan = _plan(case_dir, tmp_path / "out", realms=[realm])
+        steps = plan.for_stage("cmor")
+        assert steps
+        for step in steps:
+            assert step.command[step.command.index("--model-res") + 1] == "NorESM3-LM"
 
 
 # ------------------------------------------- forwarding the grid decision
@@ -516,5 +517,4 @@ class TestGridIsNotDecidedHere:
         assert {step.stage for step in plan.steps} == set(STAGES)
         assert not plan.skipped
         command = _command_of(plan, "cmor-landIce-yr")
-        assert "--atmos-res" not in command
         assert command[command.index("--ice-sheet") + 1] == "gris"

@@ -53,7 +53,7 @@ from cmip7_prep.include_patterns import (
     patterns_for_variable,
 )
 from cmip7_prep.mapping_compat import Mapping
-from cmip7_prep.grids import ATM_RESOLUTIONS, resolution_for
+from cmip7_prep.grids import MODEL_RESOLUTIONS, CICE_GRID_VARS, resolution_for
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
     realize_regrid_prepare,
@@ -147,6 +147,17 @@ def parse_args():
         ),
     )
     required.add_argument(
+        "--model-res",
+        type=str,
+        choices=list(MODEL_RESOLUTIONS),
+        required=True,
+        help=(
+            "Model resolution, as named in data/<model>_grids.yaml. It selects "
+            "the grid each realm's input is on and the grid label its output "
+            "carries, so every realm needs it."
+        ),
+    )
+    required.add_argument(
         "--experiment",
         type=str,
         required=True,
@@ -155,18 +166,6 @@ def parse_args():
 
     case = parser.add_argument_group("other properties of the case")
 
-    case.add_argument(
-        "--atmos-res",
-        type=str,
-        choices=list(ATM_RESOLUTIONS),
-        default=None,
-        help=(
-            "Grid the atmosphere and land were run on. Required when --realm "
-            "is atmos, atmosChem, aerosol or land; ignored otherwise, since "
-            "ocean and sea ice are on the model's own tripolar grid and land "
-            "ice is written on its native projected grid."
-        ),
-    )
     case.add_argument(
         "--ocn-static-file",
         type=str,
@@ -369,9 +368,15 @@ def _prepare_seaice_native(mapping, ds_native, varname, frequency):
     means carry Northern and Southern Hemisphere variants that become separate
     published datasets.
 
-    TLAT/TLON ride along as coordinates, but the *_bounds variables are data
-    variables and would be dropped by the realize_all projection, so they are
-    reassigned for the 2-D variants that need them.
+    realize_all hands back one variable at a time, and a new dataset is built
+    around it.  The lat/lon arrays come along, because xarray carries
+    coordinates with a variable.  The bounds arrays are ordinary variables
+    rather than coordinates, so they stay behind in the original dataset and
+    have to be copied over here.  Only variants that are still maps need them;
+    the hemispheric sums are single numbers.
+
+    All of CICE's lat/lon and bounds arrays are copied, not just the T ones, so
+    that for example siu and siv keep ULAT/ULON.
 
     Returns (cmor_items, status).
     """
@@ -381,9 +386,19 @@ def _prepare_seaice_native(mapping, ds_native, varname, frequency):
         if "time_bounds" in ds_native and "time_bounds" not in ds_v:
             ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
         if "nj" in da.dims and "ni" in da.dims:
-            for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+            for gname in CICE_GRID_VARS:
                 if gname in ds_native and gname not in ds_v:
                     ds_v = ds_v.assign({gname: ds_native[gname]})
+            # realize_all need not preserve attributes, and without this the
+            # writer cannot tell which grid point the variable is on.
+            native = ds_native.get(varname)
+            # xarray moves this attribute into encoding when it decodes
+            # coordinates, so both places are checked.
+            coords_attr = getattr(native, "attrs", {}).get("coordinates") or getattr(
+                native, "encoding", {}
+            ).get("coordinates")
+            if coords_attr and "coordinates" not in ds_v[varname].attrs:
+                ds_v[varname].attrs["coordinates"] = coords_attr
         cmor_items.append((ds_v, variant_cfg))
     return (
         cmor_items,
@@ -487,6 +502,7 @@ def process_one_var(
     tables_root,
     outdir,
     resolution,
+    case_resolution,
     model,
     realm="atmos",
     frequency="mon",
@@ -495,7 +511,12 @@ def process_one_var(
     ice_sheet=None,
     experiment=None,
 ) -> list[tuple[str, str]]:
-    """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
+    """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples.
+
+    ``resolution`` is the grid this realm regrids from; ``case_resolution`` is
+    the resolution the case was run at, which identifies it for the metadata.
+    They are the same string only for the atmosphere and land realms.
+    """
     varname = cmip_var.branded_variable_name.name
 
     # At this point you have a cmip_var (metadata from database query for the target variable)
@@ -640,9 +661,15 @@ def process_one_var(
                 # JSON files.  frequency, variant indices, experiment metadata
                 # and the per-realm grid_label are already baked in, so only the
                 # per-variable region is set below.
+                # case_resolution, not resolution: source_id,
+                # nominal_resolution and grid_label are keyed by the resolution
+                # the case was run at (ne16 is NorESM3-LM at 250 km, ne30 is
+                # NorESM3-MM at 100 km), while resolution is the grid this realm
+                # regrids from.  Passing the latter (tnx1v4 for sea ice) matches
+                # nothing, and the dataset is labelled with the fallbacks.
                 dataset_cfg = build_dataset_cfg(
                     model=model,
-                    resolution=resolution,
+                    resolution=case_resolution,
                     experiment=experiment,
                     frequency=frequency,
                     ripf=ripf_index,
@@ -721,7 +748,7 @@ def main():
     OUTDIR = args.outdir
     # The grid to regrid from follows from the model and realm; see grids.py.
     try:
-        resolution = resolution_for(args.model, args.realm, args.atmos_res)
+        resolution = resolution_for(args.model, args.realm, args.model_res)
     except ValueError as exc:
         logger.error("%s", exc)
         sys.exit(2)
@@ -729,7 +756,7 @@ def main():
         "input grid for realm %s is %s (atmosphere/land ran at %s)",
         args.realm,
         resolution,
-        args.atmos_res,
+        args.model_res,
     )
     model = args.model
     frequency = args.frequency
@@ -992,6 +1019,7 @@ def main():
                         tables_root,
                         OUTDIR,
                         resolution,
+                        args.model_res,
                         model,
                         realm=realm,
                         frequency=frequency,
@@ -1012,6 +1040,7 @@ def main():
                     tables_root,
                     OUTDIR,
                     resolution,
+                    args.model_res,
                     model,
                     realm=realm,
                     frequency=frequency,

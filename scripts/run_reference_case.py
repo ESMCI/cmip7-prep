@@ -35,7 +35,7 @@ sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 
 # pylint: disable=wrong-import-position
 from cmip7_prep.cv_lookup import validate as validate_cv
-from cmip7_prep.grids import ATM_RESOLUTIONS
+from cmip7_prep.grids import MODEL_RESOLUTIONS
 from cmip7_prep.reference_run import STAGES, Plan, Step, build_plan
 
 logger = logging.getLogger("run_reference_case")
@@ -74,6 +74,16 @@ def parse_arguments():
         ),
     )
     required.add_argument(
+        "--model-res",
+        choices=list(MODEL_RESOLUTIONS),
+        required=True,
+        help=(
+            "Model resolution, as named in data/<model>_grids.yaml. It selects "
+            "the grid each realm's input is on and the grid label its output "
+            "carries, so every realm needs it."
+        ),
+    )
+    required.add_argument(
         "--experiment",
         required=True,
         help=(
@@ -83,16 +93,6 @@ def parse_arguments():
     )
 
     selection = parser.add_argument_group("selecting what to run")
-    selection.add_argument(
-        "--atmos-res",
-        choices=list(ATM_RESOLUTIONS),
-        default=None,
-        help=(
-            "Grid the atmosphere and land were run on. Required unless the "
-            "realms being processed are all ocean, sea ice or land ice, which "
-            "derive their own grid."
-        ),
-    )
     selection.add_argument(
         "--realms",
         nargs="+",
@@ -351,7 +351,7 @@ def main():
             frequencies=args.frequencies,
             years=args.years,
             stages=args.stages,
-            atmos_res=args.atmos_res,
+            model_res=args.model_res,
             experiment=args.experiment,
             workers=args.workers,
             ice_sheet=args.ice_sheet,

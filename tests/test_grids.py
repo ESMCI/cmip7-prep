@@ -1,61 +1,156 @@
-"""Tests for deriving each realm's input grid."""
+"""Tests for reading each realm's input grid from the model tables.
+
+Nothing here names a grid or a resolution.  Both are data, stated per model in
+``data/<model>_grids.yaml``, and restating them in a test would only
+assert that this file and that one were edited together.  So the tests check
+the properties the table must have, and that the lookup returns what the table
+says, whatever the table says.
+"""
 
 import pytest
 
-from cmip7_prep.grids import (
-    ATM_RESOLUTIONS,
-    needs_atmos_res,
-    NATIVE_GRID,
-    OCEAN_GRID,
-    resolution_for,
-)
+from cmip7_prep.grids import MODEL_RESOLUTIONS, CUSTOM, resolution_for
+from cmip7_prep.regrid_maps import load_regrid_maps
+
+MODELS = ("noresm", "cesm")
 
 
-class TestResolutionPerRealm:
-    """Tests for choosing each realm's input grid.
+def _rows(model):
+    """Yield (resolution, realm, row) for every row in a model's table."""
+    for resolution, realms in load_regrid_maps(model)["grid_names_per_realm"].items():
+        for realm, row in realms.items():
+            yield resolution, realm, row
 
-    The grid is not a free choice: sea ice is on the model's tripolar grid
-    whatever the atmosphere was run on, so passing one realm another's grid
-    would regrid through the wrong weights and yield plausible wrong output.
-    """
 
-    @pytest.mark.parametrize("realm", ["atmos", "atmosChem", "aerosol", "land"])
-    @pytest.mark.parametrize("atm", ATM_RESOLUTIONS)
-    def test_atmosphere_realms_take_the_given_grid(self, realm, atm):
-        """Atmosphere and land use the resolution the case was run at."""
-        assert resolution_for("noresm", realm, atm) == atm
+class TestTheLookupReturnsWhatTheTableSays:
+    """resolution_for is a reader of the table, and decides nothing itself."""
 
-    @pytest.mark.parametrize("realm", ["seaIce", "ocean", "ocnBgchem"])
-    @pytest.mark.parametrize("model", ["noresm", "cesm"])
-    def test_ocean_realms_take_the_model_grid(self, realm, model):
-        """Ocean and sea ice ignore the atmosphere resolution entirely."""
-        assert resolution_for(model, realm, "ne16") == OCEAN_GRID[model]
+    @pytest.mark.parametrize("model", MODELS)
+    def test_every_row_is_returned_verbatim(self, model):
+        """Each realm gets its own row's input_grid, for each resolution."""
+        for resolution, realm, row in _rows(model):
+            assert (
+                resolution_for(model, realm, resolution) == row["input_grid"]
+            ), f"{model}/{resolution}/{realm}"
 
-    @pytest.mark.parametrize("realm", ["seaIce", "ocean", "ocnBgchem", "landIce"])
-    def test_realms_with_their_own_grid_need_no_resolution(self, realm):
-        """A sea-ice or land-ice run need not supply an atmosphere resolution."""
-        assert resolution_for("noresm", realm)
-        assert not needs_atmos_res(realm)
+    @pytest.mark.parametrize("model", MODELS)
+    def test_the_resolution_selects_the_row(self, model):
+        """Two resolutions that differ for a realm give different answers.
 
-    @pytest.mark.parametrize("realm", ["atmos", "atmosChem", "aerosol", "land"])
-    def test_atmosphere_realms_say_so_when_it_is_missing(self, realm):
-        """A realm on the atmosphere grid refuses to guess its resolution."""
-        assert needs_atmos_res(realm)
-        with pytest.raises(ValueError, match="resolution must be given"):
-            resolution_for("noresm", realm)
-
-    def test_unknown_atmosphere_resolution_is_rejected(self):
-        """A resolution with no weight files fails before any run starts."""
-        with pytest.raises(ValueError, match="Unknown atmosphere resolution"):
-            resolution_for("noresm", "atmos", "ne120")
-
-    @pytest.mark.parametrize("model", ["noresm", "cesm"])
-    @pytest.mark.parametrize("atm", ATM_RESOLUTIONS)
-    def test_landice_is_never_regridded(self, model, atm):
-        """land ice takes the pass-through grid whatever else was asked for.
-
-        CISM output is written on its native projected grid, georeferenced from
-        its x/y coordinates, so no weight files apply and the atmosphere's
-        resolution is irrelevant to it.
+        This is what the original bug got wrong: a realm was given another
+        realm's grid, which regrids through the wrong weights and produces
+        output that looks fine.
         """
-        assert resolution_for(model, "landIce", atm) == NATIVE_GRID
+        table = load_regrid_maps(model)["grid_names_per_realm"]
+        resolutions = sorted(table)
+        differing = [
+            (realm, [table[res][realm]["input_grid"] for res in resolutions])
+            for realm in table[resolutions[0]]
+            if len({table[res][realm]["input_grid"] for res in resolutions}) > 1
+        ]
+        if not differing:
+            pytest.skip(f"{model} has only one resolution in its table")
+        for realm, expected in differing:
+            got = [resolution_for(model, realm, res) for res in resolutions]
+            assert got == expected, realm
+
+
+class TestEveryRowIsUsable:
+    """Each row must name things the rest of the table can act on."""
+
+    @pytest.mark.parametrize("model", MODELS)
+    def test_every_input_grid_has_weights(self, model):
+        """A grid with no 'resolutions' entry would fail at run time."""
+        defined = set(load_regrid_maps(model)["resolutions"])
+        for resolution, realm, row in _rows(model):
+            assert row["input_grid"] in defined, f"{model}/{resolution}/{realm}"
+
+    @pytest.mark.parametrize("model", MODELS)
+    def test_every_row_has_both_fields_and_nothing_else(self, model):
+        """Neither field may be left out, and no third field is read."""
+        for resolution, realm, row in _rows(model):
+            assert set(row) == {
+                "input_grid",
+                "grid_label",
+            }, f"{model}/{resolution}/{realm}"
+
+    @pytest.mark.parametrize("model", MODELS)
+    def test_every_resolution_defines_the_same_realms(self, model):
+        """A realm present at one resolution and missing at another would fail
+        only for the run that asked for it."""
+        table = load_regrid_maps(model)["grid_names_per_realm"]
+        realms = [set(rows) for rows in table.values()]
+        assert all(group == realms[0] for group in realms)
+
+
+class TestWhatIsRefused:
+    """A missing or unknown value fails, rather than being guessed."""
+
+    def test_a_missing_resolution_is_rejected(self):
+        """The resolution is never guessed, for any realm."""
+        with pytest.raises(ValueError, match="must be given"):
+            resolution_for("noresm", next(iter(_rows("noresm")))[1])
+
+    def test_an_unknown_resolution_is_rejected(self):
+        """A resolution the command line does not offer fails up front."""
+        unknown = "".join(MODEL_RESOLUTIONS) + "x"
+        with pytest.raises(ValueError, match="Unknown atmosphere resolution"):
+            resolution_for("noresm", "atmos", unknown)
+
+    def test_a_resolution_the_model_lacks_is_rejected(self):
+        """An offered resolution with no rows for this model fails.
+
+        Not every model runs every resolution, and the message names the ones
+        it has rather than falling back to another.
+        """
+        for model in MODELS:
+            has_rows = set(load_regrid_maps(model)["grid_names_per_realm"])
+            missing = [
+                res
+                for res in MODEL_RESOLUTIONS
+                if res not in has_rows and res != CUSTOM
+            ]
+            for res in missing:
+                with pytest.raises(ValueError, match="No grid names defined"):
+                    resolution_for(model, "atmos", res)
+
+    def test_an_unknown_realm_is_rejected(self):
+        """A misspelled realm is answered with the table's own keys."""
+        resolution = next(iter(_rows("noresm")))[0]
+        with pytest.raises(ValueError, match="No grid names defined"):
+            resolution_for("noresm", "atmosphere", resolution)
+
+
+class TestACustomCase:
+    """A case that is not one of the standard configurations."""
+
+    @pytest.mark.parametrize("model", MODELS)
+    def test_undeclared_grids_mean_nothing_is_regridded(self, model):
+        """With no block of its own, every realm is left alone.
+
+        Nothing can be assumed about the grids of a case the table says
+        nothing about, so the one safe answer is not to regrid.
+        """
+        declared = load_regrid_maps(model)["grid_names_per_realm"]
+        if CUSTOM in declared:
+            pytest.skip(f"{model} declares a {CUSTOM} block")
+        for _, realm, _ in _rows(model):
+            assert resolution_for(model, realm, CUSTOM) == CUSTOM
+
+    @pytest.mark.parametrize("model", MODELS)
+    def test_declared_grids_are_used(self, model):
+        """Filling in the block makes the case behave like any other.
+
+        This is what the commented-out template at the end of the table is
+        for, so a custom case on, say, regular lat/lon is not forced through
+        the no-regrid path.
+        """
+        declared = load_regrid_maps(model)["grid_names_per_realm"]
+        if CUSTOM not in declared:
+            pytest.skip(f"{model} declares no {CUSTOM} block")
+        for realm, row in declared[CUSTOM].items():
+            assert resolution_for(model, realm, CUSTOM) == row["input_grid"]
+
+    def test_it_is_offered_on_the_command_line(self):
+        """It is a --model-res choice, so the lookup has to accept it."""
+        assert CUSTOM in MODEL_RESOLUTIONS
