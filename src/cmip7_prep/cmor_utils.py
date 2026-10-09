@@ -134,13 +134,13 @@ def build_dataset_cfg(
     Institutional, source, license and experiment metadata are read from the
     controlled vocabulary (cmor-cvs.json); the branded source_id and nominal
     resolution come from the per-model ``dataset`` block in
-    ``data/<model>_regrid_maps.yaml``.  Replaces the packaged cmor_dataset*.json.
+    ``data/<model>_grids.yaml``.  Replaces the packaged cmor_dataset*.json.
     """
     cv = _load_controlled_vocabulary(str(tables_root))
     meta = load_regrid_maps(model).get("dataset") or {}
     base_source_id = meta.get("base_source_id")
 
-    # grid_label is the per-realm grid code from the regrid-map table; its
+    # grid_label is the per-realm grid code from the model grid table; its
     # human-readable description comes from the CV keyed by that same code.
     try:
         grid_label = get_realm_row(model, resolution, realm)["grid_label"]

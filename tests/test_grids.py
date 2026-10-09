@@ -1,7 +1,7 @@
 """Tests for reading each realm's input grid from the model tables.
 
 Nothing here names a grid or a resolution.  Both are data, stated per model in
-``data/<model>_regrid_maps.yaml``, and restating them in a test would only
+``data/<model>_grids.yaml``, and restating them in a test would only
 assert that this file and that one were edited together.  So the tests check
 the properties the table must have, and that the lookup returns what the table
 says, whatever the table says.

@@ -1,5 +1,5 @@
 # ESMF regrid weight files for CESM, keyed by resolution.
-# See noresm_regrid_maps.yaml for the schema.
+# See noresm_grids.yaml for the schema.
 
 inputdata_dir: /glade/campaign/cesm/cesmdata/inputdata/
 
@@ -22,7 +22,7 @@ resolutions:
     bilinear: cpl/gridmaps/tx2_3v2/map_t232_TO_1x1d_blin.251023.nc
 
 
-# Per-realm grids; see noresm_regrid_maps.yaml for the fields and a template.
+# Per-realm grids; see noresm_grids.yaml for the fields and a template.
 #
 # No ne16 entry: 'resolutions' above defines no ne16 weights for CESM, so an
 # ne16 CESM run could never have regridded anything.
@@ -43,7 +43,7 @@ grid_names_per_realm:
     landIce: {input_grid: custom, grid_label: g106}
 
 # Static dataset (global attribute) metadata for the CMOR dataset JSON builder;
-# see noresm_regrid_maps.yaml for the schema. CESM writes CESM3 at every
+# see noresm_grids.yaml for the schema. CESM writes CESM3 at every
 # resolution for now (placeholder).
 dataset:
   base_source_id: CESM3

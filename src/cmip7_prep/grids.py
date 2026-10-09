@@ -2,7 +2,7 @@
 
 Model components run on different grids, so the grid to regrid from depends on
 which realm is being processed.  Which grid that is is stated per realm, per
-resolution, in ``data/<model>_regrid_maps.yaml`` under ``grid_names_per_realm``
+resolution, in ``data/<model>_grids.yaml`` under ``grid_names_per_realm``
 as each row's ``input_grid``, rather than being hardcoded here, so that adding
 a model or changing a component's grid is a data change.
 

@@ -1,6 +1,6 @@
 """ESMF regrid weight files, loaded from the packaged YAML tables.
 
-Each supported model has a ``data/<model>_regrid_maps.yaml`` table mapping a
+Each supported model has a ``data/<model>_grids.yaml`` table mapping a
 resolution to its weight files::
 
     inputdata_dir: /nird/datalake/NS9560K/diagnostics/land_xesmf_diag_data/
@@ -39,10 +39,10 @@ DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 @lru_cache(maxsize=None)
 def _load_cached(model: str) -> dict:
-    """Read and cache one model's regrid-map table."""
-    path = DATA_DIR / f"{model}_regrid_maps.yaml"
+    """Read and cache one model's grid table."""
+    path = DATA_DIR / f"{model}_grids.yaml"
     if not path.is_file():
-        raise ValueError(f"No regrid-map table for model={model!r}; expected {path}")
+        raise ValueError(f"No grid table for model={model!r}; expected {path}")
     with open(path, encoding="utf-8") as handle:
         return yaml.safe_load(handle) or {}
 
