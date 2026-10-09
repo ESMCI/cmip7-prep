@@ -35,7 +35,7 @@ sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 
 # pylint: disable=wrong-import-position
 from cmip7_prep.cv_lookup import validate as validate_cv
-from cmip7_prep.grids import ATM_RESOLUTIONS
+from cmip7_prep.grids import MODEL_RESOLUTIONS
 from cmip7_prep.reference_run import STAGES, Plan, Step, build_plan
 
 logger = logging.getLogger("run_reference_case")
@@ -74,8 +74,8 @@ def parse_arguments():
         ),
     )
     required.add_argument(
-        "--atmos-res",
-        choices=list(ATM_RESOLUTIONS),
+        "--model-res",
+        choices=list(MODEL_RESOLUTIONS),
         required=True,
         help=(
             "Resolution the case was run at, named by its atmosphere grid. "
@@ -351,7 +351,7 @@ def main():
             frequencies=args.frequencies,
             years=args.years,
             stages=args.stages,
-            atmos_res=args.atmos_res,
+            model_res=args.model_res,
             experiment=args.experiment,
             workers=args.workers,
             ice_sheet=args.ice_sheet,

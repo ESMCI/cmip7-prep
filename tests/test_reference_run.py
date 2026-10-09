@@ -62,7 +62,7 @@ def _plan(case_dir, outdir, **kwargs):
     wrong output, so a caller must say which it means.
     """
     kwargs.setdefault("model", "noresm")
-    kwargs.setdefault("atmos_res", "ne16")
+    kwargs.setdefault("model_res", "ne16")
     kwargs.setdefault("experiment", "piControl")
     return build_plan(case_dir, outdir, **kwargs)
 
@@ -313,11 +313,11 @@ class TestCommands:
             case_dir,
             tmp_path / "out",
             realms=["atmos"],
-            atmos_res="ne30",
+            model_res="ne30",
             experiment="historical",
         )
         command = _command_of(plan, "cmor-atmos-mon")
-        assert command[command.index("--atmos-res") + 1] == "ne30"
+        assert command[command.index("--model-res") + 1] == "ne30"
         assert command[command.index("--experiment") + 1] == "historical"
 
     def test_variant_label_reaches_both_later_stages(self, case_dir, tmp_path):
@@ -440,7 +440,7 @@ def test_case_properties_are_required(omitted):
     """
     supplied = {
         "model": "noresm",
-        "atmos_res": "ne16",
+        "model_res": "ne16",
         "experiment": "piControl",
     }
     del supplied[omitted]
@@ -480,7 +480,7 @@ class TestAtmosResolutionIsAlwaysRequired:
                 tmp_path / "out",
                 model="noresm",
                 experiment="piControl",
-                atmos_res="ne99",
+                model_res="ne99",
             )
 
     @pytest.mark.parametrize("realm", realms_for("noresm"))
@@ -490,7 +490,7 @@ class TestAtmosResolutionIsAlwaysRequired:
         steps = plan.for_stage("cmor")
         assert steps
         for step in steps:
-            assert step.command[step.command.index("--atmos-res") + 1] == "ne16"
+            assert step.command[step.command.index("--model-res") + 1] == "ne16"
 
 
 # ------------------------------------------- forwarding the grid decision

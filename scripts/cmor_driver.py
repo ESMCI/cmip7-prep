@@ -53,7 +53,7 @@ from cmip7_prep.include_patterns import (
     patterns_for_variable,
 )
 from cmip7_prep.mapping_compat import Mapping
-from cmip7_prep.grids import ATM_RESOLUTIONS, CICE_GRID_VARS, resolution_for
+from cmip7_prep.grids import MODEL_RESOLUTIONS, CICE_GRID_VARS, resolution_for
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
     realize_regrid_prepare,
@@ -156,9 +156,9 @@ def parse_args():
     case = parser.add_argument_group("other properties of the case")
 
     case.add_argument(
-        "--atmos-res",
+        "--model-res",
         type=str,
-        choices=list(ATM_RESOLUTIONS),
+        choices=list(MODEL_RESOLUTIONS),
         required=True,
         help=(
             "Resolution the case was run at, named by its atmosphere grid. "
@@ -749,7 +749,7 @@ def main():
     OUTDIR = args.outdir
     # The grid to regrid from follows from the model and realm; see grids.py.
     try:
-        resolution = resolution_for(args.model, args.realm, args.atmos_res)
+        resolution = resolution_for(args.model, args.realm, args.model_res)
     except ValueError as exc:
         logger.error("%s", exc)
         sys.exit(2)
@@ -757,7 +757,7 @@ def main():
         "input grid for realm %s is %s (atmosphere/land ran at %s)",
         args.realm,
         resolution,
-        args.atmos_res,
+        args.model_res,
     )
     model = args.model
     frequency = args.frequency
@@ -1020,7 +1020,7 @@ def main():
                         tables_root,
                         OUTDIR,
                         resolution,
-                        args.atmos_res,
+                        args.model_res,
                         model,
                         realm=realm,
                         frequency=frequency,
@@ -1041,7 +1041,7 @@ def main():
                     tables_root,
                     OUTDIR,
                     resolution,
-                    args.atmos_res,
+                    args.model_res,
                     model,
                     realm=realm,
                     frequency=frequency,

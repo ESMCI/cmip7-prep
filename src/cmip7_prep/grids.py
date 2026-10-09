@@ -20,7 +20,7 @@ from __future__ import annotations
 
 # Grids the atmosphere and land may be run on.  'regular' means the output
 # already carries lat/lon and is not regridded.
-ATM_RESOLUTIONS = ("ne30", "ne16", "regular")
+MODEL_RESOLUTIONS = ("ne30", "ne16", "regular")
 
 # Realms whose input grid is the atmosphere/land grid the case was run on.
 ATM_GRID_REALMS = frozenset({"atmos", "atmosChem", "aerosol", "land"})
@@ -42,35 +42,25 @@ NATIVE_GRID_REALMS = frozenset({"landIce"})
 NATIVE_GRID = "regular"
 
 
-def needs_atmos_res(realm: str) -> bool:
-    """Return whether a realm's grid depends on the atmosphere resolution.
-
-    Only the realms sharing the atmosphere and land grid do.  Sea ice, ocean
-    and land ice have their own, so asking for an atmosphere resolution to
-    process them would be asking for something that cannot matter.
-    """
-    return realm in ATM_GRID_REALMS
-
-
-def resolution_for(model: str, realm: str, atmos_res: str | None = None) -> str:
+def resolution_for(model: str, realm: str, model_res: str | None = None) -> str:
     """Return the input grid name for one realm.
 
-    ``atmos_res`` is the grid the atmosphere and land were run on.  It is
+    ``model_res`` is the grid the atmosphere and land were run on.  It is
     required only for the realms on that grid, and ignored for the rest, so a
     sea-ice run need not supply one.
     """
     if realm in ATM_GRID_REALMS:
-        if atmos_res is None:
+        if model_res is None:
             raise ValueError(
                 f"Realm {realm!r} is on the atmosphere/land grid, so its "
                 "resolution must be given"
             )
-        if atmos_res not in ATM_RESOLUTIONS:
+        if model_res not in MODEL_RESOLUTIONS:
             raise ValueError(
-                f"Unknown atmosphere resolution {atmos_res!r}; "
-                f"choose from {list(ATM_RESOLUTIONS)}"
+                f"Unknown atmosphere resolution {model_res!r}; "
+                f"choose from {list(MODEL_RESOLUTIONS)}"
             )
-        return atmos_res
+        return model_res
     if realm in OCEAN_GRID_REALMS:
         try:
             return OCEAN_GRID[model]

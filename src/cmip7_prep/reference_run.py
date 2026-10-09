@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
-from .grids import ATM_RESOLUTIONS
+from .grids import MODEL_RESOLUTIONS
 from .include_patterns import all_include_patterns, load_include_patterns
 
 # Which component directory holds each realm's history files.  Mirrors
@@ -153,7 +153,7 @@ def build_plan(
     frequencies: Sequence[str] | None = None,
     years: str | None = None,
     stages: Sequence[str] = STAGES,
-    atmos_res: str | None = None,
+    model_res: str | None = None,
     experiment: str,
     workers: int = 4,
     ice_sheet: str | None = None,
@@ -171,7 +171,7 @@ def build_plan(
     history directory is absent is recorded in ``Plan.skipped`` rather than
     failing the run, since an archived case need not hold every component.
 
-    ``atmos_res`` is the resolution the case was run at, named by its
+    ``model_res`` is the resolution the case was run at, named by its
     atmosphere grid.  Every realm needs it, because it identifies the case;
     the grid a realm regrids from is derived from it.
 
@@ -194,15 +194,15 @@ def build_plan(
     # Needed whatever the realms, because it identifies the case rather than
     # only the grid the atmosphere realms regrid from: source_id,
     # nominal_resolution and every realm's grid label are keyed by it.
-    if atmos_res is None:
+    if model_res is None:
         raise ValueError(
             "The resolution the case was run at must be given; it identifies "
             "the case, not only the grid the atmosphere realms regrid from"
         )
-    if atmos_res not in ATM_RESOLUTIONS:
+    if model_res not in MODEL_RESOLUTIONS:
         raise ValueError(
-            f"Unknown atmosphere resolution {atmos_res!r}; "
-            f"choose from {list(ATM_RESOLUTIONS)}"
+            f"Unknown atmosphere resolution {model_res!r}; "
+            f"choose from {list(MODEL_RESOLUTIONS)}"
         )
 
     case_dir = Path(case_dir)
@@ -275,7 +275,7 @@ def build_plan(
                         ts_dir=ts_dir,
                         cmor_root=cmor_root,
                         model=model,
-                        atmos_res=atmos_res,
+                        model_res=model_res,
                         experiment=experiment,
                         sheet=sheet,
                         variant_label=variant_label,
@@ -360,7 +360,7 @@ def _cmor_step(
     ts_dir,
     cmor_root,
     model,
-    atmos_res,
+    model_res,
     experiment,
     sheet,
     variant_label=None,
@@ -385,8 +385,8 @@ def _cmor_step(
         "--workers",
         str(CMOR_WORKERS),
     ]
-    if atmos_res:
-        command += ["--atmos-res", atmos_res]
+    if model_res:
+        command += ["--model-res", model_res]
     if sheet:
         command += ["--ice-sheet", sheet]
     if variant_label:

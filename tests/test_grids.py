@@ -3,8 +3,7 @@
 import pytest
 
 from cmip7_prep.grids import (
-    ATM_RESOLUTIONS,
-    needs_atmos_res,
+    MODEL_RESOLUTIONS,
     NATIVE_GRID,
     OCEAN_GRID,
     resolution_for,
@@ -20,7 +19,7 @@ class TestResolutionPerRealm:
     """
 
     @pytest.mark.parametrize("realm", ["atmos", "atmosChem", "aerosol", "land"])
-    @pytest.mark.parametrize("atm", ATM_RESOLUTIONS)
+    @pytest.mark.parametrize("atm", MODEL_RESOLUTIONS)
     def test_atmosphere_realms_take_the_given_grid(self, realm, atm):
         """Atmosphere and land use the resolution the case was run at."""
         assert resolution_for("noresm", realm, atm) == atm
@@ -33,14 +32,17 @@ class TestResolutionPerRealm:
 
     @pytest.mark.parametrize("realm", ["seaIce", "ocean", "ocnBgchem", "landIce"])
     def test_realms_with_their_own_grid_need_no_resolution(self, realm):
-        """A sea-ice or land-ice run need not supply an atmosphere resolution."""
+        """These realms' input grid does not depend on the model resolution.
+
+        The resolution is still required on the command line, because it
+        identifies the case for the output metadata -- but it is not what
+        decides which grid these realms regrid from.
+        """
         assert resolution_for("noresm", realm)
-        assert not needs_atmos_res(realm)
 
     @pytest.mark.parametrize("realm", ["atmos", "atmosChem", "aerosol", "land"])
     def test_atmosphere_realms_say_so_when_it_is_missing(self, realm):
         """A realm on the atmosphere grid refuses to guess its resolution."""
-        assert needs_atmos_res(realm)
         with pytest.raises(ValueError, match="resolution must be given"):
             resolution_for("noresm", realm)
 
@@ -50,7 +52,7 @@ class TestResolutionPerRealm:
             resolution_for("noresm", "atmos", "ne120")
 
     @pytest.mark.parametrize("model", ["noresm", "cesm"])
-    @pytest.mark.parametrize("atm", ATM_RESOLUTIONS)
+    @pytest.mark.parametrize("atm", MODEL_RESOLUTIONS)
     def test_landice_is_never_regridded(self, model, atm):
         """land ice takes the pass-through grid whatever else was asked for.
 
