@@ -79,10 +79,12 @@ def get_map_paths(model: str, resolution: str) -> dict[str, Path]:
     return {method: root / name for method, name in entry.items()}
 
 
-def get_grid_names(model: str, resolution: str, realm: str) -> dict[str, str]:
-    """Return the grid names for one model and resolution.
+def get_realm_row(model: str, resolution: str, realm: str) -> dict[str, str]:
+    """Return one realm's row: the grid its input is on and its output label.
 
-    The result has keys like 'atmos', 'aerosol', 'land', 'seaIce', 'landIce'.
+    'input_grid' names an entry in 'resolutions'; 'grid_label' is the CMIP7
+    code for the grid the output lands on.  grids.py reads the first and
+    cmor_utils.py the second.
     """
     table = _load_cached(model)
     grid_names = table.get("grid_names_per_realm") or {}
@@ -98,7 +100,7 @@ def get_grid_names(model: str, resolution: str, realm: str) -> dict[str, str]:
             f"available: {sorted(realm_grids)}"
         )
 
-    return grid_names[resolution][realm] or {}
+    return dict(realm_grids[realm] or {})
 
 
 def get_grid_desc(model: str, resolution: str, realm: str) -> str:

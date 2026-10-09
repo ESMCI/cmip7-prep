@@ -16,7 +16,7 @@ import yaml
 import xarray as xr
 
 # Local imports avoid an import cycle with regrid_maps.
-from .regrid_maps import load_regrid_maps, get_grid_names
+from .regrid_maps import load_regrid_maps, get_realm_row
 
 _FILL_DEFAULT = 1.0e20
 
@@ -143,8 +143,8 @@ def build_dataset_cfg(
     # grid_label is the per-realm grid code from the regrid-map table; its
     # human-readable description comes from the CV keyed by that same code.
     try:
-        grid_label = get_grid_names(model, resolution, realm)
-    except ValueError:
+        grid_label = get_realm_row(model, resolution, realm)["grid_label"]
+    except (ValueError, KeyError):
         logger.warning(
             "No grid name for model=%s resolution=%s realm=%s; defaulting "
             "grid_label to 'gr'",

@@ -254,14 +254,14 @@ def test_tables_cover_driver_resolution_choices():
     The driver's choices and the YAML keys are edited in different files, so
     they can drift apart; a missing key turns a valid run into a ValueError.
     """
-    driver_choices = {"ne16", "ne30", "tx2_3v2", "tnx1v4", "regular"}
+    driver_choices = {"ne16", "ne30", "tx2_3v2", "tnx1v4", "custom"}
     defined = set()
     for model in ("cesm", "noresm"):
         defined |= set(load_regrid_maps(model)["resolutions"])
     assert driver_choices <= defined
 
 
-def test_regular_resolution_has_maps():
-    """'regular' skips regridding, but the fx path still asks for a map."""
+def test_custom_resolution_has_maps():
+    """'custom' skips regridding, but the fx path still asks for a map."""
     for model in ("cesm", "noresm"):
-        assert "conservative" in get_map_paths(model, "regular")
+        assert "conservative" in get_map_paths(model, "custom")

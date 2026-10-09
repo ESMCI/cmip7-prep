@@ -21,34 +21,66 @@ resolutions:
     conservative: map_tnx1v4_to_1x1_aave_c260531.nc
     bilinear: map_tnx1v4_to_1x1_blin_c260531.nc
 
-  # 'regular' means the variable already carries lat/lon, so nothing is
-  # regridded (see the resolution == "regular" branch in regrid.py) and no
+  # 'custom' means the variable already carries lat/lon, so nothing is
+  # regridded (see the resolution == "custom" branch in regrid.py) and no
   # weights are ever applied.  The entry exists only because _regrid_fx_once
   # builds a regridder before checking whether it needs one, so the file must
   # exist to be opened and discarded.  These are the maps the old implicit
   # fallback used; they are named here to keep that behaviour visible.
-  regular:
+  custom:
     conservative: map_tnx1v4_to_1x1_aave_c260531.nc
     bilinear: map_tnx1v4_to_1x1_blin_c260531.nc
 
+# Per-realm grids, for each resolution the case may have been run at.
+#
+#   input_grid   the grid the realm's history files are on, naming an entry in
+#                'resolutions' above.  'custom' means nothing is regridded:
+#                CISM land-ice output is georeferenced from its projected x/y
+#                coordinates instead.
+#   grid_label   the grid the output lands on, as a CMIP7 grid code.
+#
+# Only the atmosphere and land change with the resolution.  The ocean, sea-ice
+# and land-ice rows are deliberately identical between ne16 and ne30, because
+# those components run the same grids in both configurations.
+#
 grid_names_per_realm:
   ne16:
-    atmos: g123
-    aerosol: g123
-    atmosChem: g123
-    land: g123
-    seaIce: g202
-    landIce: g194
+    atmos: {input_grid: ne16, grid_label: g253}
+    aerosol: {input_grid: ne16, grid_label: g253}
+    atmosChem: {input_grid: ne16, grid_label: g253}
+    land: {input_grid: ne16, grid_label: g253}
+    ocean: {input_grid: tnx1v4, grid_label: g202}
+    ocnBgchem: {input_grid: tnx1v4, grid_label: g202}
+    seaIce: {input_grid: tnx1v4, grid_label: g202}
+    landIce: {input_grid: custom, grid_label: g194}
   ne30:
-    atmos: g106
-    aerosol: g106
-    atmosChem: g106
-    land: g106
-    # Sea ice and land ice do not change with the atmosphere resolution: both
-    # configurations run CICE on the tripolar ocean grid and CISM on its own
-    # projection, so these match ne16 rather than following atmos.
-    seaIce: g202
-    landIce: g194
+    atmos: {input_grid: ne30, grid_label: g106}
+    aerosol: {input_grid: ne30, grid_label: g106}
+    atmosChem: {input_grid: ne30, grid_label: g106}
+    land: {input_grid: ne30, grid_label: g106}
+    ocean: {input_grid: tnx1v4, grid_label: g202}
+    ocnBgchem: {input_grid: tnx1v4, grid_label: g202}
+    seaIce: {input_grid: tnx1v4, grid_label: g202}
+    landIce: {input_grid: custom, grid_label: g194}
+
+  # To add a resolution, uncomment and fill in every field for the grids that
+  # case ran.  Name it 'custom' to run a case this table does not otherwise
+  # describe; a 'custom' block is used like any other, and without one nothing
+  # is regridded.  Any grid may be named, including new ones, so long as each
+  # has an entry in 'resolutions' above.  Nothing is inherited from the blocks above: a
+  # resolution running a different ocean or ice-sheet grid says so here.  Each
+  # input_grid needs an entry in 'resolutions', and each grid_label must be
+  # registered in the controlled vocabulary, or CMOR refuses to write.
+  #
+  # <resolution>:
+  #   atmos: {input_grid: <grid>, grid_label: <code>}
+  #   aerosol: {input_grid: <grid>, grid_label: <code>}
+  #   atmosChem: {input_grid: <grid>, grid_label: <code>}
+  #   land: {input_grid: <grid>, grid_label: <code>}
+  #   ocean: {input_grid: <grid>, grid_label: <code>}
+  #   ocnBgchem: {input_grid: <grid>, grid_label: <code>}
+  #   seaIce: {input_grid: <grid>, grid_label: <code>}
+  #   landIce: {input_grid: <grid>, grid_label: <code>}
 
 # Static dataset (global attribute) metadata for the CMOR dataset JSON builder.
 # base_source_id is the key looked up in cmor-cvs.json for institution_id and
