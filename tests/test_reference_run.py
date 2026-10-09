@@ -62,7 +62,7 @@ def _plan(case_dir, outdir, **kwargs):
     wrong output, so a caller must say which it means.
     """
     kwargs.setdefault("model", "noresm")
-    kwargs.setdefault("model_res", "ne16")
+    kwargs.setdefault("model_res", "NorESM3-LM")
     kwargs.setdefault("experiment", "piControl")
     return build_plan(case_dir, outdir, **kwargs)
 
@@ -313,11 +313,11 @@ class TestCommands:
             case_dir,
             tmp_path / "out",
             realms=["atmos"],
-            model_res="ne30",
+            model_res="NorESM3-MM",
             experiment="historical",
         )
         command = _command_of(plan, "cmor-atmos-mon")
-        assert command[command.index("--model-res") + 1] == "ne30"
+        assert command[command.index("--model-res") + 1] == "NorESM3-MM"
         assert command[command.index("--experiment") + 1] == "historical"
 
     def test_variant_label_reaches_both_later_stages(self, case_dir, tmp_path):
@@ -440,7 +440,7 @@ def test_case_properties_are_required(omitted):
     """
     supplied = {
         "model": "noresm",
-        "model_res": "ne16",
+        "model_res": "NorESM3-LM",
         "experiment": "piControl",
     }
     del supplied[omitted]
@@ -490,7 +490,7 @@ class TestAtmosResolutionIsAlwaysRequired:
         steps = plan.for_stage("cmor")
         assert steps
         for step in steps:
-            assert step.command[step.command.index("--model-res") + 1] == "ne16"
+            assert step.command[step.command.index("--model-res") + 1] == "NorESM3-LM"
 
 
 # ------------------------------------------- forwarding the grid decision

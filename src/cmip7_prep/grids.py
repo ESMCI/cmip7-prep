@@ -19,7 +19,7 @@ from __future__ import annotations
 from .regrid_maps import get_realm_row, load_regrid_maps
 
 # Resolutions the case may have been run at, as accepted on the command line.
-MODEL_RESOLUTIONS = ("ne30", "ne16", "custom")
+MODEL_RESOLUTIONS = ("ne30", "NorESM3-LM", "NorESM3-MM", "custom")
 
 # The extension point: a case the table does not otherwise describe, whose
 # grids are declared by filling in the commented-out block at the end of

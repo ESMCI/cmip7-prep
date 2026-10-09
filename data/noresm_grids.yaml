@@ -44,16 +44,16 @@ resolutions:
 # those components run the same grids in both configurations.
 #
 grid_names_per_realm:
-  ne16:
-    atmos: {input_grid: ne16, grid_label: g253}
-    aerosol: {input_grid: ne16, grid_label: g253}
-    atmosChem: {input_grid: ne16, grid_label: g253}
-    land: {input_grid: ne16, grid_label: g253}
+  NorESM3-LM:
+    atmos: {input_grid: ne16, grid_label: g123}
+    aerosol: {input_grid: ne16, grid_label: g123}
+    atmosChem: {input_grid: ne16, grid_label: g123}
+    land: {input_grid: ne16, grid_label: g123}
     ocean: {input_grid: tnx1v4, grid_label: g202}
     ocnBgchem: {input_grid: tnx1v4, grid_label: g202}
     seaIce: {input_grid: tnx1v4, grid_label: g202}
     landIce: {input_grid: custom, grid_label: g194}
-  ne30:
+  NorESM3-MM:
     atmos: {input_grid: ne30, grid_label: g106}
     aerosol: {input_grid: ne30, grid_label: g106}
     atmosChem: {input_grid: ne30, grid_label: g106}
@@ -92,10 +92,10 @@ dataset:
   source_type: AOGCM
   calendar: noleap
   source_ids:
-    ne16: NorESM3-LM
-    ne30: NorESM3-MM
+    NorESM3-LM: NorESM3-LM
+    NorESM3-MM: NorESM3-MM
   default_source_id: NorESM3
   nominal_resolution:
-    ne16: 250 km
-    ne30: 100 km
+    NorESM3-LM: 250 km
+    NorESM3-MM: 100 km
   default_nominal_resolution: 100 km

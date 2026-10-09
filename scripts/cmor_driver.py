@@ -147,6 +147,17 @@ def parse_args():
         ),
     )
     required.add_argument(
+        "--model-res",
+        type=str,
+        choices=list(MODEL_RESOLUTIONS),
+        required=True,
+        help=(
+            "Model resolution, as named in data/<model>_grids.yaml. It selects "
+            "the grid each realm's input is on and the grid label its output "
+            "carries, so every realm needs it."
+        ),
+    )
+    required.add_argument(
         "--experiment",
         type=str,
         required=True,
@@ -155,18 +166,6 @@ def parse_args():
 
     case = parser.add_argument_group("other properties of the case")
 
-    case.add_argument(
-        "--model-res",
-        type=str,
-        choices=list(MODEL_RESOLUTIONS),
-        required=True,
-        help=(
-            "Resolution the case was run at, named by its atmosphere grid. "
-            "Every realm needs it, because it identifies the case: ne16 is "
-            "NorESM3-LM at 250 km, ne30 is NorESM3-MM at 100 km. The grid a "
-            "realm regrids from is derived from it and from --realm."
-        ),
-    )
     case.add_argument(
         "--ocn-static-file",
         type=str,

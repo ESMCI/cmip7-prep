@@ -78,9 +78,9 @@ def parse_arguments():
         choices=list(MODEL_RESOLUTIONS),
         required=True,
         help=(
-            "Resolution the case was run at, named by its atmosphere grid. "
-            "Every realm needs it, because it identifies the case: ne16 is "
-            "NorESM3-LM at 250 km, ne30 is NorESM3-MM at 100 km."
+            "Model resolution, as named in data/<model>_grids.yaml. It selects "
+            "the grid each realm's input is on and the grid label its output "
+            "carries, so every realm needs it."
         ),
     )
     required.add_argument(
