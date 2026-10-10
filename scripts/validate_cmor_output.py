@@ -40,7 +40,7 @@ from cmor_driver import REALM_YAML_MAP
 logger = logging.getLogger("cmip7_prep.validate_cmor_output")
 
 MODEL_NAMING_MAPS = {
-    "noresm": ["NCC", "NorESM3"],
+    "noresm": ["NCC", "NorESM3-LM"],
     "cesm": ["NCAR", "CESM3"],
 }
 

@@ -1,6 +1,6 @@
 """ESMF regrid weight files, loaded from the packaged YAML tables.
 
-Each supported model has a ``data/<model>_regrid_maps.yaml`` table mapping a
+Each supported model has a ``data/<model>_grids.yaml`` table mapping a
 resolution to its weight files::
 
     inputdata_dir: /nird/datalake/NS9560K/diagnostics/land_xesmf_diag_data/
@@ -39,10 +39,10 @@ DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 @lru_cache(maxsize=None)
 def _load_cached(model: str) -> dict:
-    """Read and cache one model's regrid-map table."""
-    path = DATA_DIR / f"{model}_regrid_maps.yaml"
+    """Read and cache one model's grid table."""
+    path = DATA_DIR / f"{model}_grids.yaml"
     if not path.is_file():
-        raise ValueError(f"No regrid-map table for model={model!r}; expected {path}")
+        raise ValueError(f"No grid table for model={model!r}; expected {path}")
     with open(path, encoding="utf-8") as handle:
         return yaml.safe_load(handle) or {}
 
@@ -77,3 +77,46 @@ def get_map_paths(model: str, resolution: str) -> dict[str, Path]:
             "every resolution needs one, since fx fields are always conservative"
         )
     return {method: root / name for method, name in entry.items()}
+
+
+def get_realm_row(model: str, resolution: str, realm: str) -> dict[str, str]:
+    """Return one realm's row: the grid its input is on and its output label.
+
+    'input_grid' names an entry in 'resolutions'; 'grid_label' is the CMIP7
+    code for the grid the output lands on.  grids.py reads the first and
+    cmor_utils.py the second.
+    """
+    table = _load_cached(model)
+    grid_names = table.get("grid_names_per_realm") or {}
+    if resolution not in grid_names:
+        raise ValueError(
+            f"No grid names defined for model={model}, resolution={resolution}; "
+            f"available: {sorted(grid_names)}"
+        )
+    realm_grids = grid_names.get(resolution) or {}
+    if realm not in realm_grids:
+        raise ValueError(
+            f"No grid names defined for model={model}, resolution={resolution}, realm={realm}; "
+            f"available: {sorted(realm_grids)}"
+        )
+
+    return dict(realm_grids[realm] or {})
+
+
+def get_grid_desc(model: str, resolution: str, realm: str) -> str:
+    """Return the grid description for one model and resolution."""
+    table = _load_cached(model)
+    grid_descs = table.get("grid_descs_per_realm") or {}
+    if resolution not in grid_descs:
+        raise ValueError(
+            f"No grid descriptions defined for model={model}, resolution={resolution}; "
+            f"available: {sorted(grid_descs)}"
+        )
+    realm_descs = grid_descs.get(resolution) or {}
+    if realm not in realm_descs:
+        raise ValueError(
+            f"No grid descriptions defined for model={model}, "
+            f"resolution={resolution}, realm={realm}; "
+            f"available: {sorted(realm_descs)}"
+        )
+    return grid_descs[resolution][realm] or ""

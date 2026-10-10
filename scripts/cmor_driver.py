@@ -14,6 +14,11 @@ import argparse
 from concurrent.futures import as_completed
 
 
+import inspect
+
+print(inspect.getframeinfo(inspect.getouterframes(inspect.currentframe())[0][0])[0])
+
+
 import os
 from pathlib import Path
 import logging
@@ -27,18 +32,27 @@ import glob
 import json
 import numpy as np
 import xarray as xr
+
+# Load all possible cmip vars for this realm and this experiment
+# The data_request_api is a CMIP7-specific Python package that is
+# separate from CMOR itself but closely related to it.
+# It produce lists of variables requested for each CMIP7 experiment
+from data_request_api.query import data_request as dr
+from data_request_api.content import dump_transformation as dt
+
 from cmor import set_cur_dataset_attribute
 
 from cmip7_prep.cmor_utils import (
     bounds_from_centers_1d,
     roll_for_monotonic_with_bounds,
-    packaged_dataset_json,
+    build_dataset_cfg,
 )
 from cmip7_prep.include_patterns import (
     get_include_patterns,
     patterns_for_variable,
 )
 from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.grids import MODEL_RESOLUTIONS, CICE_GRID_VARS, resolution_for
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
     realize_regrid_prepare,
@@ -49,6 +63,7 @@ from cmip7_prep.pipeline import (
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
+
 
 from dask import delayed
 
@@ -83,46 +98,23 @@ REALM_YAML_MAP = {
     },
 }
 
+
 # If CESM archives time series under a component directory, a realm has to be
 # mapped to the component that wrote it.  Several realms share a component.
-REALM_COMPONENT_MAP = {
-    "atmos": "atm",
-    "aerosol": "atm",
-    "atmosChem": "atm",
-    "land": "lnd",
-    "ocean": "ocn",
-    "ocnBgchem": "ocn",
-    "seaIce": "ice",
-    "landIce": "glc",
-}
-
-
 def parse_args():
+    """Parse the command line, grouped so --help reads as four decisions."""
     parser = argparse.ArgumentParser(
-        description="CMIP7 monthly processing for atm/lnd realms"
+        description="CMIP7 processing of model time series into CMORized output"
     )
-    parser.add_argument(
-        "--version",
-        action="store_true",
-        help="Show program version and exit",
+
+    required = parser.add_argument_group("required arguments")
+    required.add_argument(
+        "--model",
+        choices=["cesm", "noresm"],
+        required=True,
+        help="Model whose variable mappings to use",
     )
-    parser.add_argument(
-        "--cmip-vars",
-        nargs="*",
-        help="List of CMIP variable names to process directly (bypasses variable search)",
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=1,
-        help="Number of Dask workers (default: set to 1 for serial execution)",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing timeseries outputs (default: False)",
-    )
-    parser.add_argument(
+    required.add_argument(
         "--realm",
         choices=[
             "atmos",
@@ -134,10 +126,56 @@ def parse_args():
             "seaIce",
             "landIce",
         ],
-        default="atmos",
-        help="Realm to process. (Default: atmos)",
+        required=True,
+        help="Realm to process",
     )
-    parser.add_argument(
+    required.add_argument(
+        "--frequency",
+        type=str,
+        required=True,
+        choices=["mon", "day", "6hr", "3hr", "1hr", "yr"],
+        help="Frequency of the data being translated",
+    )
+    required.add_argument(
+        "--tsdir",
+        type=str,
+        required=True,
+        help=(
+            "Directory of time series files to CMORize, as produced by "
+            "gen_timeseries.py or another time series utility"
+        ),
+    )
+    required.add_argument(
+        "--model-res",
+        type=str,
+        choices=list(MODEL_RESOLUTIONS),
+        required=True,
+        help=(
+            "Model resolution, as named in data/<model>_grids.yaml. It selects "
+            "the grid each realm's input is on and the grid label its output "
+            "carries, so every realm needs it."
+        ),
+    )
+    required.add_argument(
+        "--experiment",
+        type=str,
+        required=True,
+        help="CMIP7 experiment_id of the case",
+    )
+
+    case = parser.add_argument_group("other properties of the case")
+
+    case.add_argument(
+        "--ocn-static-file",
+        type=str,
+        default=None,
+        help=(
+            "MOM6 static file supplying the ocean fx fields deptho, areacello "
+            "and sftof, which come from nowhere else. Used for CESM with "
+            "--realm ocean; ignored for other models and realms."
+        ),
+    )
+    case.add_argument(
         "--ice-sheet",
         choices=["gris", "ais"],
         default=None,
@@ -146,111 +184,86 @@ def parse_args():
             "'ais' (Antarctica). Required when --realm landIce; ignored otherwise."
         ),
     )
-    parser.add_argument(
-        "--resolution",
+    case.add_argument(
+        "--variant-label",
+        "--realization-initialization-physics-forcing",
+        dest="variant_label",
         type=str,
-        choices=[
-            "ne16",
-            "ne30",
-            "tx2_3v2",
-            "tnx1v4",
-            "regular",
-        ],
-        default="ne30",
-        help="input_grid name (Default: ne30)",
-    )
-    parser.add_argument(
-        "--ocn-static-file",
-        type=str,
-        default=None,
-        help="Path to static file for CESM/MOM variables (optional)",
-    )
-    parser.add_argument(
-        "--tsdir",
-        type=str,
-        help="Time series directory (optional)."
-        "If not specified, will use a preset time series test directory",
-    )
-    parser.add_argument(  # Move to a wrapper script
-        "--caseroot", type=str, help="Case root directory"
-    )
-    parser.add_argument(  # Move to a wrapper script
-        "--cimeroot", type=str, help="CIME root directory"
-    )
-    parser.add_argument(
-        "--test", action="store_true", help="Run in test mode with default paths"
-    )
-    parser.add_argument(
-        "--frequency",
-        type=str,
-        default="mon",
-        choices=["mon", "day", "6hr", "3hr", "1hr", "yr"],
+        default="r1i1p1f1",
+        metavar="rXiYpZfW",
         help=(
-            "Frequency of data to be translated "
-            "(mon, day, 6hr, 3hr, 1hr, yr), (Default: mon)"
+            "Ensemble member this output belongs to: realization, "
+            "initialization, physics and forcing indices, e.g. r1i1p1f1. This "
+            "is the CMIP variant_label, and appears in the output paths and "
+            "file names. The longer spelling is accepted as an alias. "
+            "(default: r1i1p1f1)"
         ),
     )
-    parser.add_argument(
+
+    selection = parser.add_argument_group("which variables to produce")
+    selection.add_argument(
+        "--cmip-vars",
+        nargs="*",
+        help="CMIP variable names to process directly (bypasses variable search)",
+    )
+    selection.add_argument(
+        "--run-all-from-yaml",
+        action="store_true",
+        help=(
+            "Ignore the CMIP7 data request variable list and run every variable "
+            "defined in the YAML mapping file"
+        ),
+    )
+    selection.add_argument(
+        "--custom-yaml",
+        default=False,
+        help="Custom YAML mapping file, overriding the packaged one (optional)",
+    )
+
+    paths = parser.add_argument_group("input and output")
+
+    paths.add_argument(
         "--outdir",
         type=str,
         default=".",
-        help="Output directory for CMORized files. (Default .)",
+        help="Output directory for CMORized files (default: the current directory)",
     )
-    parser.add_argument(
-        "--experiment",
+    paths.add_argument(
+        "--tables-root",
         type=str,
-        default="piControl",
-        help="Experiment name for data request. (Default piControl)",
+        default=None,
+        help="cmip7-cmor-tables checkout, overriding the model-specific default",
     )
-    parser.add_argument(
-        "--model",
-        choices=["cesm", "noresm"],
-        default="cesm",
-        help="Model to use, default: cesm",
+    paths.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing outputs (default: False)",
     )
-    parser.add_argument(
+
+    behaviour = parser.add_argument_group("how to run")
+    behaviour.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of Dask workers (default: 1, serial execution)",
+    )
+    behaviour.add_argument(
+        "--test", action="store_true", help="Run in test mode with default paths"
+    )
+    behaviour.add_argument(
         "--debug",
         action="store_true",
         help="Enable debug logging output",
     )
-    parser.add_argument(
+    behaviour.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="log output level",
-    )
-    parser.add_argument(
-        "--custom-yaml",
-        default=False,
-        help="Path to custom YAML mapping file (optional, overrides default packaged YAML)",
-    )
-    parser.add_argument(
-        "--tables-root",
-        type=str,
-        default=None,
-        help="Path to cmip7-cmor-tables directory (optional, overrides model-specific default)",
-    )
-    parser.add_argument(
-        "--run-all-from-yaml",
-        action="store_true",
-        help="Override CMIP7 data request variable list and run all variables defined in the YAML mapping file",
-    )
-    parser.add_argument(
-        "--realization-initialization-physics-forcing",
-        type=str,
-        default="r1i1p1f1",
-        help="Realization, initialization, physics, and forcing indices in the format rXiYpZfW (default: r1i1p1f1)",
+        help="Log output level (default: INFO)",
     )
 
     args = parser.parse_args()
     return args
-
-
-def get_version():
-    # Use dynamic version from cmip7_prep
-    from cmip7_prep import __version__
-
-    return __version__
 
 
 def _priority_for_logging(data_request, cmip_var) -> str:
@@ -354,9 +367,15 @@ def _prepare_seaice_native(mapping, ds_native, varname, frequency):
     means carry Northern and Southern Hemisphere variants that become separate
     published datasets.
 
-    TLAT/TLON ride along as coordinates, but the *_bounds variables are data
-    variables and would be dropped by the realize_all projection, so they are
-    reassigned for the 2-D variants that need them.
+    realize_all hands back one variable at a time, and a new dataset is built
+    around it.  The lat/lon arrays come along, because xarray carries
+    coordinates with a variable.  The bounds arrays are ordinary variables
+    rather than coordinates, so they stay behind in the original dataset and
+    have to be copied over here.  Only variants that are still maps need them;
+    the hemispheric sums are single numbers.
+
+    All of CICE's lat/lon and bounds arrays are copied, not just the T ones, so
+    that for example siu and siv keep ULAT/ULON.
 
     Returns (cmor_items, status).
     """
@@ -366,9 +385,19 @@ def _prepare_seaice_native(mapping, ds_native, varname, frequency):
         if "time_bounds" in ds_native and "time_bounds" not in ds_v:
             ds_v = ds_v.assign(time_bounds=ds_native["time_bounds"])
         if "nj" in da.dims and "ni" in da.dims:
-            for gname in ("TLAT", "TLON", "latt_bounds", "lont_bounds"):
+            for gname in CICE_GRID_VARS:
                 if gname in ds_native and gname not in ds_v:
                     ds_v = ds_v.assign({gname: ds_native[gname]})
+            # realize_all need not preserve attributes, and without this the
+            # writer cannot tell which grid point the variable is on.
+            native = ds_native.get(varname)
+            # xarray moves this attribute into encoding when it decodes
+            # coordinates, so both places are checked.
+            coords_attr = getattr(native, "attrs", {}).get("coordinates") or getattr(
+                native, "encoding", {}
+            ).get("coordinates")
+            if coords_attr and "coordinates" not in ds_v[varname].attrs:
+                ds_v[varname].attrs["coordinates"] = coords_attr
         cmor_items.append((ds_v, variant_cfg))
     return (
         cmor_items,
@@ -472,6 +501,7 @@ def process_one_var(
     tables_root,
     outdir,
     resolution,
+    case_resolution,
     model,
     realm="atmos",
     frequency="mon",
@@ -480,12 +510,14 @@ def process_one_var(
     ice_sheet=None,
     experiment=None,
 ) -> list[tuple[str, str]]:
-    """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples."""
+    """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples.
+
+    ``resolution`` is the grid this realm regrids from; ``case_resolution`` is
+    the resolution the case was run at, which identifies it for the metadata.
+    They are the same string only for the atmosphere and land realms.
+    """
     varname = cmip_var.branded_variable_name.name
 
-    realization_index, initialization_index, physics_index, forcing_index = (
-        parse_realization_initialization_physics_forcing(ripf_index)
-    )
     # At this point you have a cmip_var (metadata from database query for the target variable)
     # queried a cmor database from the cloud
     logger.debug(f"Starting processing for variable: {varname}")
@@ -620,38 +652,37 @@ def process_one_var(
             try:
                 log_dir = outdir / "logs"
 
-                # TODO: add NorESM institution_id below
-                # Initialize CMOR class
-                metadata_json = None
-                if model == "noresm":
-                    metadata_json = packaged_dataset_json("cmor_dataset_noresm.json")
-
+                # Global/dataset attributes assembled from the CV plus the
+                # per-model dataset config; replaces the packaged cmor_dataset
+                # JSON files.  frequency, variant indices, experiment metadata
+                # and the per-realm grid_label are already baked in, so only the
+                # per-variable region is set below.
+                # case_resolution, not resolution: source_id,
+                # nominal_resolution and grid_label are keyed by the resolution
+                # the case was run at (ne16 is NorESM3-LM at 250 km, ne30 is
+                # NorESM3-MM at 100 km), while resolution is the grid this realm
+                # regrids from.  Passing the latter (tnx1v4 for sea ice) matches
+                # nothing, and the dataset is labelled with the fallbacks.
+                dataset_cfg = build_dataset_cfg(
+                    model=model,
+                    resolution=case_resolution,
+                    experiment=experiment,
+                    frequency=frequency,
+                    ripf=ripf_index,
+                    tables_root=tables_root,
+                    realm=realm,
+                )
                 with CmorSession(
                     tables_root=tables_root,
                     log_dir=log_dir,
                     log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
-                    dataset_json=metadata_json,
-                    dataset_attrs={"institution_id": "NCC", "GLOBAL_IS_CMIP7": True},
+                    dataset_attrs=dataset_cfg,
                     outdir=outdir,
                     ice_sheet=ice_sheet,
+                    realm=realm,
                 ) as cm:
-                    set_cur_dataset_attribute("frequency", frequency)
-                    set_cur_dataset_attribute("realization_index", realization_index)
-                    set_cur_dataset_attribute(
-                        "initialization_index", initialization_index
-                    )
-                    set_cur_dataset_attribute("physics_index", physics_index)
-                    set_cur_dataset_attribute("forcing_index", forcing_index)
                     region = write_cfg.get("region", "glb")
                     set_cur_dataset_attribute("region", region)
-                    # Updating with correct experiment info from CMIP7 tables
-                    experiment_info = get_experiment_info_from_tables(
-                        experiment, tables_root
-                    )
-                    for key, value in experiment_info.items():
-                        if isinstance(value, list):
-                            value = value[0]
-                        set_cur_dataset_attribute(key, value)
 
                     logger.info(
                         f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
@@ -669,9 +700,9 @@ def process_one_var(
                             "standard_name": write_cfg.get("standard_name", None),
                             "levels": write_cfg.get("levels", None),
                             "branded_variable_name": cmip7name,
+                            "grid_label": dataset_cfg.get("grid_label"),
                         },
                     )()
-
                     # Now use CMOR utility to write out netcdf variable
                     cm.write_variable(ds_cmor_write, cmip_var, vdef)
 
@@ -711,26 +742,49 @@ def main():
 
     # Set variables used below
     OUTDIR = args.outdir
-    resolution = args.resolution
+    # The grid to regrid from follows from the model and realm; see grids.py.
+    try:
+        resolution = resolution_for(args.model, args.realm, args.model_res)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(2)
+    logger.info(
+        "input grid for realm %s is %s (atmosphere/land ran at %s)",
+        args.realm,
+        resolution,
+        args.model_res,
+    )
     model = args.model
     frequency = args.frequency
     realm = args.realm
     logger.debug("Realm is %s", realm)
-    ripf_index = args.realization_initialization_physics_forcing
+    ripf_index = args.variant_label
 
-    # Ocean fx fields (areacello, deptho, sftof) are read from the MOM6 static
-    # file and merged into the native data and the CMOR output.  CESM only.
+    # Ocean only: ocean fx fields (deptho, areacello, sftof) are read
+    # from the MOM6 static file and merged into the native data and
+    # the CMOR output.
     ocn_fx_fields = None
-    if model == "cesm":
-        if realm in ["ocean", "seaIce"]:
-            if args.ocn_static_file:
-                ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
-                logger.info(
-                    f"Loaded ocean fx fields from {args.ocn_static_file}: {list(ocn_fx_fields.keys())}"
-                )
+    if model == "cesm" and realm == "ocean":
+        if args.ocn_static_file:
+            ocn_fx_fields = ocean_fx_fields(args.ocn_static_file)
+            logger.info(
+                "Loaded ocean fx fields from %s: %s",
+                args.ocn_static_file,
+                list(ocn_fx_fields),
+            )
+    elif args.ocn_static_file:
+        logger.warning(
+            "Ignoring --ocn-static-file: it supplies ocean fx fields, which "
+            "model=%s realm=%s does not use",
+            model,
+            realm,
+        )
 
     # Determine time series directory (TSDIR)
-    TSDIR = _resolve_tsdir(args, model, realm)
+    TSDIR = Path(args.tsdir)
+    if not TSDIR.is_dir():
+        logger.error("Time series directory %s does not exist", TSDIR)
+        sys.exit(1)
 
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)
@@ -753,13 +807,6 @@ def main():
         logger.info(f"Loading mapping YAML: {yaml_filename}")
         mapping = Mapping.from_packaged_default(filename=yaml_filename)
     mapping.default_freq = frequency
-
-    # Load all possible cmip vars for this realm and this experiment
-    # The data_request_api is a CMIP7-specific Python package that is
-    # separate from CMOR itself but closely related to it.
-    # It produce lists of variables requested for each CMIP7 experiment
-    from data_request_api.query import data_request as dr
-    from data_request_api.content import dump_transformation as dt
 
     logger.info("Loading data request content %s", realm)
     content_dic = dt.get_transformed_content()
@@ -971,6 +1018,7 @@ def main():
                         tables_root,
                         OUTDIR,
                         resolution,
+                        args.model_res,
                         model,
                         realm=realm,
                         frequency=frequency,
@@ -991,6 +1039,7 @@ def main():
                     tables_root,
                     OUTDIR,
                     resolution,
+                    args.model_res,
                     model,
                     realm=realm,
                     frequency=frequency,
@@ -1025,48 +1074,5 @@ def main():
     )
 
 
-def _resolve_tsdir(args, model, realm):
-    """Return the time series directory (TSDIR) for this run."""
-    TSDIR = None
-    if args.tsdir:
-        TSDIR = Path(args.tsdir)
-        if not TSDIR.exists():
-            logger.error(f"Time series directory {TSDIR} does not exist")
-            sys.exit(1)
-    else:
-        if model == "noresm":
-            logger.error("must specify --tsdir as an input argument for noresm model")
-            sys.exit(1)
-        elif model == "cesm":
-            if args.caseroot and args.cimeroot:
-                caseroot = args.caseroot
-                cimeroot = args.cimeroot
-                sys.path.append(cimeroot)
-                _LIBDIR = os.path.join(cimeroot, "CIME", "Tools")
-                sys.path.append(_LIBDIR)
-                try:
-                    from CIME.case import Case
-                except ImportError as e:
-                    logger.error(f"Error importing CIME modules: {e}")
-                    sys.exit(1)
-                with Case(caseroot, read_only=True) as case:
-                    inputroot = case.get_value("DOUT_S_ROOT")
-                component = REALM_COMPONENT_MAP.get(realm)
-                if component is None:
-                    logger.error(f"no time series directory exists for realm {realm}")
-                    sys.exit(1)
-                TSDIR = (
-                    Path(inputroot) / component / "proc" / "tseries" / args.frequency
-                )
-            else:
-                logger.error("no time series directory found for cesm model")
-                sys.exit(1)
-    return TSDIR
-
-
 if __name__ == "__main__":
-    args = parse_args()
-    if getattr(args, "version", False):
-        print(f"cmor_driver.py version: {get_version()}")
-        sys.exit(0)
     main()

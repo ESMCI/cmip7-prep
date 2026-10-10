@@ -5,7 +5,7 @@
 # Fluxes must conserve their integral over a cell and use the conservative map,
 # which is the default for anything not listed here.
 #
-# Unlike the include-pattern and regrid-map tables, this file is NOT per model:
+# Unlike the include-pattern and grid tables, this file is NOT per model:
 # whether a quantity is intensive is a property of the variable, not of the
 # model that produced it.  Keeping one copy stops CESM and NorESM output from
 # diverging in how the same variable was regridded.

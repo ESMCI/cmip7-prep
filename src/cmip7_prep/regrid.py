@@ -380,14 +380,14 @@ def regrid_to_latlon(
 
     # In future: handle if the lat, lon coords are already present, but still on the wrong grid
     # or other changes to the grid should be made.
-    if resolution == "regular":
+    if resolution == "custom":
         if "lat" in var_da.dims and "lon" in var_da.dims:
             logger.info(
                 "Variable already has 'lat' and 'lon' dims; skipping regridding."
             )
             return var_da
         raise KeyError(
-            "regular grid is requested but variable does not have 'lat','lon' dims"
+            "custom grid is requested but variable does not have 'lat','lon' dims"
         )
 
     if "ncol" not in var_da.dims and "lndgrid" not in var_da.dims:

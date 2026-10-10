@@ -2,10 +2,10 @@
 """Thin CMOR wrapper used by cmip7_prep.
 
 This module centralizes CMOR session setup and writing so that the rest of the
-pipeline can stay xarray-first. It supports either a dataset JSON file (preferred)
-or directly injected global attributes, and creates axes based on the coordinates
-present in the provided dataset. It also supports a packaged default
-`cmor_dataset.json` living under `cmip7_prep/data/`.
+pipeline can stay xarray-first. It takes the global/dataset attributes as an
+in-memory dict (built by ``cmor_utils.build_dataset_cfg``), or, as a fallback, a
+dataset JSON path, and creates axes based on the coordinates present in the
+provided dataset.
 """
 
 from pathlib import Path
@@ -22,8 +22,8 @@ import cmor
 
 import numpy as np
 import xarray as xr
+from .grids import CICE_BOUNDS_BY_COORD
 from .cmor_utils import (
-    packaged_dataset_json,
     get_cmor_attr,
     set_cmor_attr,
     encode_time_to_num,
@@ -68,6 +68,134 @@ def _horizontal_only(da_coord: xr.DataArray, keep) -> xr.DataArray:
 # ---------------------------------------------------------------------
 # CMOR session
 # ---------------------------------------------------------------------
+
+# One unit of time is written differently in different places: a year is
+# "common_year" in a CISM units string but "year" in a time_period_freq
+# attribute.  Each variant maps to a single name below, so that the unit a
+# period is given in can be compared with the unit an axis counts in.
+_TIME_UNIT_NAMES = {
+    "common_year": "year",
+    "common_years": "year",
+    "year": "year",
+    "years": "year",
+    "month": "month",
+    "months": "month",
+    "day": "day",
+    "days": "day",
+    "hour": "hour",
+    "hours": "hour",
+}
+
+
+def _time_unit_name(word: str) -> str | None:
+    """Return the one name for a unit of time, or None if it is unrecognised."""
+    return _TIME_UNIT_NAMES.get(str(word).strip().lower())
+
+
+def period_in_axis_units(dataset, units: str) -> float | None:
+    """Return the averaging period, in the unit the time axis counts in.
+
+    The model records its averaging period in a ``time_period_freq``
+    attribute, written as a unit and a count: ``"year_1"`` for an annual mean,
+    ``"month_1"`` for a monthly one.  The time axis counts in a unit of its
+    own, named at the start of its units string -- ``"common_year since
+    0000-01-01"`` counts in years.
+
+    The period is returned only when those two units are the same, since
+    converting between them is not always possible: a year is 360, 365 or
+    365.25 days depending on the calendar, and a month has no fixed length at
+    all.  Anything else returns None, leaving the caller to say so rather than
+    record a period the data does not have.
+    """
+    period = getattr(dataset, "attrs", {}).get("time_period_freq")
+    if not period or not units:
+        return None
+
+    name, separator, count = str(period).strip().rpartition("_")
+    if not separator or not count.isdigit():
+        return None
+
+    period_unit = _time_unit_name(name)
+    axis_unit = _time_unit_name(str(units).split()[0])
+    if period_unit is None or period_unit != axis_unit:
+        return None
+    return float(count)
+
+
+def is_latitude(da) -> bool:
+    """Return whether a variable is a latitude coordinate."""
+    attrs = getattr(da, "attrs", {})
+    return attrs.get("standard_name") == "latitude" or str(
+        attrs.get("units", "")
+    ).startswith("degrees_north")
+
+
+def is_longitude(da) -> bool:
+    """Return whether a variable is a longitude coordinate."""
+    attrs = getattr(da, "attrs", {})
+    return attrs.get("standard_name") == "longitude" or str(
+        attrs.get("units", "")
+    ).startswith("degrees_east")
+
+
+def horizontal_coords_of(dataset, var_da, fallback_lat, fallback_lon):
+    """Return the latitude and longitude a variable is actually defined on.
+
+    This matters on a staggered grid: CICE writes velocities on the B-grid
+    velocity point, so siu and siv are on ULAT/ULON while the thermodynamic
+    fields are on TLAT/TLON.  Taking the centre for everything put the
+    velocities in the wrong place.
+
+    The variable's own coordinates are used, wherever they are to be found --
+    attached to it, or named in a ``coordinates`` attribute.  Which of the two
+    depends on how the file was opened.  They are identified by their CF
+    attributes rather than by name, so the names need not be known here, and
+    the given fallback is used when neither yields a pair.
+    """
+    # The 'coordinates' attribute is what distinguishes the grid points.  The
+    # coordinates xarray attaches cannot: TLAT and ULAT have the same dimensions,
+    # so every variable on (nj, ni) carries both.  xarray moves the attribute
+    # into encoding when it decodes coordinates, so look in both places.
+    named = str(
+        getattr(var_da, "attrs", {}).get("coordinates")
+        or getattr(var_da, "encoding", {}).get("coordinates")
+        or ""
+    ).split()
+    candidates = [dataset[name] for name in named if name in dataset]
+
+    # Only if the variable names none: anything attached will at least be a
+    # coordinate of the right shape.
+    if not candidates:
+        candidates = list(getattr(var_da, "coords", {}).values())
+
+    lat = next((da for da in candidates if is_latitude(da)), None)
+    lon = next((da for da in candidates if is_longitude(da)), None)
+    if lat is None or lon is None:
+        return fallback_lat, fallback_lon
+    return lat, lon
+
+
+def vertex_bounds_of(dataset, coord, coord_name: str):
+    """Return the vertex bounds of a coordinate, or None if the file has none.
+
+    The coordinate's own ``bounds`` attribute is used when present.  Otherwise a
+    name built from the coordinate is tried -- CICE writes ULAT's bounds as
+    ``latu_bounds`` -- and nothing else: bounds from another grid point would
+    pair cell corners with the wrong cell centres.
+    """
+    named = getattr(coord, "attrs", {}).get("bounds")
+    if isinstance(named, str) and named in dataset:
+        return dataset[named]
+    for candidate in (
+        CICE_BOUNDS_BY_COORD.get(coord_name.upper()),
+        f"{coord_name}_bnds",
+        f"{coord_name.lower()}_bounds",
+    ):
+        if candidate and candidate in dataset:
+            return dataset[candidate]
+    return None
+
+
 class CmorSession(
     AbstractContextManager
 ):  # pylint: disable=too-many-instance-attributes
@@ -78,17 +206,19 @@ class CmorSession(
     tables_root : str or Path
         Directory containing CMOR tables and tables-csv directories with JSONs
            (e.g., CMIP6_*.json or CMIP7_*.json).
-    dataset_json : str or Path, optional
-        Path to a cmor_dataset.json with the experiment/source metadata.
     dataset_attrs : dict, optional
-        Alternative to `dataset_json`, allowing direct attribute injection.
+        Global/dataset attributes to write, typically produced by
+        ``cmor_utils.build_dataset_cfg``.  Preferred over ``dataset_json``.
+    dataset_json : str or Path, optional
+        Path to a cmor_dataset.json with the experiment/source metadata; a
+        fallback for callers that still carry a file.
     """
 
     def __init__(
         self,
         *,
         tables_root: Path | str,
-        dataset_attrs: dict[str, str] | None = None,
+        dataset_attrs: dict[str, Any] | None = None,
         dataset_json: Optional[DatasetJsonLike] = None,
         tracking_prefix: str | None = None,
         # NEW: one log per run (session)
@@ -96,6 +226,7 @@ class CmorSession(
         log_name: str | None = None,
         outdir: Path | str | None = None,
         ice_sheet: str | None = None,
+        realm: str | None = None,
     ) -> None:
         self.tables_root = tables_root
         self.dataset_attrs = dict(dataset_attrs or {})
@@ -105,6 +236,7 @@ class CmorSession(
         # Ice sheet ('gris'/'ais') selecting the CISM map projection; only used
         # for the native land-ice grid (see _define_cism_grid).
         self._ice_sheet = ice_sheet
+        self._realm = realm
         # logging config
         self._log_dir = Path(log_dir) if log_dir is not None else None
         self._log_name = log_name
@@ -166,22 +298,27 @@ class CmorSession(
                     getattr(cmor, name)(str(self._log_path))
                     break
 
-        # Resolve dataset_json to a real filesystem path
-        dj = self.dataset_json
-        if dj is None:
-            # packaged file → returns a context manager
-            cm = packaged_dataset_json("cmor_dataset.json")
-            self._dataset_json_cm = cm
-            p = cm.__enter__()  # ← ENTER the CM, get a Path
-        elif isinstance(dj, (str, Path)):
-            p = Path(dj)
+        # Resolve the dataset attributes: the in-memory dict is preferred; a
+        # dataset_json path remains as a fallback for callers that still have a
+        # file.  Either way CMOR is fed a temp JSON, since cmor.dataset_json
+        # must be called to load the CV before any variable is defined.
+        if self.dataset_attrs:
+            cfg = dict(self.dataset_attrs)
+        elif self.dataset_json is not None:
+            dj = self.dataset_json
+            if isinstance(dj, (str, Path)):
+                p = Path(dj)
+            else:
+                # caller passed a context manager directly
+                self._dataset_json_cm = dj
+                p = dj.__enter__()  # ← ENTER the CM, get a Path
+            logger.debug("CMOR JSON dataset: %s", p)
+            with open(p, encoding="utf-8") as f:
+                cfg = json.load(f)
         else:
-            # caller passed a context manager directly
-            self._dataset_json_cm = dj
-            p = dj.__enter__()  # ← ENTER the CM, get a Path
-        logger.debug("CMOR JSON dataset: %s", p)
-        with open(p, encoding="utf-8") as f:
-            cfg = json.load(f)
+            raise ValueError(
+                "CmorSession requires either dataset_attrs or dataset_json"
+            )
         cfg["outpath"] = str(self._outdir)
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         json.dump(cfg, tmp)
@@ -390,10 +527,16 @@ class CmorSession(
     def _define_cice_grid(self, ds, var_name, var_da):
         """Register a native CICE (nj, ni) tripole grid via cmor.grid().
 
-        The CICE grid is logically-rectangular: it carries TLAT/TLON cell centers
-        and vertex bounds (latt_bounds/lont_bounds, shape (nj, ni, nvertices))
-        inline. Defines i_index/j_index axes from the CMIP7 grids table and returns
-        the resulting grid id, which stands in for both the nj and ni dimensions.
+        The CICE grid is logically-rectangular and staggered: each point carries
+        its own latitude, longitude and vertex bounds inline -- TLAT/TLON with
+        latt_bounds/lont_bounds at the cell centre, ULAT/ULON with
+        latu_bounds/lonu_bounds at the velocity point, all of shape
+        (nj, ni, nvertices) for the bounds.  The variable's own 'coordinates'
+        attribute says which point it is on, and that pair is what the grid is
+        defined from.
+
+        Defines i_index/j_index axes from the CMIP7 grids table and returns the
+        resulting grid id, which stands in for both the nj and ni dimensions.
         """
         logger.debug(
             "[CMOR axis debug] Defining native CICE (nj, ni) grid for %s.",
@@ -410,30 +553,35 @@ class CmorSession(
                     return dsi[nm]
             return None
 
-        tlat = _coord(ds, "TLAT", "tlat", "lat", "latitude")
-        tlon = _coord(ds, "TLON", "tlon", "lon", "longitude")
-        if tlat is None or tlon is None:
-            raise KeyError(
-                "CICE native grid requires TLAT/TLON cell-center coordinates "
-                f"in the dataset for variable '{var_name}'."
-            )
+        centre_lat = _coord(ds, "TLAT", "tlat", "lat", "latitude")
+        centre_lon = _coord(ds, "TLON", "tlon", "lon", "longitude")
 
-        lat_bnds_da = None
-        lon_bnds_da = None
-        bname = tlat.attrs.get("bounds")
-        if isinstance(bname, str) and bname in ds:
-            lat_bnds_da = ds[bname]
-        bname = tlon.attrs.get("bounds")
-        if isinstance(bname, str) and bname in ds:
-            lon_bnds_da = ds[bname]
-        if lat_bnds_da is None:
-            lat_bnds_da = _coord(ds, "latt_bounds", "lat_bounds", "TLAT_bnds")
-        if lon_bnds_da is None:
-            lon_bnds_da = _coord(ds, "lont_bounds", "lon_bounds", "TLON_bnds")
+        # Which point of the staggered grid this variable is on comes from its
+        # own 'coordinates' attribute: the velocities are on the B-grid velocity
+        # point (ULAT/ULON), the thermodynamic fields on the centre (TLAT/TLON).
+        # Taking the centre for everything put siu and siv in the wrong place.
+        grid_lat, grid_lon = horizontal_coords_of(ds, var_da, centre_lat, centre_lon)
+        if grid_lat is None or grid_lon is None:
+            raise KeyError(
+                "CICE native grid requires latitude/longitude coordinates in "
+                f"the dataset for variable '{var_name}'."
+            )
+        logger.debug(
+            "[CMOR axis debug] %s is on %s/%s",
+            var_name,
+            getattr(grid_lat, "name", "?"),
+            getattr(grid_lon, "name", "?"),
+        )
+
+        lat_bnds_da = vertex_bounds_of(ds, grid_lat, str(getattr(grid_lat, "name", "")))
+        lon_bnds_da = vertex_bounds_of(ds, grid_lon, str(getattr(grid_lon, "name", "")))
         if lat_bnds_da is None or lon_bnds_da is None:
             raise KeyError(
                 "CICE native grid requires latitude/longitude vertex bounds "
-                f"(e.g. latt_bounds/lont_bounds) for variable '{var_name}'."
+                f"for {getattr(grid_lat, 'name', '?')}/{getattr(grid_lon, 'name', '?')} "
+                f"(e.g. latt_bounds/lont_bounds) for variable '{var_name}'. "
+                "Bounds from another grid point are not substituted: they would "
+                "pair cell corners with the wrong cell centres."
             )
 
         # The horizontal grid is static.  During the multi-file merge, xarray
@@ -444,8 +592,8 @@ class CmorSession(
         # rank does not match number of axes passed via axis_ids".  Collapse any
         # non-horizontal dimension (e.g. time) by taking the first index, since
         # the grid geometry does not vary in time.
-        tlat = _horizontal_only(tlat, ("nj", "ni"))
-        tlon = _horizontal_only(tlon, ("nj", "ni"))
+        grid_lat = _horizontal_only(grid_lat, ("nj", "ni"))
+        grid_lon = _horizontal_only(grid_lon, ("nj", "ni"))
         # vertex bounds keep their trailing vertices dim in addition to nj, ni
         lat_bnds_da = _horizontal_only(
             lat_bnds_da, ("nj", "ni") + lat_bnds_da.dims[-1:]
@@ -454,8 +602,8 @@ class CmorSession(
             lon_bnds_da, ("nj", "ni") + lon_bnds_da.dims[-1:]
         )
 
-        lat_vals = np.asarray(tlat.values, dtype="f8")
-        lon_vals = np.mod(np.asarray(tlon.values, dtype="f8"), 360.0)
+        lat_vals = np.asarray(grid_lat.values, dtype="f8")
+        lon_vals = np.mod(np.asarray(grid_lon.values, dtype="f8"), 360.0)
         lat_vert = np.asarray(lat_bnds_da.values, dtype="f8")
         lon_vert = np.mod(np.asarray(lon_bnds_da.values, dtype="f8"), 360.0)
 
@@ -625,25 +773,47 @@ class CmorSession(
                 return tvals, None, str(units)
             tbnum = encode_time_to_num(tb, units, cal) if tb is not None else None
 
-            # Some model output (e.g. CISM land-ice) carries no time bounds, but
-            # CMOR requires them for time-averaged variables.  When absent,
-            # synthesize bounds from the numeric time centers using the midpoints
-            # between consecutive steps (edges extrapolated).  For evenly-spaced
-            # data this reproduces the averaging period (e.g. the calendar year
-            # for annual means).
-            if tbnum is None and tvals is not None and np.size(tvals) >= 2:
-                t = np.asarray(tvals, dtype="f8").reshape(-1)
-                mids = 0.5 * (t[:-1] + t[1:])
-                tbnum = np.empty((t.size, 2), dtype="f8")
-                tbnum[1:, 0] = mids
-                tbnum[:-1, 1] = mids
-                tbnum[0, 0] = t[0] - (mids[0] - t[0])
-                tbnum[-1, 1] = t[-1] + (t[-1] - mids[-1])
-                logger.info(
-                    "time coordinate had no bounds; synthesized %d bounds from "
-                    "centers",
-                    tbnum.shape[0],
+            # If CISM land-ice output carries no time bounds, it is built
+            # from the time values: each period is taken to END at its own time
+            # value, which is how the output is labelled -- a file stamped 1527
+            # holds the mean for 1526.
+            #
+            # Only land ice is treated this way.  Every other component writes
+            # bounds, so their absence means something went wrong earlier and is
+            # reported rather than papered over.
+            if tbnum is None and tvals is not None and self._realm != "landIce":
+                raise ValueError(
+                    f"Time coordinate has no bounds and realm is "
+                    f"{self._realm!r}, which is expected to write them. "
+                    "Check the history files and the time series built from "
+                    "them; bounds are only synthesized for landIce."
                 )
+            if tbnum is None and tvals is not None and np.size(tvals) >= 1:
+                t = np.asarray(tvals, dtype="f8").reshape(-1)
+                left = None
+                if t.size >= 2:
+                    # Each period starts where the previous one ended; the
+                    # first is extrapolated back by its own length.
+                    left = np.empty_like(t)
+                    left[1:] = t[:-1]
+                    left[0] = t[0] - (t[1] - t[0])
+                else:
+                    period = period_in_axis_units(dsi, units)
+                    if period is None:
+                        logger.warning(
+                            "time coordinate has no bounds, a single step, and "
+                            "no usable time_period_freq attribute; CMOR will "
+                            "reject the axis if the table requires bounds"
+                        )
+                    else:
+                        left = np.array([t[0] - period], dtype="f8")
+                if left is not None:
+                    tbnum = np.column_stack([left, t])
+                    logger.info(
+                        "time coordinate had no bounds; synthesized %d, each "
+                        "ending at its time value",
+                        tbnum.shape[0],
+                    )
 
             return tvals, tbnum, str(units)
 
@@ -1206,12 +1376,12 @@ class CmorSession(
             logger.debug("FX variable %s define lon_id %s", name, lon_id)
             logger.debug("Writing fx variable %s on curvilinear grid", name)
             cmor.set_cur_dataset_attribute("grid", "curvilinear")
-            cmor.set_cur_dataset_attribute("grid_label", "gn")
+            # cmor.set_cur_dataset_attribute("grid_label", "gn")
             if name == "deptho":
                 name = "deptho_ti-u-hxy-sea"
         else:
             cmor.set_cur_dataset_attribute("grid", "1x1 degree")
-            cmor.set_cur_dataset_attribute("grid_label", "gr")
+            # cmor.set_cur_dataset_attribute("grid_label", "gr")
             if name in ("areacella_ti-u-hxy-u", "sftlf_ti-u-hxy-u"):
                 self.load_table(self.tables_root, "land")
             elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
@@ -1438,12 +1608,14 @@ class CmorSession(
             missing_value=fillv,
         )
         logger.debug("Now define time dimension and write data")
-        if "lat" in data.dims and "lon" in data.dims:
-            cmor.set_cur_dataset_attribute("grid", "1x1 degree")
-            cmor.set_cur_dataset_attribute("grid_label", "gr")
-        else:
-            cmor.set_cur_dataset_attribute("grid", "curvilinear")
-            cmor.set_cur_dataset_attribute("grid_label", "gn")
+        # if "lat" in data.dims and "lon" in data.dims:
+        #     # These should be pulled fromt he grid in the tables
+        #     cmor.set_cur_dataset_attribute("grid", "1x1 degree")
+        #     cmor.set_cur_dataset_attribute("grid_label", vdef.get("grid_label", "gr"))
+        # else:
+        #     # These should be pulled fromt he grid in the tables
+        #     cmor.set_cur_dataset_attribute("grid", "curvilinear")
+        #     cmor.set_cur_dataset_attribute("grid_label", vdef.get("grid_label", "gn"))
         # ---- Prepare time info for this write (local, not cached) ----
         time_da = ds.coords.get("time")
         if time_da is None:
