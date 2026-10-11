@@ -1,6 +1,7 @@
 """Utility functions for CMOR processing."""
 
 from pathlib import Path
+from functools import lru_cache
 import json
 import warnings
 import re
