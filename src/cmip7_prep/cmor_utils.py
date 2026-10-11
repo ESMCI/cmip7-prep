@@ -1,7 +1,7 @@
 """Utility functions for CMOR processing."""
 
-from functools import lru_cache
 from pathlib import Path
+from functools import lru_cache
 import json
 import warnings
 import re
@@ -12,34 +12,12 @@ import logging
 import cmor
 import cftime
 import numpy as np
-import yaml
 import xarray as xr
 
 # Local imports avoid an import cycle with regrid_maps.
 from .regrid_maps import load_regrid_maps, get_realm_row
 
 _FILL_DEFAULT = 1.0e20
-
-_DATA_DIR = Path(__file__).parent.parent.parent / "data"
-
-
-@lru_cache(maxsize=None)
-def load_positive_overrides(model: str) -> dict:
-    """Return the hand-set 'positive' values for *model*, or {} if it has none.
-
-    'positive' tells CMOR which direction a flux is measured in.  CMOR checks
-    it against its own tables and flips the sign of the data if they disagree,
-    so a wrong value inverts the field.
-
-    A variable listed in data/<model>_positive.yaml uses that value.  Anything
-    else takes the value from the CMOR table.
-    """
-    path = _DATA_DIR / f"{model}_positive.yaml"
-    if not path.is_file():
-        return {}
-    with open(path, encoding="utf-8") as handle:
-        return (yaml.safe_load(handle) or {}).get("positive") or {}
-
 
 _HANDLE_RE = re.compile(r"^hdl:21\.14100/[0-9a-f\-]{36}$", re.IGNORECASE)
 _UUID_RE = re.compile(r"^[0-9a-f\-]{36}$", re.IGNORECASE)

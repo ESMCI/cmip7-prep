@@ -3,6 +3,7 @@ Unit tests for the Mapping class in mapping_compat.py.
 Tests mapping compatibility and normalization logic for CMIP7 variable mapping workflows.
 """
 
+import json
 import tempfile
 import xarray as xr
 import numpy as np
@@ -539,3 +540,108 @@ def test_verticalmean_rejects_bad_dim(
     """A wrong dimension name is reported before anything else is attempted."""
     with pytest.raises(ValueError, match="Dimension 'lev' not found"):
         _safe_eval("verticalmean(uvel, levelname='lev')", {"uvel": uvel_sigma})
+
+
+# ---------------------------------------------------------------------------
+# Minimal mapping form (data/schemas/mapping.schema.yaml)
+# ---------------------------------------------------------------------------
+_MINIMAL_YAML = """
+grids: [gr]
+variables:
+  tas_tavg-h2m-hxy-u: TREFHT
+  pr_tavg-u-hxy-u: (PRECC + PRECL) * 1000
+  ta_tavg-p19-hxy-air: T
+  cl_tavg-al-hxy-u: {formula: CLOUD, units: "1"}
+  rsds_tavg-u-hxy-u: {formula: FSDS, positive: up}
+  tos_tavg-u-hxy-sea: {formula: tos, grids: [gn, gr]}
+  siu_tavg-u-hxy-si:
+    formula: {day: siu_d, mon: siu}
+  siarea_tavg-u-hm-u:
+    variants:
+      - region: nh
+        formula:
+          day: (siconc_d * tarea).where(siconc_d.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+          mon: (siconc * tarea).where(siconc.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+      - region: sh
+        formula:
+          day: (siconc_d * tarea).where(siconc_d.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+          mon: (siconc * tarea).where(siconc.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+"""
+
+# A stand-in for cmip7-cmor-tables: only the fields the mapping reads.
+_TABLE = {
+    "tas_tavg-h2m-hxy-u": {
+        "units": "K",
+        "dimensions": "longitude latitude time height2m",
+    },
+    "ta_tavg-p19-hxy-air": {
+        "units": "K",
+        "dimensions": ["longitude", "latitude", "plev19", "time"],
+    },
+    "cl_tavg-al-hxy-u": {"units": "%", "dimensions": "longitude latitude alevel time"},
+}
+
+
+@pytest.fixture(name="minimal")
+def minimal_fixture(tmp_path):
+    """A Mapping over _MINIMAL_YAML that knows where the (fake) CMOR tables are."""
+    (tmp_path / "tables").mkdir()
+    (tmp_path / "tables" / "CMIP7_atmos.json").write_text(
+        json.dumps({"variable_entry": _TABLE})
+    )
+    (tmp_path / "mapping.yaml").write_text(_MINIMAL_YAML)
+    mapping = Mapping(tmp_path / "mapping.yaml")
+    mapping.tables_root = tmp_path
+    mapping.realm = "atmos"
+    return mapping
+
+
+def test_minimal_short_form(minimal):
+    """A string entry is the formula; a bare name is a plain source."""
+    assert minimal.get_cfg("tas_tavg-h2m-hxy-u")["source"] == "TREFHT"
+    cfg = minimal.get_cfg("pr_tavg-u-hxy-u")
+    assert cfg["formula"] == "(PRECC + PRECL) * 1000"
+    assert cfg["raw_variables"] == ["PRECC", "PRECL"]
+
+
+def test_minimal_grids_regrid_positive(minimal):
+    """File grids default, entry override, regrid method and positive."""
+    assert minimal.get_cfg("tas_tavg-h2m-hxy-u")["grids"] == ["gr"]
+    assert minimal.get_cfg("tos_tavg-u-hxy-sea")["grids"] == ["gn", "gr"]
+    assert minimal.get_cfg("tas_tavg-h2m-hxy-u")["regrid_method"] == "bilinear"
+    assert minimal.get_cfg("pr_tavg-u-hxy-u")["regrid_method"] == "conservative"
+    assert minimal.get_cfg("rsds_tavg-u-hxy-u")["positive"] == "up"
+
+
+def test_minimal_table_fields(minimal):
+    """Table, units and levels come from the CMOR table; declared units win."""
+    cfg = minimal.get_cfg("ta_tavg-p19-hxy-air")
+    assert (cfg["table"], cfg["units"], cfg["levels"]) == (
+        "atmos",
+        "K",
+        {"name": "plev19"},
+    )
+    cl = minimal.get_cfg("cl_tavg-al-hxy-u")
+    assert cl["units"] == "1"
+    assert cl["levels"] == {"name": "standard_hybrid_sigma"}
+
+
+def test_minimal_per_frequency(minimal):
+    """A per-frequency formula picks the frequency's model variable."""
+    assert minimal.get_cfg("siu_tavg-u-hxy-si", freq="mon")["source"] == "siu"
+    assert minimal.get_cfg("siu_tavg-u-hxy-si", freq="day")["source"] == "siu_d"
+    assert minimal.iter_variable_names(freq="3hr") == [
+        name for name in minimal.iter_variable_names() if name != "siu_tavg-u-hxy-si"
+    ]
+
+
+def test_minimal_variants_per_frequency(minimal):
+    """Variant formulas are realized per region, and per frequency."""
+    ds = _make_siarea_ds()
+    ds["siconc_d"] = ds["siconc_d"] * 2
+    mon = minimal.realize_all(ds, "siarea_tavg-u-hm-u", freq="mon")
+    day = minimal.realize_all(ds, "siarea_tavg-u-hm-u", freq="day")
+    assert [cfg["region"] for _, cfg in mon] == ["nh", "sh"]
+    assert float(day[0][0].isel(time=0)) == pytest.approx(
+        2 * float(mon[0][0].isel(time=0))
+    )

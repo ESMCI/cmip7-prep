@@ -17,5 +17,5 @@ disable=
 max-line-length=100
 
 [TYPECHECK]
-ignored-modules=xarray,xesmf,cmor,numpy,geocat.comp,yaml,cftime,pytest,dask,gents
+ignored-modules=xarray,xesmf,cmor,numpy,geocat.comp,yaml,jsonschema,cftime,pytest,dask,gents
 ignored-classes=cmor

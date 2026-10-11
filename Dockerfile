@@ -18,6 +18,7 @@ RUN conda install -y -n base -c conda-forge \
         h5netcdf \
         cftime \
         pyyaml \
+        jsonschema \
         click \
         matplotlib-base \
         pytest \

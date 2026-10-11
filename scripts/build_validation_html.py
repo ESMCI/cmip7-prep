@@ -282,6 +282,9 @@ th, td { text-align: left; padding: 0.4rem 0.75rem; border-bottom: 1px solid var
 th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
 tr:last-child td { border-bottom: none; }
 .table-wrap { overflow-x: auto; }
+/* Both the cell and its header, or the value sits at one side of the column
+   and its label at the other, and every number reads as belonging to the
+   next heading along. */
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .badge {
   display: inline-block;
@@ -297,6 +300,9 @@ tr:last-child td { border-bottom: none; }
 .badge.empty { color: var(--missing); background: var(--missing-bg); outline: 1px dashed var(--missing); outline-offset: -1px; }
 .badge.neutral { color: var(--muted); background: var(--bg); border: 1px solid var(--border); }
 .bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--border); min-width: 120px; }
+/* The status bar claims 120px, which squeezed the last column until the
+   ISO timestamp wrapped onto a second line and the row lost its baseline. */
+.nowrap { white-space: nowrap; }
 .bar span.ok { background: var(--ok); }
 .bar span.error { background: var(--error); }
 .bar span.missing { background: var(--missing); }
@@ -425,8 +431,9 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
   function renderOverviewTable() {
     var table = el("table");
     var head = el("tr");
+    var NUMERIC = { Expected: true, Produced: true, Errors: true, Missing: true };
     ["Subset", "Expected", "Produced", "Errors", "Missing", "Status", "Validated"].forEach(function (label) {
-      head.appendChild(el("th", { text: label }));
+      head.appendChild(el("th", NUMERIC[label] ? { "class": "num", text: label } : { text: label }));
     });
     table.appendChild(el("thead", {}, [head]));
     var body = el("tbody");
@@ -439,7 +446,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       row.appendChild(el("td", { "class": "num", text: counts.variables_with_log_errors != null ? counts.variables_with_log_errors : "–" }));
       row.appendChild(el("td", { "class": "num", text: counts.missing_variables != null ? counts.missing_variables : "–" }));
       row.appendChild(el("td", {}, [progressBar(counts)]));
-      row.appendChild(el("td", { text: subset.generated_at || "–" }));
+      row.appendChild(el("td", { "class": "nowrap", text: subset.generated_at || "–" }));
       body.appendChild(row);
     });
     table.appendChild(body);

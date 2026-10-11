@@ -33,7 +33,7 @@ import numpy as np
 import xarray as xr
 import yaml
 
-from cmip7_prep.mapping_compat import packaged_mapping_resource
+from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
 
 from cmor_driver import REALM_YAML_MAP
 
@@ -354,7 +354,7 @@ def build_variable_provenance(
     """Extract per-variable source/mapping info from the YAML mapping entries."""
     provenance = {}
     for variable in expected_variables:
-        entry = yaml_variables.get(variable)
+        entry = expand_entry(variable, yaml_variables.get(variable), [])
         if not isinstance(entry, dict):
             continue
         sources = entry.get("sources") or []
@@ -409,7 +409,9 @@ def collect_log_records(
     if not log_dir.is_dir():
         logger.warning("Log directory not found: %s", log_dir)
         return records
-    for log_path in sorted(log_dir.glob("*.log")):
+    # Recursive: cmor_driver.py writes its logfiles under the realm, and
+    # older output has them all in one directory.
+    for log_path in sorted(log_dir.rglob("*.log")):
         record = parse_log_file(log_path)
         if record is None:
             continue

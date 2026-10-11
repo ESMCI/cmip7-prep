@@ -13,6 +13,7 @@ h5netcdf
 cftime
 dask
 pyyaml
+jsonschema               # mapping YAML schema (cmip7_prep/schema.py)
 click
 xesmf
 geocat-comp
