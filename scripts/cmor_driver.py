@@ -650,7 +650,10 @@ def process_one_var(
         cmip7name = cmip_var.attributes["branded_variable_name"]
         for ds_cmor_write, write_cfg in cmor_items:
             try:
-                log_dir = outdir / "logs"
+                # Under the realm, as the timeseries are: a run writes one
+                # CMOR logfile per variable, so a shared directory mixes every
+                # realm's together and makes a failure hard to find.
+                log_dir = outdir / "logs" / realm
 
                 # Global/dataset attributes assembled from the CV plus the
                 # per-model dataset config; replaces the packaged cmor_dataset
