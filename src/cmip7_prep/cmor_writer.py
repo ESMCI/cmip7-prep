@@ -12,7 +12,8 @@ from pathlib import Path
 import json
 import tempfile
 
-from contextlib import AbstractContextManager
+import fcntl
+from contextlib import AbstractContextManager, contextmanager
 from typing import Any, Optional, Union
 import datetime as dt
 
@@ -1342,6 +1343,42 @@ class CmorSession(
 
         return axes_ids
 
+    @contextmanager
+    def _fx_lock(self, name: str):
+        """Hold an exclusive lock while one fx variable is checked and written.
+
+        The fx fields are shared by every variable of a run, and written by
+        whichever one is processed first.  When variables are CMORized
+        concurrently each worker is its own process with its own session, so
+        several can find a field absent and write the same file at once.  The
+        lock makes that sequence -- look, then write -- atomic between them.
+
+        The lock only holds between processes on the same machine, which is
+        where the workers run.  Two jobs on different nodes writing the same
+        output directory are not protected.  With no output directory there is
+        no file to lock, and the body simply runs.
+        """
+        if not self._outdir:
+            yield
+            return
+        lock_dir = Path(self._outdir) / ".fx-locks"
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        with open(lock_dir / f"{name}.lock", "w", encoding="utf-8") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+    def _fx_on_disk(self, name: str):
+        """Return an fx field another run or worker has already written."""
+        if not self._outdir:
+            return None
+        try:
+            return open_existing_fx(self._outdir, name)
+        except FileNotFoundError:
+            return None
+
     def _write_fx_2d(self, ds: xr.Dataset, name: str, units: str) -> None:
         if name not in ds:
             return
@@ -1469,9 +1506,11 @@ class CmorSession(
 
         # Write sftof_ti-u-hxy-u if present (native grid sea fraction: wet)
         if "sftof_ti-u-hxy-u" in ds_regr and "sftof_ti-u-hxy-u" not in self._fx_written:
-            logger.debug("Writing fx variable sftof_ti-u-hxy-u")
-            self.load_table(self.tables_root, "ocean")
-            self._write_fx_2d(ds_regr, "sftof_ti-u-hxy-u", "%")
+            with self._fx_lock("sftof_ti-u-hxy-u"):
+                if self._fx_on_disk("sftof_ti-u-hxy-u") is None:
+                    logger.debug("Writing fx variable sftof_ti-u-hxy-u")
+                    self.load_table(self.tables_root, "ocean")
+                    self._write_fx_2d(ds_regr, "sftof_ti-u-hxy-u", "%")
             self._fx_written.add("sftof_ti-u-hxy-u")
 
         for name, units in need:
@@ -1499,7 +1538,12 @@ class CmorSession(
                                 }
                             )
                             self._fx_cache[name] = out[name]
-                    self._write_fx_2d(out, name, units)
+                    # Checked again inside the lock: another worker may have
+                    # written it between this run deciding to and getting here,
+                    # and two CMOR writes of one file race on the same path.
+                    with self._fx_lock(name):
+                        if self._fx_on_disk(name) is None:
+                            self._write_fx_2d(out, name, units)
                     self._fx_written.add(name)
                     continue
 
