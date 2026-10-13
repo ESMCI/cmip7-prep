@@ -477,7 +477,11 @@ def scan_output_tree(
     inspection_errors: list[dict[str, str]] = []
     institution_id = MODEL_NAMING_MAPS[model][0]
     pattern = cmip_root.glob(
-        f"*/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
+        # The region level is not always 'glb': the hemispheric sea-ice
+        # aggregates (siarea, siextent, sivol, sisnmass) are written under 'nh'
+        # and 'sh'.  Pinning it to 'glb' made those files invisible here, so
+        # they were reported missing while sitting on disk.
+        f"*/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/*/{frequency}/*/*/*/*.nc"
     )
     for file_path in sorted(pattern):
         relative = file_path.relative_to(cmip_root)
