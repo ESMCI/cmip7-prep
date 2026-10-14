@@ -91,17 +91,35 @@ def _overwrite_or_resume(ts_collection, overwrite, logger):
     return resumed
 
 
-def _execute_or_report_complete(ts_collection, logger):
+def _execute_or_report_complete(ts_collection, logger, workers=1):
     """Generate the time series, or report that there is nothing left to do.
 
     Narrowing a finished run to its missing timesteps leaves nothing, and GenTS
     treats an empty collection as an error.  Having already produced everything
     asked for is a success, so it is reported as one.
+
+    GenTS groups variables that come from the same history files into one task
+    and then splits each group into batches, 200 variables per batch by
+    default.  A realm's variables all come from the same files, so they end up
+    in a single batch, which is a single task, which goes to a single worker --
+    leaving the rest idle however many were asked for.  The batch size is set
+    here so that there are at least as many tasks as workers.
+
+    Batching exists for a reason: a worker opens the history files once and
+    writes every variable in its batch from them.  So the batches are made no
+    smaller than they need to be.
     """
     if len(ts_collection) == 0:
         logger.info("Every requested time series already exists; nothing to generate")
         return
-    ts_collection.execute()
+    batch_size = max(1, len(ts_collection) // max(1, workers))
+    logger.info(
+        "Generating %d time series in batches of %d across %d worker(s)",
+        len(ts_collection),
+        batch_size,
+        workers,
+    )
+    ts_collection.execute(optimize_batch_n=batch_size)
 
 
 def find_unusable_files(inputdir, include_patterns, workers, logger):
@@ -378,7 +396,7 @@ def main():
         ts_collection = _overwrite_or_resume(
             ts_collection, args.overwrite_timeseries, logger
         )
-        _execute_or_report_complete(ts_collection, logger)
+        _execute_or_report_complete(ts_collection, logger, workers)
         logger.info("Finished ts_collection")
 
     else:
@@ -434,7 +452,7 @@ def main():
                         [order["primary_var"] for order in ts_collection],
                     )
 
-                _execute_or_report_complete(ts_collection, logger)
+                _execute_or_report_complete(ts_collection, logger, workers)
                 logger.info("Timeseries processing complete")
 
 
