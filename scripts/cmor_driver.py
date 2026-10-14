@@ -63,6 +63,7 @@ from cmip7_prep.pipeline import (
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
+from cmip7_prep.variable_ref import VariableRef
 
 
 from dask import delayed
@@ -1014,10 +1015,14 @@ def main():
                     f"Found {len(ts_files)} timeseries files for variable {varname} "
                     f"(model vars: {model_vars})"
                 )
+            # The data-request object cannot be pickled, so it cannot reach a
+            # worker; VariableRef carries the strings that are actually read.
+            # Used on both paths so the two behave identically.
+            var_ref = VariableRef.from_data_request(v)
             if args.workers == 1:
                 try:
                     res = process_one_var(
-                        v,
+                        var_ref,
                         mapping,
                         ts_files,
                         tables_root,
@@ -1034,7 +1039,7 @@ def main():
                     )
                     results.extend(res)
                 except Exception as exc:
-                    logger.error("FAILED variable %s: %s", v, exc)
+                    logger.error("FAILED variable %s: %s", var_ref, exc, exc_info=True)
                     continue
             else:
                 # Deferred, not computed: one variable submitted here and
@@ -1043,7 +1048,7 @@ def main():
                 # They are computed together after the loop instead.
                 pending.append(
                     process_one_var_delayed(
-                        v,
+                        var_ref,
                         mapping,
                         ts_files,
                         tables_root,
@@ -1073,7 +1078,7 @@ def main():
                 args.workers,
             )
             futures = client.compute(pending)
-            for future, result in as_completed(futures, with_results=False):
+            for future in as_completed(futures):
                 try:
                     result = future.result()
                 except Exception as exc:  # pylint: disable=broad-except
