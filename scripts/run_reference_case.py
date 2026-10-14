@@ -289,6 +289,42 @@ def run_step(step: Step, log_dir: Path) -> dict:
     return outcome
 
 
+# Opened by _start_run_log once the output directory is known.  The plan and
+# the summary table are printed rather than logged, so they need routing to the
+# file explicitly; everything that goes through a logger is handled by the
+# file handler instead.
+_RUN_LOG = None
+RUN_LOG_NAME = "run.log"
+
+
+def _start_run_log(log_dir: Path):
+    """Send the logger and everything printed to <log_dir>/run.log as well.
+
+    A run is hours long and its own account of itself -- which steps ran, how
+    long each took, which failed -- existed only in the terminal, so it was
+    lost to a closed window or a dropped connection.  The per-step logs were
+    kept, but the timings and the summary were not.
+    """
+    global _RUN_LOG  # pylint: disable=global-statement
+    log_dir.mkdir(parents=True, exist_ok=True)
+    path = log_dir / RUN_LOG_NAME
+    handler = logging.FileHandler(path, mode="w", encoding="utf-8")
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    logging.getLogger().addHandler(handler)
+    _RUN_LOG = open(path, "a", encoding="utf-8")  # pylint: disable=consider-using-with
+    return path
+
+
+def say(text: str = "") -> None:
+    """Print to the terminal, and to the run log if one is open."""
+    print(text)
+    if _RUN_LOG is not None:
+        _RUN_LOG.write(text + "\n")
+        _RUN_LOG.flush()
+
+
 def print_plan(plan: Plan) -> None:
     """Print the commands a run would issue, in the order it would issue them.
 
@@ -300,42 +336,42 @@ def print_plan(plan: Plan) -> None:
         if step.realm != realm:
             realm = step.realm
             count = sum(1 for s in plan.steps if s.realm == realm)
-            print(f"\n=== {realm} ({count} step(s)) ===")
-        print(f"  {step.key}")
-        print(f"    {' '.join(step.command)}")
-    print(f"\n{len(plan.steps)} step(s) in total")
+            say(f"\n=== {realm} ({count} step(s)) ===")
+        say(f"  {step.key}")
+        say(f"    {' '.join(step.command)}")
+    say(f"\n{len(plan.steps)} step(s) in total")
     if plan.skipped:
-        print("\n=== skipped ===")
+        say("\n=== skipped ===")
         for reason in plan.skipped:
-            print(f"  {reason}")
+            say(f"  {reason}")
 
 
 def print_report(outcomes: list[dict], plan: Plan) -> None:
     """Print the end-of-run summary table."""
-    print("\n" + "=" * 78)
-    print("REFERENCE CASE RUN")
-    print("=" * 78)
+    say("\n" + "=" * 78)
+    say("REFERENCE CASE RUN")
+    say("=" * 78)
 
     width = max((len(o["key"]) for o in outcomes), default=10)
     for outcome in outcomes:
         status = (
             "ok" if outcome["returncode"] == 0 else f"FAILED ({outcome['returncode']})"
         )
-        print(f"  {outcome['key']:<{width}}  {outcome['seconds']:7.1f}s  {status}")
+        say(f"  {outcome['key']:<{width}}  {outcome['seconds']:7.1f}s  {status}")
 
     failed = [o for o in outcomes if o["returncode"] != 0]
-    print("-" * 78)
-    print(f"  {len(outcomes) - len(failed)} ok, {len(failed)} failed")
+    say("-" * 78)
+    say(f"  {len(outcomes) - len(failed)} ok, {len(failed)} failed")
 
     if plan.skipped:
-        print("\n  skipped:")
+        say("\n  skipped:")
         for reason in plan.skipped:
-            print(f"    {reason}")
+            say(f"    {reason}")
 
     if failed:
-        print("\n  logs for the failures:")
+        say("\n  logs for the failures:")
         for outcome in failed:
-            print(f"    {outcome['key']}: {outcome['log']}")
+            say(f"    {outcome['key']}: {outcome['log']}")
 
 
 def main():
@@ -345,6 +381,9 @@ def main():
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    run_log = _start_run_log(Path(args.outdir) / "logs")
+    logger.info("Recording this run in %s", run_log)
 
     case_dir = Path(args.case_dir)
     if not case_dir.is_dir():
@@ -401,8 +440,7 @@ def main():
         return
 
     outdir = Path(args.outdir)
-    log_dir = outdir / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
+    log_dir = outdir / "logs"  # already created by _start_run_log
 
     completed = set() if args.force else read_completed(outdir)
     if completed:
