@@ -476,6 +476,11 @@ def main():
         hf_collection = HFCollection(inputdir, num_processes=workers)
         if unusable_files:
             hf_collection = hf_collection.exclude(unusable_files)
+        # Set once any stream produces work.  Checked after the loop, so that
+        # one empty stream is survivable but a run that matched nothing at all
+        # is still an error.
+        matched_anything = False
+
         for include_pattern in include_patterns:
             logger.info("Processing files with pattern: %s", include_pattern)
 
@@ -503,9 +508,17 @@ def main():
                 if varlist:
                     ts_collection = ts_collection.include("*", var_glob=varlist)
                 if len(ts_collection) == 0:
-                    raise RuntimeError(
-                        "No matching variables/files found for time series generation"
+                    # This stream holds none of the variables the realm needs,
+                    # which is ordinary once the list is narrowed.  It must not
+                    # stop the streams that come after it: raising here gave a
+                    # land run its monthly output and no daily output at all,
+                    # because the daily stream was third of four.
+                    logger.warning(
+                        "Nothing to generate from %s; skipping this stream",
+                        include_pattern,
                     )
+                    continue
+                matched_anything = True
 
                 ts_collection = _overwrite_or_resume(
                     ts_collection, args.overwrite_timeseries, logger
@@ -518,6 +531,11 @@ def main():
 
                 _execute_or_report_complete(ts_collection, logger, workers)
                 logger.info("Timeseries processing complete")
+
+        if not matched_anything:
+            raise RuntimeError(
+                "No matching variables/files found for time series generation"
+            )
 
 
 if __name__ == "__main__":
