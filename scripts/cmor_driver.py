@@ -70,8 +70,14 @@ from dask import delayed
 
 # The only logging configuration in the package: library modules attach
 # handlers to their own loggers but leave the root config to the entry point.
+#
+# The process id is in the format because --workers runs variables in separate
+# processes whose output is interleaved in one log.  Without it there is no way
+# to tell which lines belong to the same variable.  A serial run has one id
+# throughout, so it costs a little noise and nothing else.
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s [%(process)d] %(levelname)s %(name)s: %(message)s",
 )
 
 logger = logging.getLogger("cmip7_prep.cmor_driver")
@@ -689,7 +695,7 @@ def process_one_var(
                     set_cur_dataset_attribute("region", region)
 
                     logger.info(
-                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
+                        f"Writing CMOR variable {cmip7name} with frequency {frequency}"
                     )
                     vdef = type(
                         "VDef",
