@@ -971,6 +971,8 @@ def main():
             sys.exit(1)
 
         results = []
+        # Deferred per-variable work, computed together once the loop ends.
+        pending = []
         for v in cmip_vars:
             varname = v.branded_variable_name.name
             # Filter to only files containing the native model vars needed for this variable
@@ -1035,33 +1037,55 @@ def main():
                     logger.error("FAILED variable %s: %s", v, exc)
                     continue
             else:
-                fut = process_one_var_delayed(
-                    v,
-                    mapping,
-                    ts_files,
-                    tables_root,
-                    OUTDIR,
-                    resolution,
-                    args.model_res,
-                    model,
-                    realm=realm,
-                    frequency=frequency,
-                    ocn_fx_fields=ocn_fx_fields,
-                    ripf_index=ripf_index,
-                    ice_sheet=args.ice_sheet,
-                    experiment=args.experiment,
+                # Deferred, not computed: one variable submitted here and
+                # waited for would run the variables one at a time however
+                # many workers there are, which is what --workers used to do.
+                # They are computed together after the loop instead.
+                pending.append(
+                    process_one_var_delayed(
+                        v,
+                        mapping,
+                        ts_files,
+                        tables_root,
+                        OUTDIR,
+                        resolution,
+                        args.model_res,
+                        model,
+                        realm=realm,
+                        frequency=frequency,
+                        ocn_fx_fields=ocn_fx_fields,
+                        ripf_index=ripf_index,
+                        ice_sheet=args.ice_sheet,
+                        experiment=args.experiment,
+                    )
                 )
-                futures = client.compute([fut])
-                from dask.distributed import wait, as_completed
 
-                wait(futures, timeout="1200s")
-                for _, result in as_completed(futures, with_results=True):
-                    if isinstance(result, list):
-                        results.extend(result)
-                    elif isinstance(result, tuple) and len(result) == 2:
-                        results.append(result)
-                    else:
-                        results.append((str(result), "unknown"))
+        if pending:
+            # One compute for every variable, so the workers run them side by
+            # side.  Each worker is its own process with its own CMOR session,
+            # which is why they may not share one: CMOR keeps that state per
+            # process.
+            from dask.distributed import as_completed
+
+            logger.info(
+                "Computing %d variables across %d worker(s)",
+                len(pending),
+                args.workers,
+            )
+            futures = client.compute(pending)
+            for future, result in as_completed(futures, with_results=False):
+                try:
+                    result = future.result()
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.error("FAILED variable: %s", exc, exc_info=True)
+                    continue
+                if isinstance(result, list):
+                    results.extend(result)
+                elif isinstance(result, tuple) and len(result) == 2:
+                    results.append(result)
+                else:
+                    results.append((str(result), "unknown"))
+
         for v, status in set(results):
             logger.debug(f"Variable {v} processed with status: {status}")
     else:
