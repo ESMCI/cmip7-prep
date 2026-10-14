@@ -21,6 +21,9 @@ _LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
 
 from pathlib import Path
 
+from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.pipeline import _collect_required_model_vars
+
 # Time series generation imports
 import xarray as xr
 from gents.hfcollection import HFCollection
@@ -89,6 +92,43 @@ def _overwrite_or_resume(ts_collection, overwrite, logger):
         "to rewrite them"
     )
     return resumed
+
+
+def variables_the_realm_needs(model, realm, logger):
+    """Return the native variables this realm's CMORization will read.
+
+    Without this, every realm reading the same history files generates a time
+    series for every variable in them.  The three atmosphere realms all read
+    cam.h0a and cam.h1a, so each produced the same ~170 files: atmosChem spent
+    38 minutes on a 10-year case to use ten of them.
+
+    The list comes from the realm's mapping, through the same function the
+    pipeline uses to decide what to open, so it includes what a formula needs
+    and the inputs vertical interpolation adds (PS, hyam, hybm, P0) rather than
+    only the variables named directly.
+
+    Returns None if the realm has no mapping, which leaves every variable to be
+    generated -- the old behaviour, and the safe direction to fail in.
+    """
+    filename = f"{model}_to_cmip7_{realm}.yaml"
+    try:
+        mapping = Mapping.from_packaged_default(filename)
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        logger.warning(
+            "No usable mapping at %s (%s); generating every variable in the "
+            "history files",
+            filename,
+            exc,
+        )
+        return None
+    # Every frequency, not just the ones asked for: a variable left out here is
+    # one CMORization will later fail to find, which is a far worse outcome
+    # than generating a few time series that go unused.
+    needed = sorted(
+        _collect_required_model_vars(mapping, mapping.iter_variable_names())
+    )
+    logger.info("%s needs %d native variable(s) from %s", realm, len(needed), filename)
+    return needed
 
 
 def _execute_or_report_complete(ts_collection, logger, workers=1):
@@ -237,7 +277,20 @@ def parse_arguments():
         "--varlist",
         type=str,
         default=None,
-        help="Comma separated list of variables to process (default: all of them)",
+        help=(
+            "Comma separated list of variables to process. The default is the "
+            "native variables the realm's mapping needs; see --all-variables "
+            "to generate every variable in the history files instead."
+        ),
+    )
+    selection.add_argument(
+        "--all-variables",
+        action="store_true",
+        help=(
+            "Generate a time series for every variable in the history files, "
+            "not only the ones this realm needs. Slower, and produces the same "
+            "output for every realm reading the same files."
+        ),
     )
     selection.add_argument(
         "--ice-sheet",
@@ -371,11 +424,12 @@ def main():
         sys.exit(1)
     logger.info(f"include patterns are {include_patterns}")
 
-    varlist = (
-        [variable.strip() for variable in args.varlist.split(",") if variable.strip()]
-        if args.varlist
-        else None
-    )
+    if args.varlist:
+        varlist = [v.strip() for v in args.varlist.split(",") if v.strip()]
+    elif args.all_variables:
+        varlist = None
+    else:
+        varlist = variables_the_realm_needs(args.model, args.realm, logger)
 
     # Drop files GenTS cannot read time bounds from before they reach it
     unusable_files = find_unusable_files(inputdir, include_patterns, workers, logger)
