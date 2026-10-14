@@ -66,6 +66,7 @@ from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 from cmip7_prep.variable_ref import VariableRef
 
 
+import dask
 from dask import delayed
 
 # The only logging configuration in the package: library modules attach
@@ -920,6 +921,13 @@ def main():
         else:
             ml = "auto"  # Default memory limit if NCPUS is not set
         from dask.distributed import LocalCluster
+
+        # Start each worker as a fresh process rather than a copy of this one.
+        # Importing xesmf starts ESMF, and a forked copy inherits the Python
+        # object that says ESMF is running while the C-level state it refers
+        # to does not survive the fork.  Every regrid then fails with
+        # "ESMCI::VM::getCurrent() Could not determine current VM".
+        dask.config.set({"distributed.worker.multiprocessing-method": "spawn"})
 
         cluster = LocalCluster(
             n_workers=min(args.workers, len(cmip_vars)),
