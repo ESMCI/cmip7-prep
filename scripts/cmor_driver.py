@@ -11,7 +11,8 @@ Preserves all comments and error handling from both atm_monthly.py and lnd_month
 
 from __future__ import annotations
 import argparse
-from concurrent.futures import as_completed
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 import inspect
@@ -65,9 +66,6 @@ from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 from cmip7_prep.variable_ref import VariableRef
 
-
-import dask
-from dask import delayed
 
 # The only logging configuration in the package: library modules attach
 # handlers to their own loggers but leave the root config to the entry point.
@@ -738,9 +736,6 @@ def process_one_var(
     return results
 
 
-process_one_var_delayed = delayed(process_one_var)
-
-
 def main():
     run_start = time.monotonic()
     args = parse_args()
@@ -910,32 +905,6 @@ def main():
                     cmip_vars.append(var)
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
 
-    # Set up dask if appropriate
-    if args.workers == 1:
-        client = None
-        cluster = None
-    else:
-        ncpus_env = os.getenv("NCPUS")
-        if ncpus_env is not None:
-            ml = 1.0 - float(int(ncpus_env) - 1) / 128.0
-        else:
-            ml = "auto"  # Default memory limit if NCPUS is not set
-        from dask.distributed import LocalCluster
-
-        # Start each worker as a fresh process rather than a copy of this one.
-        # Importing xesmf starts ESMF, and a forked copy inherits the Python
-        # object that says ESMF is running while the C-level state it refers
-        # to does not survive the fork.  Every regrid then fails with
-        # "ESMCI::VM::getCurrent() Could not determine current VM".
-        dask.config.set({"distributed.worker.multiprocessing-method": "spawn"})
-
-        cluster = LocalCluster(
-            n_workers=min(args.workers, len(cmip_vars)),
-            threads_per_worker=1,
-            memory_limit=ml,
-        )
-        client = cluster.get_client()
-
     # Load requested variables
     if len(cmip_vars) > 0:
         # Glob the union of every time sampling for this realm and frequency.
@@ -1056,63 +1025,78 @@ def main():
                     logger.error("FAILED variable %s: %s", var_ref, exc, exc_info=True)
                     continue
             else:
-                # Deferred, not computed: one variable submitted here and
-                # waited for would run the variables one at a time however
+                # Collected, not run: submitting one variable here and
+                # waiting for it would process them one at a time however
                 # many workers there are, which is what --workers used to do.
-                # They are computed together after the loop instead.
+                # They are all submitted together after the loop.
                 pending.append(
-                    process_one_var_delayed(
-                        var_ref,
-                        mapping,
-                        ts_files,
-                        tables_root,
-                        OUTDIR,
-                        resolution,
-                        args.model_res,
-                        model,
-                        realm=realm,
-                        frequency=frequency,
-                        ocn_fx_fields=ocn_fx_fields,
-                        ripf_index=ripf_index,
-                        ice_sheet=args.ice_sheet,
-                        experiment=args.experiment,
-                    )
+                    {
+                        "cmip_var": var_ref,
+                        "mapping": mapping,
+                        "inputfiles": ts_files,
+                        "tables_root": tables_root,
+                        "outdir": OUTDIR,
+                        "resolution": resolution,
+                        "case_resolution": args.model_res,
+                        "model": model,
+                        "realm": realm,
+                        "frequency": frequency,
+                        "ripf_index": ripf_index,
+                        "ocn_fx_fields": ocn_fx_fields,
+                        "ice_sheet": args.ice_sheet,
+                        "experiment": args.experiment,
+                    }
                 )
 
         if pending:
-            # One compute for every variable, so the workers run them side by
-            # side.  Each worker is its own process with its own CMOR session,
-            # which is why they may not share one: CMOR keeps that state per
-            # process.
-            from dask.distributed import as_completed
-
+            # Each variable in its own freshly started process.
+            #
+            # Fresh, because importing xesmf starts ESMF and a forked copy
+            # inherits a Python object that says ESMF is running while the
+            # state it refers to did not survive the fork.
+            #
+            # Its own process, because CMOR keeps one session per process and
+            # two variables sharing one would corrupt each other's tables.
+            #
+            # A plain pool rather than dask: dask runs each task on a worker
+            # thread, and ESMF ties its virtual machine to the thread that
+            # started it, so every regrid failed with "ESMCI::VM::getCurrent()
+            # Could not determine current VM".  A pool runs the work in the
+            # child's main thread.  scripts/esmf_worker_check.py is the check
+            # that this mechanism works, and gen_timeseries.py spreads its
+            # file reads the same way.
             logger.info(
-                "Computing %d variables across %d worker(s)",
+                "Processing %d variables across %d worker process(es)",
                 len(pending),
                 args.workers,
             )
-            futures = client.compute(pending)
-            for future in as_completed(futures):
-                try:
-                    result = future.result()
-                except Exception as exc:  # pylint: disable=broad-except
-                    logger.error("FAILED variable: %s", exc, exc_info=True)
-                    continue
-                if isinstance(result, list):
-                    results.extend(result)
-                elif isinstance(result, tuple) and len(result) == 2:
-                    results.append(result)
-                else:
-                    results.append((str(result), "unknown"))
+            context = multiprocessing.get_context("spawn")
+            with ProcessPoolExecutor(
+                max_workers=min(args.workers, len(pending)), mp_context=context
+            ) as pool:
+                futures = {
+                    pool.submit(process_one_var, **kwargs): kwargs["cmip_var"]
+                    for kwargs in pending
+                }
+                for future in as_completed(futures):
+                    name = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as exc:  # pylint: disable=broad-except
+                        logger.error("FAILED variable %s: %s", name, exc, exc_info=True)
+                        results.append((str(name), f"ERROR: {exc!r}"))
+                        continue
+                    if isinstance(result, list):
+                        results.extend(result)
+                    elif isinstance(result, tuple) and len(result) == 2:
+                        results.append(result)
+                    else:
+                        results.append((str(result), "unknown"))
 
         for v, status in set(results):
             logger.debug(f"Variable {v} processed with status: {status}")
     else:
         logger.info("No results to process.")
-    if client:
-        client.close()
-    if cluster:
-        cluster.close()
     logger.info(
         "Run complete in %s, peak memory %.1f GB",
         _format_duration(time.monotonic() - run_start),
