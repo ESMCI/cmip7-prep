@@ -329,15 +329,34 @@ def _format_duration(seconds: float) -> str:
     return f"{hours}h{minutes:02d}m{secs:02d}s" if hours else f"{minutes}m{secs:02d}s"
 
 
+def _rss_gb(peak: int) -> float:
+    """Convert an ru_maxrss figure to GB."""
+    # Linux reports kilobytes, macOS bytes
+    return peak / 1024**2 if sys.platform != "darwin" else peak / 1024**3
+
+
 def _peak_memory_gb() -> float:
     """Peak resident memory of this process so far, in GB.
 
     ru_maxrss is a high-water mark since the process started: it never falls, so
     it reports the largest the process has ever been, not what is held now.
     """
-    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    # Linux reports kilobytes, macOS bytes
-    return peak / 1024**2 if sys.platform != "darwin" else peak / 1024**3
+    return _rss_gb(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+
+
+def _peak_worker_memory_gb() -> float:
+    """Peak resident memory of the largest finished worker, in GB.
+
+    RUSAGE_SELF counts only the process that asks, so with --workers the
+    variables are processed in children and this process reports almost
+    nothing -- 0.3 GB against the 10.6 GB the same work takes when run
+    serially.  This reports the children instead.
+
+    It is the largest single worker, not their total: the kernel keeps one
+    high-water mark for all children together.  Multiply by the worker count
+    for the worst case when sizing a node.
+    """
+    return _rss_gb(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss)
 
 
 def _prepare_native(mapping, ds_native, varname, cfg):
@@ -1097,11 +1116,21 @@ def main():
             logger.debug(f"Variable {v} processed with status: {status}")
     else:
         logger.info("No results to process.")
-    logger.info(
-        "Run complete in %s, peak memory %.1f GB",
-        _format_duration(time.monotonic() - run_start),
-        _peak_memory_gb(),
-    )
+    worker_peak = _peak_worker_memory_gb()
+    if worker_peak > 0:
+        logger.info(
+            "Run complete in %s, peak memory %.1f GB here and %.1f GB in the "
+            "largest worker",
+            _format_duration(time.monotonic() - run_start),
+            _peak_memory_gb(),
+            worker_peak,
+        )
+    else:
+        logger.info(
+            "Run complete in %s, peak memory %.1f GB",
+            _format_duration(time.monotonic() - run_start),
+            _peak_memory_gb(),
+        )
 
 
 if __name__ == "__main__":
