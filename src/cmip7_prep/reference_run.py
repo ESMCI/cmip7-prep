@@ -54,11 +54,12 @@ FREQUENCY_ORDER = ("yr", "mon", "day", "6hr", "3hr", "1hr")
 # and works when the runner was invoked as python3 or by absolute path.
 PYTHON = sys.executable or "python"
 
-# CMORization is run with one worker: running it in parallel has not been
-# tested.  Its --workers are Dask workers in any case, which is a different
-# thing from the processes gen_timeseries.py spreads file reads over, so the
-# two are not set from one number.
-CMOR_WORKERS = 1
+# CMORization gets its own worker count rather than sharing the timeseries
+# one.  Both stages spread work over processes, but a CMOR worker holds a
+# variable's regridded arrays -- 10.6 GB at peak on a two-year ne16 atmosphere
+# run -- while a timeseries worker only reads files.  One number for both would
+# either waste the timeseries stage or run the CMOR one out of memory.
+CMOR_WORKERS = 4
 
 
 @dataclass
@@ -156,6 +157,7 @@ def build_plan(
     model_res: str | None = None,
     experiment: str,
     workers: int = 4,
+    cmor_workers: int = CMOR_WORKERS,
     ice_sheet: str | None = None,
     overwrite_timeseries: bool = False,
     variant_label: str | None = None,
@@ -175,8 +177,8 @@ def build_plan(
     atmosphere grid.  Every realm needs it, because it identifies the case;
     the grid a realm regrids from is derived from it.
 
-    ``workers`` applies to time series generation only; CMORization always runs
-    with one worker (see CMOR_WORKERS).
+    ``workers`` applies to time series generation and ``cmor_workers`` to
+    CMORization; see CMOR_WORKERS for why they are counted separately.
 
     ``variant_label`` and ``tables_root`` are passed to CMORization unchanged,
     so the same command can produce output for submission rather than only
@@ -272,6 +274,7 @@ def build_plan(
                         scripts_dir=scripts_dir,
                         realm=realm,
                         frequency=frequency,
+                        workers=cmor_workers,
                         ts_dir=ts_dir,
                         cmor_root=cmor_root,
                         model=model,
@@ -357,6 +360,7 @@ def _cmor_step(
     scripts_dir,
     realm,
     frequency,
+    workers,
     ts_dir,
     cmor_root,
     model,
@@ -383,7 +387,7 @@ def _cmor_step(
         "--experiment",
         experiment,
         "--workers",
-        str(CMOR_WORKERS),
+        str(workers),
     ]
     if model_res:
         command += ["--model-res", model_res]
