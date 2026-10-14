@@ -102,20 +102,30 @@ def _execute_or_report_complete(ts_collection, logger, workers=1):
     and then splits each group into batches, 200 variables per batch by
     default.  A realm's variables all come from the same files, so they end up
     in a single batch, which is a single task, which goes to a single worker --
-    leaving the rest idle however many were asked for.  The batch size is set
-    here so that there are at least as many tasks as workers.
+    leaving the rest idle however many were asked for.
 
-    Batching exists for a reason: a worker opens the history files once and
-    writes every variable in its batch from them.  So the batches are made no
+    The batch size is set here to give several tasks per worker rather than
+    one each.  One each sounds right but leaves no slack: the variables are
+    wildly uneven -- a 3-D field is some fifty times the size of a 2-D one --
+    so a worker that draws only small variables finishes in a minute and then
+    has nothing to pick up, while another writes 3-D fields for eight.  With
+    more tasks than workers the work redistributes as they free up.
+
+    Batching still earns its place: a worker opens the history files once and
+    writes every variable in its batch from them, so the batches are not made
     smaller than they need to be.
     """
     if len(ts_collection) == 0:
         logger.info("Every requested time series already exists; nothing to generate")
         return
-    batch_size = max(1, len(ts_collection) // max(1, workers))
+    # Four tasks per worker: enough slack to even out the uneven variables
+    # without re-reading the history files any more than necessary.
+    tasks_wanted = max(1, workers) * 4
+    batch_size = max(1, len(ts_collection) // tasks_wanted)
     logger.info(
-        "Generating %d time series in batches of %d across %d worker(s)",
+        "Generating %d time series as ~%d task(s) of %d across %d worker(s)",
         len(ts_collection),
+        max(1, len(ts_collection) // batch_size),
         batch_size,
         workers,
     )
