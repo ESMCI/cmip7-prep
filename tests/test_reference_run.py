@@ -360,7 +360,7 @@ class TestCommands:
         timeseries stage or run CMORization out of memory.
         """
         plan = _plan(
-            case_dir, tmp_path / "out", realms=["seaIce"], workers=16, cmor_workers=4
+            case_dir, tmp_path / "out", realms=["seaIce"], ts_workers=16, cmor_workers=4
         )
         timeseries = _command_of(plan, "timeseries-seaIce")
         cmor = _command_of(plan, "cmor-seaIce-mon")
@@ -371,7 +371,7 @@ class TestCommands:
         self, case_dir, tmp_path
     ):
         """Asking for timeseries workers does not change the CMOR ones."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], workers=16)
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], ts_workers=16)
         cmor = _command_of(plan, "cmor-seaIce-mon")
         assert cmor[cmor.index("--workers") + 1] == str(CMOR_WORKERS)
 

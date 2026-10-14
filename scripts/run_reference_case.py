@@ -36,7 +36,13 @@ sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 # pylint: disable=wrong-import-position
 from cmip7_prep.cv_lookup import validate as validate_cv
 from cmip7_prep.grids import MODEL_RESOLUTIONS
-from cmip7_prep.reference_run import STAGES, Plan, Step, build_plan
+from cmip7_prep.reference_run import (
+    CMOR_WORKERS,
+    STAGES,
+    Plan,
+    Step,
+    build_plan,
+)
 
 logger = logging.getLogger("run_reference_case")
 
@@ -167,13 +173,25 @@ def parse_arguments():
 
     behaviour = parser.add_argument_group("how to run")
     behaviour.add_argument(
-        "--workers",
+        "--ts-workers",
         type=int,
         default=4,
         help=(
             "Worker processes for time series generation (default: 4, chosen "
-            "to be polite on a shared interactive node). CMORization always "
-            "runs with one worker."
+            "to be polite on a shared interactive node). See --cmor-workers "
+            "for the other stage."
+        ),
+    )
+    behaviour.add_argument(
+        "--cmor-workers",
+        type=int,
+        default=CMOR_WORKERS,
+        help=(
+            f"Worker processes for CMORization (default: {CMOR_WORKERS}). "
+            "Counted separately from --workers because a CMOR worker holds a "
+            "variable's regridded arrays -- measured at 3.4 to 6.7 GB each on "
+            "a two-year ne16 atmosphere run -- so memory, not cores, is "
+            "usually what limits how many are useful."
         ),
     )
     behaviour.add_argument(
@@ -353,7 +371,8 @@ def main():
             stages=args.stages,
             model_res=args.model_res,
             experiment=args.experiment,
-            workers=args.workers,
+            ts_workers=args.ts_workers,
+            cmor_workers=args.cmor_workers,
             ice_sheet=args.ice_sheet,
             overwrite_timeseries=args.force,
             plots=args.plots,

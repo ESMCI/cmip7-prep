@@ -156,7 +156,7 @@ def build_plan(
     stages: Sequence[str] = STAGES,
     model_res: str | None = None,
     experiment: str,
-    workers: int = 4,
+    ts_workers: int = 4,
     cmor_workers: int = CMOR_WORKERS,
     ice_sheet: str | None = None,
     overwrite_timeseries: bool = False,
@@ -177,7 +177,7 @@ def build_plan(
     atmosphere grid.  Every realm needs it, because it identifies the case;
     the grid a realm regrids from is derived from it.
 
-    ``workers`` applies to time series generation and ``cmor_workers`` to
+    ``ts_workers`` applies to time series generation and ``cmor_workers`` to
     CMORization; see CMOR_WORKERS for why they are counted separately.
 
     ``variant_label`` and ``tables_root`` are passed to CMORization unchanged,
@@ -261,7 +261,7 @@ def build_plan(
                     model=model,
                     frequencies=realm_frequencies,
                     years=years,
-                    workers=workers,
+                    workers=ts_workers,
                     sheet=sheet,
                     overwrite=overwrite_timeseries,
                 )
