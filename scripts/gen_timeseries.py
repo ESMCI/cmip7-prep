@@ -21,6 +21,9 @@ _LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
 
 from pathlib import Path
 
+from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.pipeline import _collect_required_model_vars
+
 # Time series generation imports
 import xarray as xr
 from gents.hfcollection import HFCollection
@@ -91,17 +94,82 @@ def _overwrite_or_resume(ts_collection, overwrite, logger):
     return resumed
 
 
-def _execute_or_report_complete(ts_collection, logger):
+def variables_the_realm_needs(model, realm, logger):
+    """Return the native variables this realm's CMORization will read.
+
+    Without this, every realm reading the same history files generates a time
+    series for every variable in them.  The three atmosphere realms all read
+    cam.h0a and cam.h1a, so each produced the same ~170 files: atmosChem spent
+    38 minutes on a 10-year case to use ten of them.
+
+    The list comes from the realm's mapping, through the same function the
+    pipeline uses to decide what to open, so it includes what a formula needs
+    and the inputs vertical interpolation adds (PS, hyam, hybm, P0) rather than
+    only the variables named directly.
+
+    Returns None if the realm has no mapping, which leaves every variable to be
+    generated -- the old behaviour, and the safe direction to fail in.
+    """
+    filename = f"{model}_to_cmip7_{realm}.yaml"
+    try:
+        mapping = Mapping.from_packaged_default(filename)
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        logger.warning(
+            "No usable mapping at %s (%s); generating every variable in the "
+            "history files",
+            filename,
+            exc,
+        )
+        return None
+    # Every frequency, not just the ones asked for: a variable left out here is
+    # one CMORization will later fail to find, which is a far worse outcome
+    # than generating a few time series that go unused.
+    needed = sorted(
+        _collect_required_model_vars(mapping, mapping.iter_variable_names())
+    )
+    logger.info("%s needs %d native variable(s) from %s", realm, len(needed), filename)
+    return needed
+
+
+def _execute_or_report_complete(ts_collection, logger, workers=1):
     """Generate the time series, or report that there is nothing left to do.
 
     Narrowing a finished run to its missing timesteps leaves nothing, and GenTS
     treats an empty collection as an error.  Having already produced everything
     asked for is a success, so it is reported as one.
+
+    GenTS groups variables that come from the same history files into one task
+    and then splits each group into batches, 200 variables per batch by
+    default.  A realm's variables all come from the same files, so they end up
+    in a single batch, which is a single task, which goes to a single worker --
+    leaving the rest idle however many were asked for.
+
+    The batch size is set here to give several tasks per worker rather than
+    one each.  One each sounds right but leaves no slack: the variables are
+    wildly uneven -- a 3-D field is some fifty times the size of a 2-D one --
+    so a worker that draws only small variables finishes in a minute and then
+    has nothing to pick up, while another writes 3-D fields for eight.  With
+    more tasks than workers the work redistributes as they free up.
+
+    Batching still earns its place: a worker opens the history files once and
+    writes every variable in its batch from them, so the batches are not made
+    smaller than they need to be.
     """
     if len(ts_collection) == 0:
         logger.info("Every requested time series already exists; nothing to generate")
         return
-    ts_collection.execute()
+    # Four tasks per worker: enough slack to even out the uneven variables
+    # without re-reading the history files any more than necessary.
+    tasks_wanted = max(1, workers) * 4
+    batch_size = max(1, len(ts_collection) // tasks_wanted)
+    logger.info(
+        "Generating %d time series as ~%d task(s) of %d across %d worker(s)",
+        len(ts_collection),
+        max(1, len(ts_collection) // batch_size),
+        batch_size,
+        workers,
+    )
+    ts_collection.execute(optimize_batch_n=batch_size)
 
 
 def find_unusable_files(inputdir, include_patterns, workers, logger):
@@ -209,7 +277,20 @@ def parse_arguments():
         "--varlist",
         type=str,
         default=None,
-        help="Comma separated list of variables to process (default: all of them)",
+        help=(
+            "Comma separated list of variables to process. The default is the "
+            "native variables the realm's mapping needs; see --all-variables "
+            "to generate every variable in the history files instead."
+        ),
+    )
+    selection.add_argument(
+        "--all-variables",
+        action="store_true",
+        help=(
+            "Generate a time series for every variable in the history files, "
+            "not only the ones this realm needs. Slower, and produces the same "
+            "output for every realm reading the same files."
+        ),
     )
     selection.add_argument(
         "--ice-sheet",
@@ -343,11 +424,12 @@ def main():
         sys.exit(1)
     logger.info(f"include patterns are {include_patterns}")
 
-    varlist = (
-        [variable.strip() for variable in args.varlist.split(",") if variable.strip()]
-        if args.varlist
-        else None
-    )
+    if args.varlist:
+        varlist = [v.strip() for v in args.varlist.split(",") if v.strip()]
+    elif args.all_variables:
+        varlist = None
+    else:
+        varlist = variables_the_realm_needs(args.model, args.realm, logger)
 
     # Drop files GenTS cannot read time bounds from before they reach it
     unusable_files = find_unusable_files(inputdir, include_patterns, workers, logger)
@@ -378,7 +460,7 @@ def main():
         ts_collection = _overwrite_or_resume(
             ts_collection, args.overwrite_timeseries, logger
         )
-        _execute_or_report_complete(ts_collection, logger)
+        _execute_or_report_complete(ts_collection, logger, workers)
         logger.info("Finished ts_collection")
 
     else:
@@ -394,6 +476,11 @@ def main():
         hf_collection = HFCollection(inputdir, num_processes=workers)
         if unusable_files:
             hf_collection = hf_collection.exclude(unusable_files)
+        # Set once any stream produces work.  Checked after the loop, so that
+        # one empty stream is survivable but a run that matched nothing at all
+        # is still an error.
+        matched_anything = False
+
         for include_pattern in include_patterns:
             logger.info("Processing files with pattern: %s", include_pattern)
 
@@ -421,9 +508,17 @@ def main():
                 if varlist:
                     ts_collection = ts_collection.include("*", var_glob=varlist)
                 if len(ts_collection) == 0:
-                    raise RuntimeError(
-                        "No matching variables/files found for time series generation"
+                    # This stream holds none of the variables the realm needs,
+                    # which is ordinary once the list is narrowed.  It must not
+                    # stop the streams that come after it: raising here gave a
+                    # land run its monthly output and no daily output at all,
+                    # because the daily stream was third of four.
+                    logger.warning(
+                        "Nothing to generate from %s; skipping this stream",
+                        include_pattern,
                     )
+                    continue
+                matched_anything = True
 
                 ts_collection = _overwrite_or_resume(
                     ts_collection, args.overwrite_timeseries, logger
@@ -434,8 +529,13 @@ def main():
                         [order["primary_var"] for order in ts_collection],
                     )
 
-                _execute_or_report_complete(ts_collection, logger)
+                _execute_or_report_complete(ts_collection, logger, workers)
                 logger.info("Timeseries processing complete")
+
+        if not matched_anything:
+            raise RuntimeError(
+                "No matching variables/files found for time series generation"
+            )
 
 
 if __name__ == "__main__":

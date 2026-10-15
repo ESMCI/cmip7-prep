@@ -7,6 +7,7 @@ import pytest
 
 from cmip7_prep.include_patterns import all_include_patterns
 from cmip7_prep.reference_run import (
+    CMOR_WORKERS,
     REALM_COMPONENT,
     STAGES,
     build_plan,
@@ -227,8 +228,8 @@ class TestPlanShape:
 # -------------------------------------------------------------- command form
 
 
-class TestCommands:
-    """Tests for the commands a plan builds."""
+class TestTimeseriesCommand:
+    """Tests for the time series command a plan builds."""
 
     def test_timeseries_command_points_at_the_right_history_dir(
         self, case_dir, tmp_path
@@ -276,6 +277,10 @@ class TestCommands:
         plan = _plan(case_dir, tmp_path / "out", realms=["landIce"], ice_sheet="ais")
         command = _command_of(plan, "timeseries-landIce")
         assert command[command.index("--ice-sheet") + 1] == "ais"
+
+
+class TestCommands:
+    """Tests for the CMOR and validation commands a plan builds."""
 
     def test_cmor_reads_the_timeseries_the_first_stage_writes(self, case_dir, tmp_path):
         """The CMOR step's --tsdir is the timeseries step's --outputdir."""
@@ -351,17 +356,28 @@ class TestCommands:
         command = _command_of(plan, "cmor-seaIce-mon")
         assert command[command.index("--tables-root") + 1] == "/some/cmip7-cmor-tables"
 
-    def test_cmorization_always_gets_one_worker(self, case_dir, tmp_path):
-        """Time series generation is parallel; CMORization is not.
+    def test_the_two_stages_are_given_separate_worker_counts(self, case_dir, tmp_path):
+        """Both stages run workers, but not the same number of them.
 
-        The two --workers mean different things -- processes reading files
-        versus Dask workers -- so a single number cannot serve both.
+        A CMOR worker holds a variable's regridded arrays while a timeseries
+        worker only reads files, so one number for both would either waste the
+        timeseries stage or run CMORization out of memory.
         """
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], workers=16)
+        plan = _plan(
+            case_dir, tmp_path / "out", realms=["seaIce"], ts_workers=16, cmor_workers=4
+        )
         timeseries = _command_of(plan, "timeseries-seaIce")
         cmor = _command_of(plan, "cmor-seaIce-mon")
         assert timeseries[timeseries.index("--workers") + 1] == "16"
-        assert cmor[cmor.index("--workers") + 1] == "1"
+        assert cmor[cmor.index("--workers") + 1] == "4"
+
+    def test_cmorization_has_a_worker_count_of_its_own_by_default(
+        self, case_dir, tmp_path
+    ):
+        """Asking for timeseries workers does not change the CMOR ones."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], ts_workers=16)
+        cmor = _command_of(plan, "cmor-seaIce-mon")
+        assert cmor[cmor.index("--workers") + 1] == str(CMOR_WORKERS)
 
     def test_timeseries_resumes_unless_overwriting_was_asked_for(
         self, case_dir, tmp_path

@@ -11,7 +11,8 @@ Preserves all comments and error handling from both atm_monthly.py and lnd_month
 
 from __future__ import annotations
 import argparse
-from concurrent.futures import as_completed
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 import inspect
@@ -63,14 +64,18 @@ from cmip7_prep.pipeline import (
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
-
-
-from dask import delayed
+from cmip7_prep.variable_ref import VariableRef
 
 # The only logging configuration in the package: library modules attach
 # handlers to their own loggers but leave the root config to the entry point.
+#
+# The process id is in the format because --workers runs variables in separate
+# processes whose output is interleaved in one log.  Without it there is no way
+# to tell which lines belong to the same variable.  A serial run has one id
+# throughout, so it costs a little noise and nothing else.
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s [%(process)d] %(levelname)s %(name)s: %(message)s",
 )
 
 logger = logging.getLogger("cmip7_prep.cmor_driver")
@@ -323,15 +328,34 @@ def _format_duration(seconds: float) -> str:
     return f"{hours}h{minutes:02d}m{secs:02d}s" if hours else f"{minutes}m{secs:02d}s"
 
 
+def _rss_gb(peak: int) -> float:
+    """Convert an ru_maxrss figure to GB."""
+    # Linux reports kilobytes, macOS bytes
+    return peak / 1024**2 if sys.platform != "darwin" else peak / 1024**3
+
+
 def _peak_memory_gb() -> float:
     """Peak resident memory of this process so far, in GB.
 
     ru_maxrss is a high-water mark since the process started: it never falls, so
     it reports the largest the process has ever been, not what is held now.
     """
-    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    # Linux reports kilobytes, macOS bytes
-    return peak / 1024**2 if sys.platform != "darwin" else peak / 1024**3
+    return _rss_gb(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+
+
+def _peak_worker_memory_gb() -> float:
+    """Peak resident memory of the largest finished worker, in GB.
+
+    RUSAGE_SELF counts only the process that asks, so with --workers the
+    variables are processed in children and this process reports almost
+    nothing -- 0.3 GB against the 10.6 GB the same work takes when run
+    serially.  This reports the children instead.
+
+    It is the largest single worker, not their total: the kernel keeps one
+    high-water mark for all children together.  Multiply by the worker count
+    for the worst case when sizing a node.
+    """
+    return _rss_gb(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss)
 
 
 def _prepare_native(mapping, ds_native, varname, cfg):
@@ -688,7 +712,7 @@ def process_one_var(
                     set_cur_dataset_attribute("region", region)
 
                     logger.info(
-                        f"Writing CMOR variable {cmip7name.name} with frequency {frequency}"
+                        f"Writing CMOR variable {cmip7name} with frequency {frequency}"
                     )
                     vdef = type(
                         "VDef",
@@ -728,9 +752,6 @@ def process_one_var(
                 results.append((str(varname), f"ERROR: {e!r}"))
     logger.debug(f"Completed all processing for variable: {varname}, results {results}")
     return results
-
-
-process_one_var_delayed = delayed(process_one_var)
 
 
 def main():
@@ -902,25 +923,6 @@ def main():
                     cmip_vars.append(var)
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
 
-    # Set up dask if appropriate
-    if args.workers == 1:
-        client = None
-        cluster = None
-    else:
-        ncpus_env = os.getenv("NCPUS")
-        if ncpus_env is not None:
-            ml = 1.0 - float(int(ncpus_env) - 1) / 128.0
-        else:
-            ml = "auto"  # Default memory limit if NCPUS is not set
-        from dask.distributed import LocalCluster
-
-        cluster = LocalCluster(
-            n_workers=min(args.workers, len(cmip_vars)),
-            threads_per_worker=1,
-            memory_limit=ml,
-        )
-        client = cluster.get_client()
-
     # Load requested variables
     if len(cmip_vars) > 0:
         # Glob the union of every time sampling for this realm and frequency.
@@ -971,6 +973,8 @@ def main():
             sys.exit(1)
 
         results = []
+        # Deferred per-variable work, computed together once the loop ends.
+        pending = []
         for v in cmip_vars:
             varname = v.branded_variable_name.name
             # Filter to only files containing the native model vars needed for this variable
@@ -1012,10 +1016,14 @@ def main():
                     f"Found {len(ts_files)} timeseries files for variable {varname} "
                     f"(model vars: {model_vars})"
                 )
+            # The data-request object cannot be pickled, so it cannot reach a
+            # worker; VariableRef carries the strings that are actually read.
+            # Used on both paths so the two behave identically.
+            var_ref = VariableRef.from_data_request(v)
             if args.workers == 1:
                 try:
                     res = process_one_var(
-                        v,
+                        var_ref,
                         mapping,
                         ts_files,
                         tables_root,
@@ -1032,49 +1040,96 @@ def main():
                     )
                     results.extend(res)
                 except Exception as exc:
-                    logger.error("FAILED variable %s: %s", v, exc)
+                    logger.error("FAILED variable %s: %s", var_ref, exc, exc_info=True)
                     continue
             else:
-                fut = process_one_var_delayed(
-                    v,
-                    mapping,
-                    ts_files,
-                    tables_root,
-                    OUTDIR,
-                    resolution,
-                    args.model_res,
-                    model,
-                    realm=realm,
-                    frequency=frequency,
-                    ocn_fx_fields=ocn_fx_fields,
-                    ripf_index=ripf_index,
-                    ice_sheet=args.ice_sheet,
-                    experiment=args.experiment,
+                # Collected, not run: submitting one variable here and
+                # waiting for it would process them one at a time however
+                # many workers there are, which is what --workers used to do.
+                # They are all submitted together after the loop.
+                pending.append(
+                    {
+                        "cmip_var": var_ref,
+                        "mapping": mapping,
+                        "inputfiles": ts_files,
+                        "tables_root": tables_root,
+                        "outdir": OUTDIR,
+                        "resolution": resolution,
+                        "case_resolution": args.model_res,
+                        "model": model,
+                        "realm": realm,
+                        "frequency": frequency,
+                        "ripf_index": ripf_index,
+                        "ocn_fx_fields": ocn_fx_fields,
+                        "ice_sheet": args.ice_sheet,
+                        "experiment": args.experiment,
+                    }
                 )
-                futures = client.compute([fut])
-                from dask.distributed import wait, as_completed
 
-                wait(futures, timeout="1200s")
-                for _, result in as_completed(futures, with_results=True):
+        if pending:
+            # Each variable in its own freshly started process.
+            #
+            # Fresh, because importing xesmf starts ESMF and a forked copy
+            # inherits a Python object that says ESMF is running while the
+            # state it refers to did not survive the fork.
+            #
+            # Its own process, because CMOR keeps one session per process and
+            # two variables sharing one would corrupt each other's tables.
+            #
+            # A plain pool rather than dask: dask runs each task on a worker
+            # thread, and ESMF ties its virtual machine to the thread that
+            # started it, so every regrid failed with "ESMCI::VM::getCurrent()
+            # Could not determine current VM".  A pool runs the work in the
+            # child's main thread.  scripts/esmf_worker_check.py is the check
+            # that this mechanism works, and gen_timeseries.py spreads its
+            # file reads the same way.
+            logger.info(
+                "Processing %d variables across %d worker process(es)",
+                len(pending),
+                args.workers,
+            )
+            context = multiprocessing.get_context("spawn")
+            with ProcessPoolExecutor(
+                max_workers=min(args.workers, len(pending)), mp_context=context
+            ) as pool:
+                futures = {
+                    pool.submit(process_one_var, **kwargs): kwargs["cmip_var"]
+                    for kwargs in pending
+                }
+                for future in as_completed(futures):
+                    name = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as exc:  # pylint: disable=broad-except
+                        logger.error("FAILED variable %s: %s", name, exc, exc_info=True)
+                        results.append((str(name), f"ERROR: {exc!r}"))
+                        continue
                     if isinstance(result, list):
                         results.extend(result)
                     elif isinstance(result, tuple) and len(result) == 2:
                         results.append(result)
                     else:
                         results.append((str(result), "unknown"))
+
         for v, status in set(results):
             logger.debug(f"Variable {v} processed with status: {status}")
     else:
         logger.info("No results to process.")
-    if client:
-        client.close()
-    if cluster:
-        cluster.close()
-    logger.info(
-        "Run complete in %s, peak memory %.1f GB",
-        _format_duration(time.monotonic() - run_start),
-        _peak_memory_gb(),
-    )
+    worker_peak = _peak_worker_memory_gb()
+    if worker_peak > 0:
+        logger.info(
+            "Run complete in %s, peak memory %.1f GB here and %.1f GB in the "
+            "largest worker",
+            _format_duration(time.monotonic() - run_start),
+            _peak_memory_gb(),
+            worker_peak,
+        )
+    else:
+        logger.info(
+            "Run complete in %s, peak memory %.1f GB",
+            _format_duration(time.monotonic() - run_start),
+            _peak_memory_gb(),
+        )
 
 
 if __name__ == "__main__":

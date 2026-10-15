@@ -412,10 +412,16 @@ def collect_log_records(
     # Recursive: cmor_driver.py writes its logfiles under the realm, and
     # older output has them all in one directory.
     for log_path in sorted(log_dir.rglob("*.log")):
+        # Which variable a log is for is in its filename, so decide whether we
+        # want it before reading it.  This directory holds every realm's logs,
+        # and the log of a 3-D daily variable is not small.
+        variable = parse_log_variable(log_path)
+        if variable is None:
+            continue
+        if expected_variables and variable not in expected_variables:
+            continue
         record = parse_log_file(log_path)
         if record is None:
-            continue
-        if expected_variables and record.variable not in expected_variables:
             continue
 
         records[record.variable].append(record)
