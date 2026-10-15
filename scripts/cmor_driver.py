@@ -66,7 +66,6 @@ from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 from cmip7_prep.variable_ref import VariableRef
 
-
 # The only logging configuration in the package: library modules attach
 # handlers to their own loggers but leave the root config to the entry point.
 #
