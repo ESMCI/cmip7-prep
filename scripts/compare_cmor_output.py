@@ -69,10 +69,19 @@ def main() -> int:
     only_b = sorted(set(files_b) - set(files_a))
     shared = sorted(set(files_a) & set(files_b))
 
+    # Both trees are usually called "cmor", so name them by something that
+    # differs.  Falling back to the full path when even the parents match.
+    label_a, label_b = root_a.parent.name, root_b.parent.name
+    if label_a == label_b:
+        label_a, label_b = str(root_a), str(root_b)
+
+    print(f"A = {root_a}\nB = {root_b}\n")
+    print(f"{len(files_a)} file(s) under A, {len(files_b)} under B\n")
+
     for key in only_a:
-        print(f"ONLY IN {root_a.name}: {key}")
+        print(f"ONLY IN A ({label_a}): {key}")
     for key in only_b:
-        print(f"ONLY IN {root_b.name}: {key}")
+        print(f"ONLY IN B ({label_b}): {key}")
 
     differed = 0
     for key in shared:
@@ -85,7 +94,7 @@ def main() -> int:
 
     print(
         f"\n{len(shared)} file(s) in both, {differed} with differing values; "
-        f"{len(only_a)} only in {root_a.name}, {len(only_b)} only in {root_b.name}"
+        f"{len(only_a)} only in A ({label_a}), {len(only_b)} only in B ({label_b})"
     )
     return 1 if (differed or only_a or only_b) else 0
 
