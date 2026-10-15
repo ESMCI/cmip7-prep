@@ -228,8 +228,8 @@ class TestPlanShape:
 # -------------------------------------------------------------- command form
 
 
-class TestCommands:
-    """Tests for the commands a plan builds."""
+class TestTimeseriesCommand:
+    """Tests for the time series command a plan builds."""
 
     def test_timeseries_command_points_at_the_right_history_dir(
         self, case_dir, tmp_path
@@ -277,6 +277,10 @@ class TestCommands:
         plan = _plan(case_dir, tmp_path / "out", realms=["landIce"], ice_sheet="ais")
         command = _command_of(plan, "timeseries-landIce")
         assert command[command.index("--ice-sheet") + 1] == "ais"
+
+
+class TestCommands:
+    """Tests for the CMOR and validation commands a plan builds."""
 
     def test_cmor_reads_the_timeseries_the_first_stage_writes(self, case_dir, tmp_path):
         """The CMOR step's --tsdir is the timeseries step's --outputdir."""

@@ -1,12 +1,12 @@
-"""Tests for the transportable stand-in for a data-request variable."""
+"""Tests for the three names copied out of a data-request variable."""
 
 import pickle
 
 from cmip7_prep.variable_ref import VariableRef, _Named
 
 
-class _Recursive:
-    """A stand-in for the data-request objects, with their fatal habit.
+class _Recursive:  # pylint: disable=too-few-public-methods
+    """Imitates the data-request objects, with their fatal habit.
 
     They answer any unknown attribute with their own ``value``.  Unpickling
     makes an empty shell and then fills it, so the shell is asked for ``value``
@@ -63,7 +63,7 @@ class TestItReadsLikeTheOriginal:
     def test_a_missing_physical_parameter_is_tolerated(self):
         """Not every variable carries one; absence should not raise."""
 
-        class _NoParameter:
+        class _NoParameter:  # pylint: disable=too-few-public-methods
             branded_variable_name = _Named("x_tavg-u-hxy-u")
             attributes: dict = {}
 
