@@ -25,6 +25,7 @@ invoked with --strict, so a missing variable or a CMOR log error fails the run.
 import argparse
 import json
 import logging
+import datetime
 import subprocess
 import sys
 import time
@@ -304,16 +305,24 @@ def _start_run_log(log_dir: Path):
     long each took, which failed -- existed only in the terminal, so it was
     lost to a closed window or a dropped connection.  The per-step logs were
     kept, but the timings and the summary were not.
+
+    Appended to, never truncated.  Re-running one realm into a finished run's
+    directory is the ordinary way to repair it, and that must not erase the
+    timings of the run being repaired.  Each run writes a banner first so the
+    file reads as a sequence of runs.
     """
     global _RUN_LOG  # pylint: disable=global-statement
     log_dir.mkdir(parents=True, exist_ok=True)
     path = log_dir / RUN_LOG_NAME
-    handler = logging.FileHandler(path, mode="w", encoding="utf-8")
+    handler = logging.FileHandler(path, mode="a", encoding="utf-8")
     handler.setFormatter(
         logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     )
     logging.getLogger().addHandler(handler)
     _RUN_LOG = open(path, "a", encoding="utf-8")  # pylint: disable=consider-using-with
+    started = datetime.datetime.now().isoformat(timespec="seconds")
+    _RUN_LOG.write(f"\n{'=' * 78}\nRUN STARTED {started}\n{'=' * 78}\n")
+    _RUN_LOG.flush()
     return path
 
 
