@@ -1,0 +1,6 @@
+dataset_overrides:
+  institution_id: NCC
+  nominal_resolution: 200 km
+  source_id: NorESM3-LM
+
+variables: {}
