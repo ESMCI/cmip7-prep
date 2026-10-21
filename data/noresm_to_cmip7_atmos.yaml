@@ -1,12 +1,9 @@
-grids: [gr]
 
 variables:
 
   albisccp_tavg-u-hxy-cl: MEANCLDALB_ISCCP/CLDTOT_ISCCP
 
-  aod550volso4_tavg-u-hxy-u:
-    formula: AODVVOLC
-    units: '1.00E-09'
+  aod550volso4_tavg-u-hxy-u: AODVVOLC
 
   areacella_ti-u-hxy-u: area
 
@@ -57,6 +54,8 @@ variables:
   clt_tpt-u-hs-u: 100*CLDTOT
 
   clt_tpt-u-hxy-u: CLDTOT*100
+
+  cltc_tavg-u-hxy-u: CONCLD*100
 
   cltcalipso_tavg-u-hxy-u: CLDTOT_CAL
 
@@ -109,6 +108,8 @@ variables:
   hur_tpt-500hPa-hxy-air: RELHUM500
 
   hur_tpt-850hPa-hxy-air: RELHUM850
+
+  hur_tpt-al-hs-u: RELHUM
 
   hurs_tavg-h2m-hxy-u: RHREFHT
 
@@ -232,9 +233,7 @@ variables:
 
   rldscs_tpt-u-hxy-u: FLDSC
 
-  rls_tavg-u-hxy-u:
-    formula: FLNS
-    positive: up
+  rls_tavg-u-hxy-u: FLNS
 
   rlu_tavg-alh-hxy-u: FUL
 
@@ -270,17 +269,13 @@ variables:
 
   rsdcs_tpt-alh-hs-u: FDSC
 
-  rsds_tavg-u-hxy-u:
-    formula: FSDS
-    positive: up
+  rsds_tavg-u-hxy-u: FSDS
 
   rsds_tpt-u-hs-u: FSDS
 
   rsds_tpt-u-hxy-u: FSDS
 
-  rsdscs_tavg-u-hxy-u:
-    formula: FSDSC
-    positive: up
+  rsdscs_tavg-u-hxy-u: FSDSC
 
   rsdscs_tpt-u-hs-u: FSDSC
 
@@ -288,9 +283,7 @@ variables:
 
   rsdsdiff_tavg-u-hxy-u: SOLLD+SOLSD
 
-  rsdt_tavg-u-hxy-u:
-    formula: FSNTOA+FSUTOA
-    positive: up
+  rsdt_tavg-u-hxy-u: FSNTOA+FSUTOA
 
   rsdt_tpt-u-hs-u: FSNTOA+FSUTOA
 

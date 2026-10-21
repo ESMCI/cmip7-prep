@@ -6,6 +6,9 @@ import sys
 import argparse
 from typing import Optional
 
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "../", "src"))
+
 from cmip7_prep.mapping_compat import load_intensive_vars
 
 # ── Regrid method ────────────────────────────────────────────────────────────
@@ -230,8 +233,8 @@ def is_math_expression(expr: str) -> bool:
         return True
     # Commenting out, this is definitely classifying to much as expressions,
     # not sure if we are missing somethng, though...
-    # if re.search(r'\d', expr):
-    #     return True
+    if re.search(r'\d', expr):
+        return True
     if re.search(r"\w+\s+\w+", expr):
         return True
     if re.search("FATES", expr):
@@ -666,7 +669,7 @@ def _build_entry(row, config):
 _VARIANT_FIELDS = ("long_name", "formula", "region")
 
 
-def read_csv(filepath, config):
+def read_csv(filepath, config, short_format=True):
     """Read CSV and return a dict mapping each realm to its own data dict::
 
         { "atmos": {"dataset_overrides": {...}, "variables": {...}}, ... }
@@ -713,10 +716,15 @@ def read_csv(filepath, config):
         result = {}
         for realm in realm_outputs:
             realm_entries = [(n, e) for n, e, r in all_entries if r == realm]
-            result[realm] = {
-                "dataset_overrides": config["dataset_overrides"],
-                "variables": _group_entries(realm_entries),
-            }
+            if not short_format:
+                result[realm] = {
+                    "dataset_overrides": config["dataset_overrides"],
+                    "variables": _group_entries(realm_entries, short_format),
+                }
+            else:
+                result[realm] = {
+                    "variables": _group_entries(realm_entries, short_format),
+                }
         return result
 
     entries = [(n, e) for n, e, _ in all_entries]
@@ -725,9 +733,21 @@ def read_csv(filepath, config):
         "variables": _group_entries(entries),
     }
 
+def _get_short_format(entry):
+    """Return the short format representation of an entry."""
+    print(entry['sources'])
+    if 'formula' in entry:
+        return entry['formula']
+    if len(entry['sources']) == 1:
+        return entry['sources'][0]['model_var']
+    source_string = ""
+    for source in entry['sources']:
+        source_string += source['model_var'] + ","
+    source_string = source_string.rstrip(",")
+    return source_string
 
 # ── group entries ─────────────────────────────────────────────────────────────
-def _group_entries(all_entries):
+def _group_entries(all_entries, short_format=True):
     """Group (name, entry) pairs by name, handling variants."""
     grouped = {}
     for name, entry in all_entries:
@@ -735,8 +755,13 @@ def _group_entries(all_entries):
 
     data = {}
     for name, entries in grouped.items():
+        print(name)
+        #sys.exit(4)
         if len(entries) == 1:
-            data[name] = entries[0]
+            if short_format:
+                data[name] = _get_short_format(entries[0])
+            else:
+                data[name] = entries[0]
         else:
             if entries[0].get("table") == "seaIce":
                 base = {k: v for k, v in entries[0].items() if k not in _VARIANT_FIELDS}
@@ -747,15 +772,21 @@ def _group_entries(all_entries):
                 data[name] = base
             else:
                 # Multiple rows for non-seaIce variables are duplicates; use the first.
-                data[name] = entries[0]
+                if short_format:
+                    data[name] = _get_short_format(entries[0])
+                else:
+                    data[name] = entries[0]
     return data
 
 
 # ── write yaml ────────────────────────────────────────────────────────────────
-def write_yaml(data, filepath):
+def write_yaml(data, filepath, short_format=True):
     """Write dictionary to a YAML file with minor formatting improvements."""
     with open(filepath, "w") as f:
-        yaml.dump(data, f, default_flow_style=None)
+        if short_format:
+            yaml.dump(data, f, default_flow_style=False)
+        else:
+            yaml.dump(data, f, default_flow_style=None, line_break=",")
     with open(filepath, "r") as f:
         lines = f.readlines()
     modified_lines = []
@@ -807,11 +838,16 @@ def main():
         default=None,
         help="Input CSV file (default: model-specific)",
     )
+    parser.add_argument(
+        "--short-format",
+        default=True,
+        help="Use simplified short format for the YAML output",
+    )
     args = parser.parse_args()
 
     config = MODEL_CONFIGS[args.model]
     input_file = args.input or config["default_input"]
-    data = read_csv(input_file, config)
+    data = read_csv(input_file, config, short_format=args.short_format)
 
     # Merge realms that share the same output file (e.g. ocean + fx → ocean yaml).
     merged: dict = {}
@@ -824,7 +860,7 @@ def main():
 
     total = 0
     for output_file, file_data in merged.items():
-        write_yaml(file_data, output_file)
+        write_yaml(file_data, output_file, short_format=args.short_format)
         count = len(file_data["variables"])
         total += count
         print(f"wrote {count} entries to {output_file}")

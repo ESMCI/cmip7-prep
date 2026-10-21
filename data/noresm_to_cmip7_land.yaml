@@ -1,4 +1,3 @@
-grids: [gr]
 
 variables:
 
@@ -6,25 +5,33 @@ variables:
 
   burntFractionAll_tavg-u-hxy-u: (FATES_BURNFRAC *3600*24*30*100)*FATES_FRACTION
 
-  c3PftFrac_tavg-u-hxy-u: (FATES_AREA_PLANTS-sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[14], dimname='fates_levpft'))*FATES_FRACTION*100
+  c3PftFrac_tavg-u-hxy-u: (FATES_AREA_PLANTS-sumover_index(FATES_CANOPYCROWNAREA_PF,
+    indexlist=[14], dimname='fates_levpft'))*FATES_FRACTION*100
 
-  c4PftFrac_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[14], dimname='fates_levpft')*FATES_FRACTION*100
+  c4PftFrac_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[14],
+    dimname='fates_levpft')*FATES_FRACTION*100
 
   cLand_tavg-u-hxy-lnd: TOTECOSYSC / 1000
 
   cLeaf_tavg-u-hxy-lnd: (FATES_LEAFC)*FATES_FRACTION
 
-  cLitterCwd_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
+  cLitterCwd_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1],
+    dimname='fates_levelem'))*FATES_FRACTION
 
-  cLitterSubSurf_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_BG_FINE_EL, indexlist=[1], dimname='fates_levelem') + sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
+  cLitterSubSurf_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_BG_FINE_EL, indexlist=[1],
+    dimname='fates_levelem') + sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1],
+    dimname='fates_levelem'))*FATES_FRACTION
 
-  cLitterSurf_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_AG_FINE_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
+  cLitterSurf_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_AG_FINE_EL, indexlist=[1],
+    dimname='fates_levelem'))*FATES_FRACTION
 
   cOther_tavg-u-hxy-lnd: (FATES_SEED_BANK + FATES_REPROC + FATES_STOREC)*FATES_FRACTION
 
   cProduct_tavg-u-hxy-lnd: TOT_WOODPRODC / 1000
 
   cRoot_tavg-u-hxy-lnd: (FATES_VEGC - FATES_VEGC_ABOVEGROUND) * FATES_FRACTION
+
+  cSoilPools_tavg-u-hxy-lnd: SOIL1C,SOIL2C,SOIL3C,SOIL4C
 
   cSoil_tavg-d100cm-hxy-lnd: TOTSOMC_1m / 1000
 
@@ -40,9 +47,11 @@ variables:
 
   cVeg_tavg-u-hxy-ng: (sumover_index(FATES_VEGC_PF, indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
 
-  cVeg_tavg-u-hxy-shb: (sumover_index(FATES_VEGC_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+  cVeg_tavg-u-hxy-shb: (sumover_index(FATES_VEGC_PF, indexlist=[7, 8, 9, 10, 11],
+    dimname='fates_levpft'))*FATES_FRACTION
 
-  cVeg_tavg-u-hxy-tree: (sumover_index(FATES_VEGC_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+  cVeg_tavg-u-hxy-tree: (sumover_index(FATES_VEGC_PF, indexlist=[1, 2, 3, 4, 5, 6],
+    dimname='fates_levpft'))*FATES_FRACTION
 
   cnc_tavg-u-hxy-u: (FATES_AREA_PLANTS * 100)*FATES_FRACTION
 
@@ -94,7 +103,8 @@ variables:
 
   fVegLitterMortality_tavg-u-hxy-lnd: (FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
 
-  fVegLitterSenescence_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_IN_EL, indexlist=[1], dimname='fates_levelem')-FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
+  fVegLitterSenescence_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_IN_EL, indexlist=[1],
+    dimname='fates_levelem')-FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
 
   fVegLitter_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_IN_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
 
@@ -114,13 +124,15 @@ variables:
 
   gpp_tavg-u-hxy-shb: (sumover_index(FATES_GPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
 
-  gpp_tavg-u-hxy-tree: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+  gpp_tavg-u-hxy-tree: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6],
+    dimname='fates_levpft'))*FATES_FRACTION
 
   grassFracC3_tavg-u-hxy-u: (FATES_CROWNAREA_PF(12+13))*FATES_FRACTION
 
   grassFracC4_tavg-u-hxy-u: (sumover_index(FATES_CROWNAREA_PF, indexlist=[14], dimname='fates_levpft'))*FATES_FRACTION
 
-  grassFrac_tavg-u-hxy-u: sumover_index(FATES_CROWNAREA_PF, indexlist=[12, 13, 14], dimname='fates_levpft')*FATES_FRACTION
+  grassFrac_tavg-u-hxy-u: sumover_index(FATES_CROWNAREA_PF, indexlist=[12, 13, 14],
+    dimname='fates_levpft')*FATES_FRACTION
 
   hfdsl_tavg-u-hxy-lnd: FGR
 
@@ -178,7 +190,8 @@ variables:
 
   npp_tavg-u-hxy-shb: (sumover_index(FATES_NPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
 
-  npp_tavg-u-hxy-tree: (sumover_index(FATES_NPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+  npp_tavg-u-hxy-tree: (sumover_index(FATES_NPP_PF, indexlist=[1, 2, 3, 4, 5, 6],
+    dimname='fates_levpft'))*FATES_FRACTION
 
   orog_tavg-u-hxy-is: usurf
 
@@ -190,11 +203,13 @@ variables:
 
   qgwr_tavg-u-hxy-lnd: QCHARGE
 
-  raLeaf_tavg-u-hxy-lnd: (FATES_LEAFMAINTAR + (FATES_GROWTH_RESP * FATES_LEAFC_ALLOC / FATES_NPP))*FATES_FRACTION
+  raLeaf_tavg-u-hxy-lnd: (FATES_LEAFMAINTAR + (FATES_GROWTH_RESP * FATES_LEAFC_ALLOC
+    / FATES_NPP))*FATES_FRACTION
 
   raLut_tavg-u-hxy-multi: (FATES_GPP_LU-FATES_NPP_LU)*FATES_FRACTION
 
-  raRoot_tavg-u-hxy-lnd: ((FATES_FROOTMAINTAR+FATES_CROOTMAINTAR) + (FATES_GROWTH_RESP * (FATES_FROOT_ALLOC + FATES_CROOT_ALLOC) / FATES_NPP))*FATES_FRACTION
+  raRoot_tavg-u-hxy-lnd: ((FATES_FROOTMAINTAR+FATES_CROOTMAINTAR) + (FATES_GROWTH_RESP
+    * (FATES_FROOT_ALLOC + FATES_CROOT_ALLOC) / FATES_NPP))*FATES_FRACTION
 
   raStem_tavg-u-hxy-lnd: (FATES_LSTEMMAINTAR)*FATES_FRACTION
 
@@ -202,11 +217,14 @@ variables:
 
   ra_tavg-u-hxy-lnd: FATES_AUTORESP*FATES_FRACTION
 
-  ra_tavg-u-hxy-ng: (sumover_index(FATES_GPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft')-sumover_index(FATES_NPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
+  ra_tavg-u-hxy-ng: (sumover_index(FATES_GPP_PF, indexlist=[12, 13, 14], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
+    indexlist=[12, 13, 14], dimname='fates_levpft'))*FATES_FRACTION
 
-  ra_tavg-u-hxy-shb: (sumover_index(FATES_GPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft')-sumover_index(FATES_NPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
+  ra_tavg-u-hxy-shb: (sumover_index(FATES_GPP_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
+    indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft'))*FATES_FRACTION
 
-  ra_tavg-u-hxy-tree: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')-sumover_index(FATES_NPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
+  ra_tavg-u-hxy-tree: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft')-sumover_index(FATES_NPP_PF,
+    indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft'))*FATES_FRACTION
 
   residualFrac_tavg-u-hxy-u: 1-FATES_FRACTION
 
@@ -230,7 +248,8 @@ variables:
 
   sftgif_ti-u-hxy-u: sumover_index(PCT_LANDUNIT, indexlist=[4], dimname='ltype')
 
-  shrubFrac_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[7, 8, 9, 10, 11], dimname='fates_levpft') *FATES_FRACTION
+  shrubFrac_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[7, 8,
+    9, 10, 11], dimname='fates_levpft') *FATES_FRACTION
 
   slthick_ti-sl-hxy-lnd: ZSOI
 
@@ -244,15 +263,20 @@ variables:
 
   tran_tavg-u-hxy-u: QVEGT
 
-  treeFracBdlDcd_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[5, 6], dimname='fates_levpft')*FATES_FRACTION*100
+  treeFracBdlDcd_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[5,
+    6], dimname='fates_levpft')*FATES_FRACTION*100
 
-  treeFracBdlEvg_tavg-u-hxy-u: (sumover_index(FATES_CROWNAREA_PF, indexlist=[1, 4], dimname='fates_levpft'))*FATES_FRACTION
+  treeFracBdlEvg_tavg-u-hxy-u: (sumover_index(FATES_CROWNAREA_PF, indexlist=[1, 4],
+    dimname='fates_levpft'))*FATES_FRACTION
 
-  treeFracNdlDcd_tavg-u-hxy-u: (sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[3], dimname='fates_levpft')*100)*FATES_FRACTION
+  treeFracNdlDcd_tavg-u-hxy-u: (sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[3],
+    dimname='fates_levpft')*100)*FATES_FRACTION
 
-  treeFracNdlEvg_tavg-u-hxy-u: (sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[2], dimname='fates_levpft')*100)*FATES_FRACTION
+  treeFracNdlEvg_tavg-u-hxy-u: (sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[2],
+    dimname='fates_levpft')*100)*FATES_FRACTION
 
-  treeFrac_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[1, 2, 3, 4, 5, 6], dimname='fates_levpft') *FATES_FRACTION*100
+  treeFrac_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[1, 2,
+    3, 4, 5, 6], dimname='fates_levpft') *FATES_FRACTION*100
 
   tsLut_tavg-u-hxy-multi: TSKIN
 
@@ -266,7 +290,8 @@ variables:
 
   vegHeight_tavg-u-hxy-veg: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
 
-  wetlandCH4_tavg-u-hxy-lnd: (CH4_SURF_DIFF_SAT+CH4_SURF_EBUL_SAT+CH4_SURF_AERE_SAT) * 0.016043 * FINUNDATED
+  wetlandCH4_tavg-u-hxy-lnd: (CH4_SURF_DIFF_SAT+CH4_SURF_EBUL_SAT+CH4_SURF_AERE_SAT)
+    * 0.016043 * FINUNDATED
 
   wetlandFrac_tavg-u-hxy-u: FINUNDATED
 
