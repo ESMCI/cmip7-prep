@@ -7,6 +7,7 @@ import argparse
 from typing import Optional
 
 import os
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "../", "src"))
 
 from cmip7_prep.mapping_compat import load_intensive_vars
@@ -233,7 +234,7 @@ def is_math_expression(expr: str) -> bool:
         return True
     # Commenting out, this is definitely classifying to much as expressions,
     # not sure if we are missing somethng, though...
-    if re.search(r'\d', expr):
+    if re.search(r"\d", expr):
         return True
     if re.search(r"\w+\s+\w+", expr):
         return True
@@ -733,18 +734,20 @@ def read_csv(filepath, config, short_format=True):
         "variables": _group_entries(entries),
     }
 
+
 def _get_short_format(entry):
     """Return the short format representation of an entry."""
-    print(entry['sources'])
-    if 'formula' in entry:
-        return entry['formula']
-    if len(entry['sources']) == 1:
-        return entry['sources'][0]['model_var']
+    print(entry["sources"])
+    if "formula" in entry:
+        return entry["formula"]
+    if len(entry["sources"]) == 1:
+        return entry["sources"][0]["model_var"]
     source_string = ""
-    for source in entry['sources']:
-        source_string += source['model_var'] + ","
+    for source in entry["sources"]:
+        source_string += source["model_var"] + ","
     source_string = source_string.rstrip(",")
     return source_string
+
 
 # ── group entries ─────────────────────────────────────────────────────────────
 def _group_entries(all_entries, short_format=True):
@@ -756,7 +759,7 @@ def _group_entries(all_entries, short_format=True):
     data = {}
     for name, entries in grouped.items():
         print(name)
-        #sys.exit(4)
+        # sys.exit(4)
         if len(entries) == 1:
             if short_format:
                 data[name] = _get_short_format(entries[0])
