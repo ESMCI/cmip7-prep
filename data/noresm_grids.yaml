@@ -45,10 +45,10 @@ resolutions:
 #
 grid_names_per_realm:
   NorESM3-LM:
-    atmos: {input_grid: ne16, grid_label: g123}
-    aerosol: {input_grid: ne16, grid_label: g123}
-    atmosChem: {input_grid: ne16, grid_label: g123}
-    land: {input_grid: ne16, grid_label: g123}
+    atmos: {input_grid: ne16, grid_label: g253}
+    aerosol: {input_grid: ne16, grid_label: g253}
+    atmosChem: {input_grid: ne16, grid_label: g253}
+    land: {input_grid: ne16, grid_label: g253}
     ocean: {input_grid: tnx1v4, grid_label: g202}
     ocnBgchem: {input_grid: tnx1v4, grid_label: g202}
     seaIce: {input_grid: tnx1v4, grid_label: g202}

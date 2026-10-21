@@ -1,14 +1,9 @@
-grids: [gr]
 
 variables:
 
-  cfc11_tavg-u-hm-air:
-    formula: f11vmr
-    units: '1.00E-12'
+  cfc11_tavg-u-hm-air: f11vmr
 
-  cfc12_tavg-u-hm-air:
-    formula: f12vmr
-    units: '1.00E-12'
+  cfc12_tavg-u-hm-air: f12vmr
 
   ch4_tavg-al-hxy-u: ch4vmr
 
@@ -16,9 +11,7 @@ variables:
 
   ch4_tavg-p39-hy-air: ch4vmr
 
-  ch4_tavg-u-hm-air:
-    formula: ch4vmr
-    units: '1.00E-09'
+  ch4_tavg-u-hm-air: ch4vmr
 
   dms_tavg-al-hxy-u: DMS
 
@@ -28,9 +21,7 @@ variables:
 
   n2o_tavg-p39-hy-air: n2ovmr
 
-  n2o_tavg-u-hm-air:
-    formula: n2ovmr
-    units: '1.00E-09'
+  n2o_tavg-u-hm-air: n2ovmr
 
   o3_tavg-al-hxy-u: ozone
 
