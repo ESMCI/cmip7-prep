@@ -917,7 +917,7 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG, short_format=False)
         var = data["atmos"]["variables"]["pr"]
         assert var["formula"] == "(PRECC + PRECL) * 1000.0"
         assert [s["model_var"] for s in var["sources"]] == ["PRECC", "PRECL"]

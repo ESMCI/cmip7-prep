@@ -234,8 +234,8 @@ def is_math_expression(expr: str) -> bool:
         return True
     # Commenting out, this is definitely classifying to much as expressions,
     # not sure if we are missing somethng, though...
-    if re.search(r"\d", expr):
-        return True
+    # if re.search(r"\d", expr):
+    #     return True
     if re.search(r"\w+\s+\w+", expr):
         return True
     if re.search("FATES", expr):
