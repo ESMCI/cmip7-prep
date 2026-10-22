@@ -1679,16 +1679,27 @@ class CmorSession(
                 slab,
                 rec_bytes / (1024 * 1024),
             )
-            for start in range(0, ntime, slab):
+            # Reported about ten times over, not once per slab.  Fifty years
+            # of daily data is some 1500 slabs, and two lines each across
+            # every worker buried everything else worth reading.  The first
+            # and last are always reported, so the size and the finish are
+            # never missing.
+            slabs = max(1, -(-ntime // slab))
+            report_every = max(1, slabs // 10)
+            for index, start in enumerate(range(0, ntime, slab)):
                 stop = min(start + slab, ntime)
-                logger.debug("[mem] materializing slab %d:%d of %d", start, stop, ntime)
+                tell = index == 0 or index == slabs - 1 or index % report_every == 0
                 block = np.asarray(data_filled.isel(time=slice(start, stop)))
-                logger.debug(
-                    "[mem] slab %d:%d materialized, %.1f MB; writing",
-                    start,
-                    stop,
-                    block.nbytes / (1024 * 1024),
-                )
+                if tell:
+                    logger.debug(
+                        "[mem] slab %d of %d (%d:%d of %d), %.1f MB; writing",
+                        index + 1,
+                        slabs,
+                        start,
+                        stop,
+                        ntime,
+                        block.nbytes / (1024 * 1024),
+                    )
                 cmor.write(var_id, block, ntimes_passed=stop - start)
         else:
             cmor.write(
