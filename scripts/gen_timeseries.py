@@ -131,7 +131,7 @@ def variables_the_realm_needs(model, realm, logger):
     return needed
 
 
-def _execute_or_report_complete(ts_collection, logger, workers=1):
+def _execute_or_report_complete(ts_collection, logger, workers=1, budget_gb=16.0):
     """Generate the time series, or report that there is nothing left to do.
 
     Narrowing a finished run to its missing timesteps leaves nothing, and GenTS
@@ -169,7 +169,50 @@ def _execute_or_report_complete(ts_collection, logger, workers=1):
         batch_size,
         workers,
     )
-    ts_collection.execute(optimize_batch_n=batch_size)
+    # GenTS gives every worker the same cache ceiling however many there are,
+    # so its total grows with the worker count and a run that works at four
+    # workers is killed at twelve.  Dividing a fixed budget keeps the total
+    # flat and makes the worker count safe to raise.
+    per_worker = max(1, int(budget_gb * 1024**3 / max(1, workers)))
+    logger.info(
+        "Cache ceiling %.2f GB per worker (%.1f GB across %d)",
+        per_worker / 1024**3,
+        budget_gb,
+        workers,
+    )
+    if per_worker < 1024**3:
+        logger.warning(
+            "That is under 1 GB each, which means a lot of re-reading. Either "
+            "use fewer workers or raise --memory-budget-gb, whichever the node "
+            "can afford."
+        )
+
+    # raise_errors, because GenTS otherwise logs a failed order and carries on.
+    # One worker killed for memory breaks its whole pool, so every order after
+    # it fails too -- a run wrote 217 of 395 time series, reported success, and
+    # was found out only when CMORization had no input.  A missing time series
+    # is never acceptable, so the first failure stops the run.
+    written = ts_collection.execute(
+        optimize_batch_n=batch_size,
+        memory_limit_bytes=per_worker,
+        raise_errors=True,
+    )
+    # Checked as well, in case GenTS ever returns short without raising.
+    asked = len(ts_collection)
+    count = len(written) if written is not None else None
+    if count is None:
+        logger.warning(
+            "GenTS reported nothing about what it wrote; %d time series were "
+            "asked for and cannot be confirmed",
+            asked,
+        )
+    elif count < asked:
+        raise RuntimeError(
+            f"GenTS wrote {count} of {asked} time series without raising. "
+            f"The missing ones are a failure, not a skip."
+        )
+    else:
+        logger.info("Wrote %d time series", count)
 
 
 def find_unusable_files(inputdir, include_patterns, workers, logger):
@@ -334,6 +377,19 @@ def parse_arguments():
         help="Number of workers (default: 32)",
     )
     behaviour.add_argument(
+        "--memory-budget-gb",
+        type=float,
+        default=16.0,
+        help=(
+            "Total memory GenTS may use for caching across all workers "
+            "(default: 16). Divided by --workers to give each one its "
+            "ceiling, so raising the worker count does not raise total "
+            "memory. GenTS on its own gives every worker 4 GB regardless of "
+            "how many there are, which is what killed runs at 12 workers: "
+            "48 GB of cache before any data is read."
+        ),
+    )
+    behaviour.add_argument(
         "--debug", action="store_true", help="Turn on debug output (False by default)."
     )
 
@@ -460,7 +516,9 @@ def main():
         ts_collection = _overwrite_or_resume(
             ts_collection, args.overwrite_timeseries, logger
         )
-        _execute_or_report_complete(ts_collection, logger, workers)
+        _execute_or_report_complete(
+            ts_collection, logger, workers, args.memory_budget_gb
+        )
         logger.info("Finished ts_collection")
 
     else:
@@ -529,7 +587,9 @@ def main():
                         [order["primary_var"] for order in ts_collection],
                     )
 
-                _execute_or_report_complete(ts_collection, logger, workers)
+                _execute_or_report_complete(
+                    ts_collection, logger, workers, args.memory_budget_gb
+                )
                 logger.info("Timeseries processing complete")
 
         if not matched_anything:
