@@ -6,6 +6,11 @@ or to also run the embedded doctests:
     pytest --doctest-modules scripts/convert_csv_to_yaml.py tests/test_convert_csv_to_yaml.py -v
 """
 
+# Just over pylint's 1000-line limit once black has reformatted this file.  It
+# wants splitting at the _write_temp_csv helper -- string helpers above, file
+# reading below -- but it is mid-refactor, so not yet.
+# pylint: disable=too-many-lines
+
 import csv
 import os
 import sys
@@ -917,7 +922,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG, short_format=False)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         var = data["atmos"]["variables"]["pr"]
         assert var["formula"] == "(PRECC + PRECL) * 1000.0"
         assert [s["model_var"] for s in var["sources"]] == ["PRECC", "PRECL"]
