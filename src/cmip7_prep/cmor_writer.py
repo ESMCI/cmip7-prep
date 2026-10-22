@@ -352,14 +352,30 @@ class CmorSession(
         # Default region to "glb"; overridden per-variable in cmor_driver.py for NH/SH variants
         cmor.set_cur_dataset_attribute("region", "glb")
 
-        logger.debug("set _controlled_vocabulary_file:")
-        cmor.set_cur_dataset_attribute(
-            "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")
-        )
-        logger.debug("set _axis_entry_file:")
-        cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
-        logger.debug("set _formula_var_file:")
-        cmor.set_cur_dataset_attribute("_FORMULA_VAR_FILE", "CMIP7_formula_terms.json")
+        # A session is open from here on.  Python calls __exit__ only when
+        # __enter__ has returned, so anything failing below would leave the
+        # session open with nothing to close it.  CMOR allows one session per
+        # process and the pool gives each worker variable after variable, so a
+        # single leak makes every later variable in that worker fail with
+        # "Problem with 'cmor.setup'".
+        try:
+            logger.debug("set _controlled_vocabulary_file:")
+            cmor.set_cur_dataset_attribute(
+                "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")
+            )
+            logger.debug("set _axis_entry_file:")
+            cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
+            logger.debug("set _formula_var_file:")
+            cmor.set_cur_dataset_attribute(
+                "_FORMULA_VAR_FILE", "CMIP7_formula_terms.json"
+            )
+        except BaseException:
+            try:
+                cmor.close()
+            except Exception:  # pylint: disable=broad-except
+                # Already unusable; the original failure is the one to report.
+                pass
+            raise
         logger.debug("CMOR session initialized")
         return self
 

@@ -534,3 +534,29 @@ class TestGridIsNotDecidedHere:
         assert not plan.skipped
         command = _command_of(plan, "cmor-landIce-yr")
         assert command[command.index("--ice-sheet") + 1] == "gris"
+
+
+# -------------------------------------------------- years reaching CMORization
+
+
+class TestYearsReachCmorization:
+    """Tests that output files cover the same spans as the time series."""
+
+    def test_the_years_given_reach_the_cmor_step(self, case_dir, tmp_path):
+        """Otherwise CMOR writes one file covering everything it finds."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["land"], years="1:50:10")
+        command = _command_of(plan, "cmor-land-mon")
+        assert command[command.index("--years") + 1] == "1:50:10"
+
+    def test_both_stages_are_given_the_same_spec(self, case_dir, tmp_path):
+        """One value, so the two cannot drift apart."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["land"], years="1:50:10")
+        timeseries = _command_of(plan, "timeseries-land")
+        cmor = _command_of(plan, "cmor-land-mon")
+        assert timeseries[timeseries.index("--years-spec") + 1] == "1:50:10"
+        assert cmor[cmor.index("--years") + 1] == "1:50:10"
+
+    def test_no_years_leaves_the_cmor_step_without_them(self, case_dir, tmp_path):
+        """Unsplit output stays the default."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["land"])
+        assert "--years" not in _command_of(plan, "cmor-land-mon")
