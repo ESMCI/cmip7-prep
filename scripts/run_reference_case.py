@@ -36,6 +36,7 @@ sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 
 # pylint: disable=wrong-import-position
 from cmip7_prep.time_windows import year_windows
+from cmip7_prep.validation_exit import RAN_AND_FOUND_PROBLEMS, RAN_AND_PASSED
 from cmip7_prep.cv_lookup import validate as validate_cv
 from cmip7_prep.grids import MODEL_RESOLUTIONS
 from cmip7_prep.reference_run import (
@@ -269,17 +270,35 @@ def step_log_dir(outdir: Path, tag: str | None) -> Path:
     return outdir / "logs" / tag
 
 
-def counts_as_done(stage: str, returncode: int) -> bool:
-    """Whether a finished step should be skipped by a later resume.
+def outcome_label(stage: str, returncode: int) -> str:
+    """How a finished step's result reads in the summary.
 
-    A step that succeeded, always.  And validation whether it passed or not:
-    it produces a report that nothing else consumes, and under --strict it
-    fails while any requested variable is missing -- so recording it only on
-    success meant it was never recorded, and every resume repeated all of it.
-    On a 50-year run that was 75 minutes of rework before reaching the step
-    that had actually stopped.  --force runs it again.
+    Validation reporting problems is not a failure of the run -- it is the
+    report, and under --strict it says so whenever a requested variable is
+    missing.  Calling that FAILED, in the same words as a crash, made twelve
+    working reports look like twelve broken steps.
     """
-    return returncode == 0 or stage == "validate"
+    if returncode == 0:
+        return "ok"
+    if stage == "validate" and returncode == RAN_AND_FOUND_PROBLEMS:
+        return "reported problems"
+    return f"FAILED ({returncode})"
+
+
+def counts_as_done(stage: str, returncode: int) -> bool:
+    """Whether a resume can skip this step because it already ran.
+
+    Time series and CMOR steps count only if they succeeded.  Validation counts
+    unless it crashed, because reporting problems is its job rather than a
+    failure.
+
+    --force skips nothing.
+    """
+    if returncode == RAN_AND_PASSED:
+        return True
+    if stage == "validate" and returncode == RAN_AND_FOUND_PROBLEMS:
+        return True
+    return False
 
 
 def should_stop(stage: str, returncode: int, keep_going: bool) -> bool:
@@ -342,8 +361,18 @@ def run_step(step: Step, log_dir: Path) -> dict:
         "seconds": elapsed,
         "log": str(log_path),
     }
-    if completed.returncode == 0:
+    label = outcome_label(step.stage, completed.returncode)
+    if label == "ok":
         logger.info("[%s] ok in %.1fs", step.key, elapsed)
+    elif label == "reported problems":
+        # A warning, not an error: the report is the step's job, and under
+        # --strict it has problems to report whenever a variable is missing.
+        logger.warning(
+            "[%s] reported problems after %.1fs -- see %s",
+            step.key,
+            elapsed,
+            log_path,
+        )
     else:
         logger.error(
             "[%s] FAILED (exit %d) after %.1fs -- see %s",
@@ -428,23 +457,53 @@ def print_report(outcomes: list[dict], plan: Plan) -> None:
 
     width = max((len(o["key"]) for o in outcomes), default=10)
     for outcome in outcomes:
-        status = (
-            "ok" if outcome["returncode"] == 0 else f"FAILED ({outcome['returncode']})"
-        )
+        status = outcome_label(outcome["stage"], outcome["returncode"])
         say(f"  {outcome['key']:<{width}}  {outcome['seconds']:7.1f}s  {status}")
 
-    failed = [o for o in outcomes if o["returncode"] != 0]
+    # Counted the way they are labelled: a validation report is not a failure.
+    broken = [
+        o
+        for o in outcomes
+        if outcome_label(o["stage"], o["returncode"]).startswith("FAILED")
+    ]
+    reported = [
+        o
+        for o in outcomes
+        if outcome_label(o["stage"], o["returncode"]) == "reported problems"
+    ]
     say("-" * 78)
-    say(f"  {len(outcomes) - len(failed)} ok, {len(failed)} failed")
+    tally = f"  {len(outcomes) - len(broken) - len(reported)} ok"
+    if reported:
+        tally += f", {len(reported)} reported problems"
+    tally += f", {len(broken)} failed"
+    total = sum(o["seconds"] for o in outcomes)
+    say(f"{tally}, {total / 60:.1f} min")
+
+    # Where the time went, which is the question asked after every long run.
+    by_stage: dict[str, float] = {}
+    for outcome in outcomes:
+        by_stage[outcome["stage"]] = (
+            by_stage.get(outcome["stage"], 0.0) + outcome["seconds"]
+        )
+    if len(by_stage) > 1:
+        spent = ", ".join(
+            f"{stage} {seconds / 60:.1f}"
+            for stage, seconds in sorted(by_stage.items(), key=lambda kv: -kv[1])
+        )
+        say(f"  minutes by stage: {spent}")
 
     if plan.skipped:
         say("\n  skipped:")
         for reason in plan.skipped:
             say(f"    {reason}")
 
-    if failed:
+    if broken:
         say("\n  logs for the failures:")
-        for outcome in failed:
+        for outcome in broken:
+            say(f"    {outcome['key']}: {outcome['log']}")
+    if reported:
+        say("\n  validation reports:")
+        for outcome in reported:
             say(f"    {outcome['key']}: {outcome['log']}")
 
 
@@ -559,8 +618,15 @@ def main():
         return
     print_report(outcomes, plan)
 
-    failed = any(outcome["returncode"] != 0 for outcome in outcomes)
-    sys.exit(1 if failed else 0)
+    # A validation report is not a failure of the run, so it does not decide
+    # the exit code either -- otherwise every run exits non-zero for ever,
+    # which makes the code useless for telling whether anything is wrong.
+    broken = [
+        outcome
+        for outcome in outcomes
+        if outcome_label(outcome["stage"], outcome["returncode"]).startswith("FAILED")
+    ]
+    sys.exit(1 if broken else 0)
 
 
 if __name__ == "__main__":

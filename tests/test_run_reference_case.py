@@ -30,16 +30,21 @@ class TestCountsAsDone:
         """It has to be run again; nothing downstream can proceed without it."""
         assert counts_as_done(stage, 1) is False
 
-    def test_validation_is_done_even_when_it_failed(self):
-        """It reports rather than produces, and --strict fails it while any
-        requested variable is missing -- so recording it only on success meant
+    def test_validation_that_found_problems_is_done(self):
+        """Exit 1 means it ran and reported. --strict fails it while any
+        requested variable is missing, so recording it only on success meant
         every resume repeated all of it."""
         assert counts_as_done("validate", 1) is True
 
-    def test_validation_is_done_whatever_the_exit_code(self):
-        """A crash is no more reason to repeat it than a strict complaint."""
-        assert counts_as_done("validate", 2) is True
-        assert counts_as_done("validate", 137) is True
+    def test_validation_that_could_not_run_is_not_done(self):
+        """Exit 3 is the validator saying it crashed -- nothing to show, so it
+        has to be tried again rather than recorded."""
+        assert counts_as_done("validate", 3) is False
+
+    @pytest.mark.parametrize("returncode", [2, 137, -15])
+    def test_any_other_ending_is_not_done(self, returncode):
+        """An argument error, a kill, a signal: none of them ran."""
+        assert counts_as_done("validate", returncode) is False
 
 
 class TestPeriodTag:

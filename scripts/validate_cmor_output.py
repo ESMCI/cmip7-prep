@@ -33,6 +33,11 @@ import numpy as np
 import xarray as xr
 import yaml
 
+from cmip7_prep.validation_exit import (
+    COULD_NOT_RUN,
+    RAN_AND_FOUND_PROBLEMS,
+    RAN_AND_PASSED,
+)
 from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
 
 from cmor_driver import REALM_YAML_MAP
@@ -1092,9 +1097,15 @@ def main() -> int:
     if args.strict and (
         report["variables_with_log_errors"] or report["expected_but_not_produced"]
     ):
-        return 1
-    return 0
+        return RAN_AND_FOUND_PROBLEMS
+    return RAN_AND_PASSED
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except BaseException:  # pylint: disable=broad-except
+        logger.exception("Validation could not run")
+        sys.exit(COULD_NOT_RUN)
