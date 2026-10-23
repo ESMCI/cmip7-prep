@@ -527,32 +527,6 @@ def _prepare_regridded(
     return cmor_items
 
 
-def _start_worker_log(log_dir) -> None:
-    """Send this worker's own logging to its own file.
-
-    Run once in each worker as it starts.  Eight workers sharing one stream
-    interleave line by line, and following any one variable through that is
-    hopeless.  Each worker writes its own file instead, and the parent's
-    stream keeps the things that are about the run as a whole: which jobs
-    started, which failed, and the summary.
-    """
-    path = Path(log_dir) / f"worker_{os.getpid()}.log"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(path, encoding="utf-8")
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-    )
-    root = logging.getLogger()
-    # The stream handler goes: left in place, every line would land in the
-    # shared log as well and nothing would be gained.
-    for existing in list(root.handlers):
-        if isinstance(existing, logging.StreamHandler) and not isinstance(
-            existing, logging.FileHandler
-        ):
-            root.removeHandler(existing)
-    root.addHandler(handler)
-
-
 def _job_name(kwargs) -> str:
     """Name one submitted job: the variable, and its window when there is one."""
     window = kwargs.get("window")
@@ -1093,7 +1067,6 @@ def main():
                     and any(_filename_contains_var(p, mv) for mv in model_vars)
                 }
             )
-            logger.info("=" * 60)
             if not ts_files:
                 logger.warning(f"No timeseries files found for variable {varname}")
                 continue
@@ -1186,17 +1159,9 @@ def main():
                 len(pending),
                 args.workers,
             )
-            worker_log_dir = OUTDIR / "logs" / realm
-            logger.info(
-                "Each worker's own detail goes to %s/worker_<pid>.log",
-                worker_log_dir,
-            )
             context = multiprocessing.get_context("spawn")
             with ProcessPoolExecutor(
-                max_workers=min(args.workers, len(pending)),
-                mp_context=context,
-                initializer=_start_worker_log,
-                initargs=(worker_log_dir,),
+                max_workers=min(args.workers, len(pending)), mp_context=context
             ) as pool:
                 # Labelled with the window as well as the variable: the same
                 # variable is submitted once per window, so the name alone
