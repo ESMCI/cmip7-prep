@@ -516,7 +516,6 @@ def main():
     )
 
     run_log = _start_run_log(Path(args.outdir) / "logs")
-    logger.info("Recording this run in %s", run_log)
 
     case_dir = Path(args.case_dir)
     if not case_dir.is_dir():
@@ -562,12 +561,6 @@ def main():
         logger.error("Nothing to do. Skipped: %s", plan.skipped or "(nothing)")
         sys.exit(2)
 
-    logger.info(
-        "%d step(s) over realms %s",
-        len(plan.steps),
-        sorted({step.realm for step in plan.steps}),
-    )
-
     if args.dry_run:
         print_plan(plan)
         return
@@ -579,17 +572,44 @@ def main():
     tag = period_tag(args.years)
     log_dir = step_log_dir(outdir, tag)
     log_dir.mkdir(parents=True, exist_ok=True)
-    if tag:
-        logger.info("Step logs and progress for years %s", tag)
-
     completed_file = completed_path(outdir, tag)
     completed = set() if args.force else read_completed(completed_file)
-    if completed:
+
+    # One block saying what this run will do and where it will put things,
+    # rather than four lines each saying part of it.
+    to_run = [step for step in plan.steps if step.key not in completed]
+    done_already = len(plan.steps) - len(to_run)
+
+    # Said as sentences rather than a list of fields, because the first thing
+    # anyone wants from a run that takes hours is to know it is about to do
+    # what they meant.
+    logger.info(
+        "Running %s for %s of %s, over %s.",
+        " and ".join(args.stages),
+        f"years {tag}" if tag else "every year present",
+        args.experiment,
+        ", ".join(sorted({step.realm for step in plan.steps})),
+    )
+    # Named, not just counted: "12 steps" says nothing about which realm or
+    # frequency is about to take an hour.  One line per stage keeps it short.
+    for stage in args.stages:
+        in_stage = [step for step in to_run if step.stage == stage]
+        if in_stage:
+            logger.info(
+                "  %d %s step(s): %s",
+                len(in_stage),
+                stage,
+                ", ".join(f"{s.realm} {s.frequency}" for s in in_stage),
+            )
+    if done_already:
         logger.info(
-            "%d step(s) already completed, from %s; pass --force to run them " "again",
-            len(completed),
-            completed_file,
+            "  %d step(s) were done by an earlier run and will be skipped. Add "
+            "--force to do them again.",
+            done_already,
         )
+
+    logger.info("Each step's output goes to %s.", log_dir)
+    logger.info("A record of every run of this period goes to %s.", run_log)
 
     outcomes = []
     for step in plan.steps:
