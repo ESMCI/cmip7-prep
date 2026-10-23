@@ -14,12 +14,6 @@ import argparse
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-
-import inspect
-
-print(inspect.getframeinfo(inspect.getouterframes(inspect.currentframe())[0][0])[0])
-
-
 import os
 from pathlib import Path
 import logging

@@ -35,6 +35,7 @@ _LOCAL_PATH = Path(__file__).resolve().parent
 sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 
 # pylint: disable=wrong-import-position
+from cmip7_prep.time_windows import year_windows
 from cmip7_prep.cv_lookup import validate as validate_cv
 from cmip7_prep.grids import MODEL_RESOLUTIONS
 from cmip7_prep.reference_run import (
@@ -232,9 +233,52 @@ def parse_arguments():
 COMPLETED_NAME = "completed_steps.json"
 
 
-def read_completed(outdir: Path) -> set[str]:
-    """Return the keys of steps a previous run completed in this directory."""
-    path = outdir / COMPLETED_NAME
+def period_tag(years: str | None) -> str | None:
+    """Name the period a run covers, from its --years, or None without one.
+
+    ``"1:50:10"`` gives ``"1-50"``.  Used to keep the things that belong to one
+    run -- the step logs and the record of what finished -- apart from another
+    run's, while the output tree and the time series stay shared: years 1-50
+    and 51-100 are one dataset, but they are two runs.
+
+    Without it, a second period would find every step recorded as complete and
+    do nothing at all, and would overwrite the first period's step logs.
+    """
+    if not years:
+        return None
+    windows = year_windows(years)
+    return f"{windows[0][0]}-{windows[-1][1]}"
+
+
+def completed_path(outdir: Path, tag: str | None) -> Path:
+    """Where a run's record of finished steps lives."""
+    if tag is None:
+        return outdir / COMPLETED_NAME
+    return outdir / f"completed_steps_{tag}.json"
+
+
+def step_log_dir(outdir: Path, tag: str | None) -> Path:
+    """Where a run's per-step logs live.  run.log stays above this, shared."""
+    if tag is None:
+        return outdir / "logs"
+    return outdir / "logs" / tag
+
+
+def counts_as_done(stage: str, returncode: int) -> bool:
+    """Whether a finished step should be skipped by a later resume.
+
+    A step that succeeded, always.  And validation whether it passed or not:
+    it produces a report that nothing else consumes, and under --strict it
+    fails while any requested variable is missing -- so recording it only on
+    success meant it was never recorded, and every resume repeated all of it.
+    On a 50-year run that was 75 minutes of rework before reaching the step
+    that had actually stopped.  --force runs it again.
+    """
+    return returncode == 0 or stage == "validate"
+
+
+def read_completed(path: Path) -> set[str]:
+    """Return the keys of steps a previous run of this period completed."""
     if not path.is_file():
         return set()
     try:
@@ -244,9 +288,8 @@ def read_completed(outdir: Path) -> set[str]:
         return set()
 
 
-def record_completed(outdir: Path, done: set[str]) -> None:
+def record_completed(path: Path, done: set[str]) -> None:
     """Write the set of completed step keys, sorted so the file diffs cleanly."""
-    path = outdir / COMPLETED_NAME
     try:
         path.write_text(json.dumps(sorted(done), indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
@@ -449,14 +492,22 @@ def main():
         return
 
     outdir = Path(args.outdir)
-    log_dir = outdir / "logs"  # already created by _start_run_log
+    # Per-period, so finishing years 51-100 cannot overwrite the step logs or
+    # the progress record of years 1-50.  run.log stays shared and appended to,
+    # so one file still tells the whole story.
+    tag = period_tag(args.years)
+    log_dir = step_log_dir(outdir, tag)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    if tag:
+        logger.info("Step logs and progress for years %s", tag)
 
-    completed = set() if args.force else read_completed(outdir)
+    completed_file = completed_path(outdir, tag)
+    completed = set() if args.force else read_completed(completed_file)
     if completed:
         logger.info(
-            "%d step(s) already completed in %s; pass --force to run them again",
+            "%d step(s) already completed, from %s; pass --force to run them " "again",
             len(completed),
-            outdir,
+            completed_file,
         )
 
     outcomes = []
@@ -466,12 +517,16 @@ def main():
             continue
         outcome = run_step(step, log_dir)
         outcomes.append(outcome)
-        if outcome["returncode"] == 0:
+
+        if counts_as_done(step.stage, outcome["returncode"]):
             completed.add(step.key)
             # Written after every step, so an interrupted run still knows what
             # it finished.
-            record_completed(outdir, completed)
-        elif not args.keep_going:
+            record_completed(completed_file, completed)
+
+        # Stopping is decided separately from recording: a failure still stops
+        # the run unless --keep-going, validation included.
+        if outcome["returncode"] != 0 and not args.keep_going:
             logger.error("Stopping at the first failure; pass --keep-going to continue")
             break
 
