@@ -213,7 +213,12 @@ def parse_arguments():
     behaviour.add_argument(
         "--keep-going",
         action="store_true",
-        help="Continue after a failing step instead of stopping",
+        help=(
+            "Continue after a failing time series or CMORization step instead "
+            "of stopping. Validation failures never stop a run whether this is "
+            "given or not: validation reports rather than produces, and under "
+            "--strict it fails while any requested variable is missing."
+        ),
     )
     behaviour.add_argument(
         "--tables-root",
@@ -275,6 +280,23 @@ def counts_as_done(stage: str, returncode: int) -> bool:
     that had actually stopped.  --force runs it again.
     """
     return returncode == 0 or stage == "validate"
+
+
+def should_stop(stage: str, returncode: int, keep_going: bool) -> bool:
+    """Whether a finished step's result should stop the rest of the run.
+
+    Never for validation.  It reports rather than produces, nothing after it
+    depends on it, and under --strict it fails while any requested variable is
+    missing -- so stopping for it would end every run at the third step.
+
+    Otherwise a failure stops the run unless --keep-going: a missing time
+    series or CMOR file means everything after it is working from input that
+    is not there, and finding that out three hours later is worse than
+    stopping.
+    """
+    if returncode == 0 or stage == "validate":
+        return False
+    return not keep_going
 
 
 def read_completed(path: Path) -> set[str]:
@@ -524,10 +546,12 @@ def main():
             # it finished.
             record_completed(completed_file, completed)
 
-        # Stopping is decided separately from recording: a failure still stops
-        # the run unless --keep-going, validation included.
-        if outcome["returncode"] != 0 and not args.keep_going:
-            logger.error("Stopping at the first failure; pass --keep-going to continue")
+        # Decided separately from recording.
+        if should_stop(step.stage, outcome["returncode"], args.keep_going):
+            logger.error(
+                "Stopping here; pass --keep-going to carry on past a failed %s step",
+                step.stage,
+            )
             break
 
     if not outcomes:
