@@ -57,6 +57,7 @@ from cmip7_prep.pipeline import (
 )
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
+from cmip7_prep.output_files import remove_superseded
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 from cmip7_prep.time_windows import select_years, year_windows
 from cmip7_prep.variable_ref import VariableRef
@@ -782,7 +783,11 @@ def process_one_var(
                         },
                     )()
                     # Now use CMOR utility to write out netcdf variable
-                    cm.write_variable(ds_cmor_write, cmip_var, vdef)
+                    written_path = cm.write_variable(ds_cmor_write, cmip_var, vdef)
+
+                # Done after the write, so a file is only ever removed once
+                # its replacement is on disk.
+                remove_superseded(written_path)
 
                 # A high-water mark for the process, so this is the largest any
                 # variable has needed so far, not this one alone. A jump from the

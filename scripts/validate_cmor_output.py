@@ -8,6 +8,7 @@ has run. It reports:
 * variables with CMOR log errors
 * variables expected for the selected subset that were not produced
 * dimension inventory for variables that were produced
+* files whose period another file of the same variable already covers
 
 It can also optionally create:
 
@@ -39,6 +40,7 @@ from cmip7_prep.validation_exit import (
     RAN_AND_PASSED,
 )
 from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
+from cmip7_prep.output_files import redundant_pairs
 
 from cmor_driver import REALM_YAML_MAP
 
@@ -634,6 +636,7 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
         f"- Produced variables: {report['counts']['produced_variables']}",
         f"- Variables with log errors: {report['counts']['variables_with_log_errors']}",
         f"- Missing variables: {report['counts']['missing_variables']}",
+        f"- Redundant files: {report['counts']['redundant_files']}",
         "",
         "## Variables With Log Errors",
         "",
@@ -643,6 +646,9 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     lines.extend(["", "## Missing Variables", ""])
     for variable in report["expected_but_not_produced"]:
         lines.append(f"- {variable}")
+    lines.extend(["", "## Redundant Files", ""])
+    for item in report["redundant_files"]:
+        lines.append(f"- {item['redundant']} (covered by {item['covered_by']})")
     lines.extend(["", "## Produced Variable Inventory", ""])
     for item in report["dimension_inventory"]:
         dims = "; ".join(item["dims"])
@@ -1003,6 +1009,18 @@ def build_report(
     flattened_log_records = [
         asdict(record) for records in log_records.values() for record in records
     ]
+    # A variable's files should each cover a different period.  One whose
+    # period lies inside another's repeats times the other already holds, so
+    # one of the two is unwanted.
+    redundant_files = [
+        {
+            "variable": variable,
+            "redundant": str(redundant),
+            "covered_by": covering.name,
+        }
+        for variable, paths in sorted(produced_files.items())
+        for redundant, covering in redundant_pairs(paths)
+    ]
 
     return {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -1022,6 +1040,7 @@ def build_report(
             "variables_with_log_errors": len(variables_with_log_errors),
             "missing_variables": len(expected_but_not_produced),
             "inspection_errors": len(inspection_errors),
+            "redundant_files": len(redundant_files),
         },
         "expected_variables": expected_variables,
         "variables_with_log_errors": variables_with_log_errors,
@@ -1031,6 +1050,7 @@ def build_report(
         "variable_provenance": variable_provenance,
         "log_records": flattened_log_records,
         "inspection_errors": inspection_errors,
+        "redundant_files": redundant_files,
         "plots": plot_outputs,
     }
 
@@ -1051,6 +1071,16 @@ def print_summary(report: dict[str, Any]) -> None:
         print("Expected but not produced:")
         for variable in report["expected_but_not_produced"]:
             print(f"  - {variable}")
+    if report["redundant_files"]:
+        print(
+            "Files whose period another file of the same variable also covers, "
+            "so those times appear twice. A run killed while writing a variable "
+            "leaves one, and so does rerunning a variable with a different "
+            "window of years. Decide which file is wanted and delete the other:"
+        )
+        for item in report["redundant_files"]:
+            print(f"  - {item['redundant']}")
+            print(f"    covered by {item['covered_by']}")
 
 
 def main() -> int:
@@ -1149,6 +1179,7 @@ def main() -> int:
         report["dimension_inventory"], report_dir / "dimension_inventory.csv"
     )
     write_csv_rows(report["inspection_errors"], report_dir / "inspection_errors.csv")
+    write_csv_rows(report["redundant_files"], report_dir / "redundant_files.csv")
     write_markdown_summary(report, report_dir / "validation_summary.md")
 
     print_summary(report)
@@ -1165,7 +1196,9 @@ def main() -> int:
         print(f"HTML interface written to {index_path}")
 
     if args.strict and (
-        report["variables_with_log_errors"] or report["expected_but_not_produced"]
+        report["variables_with_log_errors"]
+        or report["expected_but_not_produced"]
+        or report["redundant_files"]
     ):
         return RAN_AND_FOUND_PROBLEMS
     return RAN_AND_PASSED
