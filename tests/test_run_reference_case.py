@@ -10,9 +10,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from run_reference_case import (
     completed_path,
     counts_as_done,
+    outcome_label,
     period_tag,
     read_completed,
     record_completed,
+    should_stop,
     step_log_dir,
 )
 
@@ -45,6 +47,60 @@ class TestCountsAsDone:
     def test_any_other_ending_is_not_done(self, returncode):
         """An argument error, a kill, a signal: none of them ran."""
         assert counts_as_done("validate", returncode) is False
+
+    def test_a_time_series_step_missing_a_frequency_is_done(self):
+        """Exit 4 says a frequency has no output, which a rerun cannot change."""
+        assert counts_as_done("timeseries", 4) is True
+
+    def test_exit_4_from_another_stage_is_not_done(self):
+        """Only the time series step gives exit 4 that meaning."""
+        assert counts_as_done("cmor", 4) is False
+
+
+class TestOutcomeLabel:
+    """Tests for how a finished step reads in the summary table."""
+
+    @pytest.mark.parametrize("stage", ["timeseries", "cmor", "validate"])
+    def test_success_is_ok(self, stage):
+        """Whatever the stage."""
+        assert outcome_label(stage, 0) == "ok"
+
+    def test_a_time_series_step_missing_a_frequency_is_a_warning(self):
+        """Not ok, because something is absent; not a failure, because the
+        case never wrote it."""
+        assert outcome_label("timeseries", 4) == "warning"
+
+    def test_validation_finding_problems_is_a_report(self):
+        """Reporting is what it is for."""
+        assert outcome_label("validate", 1) == "reported problems"
+
+    @pytest.mark.parametrize(
+        "stage,returncode", [("timeseries", 1), ("cmor", 4), ("validate", 3)]
+    )
+    def test_anything_else_is_a_failure(self, stage, returncode):
+        """Including exit 4 from a stage that does not define it."""
+        assert outcome_label(stage, returncode) == f"FAILED ({returncode})"
+
+
+class TestShouldStop:
+    """Tests for which results end the rest of the run."""
+
+    @pytest.mark.parametrize("stage", ["timeseries", "cmor", "validate"])
+    def test_success_never_stops(self, stage):
+        """Whatever the stage."""
+        assert should_stop(stage, 0, keep_going=False) is False
+
+    def test_a_time_series_step_missing_a_frequency_does_not_stop(self):
+        """The remaining realms are unaffected by it."""
+        assert should_stop("timeseries", 4, keep_going=False) is False
+
+    def test_a_failed_time_series_step_stops(self):
+        """Everything after it would read input that is not there."""
+        assert should_stop("timeseries", 1, keep_going=False) is True
+
+    def test_keep_going_overrides_a_failure(self):
+        """That is what it is for."""
+        assert should_stop("timeseries", 1, keep_going=True) is False
 
 
 class TestPeriodTag:

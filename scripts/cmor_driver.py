@@ -58,6 +58,7 @@ from cmip7_prep.pipeline import (
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.output_files import remove_superseded
+from cmip7_prep.worker_lifetime import die_with_parent
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 from cmip7_prep.time_windows import select_years, year_windows
 from cmip7_prep.variable_ref import VariableRef
@@ -1176,7 +1177,11 @@ def main():
             )
             context = multiprocessing.get_context("spawn")
             with ProcessPoolExecutor(
-                max_workers=min(args.workers, len(pending)), mp_context=context
+                max_workers=min(args.workers, len(pending)),
+                mp_context=context,
+                # So that killing this run does not leave workers behind
+                # holding their memory.
+                initializer=die_with_parent,
             ) as pool:
                 # Labelled with the window as well as the variable: the same
                 # variable is submitted once per window, so the name alone

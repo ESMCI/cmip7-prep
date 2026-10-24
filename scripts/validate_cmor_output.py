@@ -34,7 +34,7 @@ import numpy as np
 import xarray as xr
 import yaml
 
-from cmip7_prep.validation_exit import (
+from cmip7_prep.step_exit import (
     COULD_NOT_RUN,
     RAN_AND_FOUND_PROBLEMS,
     RAN_AND_PASSED,

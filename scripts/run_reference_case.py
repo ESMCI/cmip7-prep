@@ -36,7 +36,11 @@ sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 
 # pylint: disable=wrong-import-position
 from cmip7_prep.time_windows import year_windows
-from cmip7_prep.validation_exit import RAN_AND_FOUND_PROBLEMS, RAN_AND_PASSED
+from cmip7_prep.step_exit import (
+    A_FREQUENCY_IS_EMPTY,
+    RAN_AND_FOUND_PROBLEMS,
+    RAN_AND_PASSED,
+)
 from cmip7_prep.cv_lookup import validate as validate_cv
 from cmip7_prep.grids import MODEL_RESOLUTIONS
 from cmip7_prep.reference_run import (
@@ -273,30 +277,36 @@ def step_log_dir(outdir: Path, tag: str | None) -> Path:
 def outcome_label(stage: str, returncode: int) -> str:
     """How a finished step's result reads in the summary.
 
-    Validation reporting problems is not a failure of the run -- it is the
-    report, and under --strict it says so whenever a requested variable is
-    missing.  Calling that FAILED, in the same words as a crash, made twelve
-    working reports look like twelve broken steps.
+    Two outcomes are neither success nor failure, and saying FAILED in the same
+    words as a crash would hide the real failures among them.  Validation
+    reporting problems is the report itself, and under --strict it says so
+    whenever a requested variable is missing.  A time series step warns when a
+    frequency has no output, which rerunning cannot change.
     """
     if returncode == 0:
         return "ok"
     if stage == "validate" and returncode == RAN_AND_FOUND_PROBLEMS:
         return "reported problems"
+    if stage == "timeseries" and returncode == A_FREQUENCY_IS_EMPTY:
+        return "warning"
     return f"FAILED ({returncode})"
 
 
 def counts_as_done(stage: str, returncode: int) -> bool:
     """Whether a resume can skip this step because it already ran.
 
-    Time series and CMOR steps count only if they succeeded.  Validation counts
-    unless it crashed, because reporting problems is its job rather than a
-    failure.
+    CMOR steps count only if they succeeded.  Validation counts unless it
+    crashed, because reporting problems is its job rather than a failure.  A
+    time series step counts when its only complaint is a frequency with no
+    output, since repeating it cannot produce what the case never wrote.
 
     --force skips nothing.
     """
     if returncode == RAN_AND_PASSED:
         return True
     if stage == "validate" and returncode == RAN_AND_FOUND_PROBLEMS:
+        return True
+    if stage == "timeseries" and returncode == A_FREQUENCY_IS_EMPTY:
         return True
     return False
 
@@ -308,12 +318,17 @@ def should_stop(stage: str, returncode: int, keep_going: bool) -> bool:
     depends on it, and under --strict it fails while any requested variable is
     missing -- so stopping for it would end every run at the third step.
 
+    Never for a time series step whose only complaint is a frequency with no
+    output, which is a warning about this case rather than something wrong.
+
     Otherwise a failure stops the run unless --keep-going: a missing time
     series or CMOR file means everything after it is working from input that
     is not there, and finding that out three hours later is worse than
     stopping.
     """
     if returncode == 0 or stage == "validate":
+        return False
+    if stage == "timeseries" and returncode == A_FREQUENCY_IS_EMPTY:
         return False
     return not keep_going
 
@@ -364,12 +379,13 @@ def run_step(step: Step, log_dir: Path) -> dict:
     label = outcome_label(step.stage, completed.returncode)
     if label == "ok":
         logger.info("[%s] ok in %.1fs", step.key, elapsed)
-    elif label == "reported problems":
-        # A warning, not an error: the report is the step's job, and under
-        # --strict it has problems to report whenever a variable is missing.
+    elif label != "ok" and not label.startswith("FAILED"):
+        # Neither success nor failure: a validation report, or a time series
+        # step warning that a frequency has no output.  The log says which.
         logger.warning(
-            "[%s] reported problems after %.1fs -- see %s",
+            "[%s] %s after %.1fs -- see %s",
             step.key,
+            label,
             elapsed,
             log_path,
         )
@@ -471,10 +487,15 @@ def print_report(outcomes: list[dict], plan: Plan) -> None:
         for o in outcomes
         if outcome_label(o["stage"], o["returncode"]) == "reported problems"
     ]
+    warned = [
+        o for o in outcomes if outcome_label(o["stage"], o["returncode"]) == "warning"
+    ]
     say("-" * 78)
-    tally = f"  {len(outcomes) - len(broken) - len(reported)} ok"
+    tally = f"  {len(outcomes) - len(broken) - len(reported) - len(warned)} ok"
     if reported:
         tally += f", {len(reported)} reported problems"
+    if warned:
+        tally += f", {len(warned)} with warnings"
     tally += f", {len(broken)} failed"
     total = sum(o["seconds"] for o in outcomes)
     say(f"{tally}, {total:.1f}s")
@@ -504,6 +525,10 @@ def print_report(outcomes: list[dict], plan: Plan) -> None:
     if reported:
         say("\n  validation reports:")
         for outcome in reported:
+            say(f"    {outcome['key']}: {outcome['log']}")
+    if warned:
+        say("\n  logs for the warnings:")
+        for outcome in warned:
             say(f"    {outcome['key']}: {outcome['log']}")
 
 
