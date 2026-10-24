@@ -55,7 +55,17 @@ CANONICAL_REALM_MAP = {
     "ocnBgchem": "ocean",
 }
 
-LOG_NAME_RE = re.compile(r"^cmor_\d{8}T\d{6}Z_(?P<variable>.+)\.log$")
+# The two names a CMOR log can have, both of which carry the variable's branded
+# name.  cmor_driver.py writes the first form, variable, region and window of
+# years, as in cmor_ta_tavg-p19-hxy-air_glb_1-10.log; rerunning that variable
+# and window overwrites its log.  The second form, which earlier versions wrote
+# and which may still be on disk, carries a timestamp instead of the region and
+# window, as in cmor_20261024T120000Z_ta_tavg-p19-hxy-air.log, so every attempt
+# left a log of its own behind.
+LOG_NAME_RE = re.compile(
+    r"^cmor_(?P<variable>.+?)_(?:glb|nh|sh)(?:_-?\d+--?\d+)?\.log$"
+)
+LOG_NAME_DATED_RE = re.compile(r"^cmor_\d{8}T\d{6}Z_(?P<variable>.+)\.log$")
 LOG_ERROR_RE = re.compile(r"Error: ", re.IGNORECASE)
 LOG_SUCCESS_RE = re.compile(r"\b(success|complete(?:d)?|finished)\b", re.IGNORECASE)
 
@@ -385,7 +395,7 @@ def build_variable_provenance(
 
 def parse_log_variable(log_path: Path) -> str | None:
     """Extract the CMIP variable name from a CMOR log filename."""
-    match = LOG_NAME_RE.match(log_path.name)
+    match = LOG_NAME_RE.match(log_path.name) or LOG_NAME_DATED_RE.match(log_path.name)
     if match is None:
         return None
     return match.group("variable")

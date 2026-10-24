@@ -743,16 +743,23 @@ def process_one_var(
                     tables_root=tables_root,
                     realm=realm,
                 )
+                # One log per variable, region and window, named from those
+                # three rather than from the time.  A rerun then overwrites the
+                # log it replaces, so this directory only ever holds logs for
+                # the output that is currently there.  Validation reads all of
+                # them, and a log left by an earlier run reports errors about
+                # files that have since been replaced or deleted.
+                region = write_cfg.get("region", "glb")
+                span = f"_{window[0]}-{window[1]}" if window else ""
                 with CmorSession(
                     tables_root=tables_root,
                     log_dir=log_dir,
-                    log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
+                    log_name=f"cmor_{varname}_{region}{span}.log",
                     dataset_attrs=dataset_cfg,
                     outdir=outdir,
                     ice_sheet=ice_sheet,
                     realm=realm,
                 ) as cm:
-                    region = write_cfg.get("region", "glb")
                     set_cur_dataset_attribute("region", region)
 
                     logger.info(
