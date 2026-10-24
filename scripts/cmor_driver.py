@@ -14,12 +14,6 @@ import argparse
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-
-import inspect
-
-print(inspect.getframeinfo(inspect.getouterframes(inspect.currentframe())[0][0])[0])
-
-
 import os
 from pathlib import Path
 import logging
@@ -64,6 +58,7 @@ from cmip7_prep.pipeline import (
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
+from cmip7_prep.time_windows import select_years, year_windows
 from cmip7_prep.variable_ref import VariableRef
 
 # The only logging configuration in the package: library modules attach
@@ -226,6 +221,20 @@ def parse_args():
     )
 
     paths = parser.add_argument_group("input and output")
+    paths.add_argument(
+        "--years",
+        default=None,
+        metavar="FIRST:LAST:INCREMENT",
+        help=(
+            "Years to CMORize, and how to split them across output files: "
+            "1:50:10 writes five ten-year files. Spelled the same way as "
+            "gen_timeseries.py --years-spec, so one value can be given to "
+            "both. Which times fall in a window is read from the data's own "
+            "time axis, not from any filename. Without this, all the times "
+            "found are written to one file per variable, however many years "
+            "that is."
+        ),
+    )
 
     paths.add_argument(
         "--outdir",
@@ -518,6 +527,13 @@ def _prepare_regridded(
     return cmor_items
 
 
+def _job_name(kwargs) -> str:
+    """Name one submitted job: the variable, and its window when there is one."""
+    window = kwargs.get("window")
+    name = str(kwargs["cmip_var"])
+    return f"{name} years {window[0]}-{window[1]}" if window else name
+
+
 def process_one_var(
     cmip_var,
     mapping,
@@ -533,6 +549,7 @@ def process_one_var(
     ocn_fx_fields=None,
     ice_sheet=None,
     experiment=None,
+    window=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples.
 
@@ -600,6 +617,33 @@ def process_one_var(
                 logger.debug(f"Source variable(s) not found for {varname}, skipping")
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
+
+            # One window of years, taken before anything else happens: the
+            # regridding and the vertical interpolation then only ever see a
+            # window's worth, and the output file covers that window.
+            if window is not None:
+                first, last = window
+                windowed = select_years(ds_native, first, last)
+                if windowed is None:
+                    logger.warning(
+                        "%s has no data in years %d-%d; no file written",
+                        varname,
+                        first,
+                        last,
+                    )
+                    results.append(
+                        (varname, f"WARNING: nothing in years {first}-{last}")
+                    )
+                    continue
+                logger.info(
+                    "%s: years %d-%d, %d time(s) of %d",
+                    varname,
+                    first,
+                    last,
+                    windowed.sizes.get("time", 0),
+                    ds_native.sizes.get("time", 0),
+                )
+                ds_native = windowed
             if model == "cesm":
                 # Append ocn_fx_fields to ds_native if available
                 # fx - grid definition like topography, fraction
@@ -923,6 +967,10 @@ def main():
                     cmip_vars.append(var)
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
 
+    # One entry per variable, each saying "ok" or why it was not written.
+    # Checked at the end of main to decide whether the run succeeded.
+    results: list[tuple[str, str]] = []
+
     # Load requested variables
     if len(cmip_vars) > 0:
         # Glob the union of every time sampling for this realm and frequency.
@@ -972,7 +1020,22 @@ def main():
             )
             sys.exit(1)
 
-        results = []
+        # One window per output file.  None means no splitting: every time
+        # found goes into one file per variable, as before --years existed.
+        if args.years:
+            try:
+                windows = year_windows(args.years)
+            except ValueError as exc:
+                logger.error("%s", exc)
+                sys.exit(2)
+            logger.info(
+                "Writing %d window(s) of years: %s",
+                len(windows),
+                ", ".join(f"{a}-{b}" for a, b in windows),
+            )
+        else:
+            windows = [None]
+
         # Deferred per-variable work, computed together once the loop ends.
         pending = []
         for v in cmip_vars:
@@ -1007,7 +1070,6 @@ def main():
                     and any(_filename_contains_var(p, mv) for mv in model_vars)
                 }
             )
-            logger.info("=" * 60)
             if not ts_files:
                 logger.warning(f"No timeseries files found for variable {varname}")
                 continue
@@ -1020,51 +1082,63 @@ def main():
             # worker; VariableRef carries the strings that are actually read.
             # Used on both paths so the two behave identically.
             var_ref = VariableRef.from_data_request(v)
-            if args.workers == 1:
-                try:
-                    res = process_one_var(
-                        var_ref,
-                        mapping,
-                        ts_files,
-                        tables_root,
-                        OUTDIR,
-                        resolution,
-                        args.model_res,
-                        model,
-                        realm=realm,
-                        frequency=frequency,
-                        ocn_fx_fields=ocn_fx_fields,
-                        ripf_index=ripf_index,
-                        ice_sheet=args.ice_sheet,
-                        experiment=args.experiment,
+            # A variable and a window together are one unit of work: each
+            # writes its own file, and each holds only that window's data, so
+            # five windows is five smaller jobs rather than one large one.
+            for window in windows:
+                if args.workers == 1:
+                    try:
+                        res = process_one_var(
+                            var_ref,
+                            mapping,
+                            ts_files,
+                            tables_root,
+                            OUTDIR,
+                            resolution,
+                            args.model_res,
+                            model,
+                            realm=realm,
+                            frequency=frequency,
+                            ocn_fx_fields=ocn_fx_fields,
+                            ripf_index=ripf_index,
+                            ice_sheet=args.ice_sheet,
+                            experiment=args.experiment,
+                            window=window,
+                        )
+                        results.extend(res)
+                    except Exception as exc:
+                        logger.error(
+                            "FAILED %s%s: %s",
+                            var_ref,
+                            f" years {window[0]}-{window[1]}" if window else "",
+                            exc,
+                            exc_info=True,
+                        )
+                        continue
+                else:
+                    # Collected, not run: submitting one variable here and
+                    # waiting for it would process them one at a time however
+                    # many workers there are, which is what --workers used to
+                    # do.  They are all submitted together after the loop.
+                    pending.append(
+                        {
+                            "cmip_var": var_ref,
+                            "mapping": mapping,
+                            "inputfiles": ts_files,
+                            "tables_root": tables_root,
+                            "outdir": OUTDIR,
+                            "resolution": resolution,
+                            "case_resolution": args.model_res,
+                            "model": model,
+                            "realm": realm,
+                            "frequency": frequency,
+                            "ripf_index": ripf_index,
+                            "ocn_fx_fields": ocn_fx_fields,
+                            "ice_sheet": args.ice_sheet,
+                            "experiment": args.experiment,
+                            "window": window,
+                        }
                     )
-                    results.extend(res)
-                except Exception as exc:
-                    logger.error("FAILED variable %s: %s", var_ref, exc, exc_info=True)
-                    continue
-            else:
-                # Collected, not run: submitting one variable here and
-                # waiting for it would process them one at a time however
-                # many workers there are, which is what --workers used to do.
-                # They are all submitted together after the loop.
-                pending.append(
-                    {
-                        "cmip_var": var_ref,
-                        "mapping": mapping,
-                        "inputfiles": ts_files,
-                        "tables_root": tables_root,
-                        "outdir": OUTDIR,
-                        "resolution": resolution,
-                        "case_resolution": args.model_res,
-                        "model": model,
-                        "realm": realm,
-                        "frequency": frequency,
-                        "ripf_index": ripf_index,
-                        "ocn_fx_fields": ocn_fx_fields,
-                        "ice_sheet": args.ice_sheet,
-                        "experiment": args.experiment,
-                    }
-                )
 
         if pending:
             # Each variable in its own freshly started process.
@@ -1084,7 +1158,7 @@ def main():
             # that this mechanism works, and gen_timeseries.py spreads its
             # file reads the same way.
             logger.info(
-                "Processing %d variables across %d worker process(es)",
+                "Processing %d job(s) across %d worker process(es)",
                 len(pending),
                 args.workers,
             )
@@ -1092,8 +1166,11 @@ def main():
             with ProcessPoolExecutor(
                 max_workers=min(args.workers, len(pending)), mp_context=context
             ) as pool:
+                # Labelled with the window as well as the variable: the same
+                # variable is submitted once per window, so the name alone
+                # would not say which job failed.
                 futures = {
-                    pool.submit(process_one_var, **kwargs): kwargs["cmip_var"]
+                    pool.submit(process_one_var, **kwargs): _job_name(kwargs)
                     for kwargs in pending
                 }
                 for future in as_completed(futures):
@@ -1101,7 +1178,7 @@ def main():
                     try:
                         result = future.result()
                     except Exception as exc:  # pylint: disable=broad-except
-                        logger.error("FAILED variable %s: %s", name, exc, exc_info=True)
+                        logger.error("FAILED %s: %s", name, exc, exc_info=True)
                         results.append((str(name), f"ERROR: {exc!r}"))
                         continue
                     if isinstance(result, list):
@@ -1130,6 +1207,19 @@ def main():
             _format_duration(time.monotonic() - run_start),
             _peak_memory_gb(),
         )
+
+    # Writing no variables at all is a failure, even when every variable was
+    # skipped for a reason that was reported at the time.  A run that produces
+    # nothing should not report success.
+    written = [name for name, status in results if status == "ok"]
+    if not written:
+        logger.error(
+            "No variables were written. %d were attempted; see the warnings "
+            "and errors above for each.",
+            len({name for name, _ in results}),
+        )
+        sys.exit(1)
+    logger.info("Wrote %d variable(s)", len(written))
 
 
 if __name__ == "__main__":

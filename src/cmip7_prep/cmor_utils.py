@@ -40,8 +40,12 @@ _INSTITUTION_ID_BY_MODEL = {"noresm": "NCC", "cesm": "NCAR"}
 
 # DRS path/filename templates; structural, so they live here rather than in the
 # CV or the per-model config.
+# As the controlled vocabulary's directory_path_template gives it, except for
+# the trailing <version>: that is a dated directory identifying one published
+# edition of a dataset, and how it should be managed is a publication question
+# rather than a CMORization one.
 _OUTPUT_PATH_TEMPLATE = (
-    "<mip_era><activity_id><institution_id><source_id><experiment_id>"
+    "<drs_specs><mip_era><activity_id><institution_id><source_id><experiment_id>"
     "<variant_label><region><frequency><variable_id><branding_suffix><grid_label>"
 )
 _OUTPUT_FILE_TEMPLATE = (

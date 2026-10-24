@@ -35,6 +35,8 @@ _LOCAL_PATH = Path(__file__).resolve().parent
 sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 
 # pylint: disable=wrong-import-position
+from cmip7_prep.time_windows import year_windows
+from cmip7_prep.validation_exit import RAN_AND_FOUND_PROBLEMS, RAN_AND_PASSED
 from cmip7_prep.cv_lookup import validate as validate_cv
 from cmip7_prep.grids import MODEL_RESOLUTIONS
 from cmip7_prep.reference_run import (
@@ -212,7 +214,12 @@ def parse_arguments():
     behaviour.add_argument(
         "--keep-going",
         action="store_true",
-        help="Continue after a failing step instead of stopping",
+        help=(
+            "Continue after a failing time series or CMORization step instead "
+            "of stopping. Validation failures never stop a run whether this is "
+            "given or not: validation reports rather than produces, and under "
+            "--strict it fails while any requested variable is missing."
+        ),
     )
     behaviour.add_argument(
         "--tables-root",
@@ -232,9 +239,87 @@ def parse_arguments():
 COMPLETED_NAME = "completed_steps.json"
 
 
-def read_completed(outdir: Path) -> set[str]:
-    """Return the keys of steps a previous run completed in this directory."""
-    path = outdir / COMPLETED_NAME
+def period_tag(years: str | None) -> str | None:
+    """Name the period a run covers, from its --years, or None without one.
+
+    ``"1:50:10"`` gives ``"1-50"``.  Used to keep the things that belong to one
+    run -- the step logs and the record of what finished -- apart from another
+    run's, while the output tree and the time series stay shared: years 1-50
+    and 51-100 are one dataset, but they are two runs.
+
+    Each period therefore has its own step logs and its own record of what
+    finished, and neither can overwrite the other's.
+    """
+    if not years:
+        return None
+    windows = year_windows(years)
+    return f"{windows[0][0]}-{windows[-1][1]}"
+
+
+def completed_path(outdir: Path, tag: str | None) -> Path:
+    """Where a run's record of finished steps lives."""
+    if tag is None:
+        return outdir / COMPLETED_NAME
+    return outdir / f"completed_steps_{tag}.json"
+
+
+def step_log_dir(outdir: Path, tag: str | None) -> Path:
+    """Where a run's per-step logs live.  run.log stays above this, shared."""
+    if tag is None:
+        return outdir / "logs"
+    return outdir / "logs" / tag
+
+
+def outcome_label(stage: str, returncode: int) -> str:
+    """How a finished step's result reads in the summary.
+
+    Validation reporting problems is not a failure of the run -- it is the
+    report, and under --strict it says so whenever a requested variable is
+    missing.  Calling that FAILED, in the same words as a crash, made twelve
+    working reports look like twelve broken steps.
+    """
+    if returncode == 0:
+        return "ok"
+    if stage == "validate" and returncode == RAN_AND_FOUND_PROBLEMS:
+        return "reported problems"
+    return f"FAILED ({returncode})"
+
+
+def counts_as_done(stage: str, returncode: int) -> bool:
+    """Whether a resume can skip this step because it already ran.
+
+    Time series and CMOR steps count only if they succeeded.  Validation counts
+    unless it crashed, because reporting problems is its job rather than a
+    failure.
+
+    --force skips nothing.
+    """
+    if returncode == RAN_AND_PASSED:
+        return True
+    if stage == "validate" and returncode == RAN_AND_FOUND_PROBLEMS:
+        return True
+    return False
+
+
+def should_stop(stage: str, returncode: int, keep_going: bool) -> bool:
+    """Whether a finished step's result should stop the rest of the run.
+
+    Never for validation.  It reports rather than produces, nothing after it
+    depends on it, and under --strict it fails while any requested variable is
+    missing -- so stopping for it would end every run at the third step.
+
+    Otherwise a failure stops the run unless --keep-going: a missing time
+    series or CMOR file means everything after it is working from input that
+    is not there, and finding that out three hours later is worse than
+    stopping.
+    """
+    if returncode == 0 or stage == "validate":
+        return False
+    return not keep_going
+
+
+def read_completed(path: Path) -> set[str]:
+    """Return the keys of steps a previous run of this period completed."""
     if not path.is_file():
         return set()
     try:
@@ -244,9 +329,8 @@ def read_completed(outdir: Path) -> set[str]:
         return set()
 
 
-def record_completed(outdir: Path, done: set[str]) -> None:
+def record_completed(path: Path, done: set[str]) -> None:
     """Write the set of completed step keys, sorted so the file diffs cleanly."""
-    path = outdir / COMPLETED_NAME
     try:
         path.write_text(json.dumps(sorted(done), indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
@@ -277,8 +361,18 @@ def run_step(step: Step, log_dir: Path) -> dict:
         "seconds": elapsed,
         "log": str(log_path),
     }
-    if completed.returncode == 0:
+    label = outcome_label(step.stage, completed.returncode)
+    if label == "ok":
         logger.info("[%s] ok in %.1fs", step.key, elapsed)
+    elif label == "reported problems":
+        # A warning, not an error: the report is the step's job, and under
+        # --strict it has problems to report whenever a variable is missing.
+        logger.warning(
+            "[%s] reported problems after %.1fs -- see %s",
+            step.key,
+            elapsed,
+            log_path,
+        )
     else:
         logger.error(
             "[%s] FAILED (exit %d) after %.1fs -- see %s",
@@ -363,23 +457,53 @@ def print_report(outcomes: list[dict], plan: Plan) -> None:
 
     width = max((len(o["key"]) for o in outcomes), default=10)
     for outcome in outcomes:
-        status = (
-            "ok" if outcome["returncode"] == 0 else f"FAILED ({outcome['returncode']})"
-        )
-        say(f"  {outcome['key']:<{width}}  {outcome['seconds']:7.1f}s  {status}")
+        status = outcome_label(outcome["stage"], outcome["returncode"])
+        say(f"  {outcome['key']:<{width}}  {outcome['seconds']:9.1f}s  {status}")
 
-    failed = [o for o in outcomes if o["returncode"] != 0]
+    # Counted the way they are labelled: a validation report is not a failure.
+    broken = [
+        o
+        for o in outcomes
+        if outcome_label(o["stage"], o["returncode"]).startswith("FAILED")
+    ]
+    reported = [
+        o
+        for o in outcomes
+        if outcome_label(o["stage"], o["returncode"]) == "reported problems"
+    ]
     say("-" * 78)
-    say(f"  {len(outcomes) - len(failed)} ok, {len(failed)} failed")
+    tally = f"  {len(outcomes) - len(broken) - len(reported)} ok"
+    if reported:
+        tally += f", {len(reported)} reported problems"
+    tally += f", {len(broken)} failed"
+    total = sum(o["seconds"] for o in outcomes)
+    say(f"{tally}, {total:.1f}s")
+
+    # Where the time went, which is the question asked after every long run.
+    by_stage: dict[str, float] = {}
+    for outcome in outcomes:
+        by_stage[outcome["stage"]] = (
+            by_stage.get(outcome["stage"], 0.0) + outcome["seconds"]
+        )
+    if len(by_stage) > 1:
+        spent = ", ".join(
+            f"{stage} {seconds:.1f}s"
+            for stage, seconds in sorted(by_stage.items(), key=lambda kv: -kv[1])
+        )
+        say(f"  by stage: {spent}")
 
     if plan.skipped:
         say("\n  skipped:")
         for reason in plan.skipped:
             say(f"    {reason}")
 
-    if failed:
+    if broken:
         say("\n  logs for the failures:")
-        for outcome in failed:
+        for outcome in broken:
+            say(f"    {outcome['key']}: {outcome['log']}")
+    if reported:
+        say("\n  validation reports:")
+        for outcome in reported:
             say(f"    {outcome['key']}: {outcome['log']}")
 
 
@@ -392,7 +516,6 @@ def main():
     )
 
     run_log = _start_run_log(Path(args.outdir) / "logs")
-    logger.info("Recording this run in %s", run_log)
 
     case_dir = Path(args.case_dir)
     if not case_dir.is_dir():
@@ -438,26 +561,55 @@ def main():
         logger.error("Nothing to do. Skipped: %s", plan.skipped or "(nothing)")
         sys.exit(2)
 
-    logger.info(
-        "%d step(s) over realms %s",
-        len(plan.steps),
-        sorted({step.realm for step in plan.steps}),
-    )
-
     if args.dry_run:
         print_plan(plan)
         return
 
     outdir = Path(args.outdir)
-    log_dir = outdir / "logs"  # already created by _start_run_log
+    # Per-period, so finishing years 51-100 cannot overwrite the step logs or
+    # the progress record of years 1-50.  run.log stays shared and appended to,
+    # so one file still tells the whole story.
+    tag = period_tag(args.years)
+    log_dir = step_log_dir(outdir, tag)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    completed_file = completed_path(outdir, tag)
+    completed = set() if args.force else read_completed(completed_file)
 
-    completed = set() if args.force else read_completed(outdir)
-    if completed:
+    # One block saying what this run will do and where it will put things,
+    # rather than four lines each saying part of it.
+    to_run = [step for step in plan.steps if step.key not in completed]
+    done_already = len(plan.steps) - len(to_run)
+
+    # Said as sentences rather than a list of fields, because the first thing
+    # anyone wants from a run that takes hours is to know it is about to do
+    # what they meant.
+    logger.info(
+        "Running %s for %s of %s, over %s.",
+        " and ".join(args.stages),
+        f"years {tag}" if tag else "every year present",
+        args.experiment,
+        ", ".join(sorted({step.realm for step in plan.steps})),
+    )
+    # Named, not just counted: "12 steps" says nothing about which realm or
+    # frequency is about to take an hour.  One line per stage keeps it short.
+    for stage in args.stages:
+        in_stage = [step for step in to_run if step.stage == stage]
+        if in_stage:
+            logger.info(
+                "  %d %s step(s): %s",
+                len(in_stage),
+                stage,
+                ", ".join(f"{s.realm} {s.frequency}" for s in in_stage),
+            )
+    if done_already:
         logger.info(
-            "%d step(s) already completed in %s; pass --force to run them again",
-            len(completed),
-            outdir,
+            "  %d step(s) were done by an earlier run and will be skipped. Add "
+            "--force to do them again.",
+            done_already,
         )
+
+    logger.info("Each step's output goes to %s.", log_dir)
+    logger.info("A record of every run of this period goes to %s.", run_log)
 
     outcomes = []
     for step in plan.steps:
@@ -466,13 +618,19 @@ def main():
             continue
         outcome = run_step(step, log_dir)
         outcomes.append(outcome)
-        if outcome["returncode"] == 0:
+
+        if counts_as_done(step.stage, outcome["returncode"]):
             completed.add(step.key)
             # Written after every step, so an interrupted run still knows what
             # it finished.
-            record_completed(outdir, completed)
-        elif not args.keep_going:
-            logger.error("Stopping at the first failure; pass --keep-going to continue")
+            record_completed(completed_file, completed)
+
+        # Decided separately from recording.
+        if should_stop(step.stage, outcome["returncode"], args.keep_going):
+            logger.error(
+                "Stopping here; pass --keep-going to carry on past a failed %s step",
+                step.stage,
+            )
             break
 
     if not outcomes:
@@ -480,8 +638,15 @@ def main():
         return
     print_report(outcomes, plan)
 
-    failed = any(outcome["returncode"] != 0 for outcome in outcomes)
-    sys.exit(1 if failed else 0)
+    # A validation report is not a failure of the run, so it does not decide
+    # the exit code either -- otherwise every run exits non-zero for ever,
+    # which makes the code useless for telling whether anything is wrong.
+    broken = [
+        outcome
+        for outcome in outcomes
+        if outcome_label(outcome["stage"], outcome["returncode"]).startswith("FAILED")
+    ]
+    sys.exit(1 if broken else 0)
 
 
 if __name__ == "__main__":

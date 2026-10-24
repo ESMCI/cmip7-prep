@@ -33,6 +33,11 @@ import numpy as np
 import xarray as xr
 import yaml
 
+from cmip7_prep.validation_exit import (
+    COULD_NOT_RUN,
+    RAN_AND_FOUND_PROBLEMS,
+    RAN_AND_PASSED,
+)
 from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
 
 from cmor_driver import REALM_YAML_MAP
@@ -226,14 +231,18 @@ def _looks_like_cmip_root(path: Path) -> bool:
 def resolve_cmip_root(root_output_path: str | Path) -> Path:
     """Resolve the CMIP7 root directory from either a parent or direct path."""
     root = Path(root_output_path).expanduser().resolve()
-    if _looks_like_cmip_root(root):
-        return root
-    cmip_root = root / "CMIP7"
-    if _looks_like_cmip_root(cmip_root):
-        return cmip_root
+    # The output root may be given as the CMIP7 directory itself, as its
+    # parent, or as the parent of the DRS specification directory that the
+    # controlled vocabulary puts above it (MIP-DRS7/CMIP7/...).
+    tried = [root, root / "CMIP7"]
+    tried += sorted(child / "CMIP7" for child in root.glob("*") if child.is_dir())
+    for candidate in tried:
+        if _looks_like_cmip_root(candidate):
+            return candidate
     raise FileNotFoundError(
-        f"Could not locate CMIP output under {root}. Expected activity/institution "
-        f"directories under either {root} or {root / 'CMIP7'}."
+        f"Could not locate CMIP output under {root}. Expected activity and "
+        f"institution directories under one of: "
+        + ", ".join(str(path) for path in tried)
     )
 
 
@@ -418,7 +427,9 @@ def collect_log_records(
         variable = parse_log_variable(log_path)
         if variable is None:
             continue
-        if expected_variables and variable not in expected_variables:
+        # Read only the logs for variables that this realm and frequency
+        # expect.  One directory holds every realm's logs.
+        if variable not in expected_variables:
             continue
         record = parse_log_file(log_path)
         if record is None:
@@ -466,7 +477,11 @@ def scan_output_tree(
     inspection_errors: list[dict[str, str]] = []
     institution_id = MODEL_NAMING_MAPS[model][0]
     pattern = cmip_root.glob(
-        f"*/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/glb/{frequency}/*/*/*/*.nc"
+        # The region level is not always 'glb': the hemispheric sea-ice
+        # aggregates (siarea, siextent, sivol, sisnmass) are written under 'nh'
+        # and 'sh'.  Pinning it to 'glb' made those files invisible here, so
+        # they were reported missing while sitting on disk.
+        f"*/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/*/{frequency}/*/*/*/*.nc"
     )
     for file_path in sorted(pattern):
         relative = file_path.relative_to(cmip_root)
@@ -496,11 +511,12 @@ def scan_output_tree(
         if ensemble_member and path_ensemble != ensemble_member:
             logger.debug("Skipping due to ensemble filter: %s", ensemble_member)
             continue
-        if (
-            expected_variables
-            and f"{variable}_{dimension_folder}" not in expected_variables
-        ):
-            logger.debug("Skipping due to expected_variables filter: %s", variable)
+        # Keep only the variables that this realm and frequency expect.  All
+        # realms write their output into one CMIP7 output directory, and a
+        # file's path records its variable but not the realm that produced it,
+        # so the variable name is the only way to tell whose file this is.
+        if f"{variable}_{dimension_folder}" not in expected_variables:
+            logger.debug("Not expected here, skipping: %s", variable)
             continue
         produced[f"{variable}_{dimension_folder}"].append(file_path)
         try:
@@ -678,6 +694,20 @@ def _open_variable_timeseries(
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
+        # All four combine options are stated rather than left to xarray's
+        # defaults, which are changing.  These three functions reduce a
+        # variable to a figure, so only the time-varying data needs
+        # concatenating and the grid can be taken from the first file.
+        # A variable is written as one file per window of years, so a
+        # fifty-year run gives five files that are opened here as one series.
+        # The grid cell areas have no time dimension and are identical in all
+        # five, so "override" takes them from the first file rather than
+        # reading all five and checking that they match.  "minimal" does the
+        # same for the coordinates, and the two settings have to agree.
+        data_vars="minimal",
+        compat="override",
+        coords="minimal",
+        join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
@@ -702,6 +732,20 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
+        # All four combine options are stated rather than left to xarray's
+        # defaults, which are changing.  These three functions reduce a
+        # variable to a figure, so only the time-varying data needs
+        # concatenating and the grid can be taken from the first file.
+        # A variable is written as one file per window of years, so a
+        # fifty-year run gives five files that are opened here as one series.
+        # The grid cell areas have no time dimension and are identical in all
+        # five, so "override" takes them from the first file rather than
+        # reading all five and checking that they match.  "minimal" does the
+        # same for the coordinates, and the two settings have to agree.
+        data_vars="minimal",
+        compat="override",
+        coords="minimal",
+        join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
@@ -735,6 +779,20 @@ def _open_variable_zonal(file_paths: list[Path], variable: str) -> xr.DataArray 
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
+        # All four combine options are stated rather than left to xarray's
+        # defaults, which are changing.  These three functions reduce a
+        # variable to a figure, so only the time-varying data needs
+        # concatenating and the grid can be taken from the first file.
+        # A variable is written as one file per window of years, so a
+        # fifty-year run gives five files that are opened here as one series.
+        # The grid cell areas have no time dimension and are identical in all
+        # five, so "override" takes them from the first file rather than
+        # reading all five and checking that they match.  "minimal" does the
+        # same for the coordinates, and the two settings have to agree.
+        data_vars="minimal",
+        compat="override",
+        coords="minimal",
+        join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
@@ -1011,6 +1069,13 @@ def main() -> int:
         yaml_variables, requested_variables, args.variables
     )
     expected_variable_set = set(expected_variables)
+    if not expected_variable_set:
+        logger.warning(
+            "The data request asks for no %s variables at %s frequency, so "
+            "there is nothing to validate here.",
+            args.realm,
+            args.frequency,
+        )
 
     log_records = collect_log_records(logs_dir, expected_variable_set)
     produced_files, inventory_records, inspection_errors = scan_output_tree(
@@ -1092,9 +1157,15 @@ def main() -> int:
     if args.strict and (
         report["variables_with_log_errors"] or report["expected_but_not_produced"]
     ):
-        return 1
-    return 0
+        return RAN_AND_FOUND_PROBLEMS
+    return RAN_AND_PASSED
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except BaseException:  # pylint: disable=broad-except
+        logger.exception("Validation could not run")
+        sys.exit(COULD_NOT_RUN)

@@ -12,7 +12,8 @@ from pathlib import Path
 import json
 import tempfile
 
-from contextlib import AbstractContextManager
+import fcntl
+from contextlib import AbstractContextManager, contextmanager
 from typing import Any, Optional, Union
 import datetime as dt
 
@@ -352,14 +353,30 @@ class CmorSession(
         # Default region to "glb"; overridden per-variable in cmor_driver.py for NH/SH variants
         cmor.set_cur_dataset_attribute("region", "glb")
 
-        logger.debug("set _controlled_vocabulary_file:")
-        cmor.set_cur_dataset_attribute(
-            "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")
-        )
-        logger.debug("set _axis_entry_file:")
-        cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
-        logger.debug("set _formula_var_file:")
-        cmor.set_cur_dataset_attribute("_FORMULA_VAR_FILE", "CMIP7_formula_terms.json")
+        # A session is open from here on.  Python calls __exit__ only when
+        # __enter__ has returned, so anything failing below would leave the
+        # session open with nothing to close it.  CMOR allows one session per
+        # process and the pool gives each worker variable after variable, so a
+        # single leak makes every later variable in that worker fail with
+        # "Problem with 'cmor.setup'".
+        try:
+            logger.debug("set _controlled_vocabulary_file:")
+            cmor.set_cur_dataset_attribute(
+                "_controlled_vocabulary_file", str("../tables-cvs/cmor-cvs.json")
+            )
+            logger.debug("set _axis_entry_file:")
+            cmor.set_cur_dataset_attribute("_AXIS_ENTRY_FILE", "CMIP7_coordinate.json")
+            logger.debug("set _formula_var_file:")
+            cmor.set_cur_dataset_attribute(
+                "_FORMULA_VAR_FILE", "CMIP7_formula_terms.json"
+            )
+        except BaseException:
+            try:
+                cmor.close()
+            except Exception:  # pylint: disable=broad-except
+                # Already unusable; the original failure is the one to report.
+                pass
+            raise
         logger.debug("CMOR session initialized")
         return self
 
@@ -1326,6 +1343,42 @@ class CmorSession(
 
         return axes_ids
 
+    @contextmanager
+    def _fx_lock(self, name: str):
+        """Hold an exclusive lock while one fx variable is checked and written.
+
+        The fx fields are shared by every variable of a run, and written by
+        whichever one is processed first.  When variables are CMORized
+        concurrently each worker is its own process with its own session, so
+        several can find a field absent and write the same file at once.  The
+        lock makes that sequence -- look, then write -- atomic between them.
+
+        The lock only holds between processes on the same machine, which is
+        where the workers run.  Two jobs on different nodes writing the same
+        output directory are not protected.  With no output directory there is
+        no file to lock, and the body simply runs.
+        """
+        if not self._outdir:
+            yield
+            return
+        lock_dir = Path(self._outdir) / ".fx-locks"
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        with open(lock_dir / f"{name}.lock", "w", encoding="utf-8") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+    def _fx_on_disk(self, name: str):
+        """Return an fx field another run or worker has already written."""
+        if not self._outdir:
+            return None
+        try:
+            return open_existing_fx(self._outdir, name)
+        except FileNotFoundError:
+            return None
+
     def _write_fx_2d(self, ds: xr.Dataset, name: str, units: str) -> None:
         if name not in ds:
             return
@@ -1453,9 +1506,11 @@ class CmorSession(
 
         # Write sftof_ti-u-hxy-u if present (native grid sea fraction: wet)
         if "sftof_ti-u-hxy-u" in ds_regr and "sftof_ti-u-hxy-u" not in self._fx_written:
-            logger.debug("Writing fx variable sftof_ti-u-hxy-u")
-            self.load_table(self.tables_root, "ocean")
-            self._write_fx_2d(ds_regr, "sftof_ti-u-hxy-u", "%")
+            with self._fx_lock("sftof_ti-u-hxy-u"):
+                if self._fx_on_disk("sftof_ti-u-hxy-u") is None:
+                    logger.debug("Writing fx variable sftof_ti-u-hxy-u")
+                    self.load_table(self.tables_root, "ocean")
+                    self._write_fx_2d(ds_regr, "sftof_ti-u-hxy-u", "%")
             self._fx_written.add("sftof_ti-u-hxy-u")
 
         for name, units in need:
@@ -1483,7 +1538,12 @@ class CmorSession(
                                 }
                             )
                             self._fx_cache[name] = out[name]
-                    self._write_fx_2d(out, name, units)
+                    # Checked again inside the lock: another worker may have
+                    # written it between this run deciding to and getting here,
+                    # and two CMOR writes of one file race on the same path.
+                    with self._fx_lock(name):
+                        if self._fx_on_disk(name) is None:
+                            self._write_fx_2d(out, name, units)
                     self._fx_written.add(name)
                     continue
 
@@ -1663,16 +1723,26 @@ class CmorSession(
                 slab,
                 rec_bytes / (1024 * 1024),
             )
-            for start in range(0, ntime, slab):
+            # Progress is reported about ten times over rather than once per
+            # slab, since fifty years of daily data runs to some 1500 slabs.
+            # The first and last are always reported, so the slab size and the
+            # finish are never missing.
+            slabs = max(1, -(-ntime // slab))
+            report_every = max(1, slabs // 10)
+            for index, start in enumerate(range(0, ntime, slab)):
                 stop = min(start + slab, ntime)
-                logger.debug("[mem] materializing slab %d:%d of %d", start, stop, ntime)
+                tell = index == 0 or index == slabs - 1 or index % report_every == 0
                 block = np.asarray(data_filled.isel(time=slice(start, stop)))
-                logger.debug(
-                    "[mem] slab %d:%d materialized, %.1f MB; writing",
-                    start,
-                    stop,
-                    block.nbytes / (1024 * 1024),
-                )
+                if tell:
+                    logger.debug(
+                        "[mem] slab %d of %d (%d:%d of %d), %.1f MB; writing",
+                        index + 1,
+                        slabs,
+                        start,
+                        stop,
+                        ntime,
+                        block.nbytes / (1024 * 1024),
+                    )
                 cmor.write(var_id, block, ntimes_passed=stop - start)
         else:
             cmor.write(

@@ -275,6 +275,7 @@ def build_plan(
                         realm=realm,
                         frequency=frequency,
                         workers=cmor_workers,
+                        years=years,
                         ts_dir=ts_dir,
                         cmor_root=cmor_root,
                         model=model,
@@ -361,6 +362,7 @@ def _cmor_step(
     realm,
     frequency,
     workers,
+    years=None,
     ts_dir,
     cmor_root,
     model,
@@ -391,6 +393,10 @@ def _cmor_step(
     ]
     if model_res:
         command += ["--model-res", model_res]
+    # The same spec the time series step was given, so the output files cover
+    # the same spans as the time series that produced them.
+    if years:
+        command += ["--years", str(years)]
     if sheet:
         command += ["--ice-sheet", sheet]
     if variant_label:

@@ -715,7 +715,9 @@ def _regrid_fx_once(
     out_vars = {}
     if sftlf_path:
         logger.debug("Getting sftlf from output path %s", sftlf_path)
-        out_vars["sftlf"] = xr.open_mfdataset(sftlf_path)["sftlf"]
+        # One file, so there is nothing to combine.  open_dataset also has no
+        # combine options, whose defaults xarray is changing.
+        out_vars["sftlf"] = xr.open_dataset(sftlf_path)["sftlf"]
 
     ds_fx_native = _build_fx_native(ds_native)
 

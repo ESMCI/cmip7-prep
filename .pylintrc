@@ -1,7 +1,10 @@
 [MASTER]
 ignore-paths=build,dist,.venv,.eggs,scripts
 extension-pkg-allow-list=cmor
-init-hook='import sys, os; src = os.path.join(os.getcwd(), "src"); sys.path.insert(0, src) if src not in sys.path else None'
+# src/ for the package, scripts/ because the tests import the scripts the way
+# the scripts import each other -- through a sys.path insert that pylint does
+# not execute, so without this it reports every such import as unresolvable.
+init-hook='import sys, os; sys.path.insert(0, os.path.join(os.getcwd(), "src")); sys.path.insert(0, os.path.join(os.getcwd(), "scripts"))'
 
 [MESSAGES CONTROL]
 disable=
