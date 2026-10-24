@@ -231,14 +231,18 @@ def _looks_like_cmip_root(path: Path) -> bool:
 def resolve_cmip_root(root_output_path: str | Path) -> Path:
     """Resolve the CMIP7 root directory from either a parent or direct path."""
     root = Path(root_output_path).expanduser().resolve()
-    if _looks_like_cmip_root(root):
-        return root
-    cmip_root = root / "CMIP7"
-    if _looks_like_cmip_root(cmip_root):
-        return cmip_root
+    # The output root may be given as the CMIP7 directory itself, as its
+    # parent, or as the parent of the DRS specification directory that the
+    # controlled vocabulary puts above it (MIP-DRS7/CMIP7/...).
+    tried = [root, root / "CMIP7"]
+    tried += sorted(child / "CMIP7" for child in root.glob("*") if child.is_dir())
+    for candidate in tried:
+        if _looks_like_cmip_root(candidate):
+            return candidate
     raise FileNotFoundError(
-        f"Could not locate CMIP output under {root}. Expected activity/institution "
-        f"directories under either {root} or {root / 'CMIP7'}."
+        f"Could not locate CMIP output under {root}. Expected activity and "
+        f"institution directories under one of: "
+        + ", ".join(str(path) for path in tried)
     )
 
 
@@ -423,7 +427,9 @@ def collect_log_records(
         variable = parse_log_variable(log_path)
         if variable is None:
             continue
-        if expected_variables and variable not in expected_variables:
+        # Read only the logs for variables that this realm and frequency
+        # expect.  One directory holds every realm's logs.
+        if variable not in expected_variables:
             continue
         record = parse_log_file(log_path)
         if record is None:
@@ -501,11 +507,12 @@ def scan_output_tree(
         if ensemble_member and path_ensemble != ensemble_member:
             logger.debug("Skipping due to ensemble filter: %s", ensemble_member)
             continue
-        if (
-            expected_variables
-            and f"{variable}_{dimension_folder}" not in expected_variables
-        ):
-            logger.debug("Skipping due to expected_variables filter: %s", variable)
+        # Keep only the variables that this realm and frequency expect.  All
+        # realms write their output into one CMIP7 output directory, and a
+        # file's path records its variable but not the realm that produced it,
+        # so the variable name is the only way to tell whose file this is.
+        if f"{variable}_{dimension_folder}" not in expected_variables:
+            logger.debug("Not expected here, skipping: %s", variable)
             continue
         produced[f"{variable}_{dimension_folder}"].append(file_path)
         try:
@@ -1016,6 +1023,13 @@ def main() -> int:
         yaml_variables, requested_variables, args.variables
     )
     expected_variable_set = set(expected_variables)
+    if not expected_variable_set:
+        logger.warning(
+            "The data request asks for no %s variables at %s frequency, so "
+            "there is nothing to validate here.",
+            args.realm,
+            args.frequency,
+        )
 
     log_records = collect_log_records(logs_dir, expected_variable_set)
     produced_files, inventory_records, inspection_errors = scan_output_tree(
