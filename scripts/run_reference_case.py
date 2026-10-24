@@ -458,7 +458,7 @@ def print_report(outcomes: list[dict], plan: Plan) -> None:
     width = max((len(o["key"]) for o in outcomes), default=10)
     for outcome in outcomes:
         status = outcome_label(outcome["stage"], outcome["returncode"])
-        say(f"  {outcome['key']:<{width}}  {outcome['seconds']:7.1f}s  {status}")
+        say(f"  {outcome['key']:<{width}}  {outcome['seconds']:9.1f}s  {status}")
 
     # Counted the way they are labelled: a validation report is not a failure.
     broken = [
@@ -477,7 +477,7 @@ def print_report(outcomes: list[dict], plan: Plan) -> None:
         tally += f", {len(reported)} reported problems"
     tally += f", {len(broken)} failed"
     total = sum(o["seconds"] for o in outcomes)
-    say(f"{tally}, {total / 60:.1f} min")
+    say(f"{tally}, {total:.1f}s")
 
     # Where the time went, which is the question asked after every long run.
     by_stage: dict[str, float] = {}
@@ -487,10 +487,10 @@ def print_report(outcomes: list[dict], plan: Plan) -> None:
         )
     if len(by_stage) > 1:
         spent = ", ".join(
-            f"{stage} {seconds / 60:.1f}"
+            f"{stage} {seconds:.1f}s"
             for stage, seconds in sorted(by_stage.items(), key=lambda kv: -kv[1])
         )
-        say(f"  minutes by stage: {spent}")
+        say(f"  by stage: {spent}")
 
     if plan.skipped:
         say("\n  skipped:")
