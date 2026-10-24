@@ -247,8 +247,8 @@ def period_tag(years: str | None) -> str | None:
     run's, while the output tree and the time series stay shared: years 1-50
     and 51-100 are one dataset, but they are two runs.
 
-    Without it, a second period would find every step recorded as complete and
-    do nothing at all, and would overwrite the first period's step logs.
+    Each period therefore has its own step logs and its own record of what
+    finished, and neither can overwrite the other's.
     """
     if not years:
         return None

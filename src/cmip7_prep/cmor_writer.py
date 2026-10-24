@@ -1679,11 +1679,10 @@ class CmorSession(
                 slab,
                 rec_bytes / (1024 * 1024),
             )
-            # Reported about ten times over, not once per slab.  Fifty years
-            # of daily data is some 1500 slabs, and two lines each across
-            # every worker buried everything else worth reading.  The first
-            # and last are always reported, so the size and the finish are
-            # never missing.
+            # Progress is reported about ten times over rather than once per
+            # slab, since fifty years of daily data runs to some 1500 slabs.
+            # The first and last are always reported, so the slab size and the
+            # finish are never missing.
             slabs = max(1, -(-ntime // slab))
             report_every = max(1, slabs // 10)
             for index, start in enumerate(range(0, ntime, slab)):

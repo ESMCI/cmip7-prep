@@ -187,11 +187,9 @@ def _execute_or_report_complete(ts_collection, logger, workers=1, budget_gb=16.0
             "can afford."
         )
 
-    # raise_errors, because GenTS otherwise logs a failed order and carries on.
-    # One worker killed for memory breaks its whole pool, so every order after
-    # it fails too -- a run wrote 217 of 395 time series, reported success, and
-    # was found out only when CMORization had no input.  A missing time series
-    # is never acceptable, so the first failure stops the run.
+    # raise_errors, because GenTS otherwise logs a failed order and carries
+    # on.  A missing time series is never acceptable, since CMORization will
+    # have no input for that variable, so the first failure stops the run.
     written = ts_collection.execute(
         optimize_batch_n=batch_size,
         memory_limit_bytes=per_worker,
@@ -566,11 +564,10 @@ def main():
                 if varlist:
                     ts_collection = ts_collection.include("*", var_glob=varlist)
                 if len(ts_collection) == 0:
-                    # This stream holds none of the variables the realm needs,
-                    # which is ordinary once the list is narrowed.  It must not
-                    # stop the streams that come after it: raising here gave a
-                    # land run its monthly output and no daily output at all,
-                    # because the daily stream was third of four.
+                    # This history stream contains none of the variables
+                    # this realm needs, so there is nothing to generate from
+                    # it.  The remaining streams still have to be generated,
+                    # so skip this one and carry on.
                     logger.warning(
                         "Nothing to generate from %s; skipping this stream",
                         include_pattern,

@@ -967,6 +967,10 @@ def main():
                     cmip_vars.append(var)
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
 
+    # One entry per variable, each saying "ok" or why it was not written.
+    # Checked at the end of main to decide whether the run succeeded.
+    results: list[tuple[str, str]] = []
+
     # Load requested variables
     if len(cmip_vars) > 0:
         # Glob the union of every time sampling for this realm and frequency.
@@ -1032,7 +1036,6 @@ def main():
         else:
             windows = [None]
 
-        results = []
         # Deferred per-variable work, computed together once the loop ends.
         pending = []
         for v in cmip_vars:
@@ -1204,6 +1207,19 @@ def main():
             _format_duration(time.monotonic() - run_start),
             _peak_memory_gb(),
         )
+
+    # Writing no variables at all is a failure, even when every variable was
+    # skipped for a reason that was reported at the time.  A run that produces
+    # nothing should not report success.
+    written = [name for name, status in results if status == "ok"]
+    if not written:
+        logger.error(
+            "No variables were written. %d were attempted; see the warnings "
+            "and errors above for each.",
+            len({name for name, _ in results}),
+        )
+        sys.exit(1)
+    logger.info("Wrote %d variable(s)", len(written))
 
 
 if __name__ == "__main__":
