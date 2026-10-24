@@ -690,6 +690,11 @@ def _open_variable_timeseries(
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
+        # Concatenate only the variables that carry time, and take the rest
+        # from the first file.  Said explicitly because xarray's default is
+        # changing, and the alternative gives a time-invariant field a time
+        # dimension it does not have.
+        data_vars="minimal",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
@@ -714,6 +719,11 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
+        # Concatenate only the variables that carry time, and take the rest
+        # from the first file.  Said explicitly because xarray's default is
+        # changing, and the alternative gives a time-invariant field a time
+        # dimension it does not have.
+        data_vars="minimal",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
@@ -747,6 +757,11 @@ def _open_variable_zonal(file_paths: list[Path], variable: str) -> xr.DataArray 
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
+        # Concatenate only the variables that carry time, and take the rest
+        # from the first file.  Said explicitly because xarray's default is
+        # changing, and the alternative gives a time-invariant field a time
+        # dimension it does not have.
+        data_vars="minimal",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
