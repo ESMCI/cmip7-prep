@@ -90,9 +90,16 @@ def _open_dataset_with_cftime(files, parallel, use_cftime=True, **open_kwargs):
         combine="nested",
         decode_times=time_coder,
         parallel=parallel,
+        # All four combine options are stated rather than left to xarray's
+        # defaults, which are changing.  compat="equals" is deliberately
+        # stricter than the new default: variables that are not concatenated
+        # must agree between files, because this is the data the published
+        # output is built from.  join="outer" is the present default, stated
+        # so that behaviour does not change when xarray's does.
         data_vars="minimal",
         compat="equals",
         coords="all",
+        join="outer",
         concat_dim="time",
         **open_kwargs,
     )

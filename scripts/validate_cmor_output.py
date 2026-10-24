@@ -694,11 +694,16 @@ def _open_variable_timeseries(
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
-        # Concatenate only the variables that carry time, and take the rest
-        # from the first file.  Said explicitly because xarray's default is
-        # changing, and the alternative gives a time-invariant field a time
-        # dimension it does not have.
+        # All four combine options are stated rather than left to xarray's
+        # defaults, which are changing.  These three functions reduce a
+        # variable to a figure, so only the time-varying data needs
+        # concatenating and the grid can be taken from the first file.
+        # coords and join keep their present values, stated so that behaviour
+        # does not change when xarray's defaults do.
         data_vars="minimal",
+        compat="override",
+        coords="different",
+        join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
@@ -723,11 +728,16 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
-        # Concatenate only the variables that carry time, and take the rest
-        # from the first file.  Said explicitly because xarray's default is
-        # changing, and the alternative gives a time-invariant field a time
-        # dimension it does not have.
+        # All four combine options are stated rather than left to xarray's
+        # defaults, which are changing.  These three functions reduce a
+        # variable to a figure, so only the time-varying data needs
+        # concatenating and the grid can be taken from the first file.
+        # coords and join keep their present values, stated so that behaviour
+        # does not change when xarray's defaults do.
         data_vars="minimal",
+        compat="override",
+        coords="different",
+        join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
@@ -761,11 +771,16 @@ def _open_variable_zonal(file_paths: list[Path], variable: str) -> xr.DataArray 
     with xr.open_mfdataset(
         file_paths,
         combine="by_coords",
-        # Concatenate only the variables that carry time, and take the rest
-        # from the first file.  Said explicitly because xarray's default is
-        # changing, and the alternative gives a time-invariant field a time
-        # dimension it does not have.
+        # All four combine options are stated rather than left to xarray's
+        # defaults, which are changing.  These three functions reduce a
+        # variable to a figure, so only the time-varying data needs
+        # concatenating and the grid can be taken from the first file.
+        # coords and join keep their present values, stated so that behaviour
+        # does not change when xarray's defaults do.
         data_vars="minimal",
+        compat="override",
+        coords="different",
+        join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
         data_var = (
