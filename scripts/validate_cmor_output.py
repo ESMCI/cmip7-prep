@@ -698,11 +698,15 @@ def _open_variable_timeseries(
         # defaults, which are changing.  These three functions reduce a
         # variable to a figure, so only the time-varying data needs
         # concatenating and the grid can be taken from the first file.
-        # coords and join keep their present values, stated so that behaviour
-        # does not change when xarray's defaults do.
+        # A variable is written as one file per window of years, so a
+        # fifty-year run gives five files that are opened here as one series.
+        # The grid cell areas have no time dimension and are identical in all
+        # five, so "override" takes them from the first file rather than
+        # reading all five and checking that they match.  "minimal" does the
+        # same for the coordinates, and the two settings have to agree.
         data_vars="minimal",
         compat="override",
-        coords="different",
+        coords="minimal",
         join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
@@ -732,11 +736,15 @@ def _open_variable_map(file_paths: list[Path], variable: str) -> xr.DataArray | 
         # defaults, which are changing.  These three functions reduce a
         # variable to a figure, so only the time-varying data needs
         # concatenating and the grid can be taken from the first file.
-        # coords and join keep their present values, stated so that behaviour
-        # does not change when xarray's defaults do.
+        # A variable is written as one file per window of years, so a
+        # fifty-year run gives five files that are opened here as one series.
+        # The grid cell areas have no time dimension and are identical in all
+        # five, so "override" takes them from the first file rather than
+        # reading all five and checking that they match.  "minimal" does the
+        # same for the coordinates, and the two settings have to agree.
         data_vars="minimal",
         compat="override",
-        coords="different",
+        coords="minimal",
         join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
@@ -775,11 +783,15 @@ def _open_variable_zonal(file_paths: list[Path], variable: str) -> xr.DataArray 
         # defaults, which are changing.  These three functions reduce a
         # variable to a figure, so only the time-varying data needs
         # concatenating and the grid can be taken from the first file.
-        # coords and join keep their present values, stated so that behaviour
-        # does not change when xarray's defaults do.
+        # A variable is written as one file per window of years, so a
+        # fifty-year run gives five files that are opened here as one series.
+        # The grid cell areas have no time dimension and are identical in all
+        # five, so "override" takes them from the first file rather than
+        # reading all five and checking that they match.  "minimal" does the
+        # same for the coordinates, and the two settings have to agree.
         data_vars="minimal",
         compat="override",
-        coords="different",
+        coords="minimal",
         join="outer",
         decode_times=xr.coders.CFDatetimeCoder(use_cftime=True),
     ) as dataset:
