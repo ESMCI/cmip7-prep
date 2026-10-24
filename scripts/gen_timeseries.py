@@ -11,7 +11,6 @@ script: generate time series for all input files in a direcory
 import os
 import logging
 import sys
-import glob
 import argparse
 import logging
 from concurrent.futures import ProcessPoolExecutor
@@ -28,7 +27,7 @@ from cmip7_prep.pipeline import _collect_required_model_vars
 
 # Time series generation imports
 import xarray as xr
-from gents.hfcollection import HFCollection
+from gents.hfcollection import HFCollection, find_files, sort_hf_groups
 from gents.timeseries import TSCollection
 
 from cmip7_prep.include_patterns import (
@@ -242,34 +241,49 @@ def timeseries_per_frequency(outputdir, model, realm, ice_sheet, frequencies):
 
 def find_unusable_files(inputdir, include_patterns, workers, logger):
     """
-    Returns the history files GenTS cannot derive time bounds from: those with
-    zero time records, and those that will not open.
+    Returns the history files GenTS cannot derive a time step from.
 
-    GenTS takes a minimum over each file's time coordinate to order the files
-    into a series, so a file with no records raises a zero-size reduction in
-    gents.meta.  Files like that are written when a run segment opens a history
-    stream but ends before any sample reaches it.  They hold no data, so they
-    are dropped here instead of being left for GenTS to warn about one logged
-    traceback at a time.
+    A file with no time records, or that will not open, is unusable on its own.
+    So is every file of a group that holds fewer than two time records between
+    them, because GenTS measures a time step as the gap between two time
+    values.  It groups files by name minus the last two dot-separated fields,
+    so a file left in the input directory by another case forms a group of its
+    own, and a single monthly record is then all that group has.
     """
     candidates = sorted(
         {
-            path
+            str(path)
             for pattern in include_patterns
-            for path in glob.glob(os.path.join(inputdir, pattern))
+            for path in find_files(inputdir, pattern)
         }
     )
     if not candidates:
         return []
 
+    records = dict(zip(candidates, _time_record_counts(candidates, workers)))
+
     unusable = []
-    for path, count in zip(candidates, _time_record_counts(candidates, workers)):
+    for path, count in records.items():
         if count == 0:
             logger.warning("Skipping %s: zero time records", path)
             unusable.append(path)
         elif count == -1:
             logger.warning("Skipping %s: cannot be opened", path)
             unusable.append(path)
+
+    usable = {path: count for path, count in records.items() if path not in unusable}
+    for group, paths in sort_hf_groups([Path(path) for path in usable]).items():
+        in_group = sum(usable[str(path)] for path in paths)
+        if in_group < 2:
+            logger.warning(
+                "Skipping %d file(s) of %s: %d time record(s) between them, "
+                "too few to measure a time step from. Files from another case "
+                "in this directory group separately and look like this.",
+                len(paths),
+                group,
+                in_group,
+            )
+            unusable.extend(str(path) for path in paths)
 
     if unusable:
         logger.warning(
@@ -481,7 +495,7 @@ def main():
     filtered = []
     all_patterns = list(include_patterns)
     for include_pattern in include_patterns:
-        num = len(glob.glob(os.path.join(inputdir, include_pattern)))
+        num = len(find_files(inputdir, include_pattern))
         if num == 0:
             logger.info(
                 "No files match %s; this stream was not written, skipping it",
