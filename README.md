@@ -4,11 +4,16 @@ A Python library and set of scripts for preparing NorESM and CESM native model
 output for submission to CMIP7, through CMOR (the Climate Model Output
 Rewriter).
 
-**The documentation is the user's guide in `docs/`.** It covers what the three
-stages do, how to run them over a case, how to read what they produced, what to
-do when something goes wrong, and how the mapping files and tables work.
+[![Documentation](https://readthedocs.org/projects/cmip7prep/badge/?version=latest)](https://cmip7prep.readthedocs.io/en/latest/)
 
-Build it and read it locally:
+**Documentation: <https://cmip7prep.readthedocs.io>**
+
+The guide covers what the three stages do, how to run them over a case, how to
+read what they produced, what to do when something goes wrong, and how the
+mapping files and tables work. Its source is `docs/` in this repository, and it
+rebuilds on every push to `main`.
+
+To read it locally instead:
 
 ```bash
 pip install -r docs/requirements.txt
