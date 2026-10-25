@@ -15,8 +15,10 @@ from run_reference_case import (
     read_completed,
     record_completed,
     should_stop,
+    step_label,
     step_log_dir,
 )
+from cmip7_prep.reference_run import Step
 
 
 class TestCountsAsDone:
@@ -55,6 +57,28 @@ class TestCountsAsDone:
     def test_exit_4_from_another_stage_is_not_done(self):
         """Only the time series step gives exit 4 that meaning."""
         assert counts_as_done("cmor", 4) is False
+
+
+class TestStepLabel:
+    """Tests for how a step reads in the list of what a run will do."""
+
+    def test_a_step_with_a_frequency_names_it(self):
+        """A CMOR step runs one realm at one frequency."""
+        step = Step(
+            key="cmor-atmos-mon",
+            stage="cmor",
+            realm="atmos",
+            command=[],
+            frequency="mon",
+        )
+        assert step_label(step) == "atmos mon"
+
+    def test_a_time_series_step_names_only_the_realm(self):
+        """It covers every frequency of the realm, so it carries none."""
+        step = Step(
+            key="timeseries-atmos", stage="timeseries", realm="atmos", command=[]
+        )
+        assert step_label(step) == "atmos"
 
 
 class TestOutcomeLabel:

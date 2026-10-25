@@ -274,6 +274,15 @@ def step_log_dir(outdir: Path, tag: str | None) -> Path:
     return outdir / "logs" / tag
 
 
+def step_label(step: Step) -> str:
+    """How a step reads in the list of what a run is about to do.
+
+    A time series step covers every frequency of its realm at once and carries
+    no single frequency, so it is named by its realm alone.
+    """
+    return f"{step.realm} {step.frequency}" if step.frequency else step.realm
+
+
 def outcome_label(stage: str, returncode: int) -> str:
     """How a finished step's result reads in the summary.
 
@@ -624,7 +633,7 @@ def main():
                 "  %d %s step(s): %s",
                 len(in_stage),
                 stage,
-                ", ".join(f"{s.realm} {s.frequency}" for s in in_stage),
+                ", ".join(step_label(s) for s in in_stage),
             )
     if done_already:
         logger.info(
