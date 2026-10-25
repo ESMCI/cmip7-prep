@@ -37,23 +37,38 @@ def test_resolve_cmip_root_accepts_direct_cmip7(tmp_path):
 
 def test_parse_log_variable_extracts_variable_name():
     """CMOR log names carry the branded variable name."""
-    assert parse_log_variable(Path("cmor_20260101T010203Z_tas.log")) == "tas"
+    assert parse_log_variable(Path("cmor_tas_glb_mon_1-10.log")) == "tas"
 
 
 def test_collect_log_records_filters_to_expected_variables(tmp_path):
     """Only expected variables should be kept when collecting logs."""
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
-    (log_dir / "cmor_20260101T010203Z_tas.log").write_text(
+    (log_dir / "cmor_tas_glb_mon_1-10.log").write_text(
         "ERROR: something failed\n", encoding="utf-8"
     )
-    (log_dir / "cmor_20260101T010203Z_pr.log").write_text(
-        "all good\n", encoding="utf-8"
-    )
+    (log_dir / "cmor_pr_glb_mon_1-10.log").write_text("all good\n", encoding="utf-8")
 
     records = collect_log_records(log_dir, {"tas"})
     assert sorted(records) == ["tas"]
     assert records["tas"][0].has_error is True
+
+
+def test_collect_log_records_filters_to_the_frequency(tmp_path):
+    """A variable written at two frequencies has a log for each, and the
+    errors of one say nothing about the other."""
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    (log_dir / "cmor_tas_glb_mon_1-10.log").write_text("all good\n", encoding="utf-8")
+    (log_dir / "cmor_tas_glb_day_1-10.log").write_text(
+        "ERROR: something failed\n", encoding="utf-8"
+    )
+
+    monthly = collect_log_records(log_dir, {"tas"}, "mon")
+    assert monthly["tas"][0].has_error is False
+
+    daily = collect_log_records(log_dir, {"tas"}, "day")
+    assert daily["tas"][0].has_error is True
 
 
 def test_scan_output_tree_inventories_dims(tmp_path):

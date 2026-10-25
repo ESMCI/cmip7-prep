@@ -57,17 +57,14 @@ CANONICAL_REALM_MAP = {
     "ocnBgchem": "ocean",
 }
 
-# The two names a CMOR log can have, both of which carry the variable's branded
-# name.  cmor_driver.py writes the first form, variable, region and window of
-# years, as in cmor_ta_tavg-p19-hxy-air_glb_1-10.log; rerunning that variable
-# and window overwrites its log.  The second form, which earlier versions wrote
-# and which may still be on disk, carries a timestamp instead of the region and
-# window, as in cmor_20261024T120000Z_ta_tavg-p19-hxy-air.log, so every attempt
-# left a log of its own behind.
+# A CMOR log is named for the variable, region and frequency it holds, and for
+# the window of years as well when the run was given one.
+#     cmor_ta_tavg-p19-hxy-air_glb_mon_1-10.log
+#     cmor_ta_tavg-p19-hxy-air_glb_mon.log
 LOG_NAME_RE = re.compile(
-    r"^cmor_(?P<variable>.+?)_(?:glb|nh|sh)(?:_-?\d+--?\d+)?\.log$"
+    r"^cmor_(?P<variable>.+?)_(?:glb|nh|sh)"
+    r"_(?P<frequency>[A-Za-z0-9]+)(?:_-?\d+--?\d+)?\.log$"
 )
-LOG_NAME_DATED_RE = re.compile(r"^cmor_\d{8}T\d{6}Z_(?P<variable>.+)\.log$")
 LOG_ERROR_RE = re.compile(r"Error: ", re.IGNORECASE)
 LOG_SUCCESS_RE = re.compile(r"\b(success|complete(?:d)?|finished)\b", re.IGNORECASE)
 
@@ -395,12 +392,18 @@ def build_variable_provenance(
     return provenance
 
 
-def parse_log_variable(log_path: Path) -> str | None:
-    """Extract the CMIP variable name from a CMOR log filename."""
-    match = LOG_NAME_RE.match(log_path.name) or LOG_NAME_DATED_RE.match(log_path.name)
+def parse_log_name(log_path: Path) -> tuple[str, str] | None:
+    """Return the variable and frequency recorded in a CMOR log filename."""
+    match = LOG_NAME_RE.match(log_path.name)
     if match is None:
         return None
-    return match.group("variable")
+    return match.group("variable"), match.group("frequency")
+
+
+def parse_log_variable(log_path: Path) -> str | None:
+    """Extract the CMIP variable name from a CMOR log filename."""
+    parsed = parse_log_name(log_path)
+    return None if parsed is None else parsed[0]
 
 
 def parse_log_file(log_path: Path) -> LogRecord | None:
@@ -423,7 +426,7 @@ def parse_log_file(log_path: Path) -> LogRecord | None:
 
 
 def collect_log_records(
-    log_dir: Path, expected_variables: set[str]
+    log_dir: Path, expected_variables: set[str], frequency: str | None = None
 ) -> dict[str, list[LogRecord]]:
     """Collect log records for variables that belong to the selected subset."""
     records: dict[str, list[LogRecord]] = defaultdict(list)
@@ -436,12 +439,16 @@ def collect_log_records(
         # Which variable a log is for is in its filename, so decide whether we
         # want it before reading it.  This directory holds every realm's logs,
         # and the log of a 3-D daily variable is not small.
-        variable = parse_log_variable(log_path)
-        if variable is None:
+        parsed = parse_log_name(log_path)
+        if parsed is None:
             continue
+        variable, log_frequency = parsed
         # Read only the logs for variables that this realm and frequency
         # expect.  One directory holds every realm's logs.
         if variable not in expected_variables:
+            continue
+        # The errors of one frequency say nothing about another.
+        if frequency and log_frequency != frequency:
             continue
         record = parse_log_file(log_path)
         if record is None:
@@ -1117,7 +1124,7 @@ def main() -> int:
             args.frequency,
         )
 
-    log_records = collect_log_records(logs_dir, expected_variable_set)
+    log_records = collect_log_records(logs_dir, expected_variable_set, args.frequency)
     produced_files, inventory_records, inspection_errors = scan_output_tree(
         cmip_root,
         model=args.model,
