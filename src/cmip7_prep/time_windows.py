@@ -1,13 +1,13 @@
-"""Splitting a run into windows of years, and taking one out of a dataset.
+"""Split a run into windows of years, and take one window out of a dataset.
 
 CMORization writes one output file per window, so ``--years 1:50:10`` gives
-five ten-year files rather than one fifty-year file.  The windows are spelled
-the same way ``gen_timeseries.py --years-spec`` spells them, so the same
-argument can be given to both and they cannot drift apart.
+five ten-year files rather than one fifty-year file. A window is spelled the
+same way ``gen_timeseries.py --years-spec`` spells it, so the same argument
+serves both scripts.
 
-Which times belong to a window is decided by the dataset's own time axis, not
-by anything in a filename.  A renamed file, or time series built in pieces of a
-different size, make no difference.
+The dataset's own time axis decides which times belong to a window. A renamed
+file makes no difference, and neither do time series built in pieces of a
+different size.
 """
 
 from __future__ import annotations
@@ -19,9 +19,8 @@ def year_windows(spec: str) -> list[tuple[int, int]]:
     """Turn ``"first:last:increment"`` into one (first, last) pair per window.
 
     ``"1:50:10"`` gives ``[(1, 10), (11, 20), (21, 30), (31, 40), (41, 50)]``.
-    A final window is short rather than overrunning: ``"1:25:10"`` ends with
-    ``(21, 25)``.  An increment covering the whole range gives one window,
-    which writes a single file as before.
+    A final window is short rather than overrunning, so ``"1:25:10"`` ends
+    with ``(21, 25)``. An increment covering the whole range gives one window.
     """
     parts = str(spec).split(":")
     if len(parts) != 3:
@@ -45,10 +44,10 @@ def year_windows(spec: str) -> list[tuple[int, int]]:
 def select_years(dataset, first: int, last: int):
     """Return the part of a dataset whose times fall in the years first..last.
 
-    The years come from the time axis itself, so this is independent of the
-    calendar and of how the time series files were named or split.  Returns
-    None when the window holds nothing, which is the caller's cue to say so
-    rather than write an empty file.
+    The years come from the time axis itself, so the calendar and the way the
+    time series files were split make no difference. The result is None when
+    the window holds nothing, and the caller then says so rather than writing
+    an empty file.
     """
     if "time" not in getattr(dataset, "dims", ()):
         return dataset

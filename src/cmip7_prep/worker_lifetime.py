@@ -5,10 +5,10 @@ killed rather than shut down, and goes on holding its memory until someone
 finds it.  Linux's ``prctl(PR_SET_PDEATHSIG)`` has the kernel send the worker
 a signal the moment its parent dies, so it cannot be left behind.
 
-Pass ``die_with_parent`` as a pool's ``initializer``, which runs it once in
-every worker.  It does nothing where prctl does not exist, and nothing can be
-done at all for a pool created inside library code that takes no initializer,
-such as the one GenTS uses: those orphans have to be found and killed by hand.
+Pass ``die_with_parent`` as a pool's ``initializer`` and it runs once in every
+worker. It does nothing where prctl does not exist. A pool created inside
+library code takes no initializer, as the one GenTS uses does not, and its
+orphans have to be found and killed by hand.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ PR_SET_PDEATHSIG = 1
 def die_with_parent() -> None:
     """Ask the kernel to kill this process when its parent dies.
 
-    The signal arrives when the thread that started this process dies, which
-    for a pool worker is the thread that submitted the work.
+    The signal arrives when the thread that started this process dies. For a
+    pool worker that is the thread which submitted the work.
     """
     if not sys.platform.startswith("linux"):
         return

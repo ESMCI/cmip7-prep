@@ -221,14 +221,14 @@ def _execute_or_report_complete(ts_collection, logger, workers=1, budget_gb=16.0
 
 
 def timeseries_per_frequency(outputdir, model, realm, ice_sheet, frequencies):
-    """How many time series each requested frequency has in the output directory.
+    """Count the time series each requested frequency has in the output directory.
 
-    A frequency is covered when any of its history streams produced output:
+    A frequency is covered when any of its history streams produced output.
     NorESM land writes monthly output to both clm2.h0a and clm2.h0i, and only
     the first holds variables CMIP7 asks for.
 
-    Counts the files with the patterns cmor_driver.py uses to find its input,
-    so a frequency at zero here is one CMORization would find nothing for.
+    The patterns are the ones cmor_driver.py uses to find its input, so a
+    frequency at zero is one CMORization would find nothing for.
     """
     counts = {}
     for frequency in frequencies:
@@ -240,15 +240,10 @@ def timeseries_per_frequency(outputdir, model, realm, ice_sheet, frequencies):
 
 
 def find_unusable_files(inputdir, include_patterns, workers, logger):
-    """
-    Returns the history files GenTS cannot derive a time step from.
+    """Return the history files GenTS cannot derive a time step from.
 
-    A file with no time records, or that will not open, is unusable on its own.
-    So is every file of a group that holds fewer than two time records between
-    them, because GenTS measures a time step as the gap between two time
-    values.  It groups files by name minus the last two dot-separated fields,
-    so a file left in the input directory by another case forms a group of its
-    own, and a single monthly record is then all that group has.
+    These are a file with no time records, a file that will not open, and every
+    file of a group holding fewer than two time records between them.
     """
     candidates = sorted(
         {

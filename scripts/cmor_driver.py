@@ -58,6 +58,7 @@ from cmip7_prep.pipeline import (
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
 from cmip7_prep.output_files import remove_superseded
+from cmip7_prep.step_exit import NOTHING_TO_WRITE
 from cmip7_prep.worker_lifetime import die_with_parent
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 from cmip7_prep.time_windows import select_years, year_windows
@@ -1220,10 +1221,18 @@ def main():
             _peak_memory_gb(),
         )
 
-    # Writing no variables at all is a failure, even when every variable was
-    # skipped for a reason that was reported at the time.  A run that produces
-    # nothing should not report success.
+    # If there is nothing to write a warning should be issued.
     written = [name for name, status in results if status == "ok"]
+    if not results:
+        logger.warning(
+            "Nothing to write for realm %s at %s frequency. The mapping file "
+            "has none of the variables the data request asks for.",
+            args.realm,
+            frequency,
+        )
+        sys.exit(NOTHING_TO_WRITE)
+
+    # Every variable that was tried failed.
     if not written:
         logger.error(
             "No variables were written. %d were attempted; see the warnings "

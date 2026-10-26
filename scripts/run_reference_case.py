@@ -38,6 +38,7 @@ sys.path.insert(0, str(_LOCAL_PATH.parent / "src"))
 from cmip7_prep.time_windows import year_windows
 from cmip7_prep.step_exit import (
     A_FREQUENCY_IS_EMPTY,
+    NOTHING_TO_WRITE,
     RAN_AND_FOUND_PROBLEMS,
     RAN_AND_PASSED,
 )
@@ -244,15 +245,12 @@ COMPLETED_NAME = "completed_steps.json"
 
 
 def period_tag(years: str | None) -> str | None:
-    """Name the period a run covers, from its --years, or None without one.
+    """Return a name for the period a run covers, or None without --years.
 
-    ``"1:50:10"`` gives ``"1-50"``.  Used to keep the things that belong to one
-    run -- the step logs and the record of what finished -- apart from another
-    run's, while the output tree and the time series stay shared: years 1-50
-    and 51-100 are one dataset, but they are two runs.
-
-    Each period therefore has its own step logs and its own record of what
-    finished, and neither can overwrite the other's.
+    ``"1:50:10"`` gives ``"1-50"``. Each period gets its own step logs and its
+    own record of what finished, so one period cannot overwrite another's. The
+    output tree and the time series stay shared, because years 1-50 and 51-100
+    are one dataset.
     """
     if not years:
         return None
@@ -261,21 +259,31 @@ def period_tag(years: str | None) -> str | None:
 
 
 def completed_path(outdir: Path, tag: str | None) -> Path:
-    """Where a run's record of finished steps lives."""
+    """Return the path of a run's record of finished steps."""
     if tag is None:
         return outdir / COMPLETED_NAME
     return outdir / f"completed_steps_{tag}.json"
 
 
 def step_log_dir(outdir: Path, tag: str | None) -> Path:
-    """Where a run's per-step logs live.  run.log stays above this, shared."""
+    """Return the directory a run's per-step logs go in. run.log sits above it."""
     if tag is None:
         return outdir / "logs"
     return outdir / "logs" / tag
 
 
+# Some steps end in a way that is neither success nor failure. This table gives
+# the label each such ending gets in the summary. The run records the step and
+# carries on.
+NOTED_OUTCOMES = {
+    ("validate", RAN_AND_FOUND_PROBLEMS): "reported problems",
+    ("timeseries", A_FREQUENCY_IS_EMPTY): "warning",
+    ("cmor", NOTHING_TO_WRITE): "warning",
+}
+
+
 def step_label(step: Step) -> str:
-    """How a step reads in the list of what a run is about to do.
+    """Return how a step reads in the list of what a run is about to do.
 
     A time series step covers every frequency of its realm at once and carries
     no single frequency, so it is named by its realm alone.
@@ -284,60 +292,39 @@ def step_label(step: Step) -> str:
 
 
 def outcome_label(stage: str, returncode: int) -> str:
-    """How a finished step's result reads in the summary.
-
-    Two outcomes are neither success nor failure, and saying FAILED in the same
-    words as a crash would hide the real failures among them.  Validation
-    reporting problems is the report itself, and under --strict it says so
-    whenever a requested variable is missing.  A time series step warns when a
-    frequency has no output, which rerunning cannot change.
-    """
+    """Return how a finished step's result reads in the summary."""
     if returncode == 0:
         return "ok"
-    if stage == "validate" and returncode == RAN_AND_FOUND_PROBLEMS:
-        return "reported problems"
-    if stage == "timeseries" and returncode == A_FREQUENCY_IS_EMPTY:
-        return "warning"
-    return f"FAILED ({returncode})"
+    return NOTED_OUTCOMES.get((stage, returncode), f"FAILED ({returncode})")
 
 
 def counts_as_done(stage: str, returncode: int) -> bool:
-    """Whether a resume can skip this step because it already ran.
+    """Return True when a resume can skip this step.
 
-    CMOR steps count only if they succeeded.  Validation counts unless it
-    crashed, because reporting problems is its job rather than a failure.  A
-    time series step counts when its only complaint is a frequency with no
-    output, since repeating it cannot produce what the case never wrote.
+    A step counts if it succeeded, or if it ended in one of the noted outcomes.
 
     --force skips nothing.
     """
     if returncode == RAN_AND_PASSED:
         return True
-    if stage == "validate" and returncode == RAN_AND_FOUND_PROBLEMS:
-        return True
-    if stage == "timeseries" and returncode == A_FREQUENCY_IS_EMPTY:
-        return True
-    return False
+    return (stage, returncode) in NOTED_OUTCOMES
 
 
 def should_stop(stage: str, returncode: int, keep_going: bool) -> bool:
-    """Whether a finished step's result should stop the rest of the run.
+    """Return True when a finished step's result should stop the rest of the run.
 
-    Never for validation.  It reports rather than produces, nothing after it
-    depends on it, and under --strict it fails while any requested variable is
-    missing -- so stopping for it would end every run at the third step.
+    Validation never stops a run. It reports rather than produces, and under
+    --strict it fails whenever a requested variable is missing.
 
-    Never for a time series step whose only complaint is a frequency with no
-    output, which is a warning about this case rather than something wrong.
+    A noted outcome never stops a run either. It says the case has nothing to
+    give rather than that something is wrong.
 
-    Otherwise a failure stops the run unless --keep-going: a missing time
-    series or CMOR file means everything after it is working from input that
-    is not there, and finding that out three hours later is worse than
-    stopping.
+    Any other failure stops the run unless --keep-going. Everything after it
+    would read input that is not there.
     """
     if returncode == 0 or stage == "validate":
         return False
-    if stage == "timeseries" and returncode == A_FREQUENCY_IS_EMPTY:
+    if (stage, returncode) in NOTED_OUTCOMES:
         return False
     return not keep_going
 
@@ -609,14 +596,9 @@ def main():
     completed_file = completed_path(outdir, tag)
     completed = set() if args.force else read_completed(completed_file)
 
-    # One block saying what this run will do and where it will put things,
-    # rather than four lines each saying part of it.
     to_run = [step for step in plan.steps if step.key not in completed]
     done_already = len(plan.steps) - len(to_run)
 
-    # Said as sentences rather than a list of fields, because the first thing
-    # anyone wants from a run that takes hours is to know it is about to do
-    # what they meant.
     logger.info(
         "Running %s for %s of %s, over %s.",
         " and ".join(args.stages),

@@ -1,14 +1,13 @@
 """Find CMOR output files that duplicate each other, and delete them.
 
 Each output filename ends in the period it covers, as in
-``_00010101-00101231.nc`` for years 1 to 10.  One variable is written as one
-file per window of years, so fifty years asked for in ten-year windows gives
-five files, and no two of those five periods should overlap.
+``_00010101-00101231.nc`` for years 1 to 10. A variable is written as one file
+per window of years. Fifty years in ten-year windows gives five files, and no
+two of those periods should overlap.
 
-A file whose period lies inside another file's is therefore a duplicate: every
-time in it is already in the longer file.  That is what a run killed while
-writing a variable leaves behind, because CMOR names the file before it has
-finished filling it.
+A file whose period lies inside another file's is a duplicate. Every time in it
+is already in the longer file. A run killed while writing a variable leaves one
+behind, because CMOR names a file before it has finished filling it.
 """
 
 from __future__ import annotations
@@ -26,10 +25,9 @@ FILE_PERIOD_RE = re.compile(r"_(?P<first>\d{4,8})-(?P<last>\d{4,8})\.nc$")
 
 
 def file_period(path: Path | str) -> tuple[str, str] | None:
-    """The first and last date in a CMOR filename, as written there.
+    """Return the first and last date in a CMOR filename.
 
-    Returns None for a name that does not end in a period, such as one of the
-    fx files, which cover no time at all.
+    The result is None for a name that holds no period, such as an fx file.
     """
     match = FILE_PERIOD_RE.search(Path(path).name)
     if match is None:
@@ -41,11 +39,11 @@ def file_period(path: Path | str) -> tuple[str, str] | None:
 
 
 def covers(outer: tuple[str, str], inner: tuple[str, str]) -> bool:
-    """Whether the first period includes every date of the second.
+    """Return True when the first period includes every date of the second.
 
     The dates compare correctly as text because CMOR writes the year first and
-    pads each field to a fixed width.  Different widths mean different
-    frequencies, which are not comparable.
+    pads each field to a fixed width. Periods written to different widths
+    belong to different frequencies and never cover one another.
     """
     if len(outer[0]) != len(inner[0]):
         return False
@@ -53,7 +51,7 @@ def covers(outer: tuple[str, str], inner: tuple[str, str]) -> bool:
 
 
 def superseded_by(written: Path) -> list[Path]:
-    """The files beside this one whose period it already covers.
+    """Return the files beside this one whose period it already covers.
 
     One directory of the CMIP7 output holds one variable at one frequency on
     one grid, so every file there is comparable with every other.
@@ -90,9 +88,9 @@ def remove_superseded(written: Path | str) -> list[Path]:
 
 
 def redundant_pairs(paths: list[Path]) -> list[tuple[Path, Path]]:
-    """Pairs of one variable's files where the first's period is inside the second's.
+    """Return the pairs of a variable's files where one period is inside another.
 
-    Reports rather than deletes, for checking output that is already on disk.
+    This reports rather than deletes, for checking output already on disk.
     """
     with_period = [(path, file_period(path)) for path in sorted(paths)]
     comparable = [(path, period) for path, period in with_period if period]

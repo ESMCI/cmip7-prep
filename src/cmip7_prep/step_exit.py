@@ -1,11 +1,10 @@
-"""What the exit codes of the scripts run_reference_case.py runs mean.
+"""Define the exit codes run_reference_case.py reads from each script.
 
-Defined here rather than in each script so that the script and the caller
+They live here rather than in each script so that a script and its caller
 cannot disagree about them.
 
-validate_cmor_output.py and gen_timeseries.py both have an outcome that is
-neither success nor failure, and the caller treats those differently: it
-records them and carries on, rather than stopping the run.
+Some scripts can end in a way that is neither success nor failure. The caller
+records those and carries on rather than stopping the run.
 """
 
 RAN_AND_PASSED = 0
@@ -16,7 +15,11 @@ RAN_AND_PASSED = 0
 RAN_AND_FOUND_PROBLEMS = 1
 COULD_NOT_RUN = 3
 
-# gen_timeseries.py.  A frequency with no time series at all, which no later
-# step can work from.  Rerunning cannot produce output the case never wrote, so
-# the run notes it and goes on to the next realm.
+# gen_timeseries.py. A frequency came out with no time series at all, which no
+# later step can work from. The case never wrote the history files it needed.
 A_FREQUENCY_IS_EMPTY = 4
+
+# cmor_driver.py. The mapping file has none of the variables the data request
+# asks for, so there was nothing to write. Exit 1 means every variable that was
+# tried failed.
+NOTHING_TO_WRITE = 5
