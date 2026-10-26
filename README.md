@@ -1,259 +1,62 @@
 # cmip7-prep
 
-A Python library and driver script for preparing CESM and NorESM native model output for submission to CMIP7 via CMOR (Climate Model Output Rewriter).
+A Python library and set of scripts for preparing NorESM and CESM native model
+output for submission to CMIP7, through CMOR (the Climate Model Output
+Rewriter).
 
-## What it does
+[![Documentation](https://readthedocs.org/projects/cmip7prep/badge/?version=latest)](https://cmip7prep.readthedocs.io/en/latest/)
 
-`cmip7-prep` automates the pipeline from raw model timeseries to CMOR-compliant NetCDF:
+**Documentation: <https://cmip7prep.readthedocs.io>**
 
-1. **Variable mapping** — Reads a YAML mapping file (`cesm_to_cmip7.yaml` or `noresm_to_cmip7.yaml`) that describes how native model variables (e.g., `TREFHT`) map to CMIP names (e.g., `tas`), including unit conversions and multi-variable formulas.
-2. **File discovery** — Selects only the timeseries files needed for the requested CMIP variables.
-3. **Realization** — Evaluates the mapping (direct rename, scaling, or formula) to produce CMIP DataArrays.
-4. **Vertical interpolation** — Optionally interpolates hybrid-sigma level variables to standard CMIP pressure grids (e.g., `plev19`, `plev39`) using geocat-comp.
-5. **Regridding** — Regrids from native spectral element (SE) or tripolar ocean grids to 1° lat/lon using precomputed ESMF weight files via xESMF.
-6. **CMORization** — Writes CMOR-compliant output with correct metadata, bounds, and fill values using the CMOR library.
+The guide covers what the three stages do, how to run them over a case, how to
+read what they produced, what to do when something goes wrong, and how the
+mapping files and tables work. Its source is `docs/` in this repository, and it
+rebuilds on every push to `main`.
 
-## Generating the cmor output is accomplished in three steps:
-
-**Step 1**: The yaml mapping files for both CESM/NorESM are obtained from csv files that in turn are obtained from corresponding google-sheets that are filled in by the scientists.
-The step from google-sheet to yaml file is done using the script **convert_csv_to_yaml.py** and per-realm yaml files are created. Note that for NorESM, a filter is applied the file by whether the variables have a NorESM name dependency column is filled in or not. In addition to being in the sheet, to be produce each variable needs to have all of its dependent variables in the output.
-
-**Step 2**: Time series for each realm need to be generated from the time slice files. This is done using the script **gen_timeseries.py** which creates time series files per variable and per different time frequencies.
-
-**Step 3**: Cmorised output starting from the time series files is then created by **cmor_driver.py**.  Note that each output variable also has to be a requested cmorisation variable from the cmor7 table (https://github.com/WCRP-CMIP/cmip7-cmor-tables) for the experiment in question (e.g. piControl). If it is not requested it will not be produced.
-
-
-
-## Supported models / grids
-
-| Model  | Atmosphere grid | Ocean grid |
-|--------|-----------------|------------|
-| CESM   | ne30pg3 (SE)    | tx2_3v2 (tripolar) |
-| NorESM | ne30pg3 / ne16pg3 (SE) | — |
-
-## Installation
-
-### Prerequisites
-
-A conda environment with the required dependencies:
+To read it locally instead:
 
 ```bash
-conda create -n cmip7-prep python=3.13 \
-    xarray numpy dask xesmf cmor cftime pyyaml geocat-comp
-conda activate cmip7-prep
+pip install -r docs/requirements.txt
+sphinx-build -b html docs docs/_build/html
+open docs/_build/html/index.html
 ```
 
-### Install the package
+## Installing
 
-```bash
-pip install -e .
-```
+On NIRD, from inside a clone of this repository:
 
-### System-specific setup (Derecho / NIRD)
-
-**Derecho (CESM):**
-```bash
-module load conda
-conda activate /glade/work/jedwards/conda-envs/CMORDEV
-pip install -e .
-```
-
-**NIRD (NorESM):**
-From inside this clone of cmip7-prep
 ```bash
 cd scripts
 . setup_nird.sh
 ```
 
-Alternatively you can load up Miniforge yourself, load this conda environment and then add the path to this repository to your python path
-```bash
-conda activate /projects/NS9560K/diagnostics/cmordev_env_312/
-export PYTHONPATH=/path/to/repo/cmip7-prep/src:$PYTHONPATH
-```
-Swap `/path/to/repo` with the root path where this repository is cloned
-
-### Docker
-
-Builds a self-contained image (CMOR 3.15, ESMF/esmpy, the CMOR tables and the package itself) so no conda setup is needed on the host:
+Anywhere else:
 
 ```bash
-docker build -t cmip7-prep .
+conda env create -f environment.yml
+conda activate cmip7-prep
+pip install -e .
 ```
 
-Run it with your timeseries and output directories mounted:
+See the guide's installation page for Derecho, Docker and Apptainer.
+
+## Running
 
 ```bash
-docker run --rm -v /path/to/timeseries:/data -v /path/to/output:/out cmip7-prep \
-    python scripts/cmor_driver.py --realm atmos --tsdir /data --outdir /out
+python scripts/run_reference_case.py \
+  --case-dir <the archived case directory> \
+  --outdir <where the output should go> \
+  --model noresm --model-res NorESM3-LM \
+  --experiment piControl \
+  --years 1:50:10 \
+  --dry-run
 ```
 
-The CMOR tables are cloned at build time, defaulting to the fork used by CI. Point the build at a different checkout with:
+`--dry-run` prints the steps and exits. See the guide's tutorial page for what
+each argument does, and its recipes page for running one realm or one stage.
 
-```bash
-docker build -t cmip7-prep \
-    --build-arg TABLES_REPO=https://github.com/NorESMhub/cmip7-cmor-tables.git \
-    --build-arg TABLES_REF=noresm-dev .
-```
-
-To conver the image to an Apptainer `.sif` file for running on HPCs:
-
-```bash
-apptainer build cmip7-prep.sif docker-daemon://cmip7-prep:latest
-```
-
-## Quickstart
-
-Make sure you have generated timeseries files for the run before starting.
-
-**General usage via `cmor_driver.py`:**
-```bash
-# Atmosphere variables
-python scripts/cmor_driver.py --realm atmos --tsdir /path/to/timeseries/
-
-# Land variables
-python scripts/cmor_driver.py --realm land --tsdir /path/to/timeseries/
-```
-
-**Derecho:**
-```bash
-qcmd -- python scripts/cmor_driver.py --realm atmos --tsdir /path/to/timeseries/
-```
-
-## Validating CMOR output
-
-After running the driver, `validate_cmor_output.py` checks one subset (model /
-realm / experiment / frequency) of the output tree: it reports variables with
-CMOR log errors, expected variables that were not produced, and a dimension
-inventory, and can plot a mean time series and a time-mean map per variable.
-
-```bash
-python scripts/validate_cmor_output.py \
-    --model noresm --realm aerosol --experiment piControl --frequency mon \
-    --root-output-path /path/to/output/root \
-    --plot-timeseries --plot-maps --html
-```
-
-Reports land in `<root>/validation_reports/<model>_<realm>_<experiment>_<frequency>/`.
-The `--html` flag (or running `scripts/build_validation_html.py --root-output-path
-/path/to/output/root` directly) builds a static browsing interface at
-`<root>/validation_reports/index.html` covering **all** subsets validated so far —
-each new validation run adds to it. The page has an overview of failures per
-subset and a browse view with filters (experiment, frequency, realm, status,
-variable) showing per-variable source mapping info, error messages and plots.
-It needs no web server; open `index.html` directly, and the whole
-`validation_reports/` folder can be copied or synced as one self-contained unit.
-To publish the site elsewhere (e.g. a www-served directory), pass `--html-dir
-/path/to/site`: the plot images are then copied into that directory so it is
-self-contained.
-
-## Variable mapping files
-
-The mapping YAML files live in `data/`. Each entry describes how a native model variable maps to a CMIP variable.
-Keys use the form `<cmip_name>_<frequency>-<level>-<grid>-<realm>`:
-
-```yaml
-# Simple source mapping with unit scaling
-pr_tavg-u-hxy-u:
-  table: atmos
-  units: kg m-2 s-1
-  sources:
-    - model_var: PRECT
-      scale: 1000.0   # m/s -> kg m-2 s-1
-
-# Formula combining multiple variables
-clt_tavg-u-hxy-u:
-  table: atmos
-  units: "%"
-  formula: CLDTOT * 100
-  sources:
-    - model_var: CLDTOT
-
-# Pressure-level variable
-ta_tavg-p19-hxy-air:
-  table: atmos
-  units: K
-  dims: [time, plev, lat, lon]
-  levels:
-    name: plev19
-    units: Pa
-  sources:
-    - model_var: T
-
-# Hybrid-sigma level variable
-cl_tavg-al-hxy-u:
-  table: atmos
-  units: "%"
-  formula: CLOUD * 100
-  dims: [time, lev, lat, lon]
-  levels:
-    name: standard_hybrid_sigma
-    src_axis_name: lev
-  sources:
-    - model_var: CLOUD
-```
-
-Both CESM (`cesm_to_cmip7.yaml`) and NorESM (`noresm_to_cmip7.yaml`) mappings are included.
-
-## Maintaining the CESM variable mapping via Google Sheets
-
-The CESM variable mapping is maintained in a Google Spreadsheet and stored in version control as `data/cesm_to_cmip7.yaml`.
-
-**Spreadsheet:** <https://docs.google.com/spreadsheets/d/1BJV6CLgCTUpuaUlEQoFc-7ATBCsoJezYkyCvU1NTlxw/edit?usp=sharing>
-
-### Column format
-
-Columns A–F and L–S are populated from CMIP7 table metadata.  Columns G–K describe how each CMIP variable is generated from CESM model output and are the ones to fill in:
-
-| Col | Column | Description |
-|-----|--------|-------------|
-| G | `CESM Variable Name` | The CESM variable(s) needed as input, comma-separated, e.g. `PRECC, PRECL` |
-| H | `Formula` | Expression used to compute the CMIP variable from the CESM inputs, e.g. `(PRECC + PRECL) * 1000.0` — leave blank when the input variable needs only a rename or scaling |
-| I | `Scale` | Multiplicative scale factor applied to each input variable, comma-separated and positionally aligned with column G, e.g. `1000.0` |
-| J | `Freq` | Sampling frequency of each input variable, e.g. `day` for daily fields |
-| K | `Alias` | Rename each input variable before use, comma-separated and positionally aligned with column G |
-
-### Workflow
-
-1. Open the spreadsheet and fill in columns G–K for any variables that are missing a `CESM Variable Name`.
-2. Export as CSV: **File → Download → Comma Separated Values (.csv)**
-3. Save the downloaded file as `data/cesm_data.csv`.
-4. Regenerate the YAML:
-   ```bash
-   python scripts/convert_csv_to_yaml.py --model cesm \
-       --input data/cesm_data.csv \
-       --output data/cesm_to_cmip7.yaml
-   ```
-
-## Key modules
-
-| Module | Purpose |
-|--------|---------|
-| `cmip7_prep.mapping_compat` | Load and evaluate YAML mapping files; `Mapping`, `VarConfig` |
-| `cmip7_prep.pipeline` | File discovery, dataset opening, vertical transform dispatch |
-| `cmip7_prep.regrid` | Regrid to 1° lat/lon for CESM/NorESM or 2° lat/lon for NorESM via precomputed ESMF weight files |
-| `cmip7_prep.vertical` | Hybrid-sigma → pressure-level interpolation (geocat-comp) |
-| `cmip7_prep.cmor_writer` | Write CMOR-compliant output (`CmorSession`) |
-| `cmip7_prep.cmor_utils` | Fill values, time encoding, bounds, monotonicity utilities |
-| `cmip7_prep.cache_tools` | Regridder and FX field caching (`RegridderCache`, `FXCache`) |
-| `cmip7_prep.mom6_static` | Read MOM6 static grid for ocean FX fields |
-
-## Running tests
+## Tests
 
 ```bash
 pytest
 ```
-
-Doctests in all source modules are run automatically via `--doctest-modules` (configured in `pytest.ini`).
-
-## Data files
-
-The `data/` directory contains:
-
-| File | Description |
-|------|-------------|
-| `cesm_to_cmip7.yaml` | CESM → CMIP7 variable mapping |
-| `noresm_to_cmip7.yaml` | NorESM → CMIP7 variable mapping |
-| `cmor_dataset.json` | Default CMOR dataset attributes |
-| `piControl.json` | CMOR experiment metadata for piControl |
-| `depth_bnds.nc` | Soil level depth bounds for sdepth axis |
-| `ocean_geometry.nc` | MOM6 ocean grid geometry |

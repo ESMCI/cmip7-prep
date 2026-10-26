@@ -1,0 +1,20 @@
+/* Smaller headings than the theme's defaults, with enough space above each
+   one that a section still reads as a section. */
+.bd-article h1 {
+  font-size: 1.8rem;
+}
+
+.bd-article h2 {
+  font-size: 1.35rem;
+  margin-top: 2.2rem;
+}
+
+.bd-article h3 {
+  font-size: 1.12rem;
+  margin-top: 1.8rem;
+}
+
+.bd-article h4 {
+  font-size: 1rem;
+  margin-top: 1.5rem;
+}
