@@ -89,7 +89,7 @@ variables:
     formula: TOTVEGC
     units: g m-2
 
-  cropFrac_tavg-u-hxy-u: PCT_LANDUNIT[:,1,:,:]
+  cropFrac_tavg-u-hxy-u: PCT_LANDUNIT[:,1,...]
 
   esn_tavg-u-hxy-lnd: QSNOEVAP
 
@@ -132,10 +132,6 @@ variables:
     units: g m-2 s-1
 
   fN2O_tavg-u-hxy-lnd: F_N2O_DENIT + F_N2O_NIT
-
-  fNAnthDisturb_tavg-u-hxy-lnd:
-    formula: (DWT_CONV_NFLUX+TOT_WOODPRODN_LOSS,CROPPROD1N_LOSS)
-    units: g m-2 s-1
 
   fNLitterSoil_tavg-u-hxy-lnd:
     formula: (LIT_MET_N_TO_SOM_ACT_N + LIT_CEL_N_TO_SOM_ACT_N + LIT_LIG_N_TO_SOM_SLO_N)
@@ -345,7 +341,7 @@ variables:
     formula: C14_AR
     units: g m-2 s-1
 
-  residualFrac_tavg-u-hxy-u: 1-PCT_LANDUNIT[:,0,:,:]-PCT_LANDUNIT[:,1,:,:]
+  residualFrac_tavg-u-hxy-u: 1-PCT_LANDUNIT[:,0,...]-PCT_LANDUNIT[:,1,...]
 
   rhLitter_tavg-u-hxy-lnd:
     formula: LITTERC_HR
@@ -377,9 +373,9 @@ variables:
 
   rsus_tavg-u-hxy-sn: (SNOFSRND + SNOFSRNI + SNOFSRVI+ SNOFSRVD)
 
-  sftgif_tavg-u-hxy-u: PCT_LANDUNIT[:,3,:,:]
+  sftgif_tavg-u-hxy-u: PCT_LANDUNIT[:,3,...]
 
-  sftlaf_ti-u-hxy-u: PCT_LANDUNIT[:,4,:,:]
+  sftlaf_ti-u-hxy-u: PCT_LANDUNIT[:,4,...]
 
   slthick_ti-sl-hxy-lnd: DZSOI
 
@@ -395,7 +391,7 @@ variables:
     formula: QVEGT
     units: kg m-2 s-1
 
-  treeFrac_tavg-u-hxy-u: (PCT_NAT_PFT[:,1,:,:]+PCT_NAT_PFT[:,2,:,:]+PCT_NAT_PFT[:,3,:,:]+PCT_NAT_PFT[:,4,:,:]+PCT_NAT_PFT[:,5,:,:]+PCT_NAT_PFT[:,6,:,:]+PCT_NAT_PFT[:,7,:,:]+PCT_NAT_PFT[:,8,:,:])*PCT_LANDUNIT[:,0,:,:]
+  treeFrac_tavg-u-hxy-u: (PCT_NAT_PFT[:,1,...]+PCT_NAT_PFT[:,2,...]+PCT_NAT_PFT[:,3,...]+PCT_NAT_PFT[:,4,...]+PCT_NAT_PFT[:,5,...]+PCT_NAT_PFT[:,6,...]+PCT_NAT_PFT[:,7,...]+PCT_NAT_PFT[:,8,...])*PCT_LANDUNIT[:,0,...]
 
   tsl_tavg-sl-hxy-lnd: TSOI
 
@@ -403,7 +399,7 @@ variables:
 
   tslsi_tpt-u-hxy-lsi: TSKIN
 
-  vegFrac_tavg-u-hxy-u: PCT_LANDUNIT[:,0,:,:]+PCT_LANDUNIT[:,1,:,:]
+  vegFrac_tavg-u-hxy-u: PCT_LANDUNIT[:,0,...]+PCT_LANDUNIT[:,1,...]
 
   vegHeight_tavg-u-hxy-veg: HTOP
 

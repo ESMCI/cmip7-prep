@@ -144,3 +144,21 @@ def test_checked_in_files_match_the_csv():
             on_disk = yaml.safe_load(f)["variables"]
         assert on_disk == variables, realm
         assert not mapping_errors({"variables": on_disk})
+
+
+def test_positional_slices_work_on_unstructured_arrays(tmp_path):
+    """X[:,k,:,:] becomes X[:,k,...], valid with or without lat and lon."""
+    mappings, _ = _read(
+        tmp_path,
+        [("f_tavg-u-hxy-u", "land", "P", "P[:,1,:,:]+P[:,2,:,:]", "mon", "glb")],
+    )
+    assert mappings["land"]["f_tavg-u-hxy-u"] == "P[:,1,...]+P[:,2,...]"
+
+
+def test_tuple_formula_is_skipped(tmp_path):
+    """A comma where a + was meant would make a tuple; it is reported instead."""
+    mappings, skipped = _read(
+        tmp_path, [("f_tavg-u-hxy-lnd", "land", "A, B, C", "(A+B,C)", "mon", "glb")]
+    )
+    assert mappings["land"] == {}
+    assert "tuple" in skipped[0][2]

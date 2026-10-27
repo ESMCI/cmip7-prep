@@ -76,6 +76,10 @@ _CHUNITS = re.compile(
     r"^chunits\((?P<inner>.+),\s*units=['\"](?P<units>[^'\"]+)['\"]\)$"
 )
 _SUM_OVER = re.compile(r"\bsum\((?P<arr>\w+),\s*['\"](?P<dim>\w+)['\"]\)")
+# X[:, k, :, :] picks one level of a (time, level, lat, lon) array.  CLM and CICE
+# write unstructured (time, level, ncol) arrays, where that fourth index is out
+# of range, so the trailing full slices are written as an ellipsis instead.
+_TRAILING_SLICES = re.compile(r"\[(?P<head>:,\s*\d+)(?:,\s*:)+\]")
 _NOT_AVAILABLE = {"", "n/a", "?"}
 
 
@@ -96,6 +100,10 @@ def parse_request_formula(source: str, formula: str, freq: str = "") -> tuple:
     ('CCN6', 'cm-3', None)
     >>> parse_request_formula("TOT_CLD_VISTAU", 'sum(TOT_CLD_VISTAU, "lev")')
     ('TOT_CLD_VISTAU.sum(dim="lev")', None, None)
+    >>> parse_request_formula("P", "P[:,1,:,:]+P[:,2,:,:]")
+    ('P[:,1,...]+P[:,2,...]', None, None)
+    >>> parse_request_formula("A, B, C", "(A+B,C)")[2]
+    'formula is a tuple, not a single expression'
     >>> parse_request_formula("CLIMODIS [COSP]", "")
     ('CLIMODIS', None, None)
     >>> parse_request_formula("sisi_d, sisi", "", "day")
@@ -128,11 +136,15 @@ def parse_request_formula(source: str, formula: str, freq: str = "") -> tuple:
     if match:
         formula, units = match["inner"].strip(), match["units"]
     formula = _SUM_OVER.sub(r'\g<arr>.sum(dim="\g<dim>")', formula)
+    formula = _TRAILING_SLICES.sub(r"[\g<head>,...]", formula)
 
     try:
         tree = ast.parse(formula, mode="eval")
     except SyntaxError:
         return None, None, "formula is not a valid expression"
+    if isinstance(tree.body, ast.Tuple):
+        # A stray comma, as in (A+B,C) for A+B+C, would evaluate to a tuple.
+        return None, None, "formula is a tuple, not a single expression"
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.Call)
