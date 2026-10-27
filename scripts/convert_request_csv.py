@@ -23,6 +23,11 @@ are shared with it by import.  If the two scripts are merged later, the merging
 of rows (``_entry_for``) and the formula parsing (``parse_request_formula``)
 are the parts worth keeping.
 
+TEMPORARY: this script, including the skipping of climatology and extremum
+entries in ``_wrong_sampling``, is a stopgap until the request CSV can be
+converted by ``convert_csv_to_yaml.py`` (or its successor) directly.  Do not
+build on it; fold what is worth keeping into that script and delete this one.
+
 Writes ``cesm_to_cmip7_<realm>.yaml``, checked against
 ``data/schemas/mapping.schema.yaml`` before anything is written.
 """
@@ -81,6 +86,12 @@ _SUM_OVER = re.compile(r"\bsum\((?P<arr>\w+),\s*['\"](?P<dim>\w+)['\"]\)")
 # of range, so the trailing full slices are written as an ellipsis instead.
 _TRAILING_SLICES = re.compile(r"\[(?P<head>:,\s*\d+)(?:,\s*:)+\]")
 _NOT_AVAILABLE = {"", "n/a", "?"}
+
+# The time-sampling token of a branded name: tas_tmax-h2m-hxy-u -> tmax.
+_SAMPLING = re.compile(r"^[^_]+_(?P<sampling>t[a-z]+)-")
+_MEAN_SAMPLINGS = ("tavg", "tpt")
+_EXTREMA_SAMPLINGS = ("tmax", "tmin", "tmaxavg", "tminavg")
+_CLIMATOLOGY_SAMPLINGS = ("tclm", "tclmdc")
 
 
 def parse_request_formula(source: str, formula: str, freq: str = "") -> tuple:
@@ -210,6 +221,55 @@ def _entry_for(rows: list) -> tuple:
     return entry, notes
 
 
+def _wrong_sampling(variables: dict) -> dict:
+    """Return ``{name: reason}`` for entries that would write the wrong statistic.
+
+    The pipeline reads one value per time step, so it can write time means and
+    instantaneous values.  Two kinds of entry in the request cannot be made
+    that way:
+
+    * Climatologies (``tclm``, ``tclmdc``) are a reduction over many years, which
+      no source variable holds.
+    * Extrema (``tmax``, ``tmin`` and their ``avg`` forms) are only right when
+      the source is itself a max or min, as ``TREFHTMX`` is.  Where the CSV
+      gives the same source as the time-mean or instantaneous variable of that
+      name, the output would be a mean labelled as a maximum.
+
+    >>> _wrong_sampling({"a_tclm-u-hxy-u": "A"})
+    {'a_tclm-u-hxy-u': 'climatologies are not produced'}
+    >>> _wrong_sampling({"tas_tmax-h2m-hxy-u": "TREFHTMX", "tas_tavg-h2m-hxy-u": "TREFHT"})
+    {}
+    >>> _wrong_sampling({"b_tmax-u-hxy-u": "PBLH", "b_tavg-u-hxy-u": "PBLH"})
+    {'b_tmax-u-hxy-u': 'same source as b_tavg-u-hxy-u, so it would be a mean labelled as an extremum'}
+    """
+
+    def formula_of(entry):
+        return entry if isinstance(entry, str) else entry.get("formula")
+
+    skipped = {}
+    for name, entry in variables.items():
+        match = _SAMPLING.match(name)
+        sampling = match["sampling"] if match else None
+        if sampling in _CLIMATOLOGY_SAMPLINGS:
+            skipped[name] = "climatologies are not produced"
+        elif sampling in _EXTREMA_SAMPLINGS:
+            root = name.split("_", 1)[0]
+            for other, other_entry in variables.items():
+                other_match = _SAMPLING.match(other)
+                if (
+                    other.split("_", 1)[0] == root
+                    and other_match
+                    and other_match["sampling"] in _MEAN_SAMPLINGS
+                    and formula_of(other_entry) == formula_of(entry)
+                ):
+                    skipped[name] = (
+                        f"same source as {other}, so it would be a mean "
+                        "labelled as an extremum"
+                    )
+                    break
+    return skipped
+
+
 def read_request_csv(filepath, config):
     """Read the CMIP7 request CSV into ``({realm: {name: entry}}, skipped)``.
 
@@ -256,6 +316,10 @@ def read_request_csv(filepath, config):
                 entry = {"formula": entry} if isinstance(entry, str) else entry
                 entry["grids"] = list(override)
         mappings[realm][name] = entry
+    for realm, variables in mappings.items():
+        for name, reason in _wrong_sampling(variables).items():
+            del variables[name]
+            problems.setdefault((realm, name), set()).add(reason)
     for (realm, name), reasons in sorted(problems.items()):
         if name not in mappings[realm]:
             skipped.append((realm, name, "; ".join(sorted(reasons))))

@@ -23,8 +23,6 @@ variables:
 
   ch4_tavg-u-hm-air: CH4
 
-  ch4_tclm-u-hm-air: CH4
-
   chegph2oo1d_tavg-al-hxy-u: r_O1D_H2O/6.022E23 *1.E6 *2.
 
   dms_tavg-al-hxy-u: DMS
@@ -70,8 +68,6 @@ variables:
   o3_tavg-p19-hxy-air: O3
 
   o3_tavg-p39-hy-air: O3
-
-  o3_tclm-p19-hxy-air: O3
 
   o3_tpt-al-hxy-u: O3
 

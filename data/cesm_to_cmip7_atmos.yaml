@@ -9,10 +9,6 @@ variables:
 
   bldep_tavg-u-hxy-u: PBLH
 
-  bldep_tmax-u-hxy-u: PBLH
-
-  bldep_tmin-u-hxy-u: PBLH
-
   bldep_tpt-u-hxy-u: PBLH
 
   ccb_tavg-u-hxy-ccl: PCLDBOT
@@ -107,8 +103,6 @@ variables:
 
   co2_tavg-p19-hxy-air: CO2
 
-  co2_tclm-p19-hxy-air: CO2
-
   co2mass_tavg-u-hm-u: TMCO2 * AREA
 
   dmc_tavg-alh-hxy-u: ZMMU
@@ -195,21 +189,15 @@ variables:
 
   noaahi2m_tavg-h2m-hxy-u: HIA
 
-  noaahi2m_tmax-h2m-hxy-u: HIA
-
   parasolRefl_tavg-u-hxy-sea: RFL_PARASOL
 
   pctisccp_tavg-u-hxy-cl: MEANPTOP_ISCCP
 
   pfull_tavg-al-hxy-u: PMID
 
-  pfull_tclm-al-hxy-u: PMID
-
   pfull_tpt-al-hxy-u: PMID
 
   phalf_tavg-alh-hxy-u: PINT
-
-  phalf_tclm-alh-hxy-u: PINT
 
   phalf_tpt-alh-hs-u: PINT
 
@@ -287,13 +275,9 @@ variables:
 
   rlut_tavg-u-hxy-u: FLUT
 
-  rlut_tclmdc-u-hxy-u: FLUT
-
   rlut_tpt-u-hxy-u: FLUT
 
   rlutcs_tavg-u-hxy-u: FLUTC
-
-  rlutcs_tclmdc-u-hxy-u: FLUTC
 
   rlutcs_tpt-u-hxy-u: FLUTC
 
@@ -315,8 +299,6 @@ variables:
 
   rsdt_tavg-u-hxy-u: SOLIN
 
-  rsdt_tclmdc-u-hxy-u: SOLIN
-
   rss_tavg-u-hxy-u: FSNS
 
   rsu_tavg-alh-hxy-u: FUS
@@ -331,13 +313,9 @@ variables:
 
   rsut_tavg-u-hxy-u: FSUTOA
 
-  rsut_tclmdc-u-hxy-u: FSUTOA
-
   rsut_tpt-u-hxy-u: FSUTOA
 
   rsutcs_tavg-u-hxy-u: SOLIN - FSNTOAC
-
-  rsutcs_tclmdc-u-hxy-u: SOLIN - FSNTOAC
 
   rsutcs_tpt-u-hxy-u: SOLIN - FSNTOAC
 
@@ -346,10 +324,6 @@ variables:
   scldncl_tavg-u-hxy-scl: ACTNL/FCTL
 
   sfcWind_tavg-h10m-hxy-u: U10
-
-  sfcWind_tmax-h10m-hxy-u: U10
-
-  sfcWind_tmaxavg-h10m-hxy-u: U10
 
   sftlf_ti-u-hxy-u: LANDFRAC
 

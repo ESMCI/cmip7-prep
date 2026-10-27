@@ -162,3 +162,37 @@ def test_tuple_formula_is_skipped(tmp_path):
     )
     assert mappings["land"] == {}
     assert "tuple" in skipped[0][2]
+
+
+def test_climatologies_are_skipped(tmp_path):
+    """tclm and tclmdc need a reduction over years that no source provides."""
+    mappings, skipped = _read(
+        tmp_path,
+        [
+            ("co2_tclm-p19-hxy-air", "atmos", "CO2", "", "mon", "glb"),
+            ("rlut_tclmdc-u-hxy-u", "atmos", "FLUT", "", "mon", "glb"),
+            ("rlut_tpt-u-hxy-u", "atmos", "FLUT", "", "mon", "glb"),
+        ],
+    )
+    assert list(mappings["atmos"]) == ["rlut_tpt-u-hxy-u"]
+    assert {row[1] for row in skipped} == {
+        "co2_tclm-p19-hxy-air",
+        "rlut_tclmdc-u-hxy-u",
+    }
+
+
+def test_extremum_copying_the_mean_is_skipped_but_a_real_one_is_kept(tmp_path):
+    """tmax is kept when its source is a maximum, dropped when it is the mean."""
+    mappings, skipped = _read(
+        tmp_path,
+        [
+            ("tas_tavg-h2m-hxy-u", "atmos", "TREFHT", "", "mon", "glb"),
+            ("tas_tmax-h2m-hxy-u", "atmos", "TREFHTMX", "", "mon", "glb"),
+            ("bldep_tavg-u-hxy-u", "atmos", "PBLH", "", "mon", "glb"),
+            ("bldep_tmax-u-hxy-u", "atmos", "PBLH", "", "mon", "glb"),
+        ],
+    )
+    assert "tas_tmax-h2m-hxy-u" in mappings["atmos"]
+    assert "bldep_tmax-u-hxy-u" not in mappings["atmos"]
+    assert [row[1] for row in skipped] == ["bldep_tmax-u-hxy-u"]
+    assert "mean labelled as an extremum" in skipped[0][2]
