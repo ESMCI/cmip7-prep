@@ -28,24 +28,17 @@ optionally plots a mean time series and a time-mean map per variable.
 Finally it builds an HTML index summarizing every realm and all
 frequencies for that realm that have been validated.
 
-## The driver
-
-`run_reference_case.py` runs all three stages, for every realm the model
-declares and every frequency each realm declares, and prints one table at the
-end saying what succeeded, what did not, and how long each step took. It is
-what you normally use; the three scripts are there for when you want one realm
-or one stage on its own.
-
-A full fifty-year NorESM case over every realm takes around seven hours. About
-two of those are time series generation and CMORization; the rest is validation
-with `--plots`, which plots every variable of every realm and frequency. Leave
-the plots out and the run is a fraction of that.
+The script [`run_reference_case.py`](tutorial.md#the-arguments) runs all three
+stages over every realm and frequency in
+`data/<model>_include_patterns.yaml`, unless you specify the subset(s) you
+want with `--realms` and `--frequencies`. Every argument it takes is described
+in [the tutorial](tutorial.md#the-arguments).
 
 ## The branded variable name
 
-A CMIP7 variable name on its own does not say enough. A monthly mean of surface
-air temperature and a monthly maximum of it are both `tas`. The branded
-variable name settles that by adding four labels to the root name:
+A CMIP7 branded variable variable name contains the name of the
+variable followed by four additional labels.  For example the time
+averaged surface air temperature is represented as follows:
 
 ```text
 ta_tavg-p19-hxy-air
@@ -61,15 +54,18 @@ root variable name
 |---|---|---|
 | temporal | how time was treated | `tavg` averaged, `tpt` at an instant, `tmax`, `tmin`, `tclm` a climatology, `ti` no time dimension |
 | vertical | which levels | `u` none, `p19` 19 pressure levels, `al` model levels, `h2m` 2 m height, `d100m` 100 m depth |
-| horizontal | how space was treated | `hxy` on a grid, `hm` a mean over an area, `hs` at sites, `ht` along a transect |
+| horizontal | how space was treated | `hxy` on a grid, `hm` collapsed to one value, `hs` at sites, `ht` along a transect |
 | area | which areas contribute | `u` unmasked, `air`, `sea`, `si` sea ice, `lnd` land, `sn` snow |
 
-So `siextent_tavg-u-hm-u` is sea-ice extent, averaged over each interval, with
-no vertical level, reported as a mean over an area rather than on a grid, and
-unmasked. Being a horizontal mean, it is a single number per time step.
+Another example is `siextent_tavg-u-hm-u` is sea-ice extent, which
+represents sea-ice extent averaged over each reported interval, with
+no vertical level and no mask. The `hm` label means the horizontal
+dimensions have been collapsed, so this variable is one number per
+time step rather than a field on a grid.
 
-The controlled vocabulary lists every label: 10 temporal, 44 vertical, 6
-horizontal and 26 area.
+The values each label may take come from the CMIP7 controlled vocabulary, which
+is a file listing every value CMIP7 accepts. It defines 10 temporal labels, 44
+vertical, 6 horizontal and 26 area.
 
 The branded name is used throughout. The mapping files are keyed by it, the
 CMOR tables are keyed by it, the suffix is its own level in the output
@@ -80,7 +76,7 @@ instantaneous history files are read.
 
 A CMIP7 variable is not a model variable. Variable mapping specifies
 how to get from one or more model output variables to the required
-CMIP7 vairable.
+CMIP7 variable.
 
 The files that specify this mapping are grouped by realms and model
 type (i.e. noresm or cesm).  A realm is a part of the Earth system
@@ -90,10 +86,10 @@ ice. It groups variables rather than files. As an example, the
 in CAM time-slice files but differ only in which variables they ask
 for out of them.
 
-Naming a realm decides three things: which variable mapping file (see below) is read, which
-history streams are searched, and which frequencies are available.
+Naming a realm decides three things: which variable mapping file is read, which
+history time slice files are searched, and which frequencies are available.
 
-| realm | covers | history streams | frequencies |
+| realm | covers | history time slice files | frequencies |
 |---|---|---|---|
 | `atmos` | the atmosphere | `cam.h0a` to `cam.h7i` | mon, day, 6hr, 3hr, 1hr |
 | `atmosChem` | atmospheric chemistry |  `cam.h0a` to `cam.h7i` | mon, day, 6hr, 3hr, 1hr |
@@ -102,15 +98,19 @@ history streams are searched, and which frequencies are available.
 | `seaIce` | sea ice | `cice.h`, `cice.h1` | mon, day |
 | `landIce` | the ice sheets | `cism.<ice_sheet>.h` | yr |
 
-Every realm and model pair has it's own variable mapping yaml file
-that lives data (e.g. `noresm_to_cmip7_atmos.yaml`). Each entry in the
-yaml file specifies the relationship between the model's native field
-or fields and the target CMIP7 variable.  As an example,
+Every realm and model pair has its own variable mapping yaml file in
+[`data/`](https://github.com/ESMCI/cmip7-prep/tree/main/data), named
+`<model>_to_cmip7_<realm>.yaml`. For NorESM those are
+`noresm_to_cmip7_atmos.yaml`, `noresm_to_cmip7_atmosChem.yaml`,
+`noresm_to_cmip7_aerosol.yaml`, `noresm_to_cmip7_land.yaml`,
+`noresm_to_cmip7_seaIce.yaml` and `noresm_to_cmip7_landIce.yaml`. Each entry in
+the yaml file specifies the relationship between the model's native field or
+fields and the target CMIP7 variable.  As an example,
 `clt_tavg-u-hxy-u` is obtained from the model variable `CLDTOT`
 multiplied by 100 to turn a fraction into a percentage.
 
-Note that the  mapping files are generated from Google Sheets that the scientists fill in,
-by way of a CSV, using `convert_csv_to_yaml.py`.
+Note that the mapping files are generated from Google Sheets that the
+scientists fill in, by way of a CSV, using `convert_csv_to_yaml.py`.
 
 ## Mapping CMIP7 realm, frequency and sampling to output time series files
 
@@ -118,8 +118,9 @@ A model does not write all of its output to one set of files. As an example, CAM
 monthly averages to one set of files, daily averages to another, six-hourly
 instantaneous values to a third, and so on.
 
-The files `<model>_include_patterns.yaml` specify  which stream to read for a given realm,
-frequency and sampling type (e.g. time average versus instantaneous):
+The files `<model>_include_patterns.yaml` specify which history time slice
+files to read for a given realm, frequency and sampling type, meaning time
+average versus instantaneous:
 
 ```yaml
 atmos:
@@ -178,14 +179,16 @@ needed for a given realm and frequency. The CMOR writer then uses the CMOR
 JSON tables to determine how to write each variable out - its units, standard
 name, dimensions, cell methods and the rest of its metadata.
 
-The tables are a checkout of
-[cmip7-cmor-tables](https://github.com/WCRP-CMIP/cmip7-cmor-tables), with one
-file per realm. The driver looks for the checkout beside this repository and
-`--tables-root` points it elsewhere.
+The per-realm tables are in `cmip7-cmor-tables/tables/`, and the controlled
+vocabulary is one file beside them at
+`cmip7-cmor-tables/tables-cvs/cmor-cvs.json`. That file also holds the accepted
+values for `experiment_id`, `source_id` and `grid_label`. Use `--tables-root`
+to read a different checkout.
 
 ## What a run needs
 
-- An archived case directory holding `atm/hist`, `lnd/hist`, `ice/hist`, `glc/hist` and `ocn/hist` subdirectories.
+- An archived case directory holding the `atm/hist`, `lnd/hist`, `ice/hist`,
+  `glc/hist` and `ocn/hist` subdirectories.
 - A writable output directory.
 - The CMIP7 CMOR tables, which the driver finds beside this repository by
   default.
