@@ -29,10 +29,7 @@ Finally it builds an HTML index summarizing every realm and all
 frequencies for that realm that have been validated.
 
 The script [`run_reference_case.py`](tutorial.md#the-arguments) runs all three
-stages over every realm and frequency in
-`data/<model>_include_patterns.yaml`, unless you specify the subset(s) you
-want with `--realms` and `--frequencies`. Every argument it takes is described
-in [the tutorial](tutorial.md#the-arguments).
+stages over every target realm and frequency and is discussed in more detail below.
 
 ## The branded variable name
 
@@ -139,13 +136,15 @@ contain `cam.h0a`, and six-hourly instantaneous output is in
 filenames. The files are found by globbing for the substrings (.e.g
 globbing `*cam.h0a*`).
 
-The sampling level is there because CMIP7 frequency does not distinguish
-time-averaged output from instantaneous output, and both can be monthly. The
-branded variable name carries it, as in `tas_tavg-u-hxy-u`, and CAM encodes it
-in the file name - `a` for averaged and `i` for instantaneous.
+A CMIP7 frequency (e.g. mon, day, 6hr) says how often a value is
+reported, but not whether that value is an average over the interval
+or a single sample from it. That information is contained in the
+branded variable name where `tavg` denotes an average sampling and
+`tpt` denotes an instantaneous sampling.
+`<model>_include_patterns.yaml` contains the mapping for the realm
+(e.g. atmos), the frequency (e.g. day) and the sampling (e.g. tpt) to
+the model output files.
 
-A realm, frequency and sampling combination that is absent from this file is
-output the model does not write, and asking for errors with `No include_patterns defined for ...`.
 
 ## The grid specification file
 
