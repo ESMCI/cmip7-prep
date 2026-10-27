@@ -78,9 +78,8 @@ logging.basicConfig(
 
 logger = logging.getLogger("cmip7_prep.cmor_driver")
 
-# Path for cmor tables
-# TODO: the following TABLES_cesm is no longer valid - can the TABLES_noresm be used?
-# TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+# Path for cmor tables.  CESM uses the same checkout: its CV already holds the
+# NCAR institution and the CESM3 source.
 TABLES_noresm = str(Path(__file__).parent.parent / "cmip7-cmor-tables")
 
 
@@ -95,9 +94,13 @@ REALM_YAML_MAP = {
     },
     "cesm": {
         "atmos": "cesm_to_cmip7_atmos.yaml",
+        "atmosChem": "cesm_to_cmip7_atmosChem.yaml",
+        "aerosol": "cesm_to_cmip7_aerosol.yaml",
         "land": "cesm_to_cmip7_land.yaml",
         "seaIce": "cesm_to_cmip7_seaIce.yaml",
+        "landIce": "cesm_to_cmip7_landIce.yaml",
         "ocean": "cesm_to_cmip7_ocean.yaml",
+        "ocnBgchem": "cesm_to_cmip7_ocnBgchem.yaml",
     },
 }
 
@@ -997,8 +1000,6 @@ def main():
             if not Path(tables_root).exists:
                 logger.error(f"input tables-root path {tables_root} does not exist")
                 sys.exit(1)
-        elif model == "cesm" and Path(TABLES_cesm).exists():
-            tables_root = Path(TABLES_cesm)
         elif model == "noresm" and Path(TABLES_noresm).exists():
             tables_root = Path(TABLES_noresm)
         else:

@@ -29,15 +29,12 @@ RUN conda install -y -n base -c conda-forge \
 RUN pip install --no-cache-dir \
         gents \
         dulwich \
-        cmip7-data-request-api
+        cmip7-data-request-api==1.4
 
 WORKDIR /opt/cmip7-prep
 COPY . .
 
-ARG TABLES_REPO=https://github.com/CESM-Development/cmip7-cmor-tables.git
-ARG TABLES_REF=cesm-dev
-RUN rm -rf cmip7-cmor-tables \
-    && git clone --depth 1 --branch "${TABLES_REF}" "${TABLES_REPO}" cmip7-cmor-tables
+RUN test -f cmip7-cmor-tables/tables-cvs/cmor-cvs.json
 
 RUN pip install --no-cache-dir --no-deps .
 ENV PYTHONPATH=/opt/cmip7-prep
