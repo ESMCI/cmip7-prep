@@ -8,6 +8,7 @@ has run. It reports:
 * variables with CMOR log errors
 * variables expected for the selected subset that were not produced
 * dimension inventory for variables that were produced
+* files whose period another file of the same variable already covers
 
 It can also optionally create:
 
@@ -33,12 +34,13 @@ import numpy as np
 import xarray as xr
 import yaml
 
-from cmip7_prep.validation_exit import (
+from cmip7_prep.step_exit import (
     COULD_NOT_RUN,
     RAN_AND_FOUND_PROBLEMS,
     RAN_AND_PASSED,
 )
 from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
+from cmip7_prep.output_files import redundant_pairs
 
 from cmor_driver import REALM_YAML_MAP
 
@@ -55,7 +57,14 @@ CANONICAL_REALM_MAP = {
     "ocnBgchem": "ocean",
 }
 
-LOG_NAME_RE = re.compile(r"^cmor_\d{8}T\d{6}Z_(?P<variable>.+)\.log$")
+# A CMOR log is named for the variable, region and frequency it holds, and for
+# the window of years as well when the run was given one.
+#     cmor_ta_tavg-p19-hxy-air_glb_mon_1-10.log
+#     cmor_ta_tavg-p19-hxy-air_glb_mon.log
+LOG_NAME_RE = re.compile(
+    r"^cmor_(?P<variable>.+?)_(?:glb|nh|sh)"
+    r"_(?P<frequency>[A-Za-z0-9]+)(?:_-?\d+--?\d+)?\.log$"
+)
 LOG_ERROR_RE = re.compile(r"Error: ", re.IGNORECASE)
 LOG_SUCCESS_RE = re.compile(r"\b(success|complete(?:d)?|finished)\b", re.IGNORECASE)
 
@@ -383,12 +392,18 @@ def build_variable_provenance(
     return provenance
 
 
-def parse_log_variable(log_path: Path) -> str | None:
-    """Extract the CMIP variable name from a CMOR log filename."""
+def parse_log_name(log_path: Path) -> tuple[str, str] | None:
+    """Return the variable and frequency recorded in a CMOR log filename."""
     match = LOG_NAME_RE.match(log_path.name)
     if match is None:
         return None
-    return match.group("variable")
+    return match.group("variable"), match.group("frequency")
+
+
+def parse_log_variable(log_path: Path) -> str | None:
+    """Extract the CMIP variable name from a CMOR log filename."""
+    parsed = parse_log_name(log_path)
+    return None if parsed is None else parsed[0]
 
 
 def parse_log_file(log_path: Path) -> LogRecord | None:
@@ -411,7 +426,7 @@ def parse_log_file(log_path: Path) -> LogRecord | None:
 
 
 def collect_log_records(
-    log_dir: Path, expected_variables: set[str]
+    log_dir: Path, expected_variables: set[str], frequency: str | None = None
 ) -> dict[str, list[LogRecord]]:
     """Collect log records for variables that belong to the selected subset."""
     records: dict[str, list[LogRecord]] = defaultdict(list)
@@ -424,12 +439,16 @@ def collect_log_records(
         # Which variable a log is for is in its filename, so decide whether we
         # want it before reading it.  This directory holds every realm's logs,
         # and the log of a 3-D daily variable is not small.
-        variable = parse_log_variable(log_path)
-        if variable is None:
+        parsed = parse_log_name(log_path)
+        if parsed is None:
             continue
+        variable, log_frequency = parsed
         # Read only the logs for variables that this realm and frequency
         # expect.  One directory holds every realm's logs.
         if variable not in expected_variables:
+            continue
+        # The errors of one frequency say nothing about another.
+        if frequency and log_frequency != frequency:
             continue
         record = parse_log_file(log_path)
         if record is None:
@@ -624,6 +643,7 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
         f"- Produced variables: {report['counts']['produced_variables']}",
         f"- Variables with log errors: {report['counts']['variables_with_log_errors']}",
         f"- Missing variables: {report['counts']['missing_variables']}",
+        f"- Redundant files: {report['counts']['redundant_files']}",
         "",
         "## Variables With Log Errors",
         "",
@@ -633,6 +653,9 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     lines.extend(["", "## Missing Variables", ""])
     for variable in report["expected_but_not_produced"]:
         lines.append(f"- {variable}")
+    lines.extend(["", "## Redundant Files", ""])
+    for item in report["redundant_files"]:
+        lines.append(f"- {item['redundant']} (covered by {item['covered_by']})")
     lines.extend(["", "## Produced Variable Inventory", ""])
     for item in report["dimension_inventory"]:
         dims = "; ".join(item["dims"])
@@ -993,6 +1016,18 @@ def build_report(
     flattened_log_records = [
         asdict(record) for records in log_records.values() for record in records
     ]
+    # A variable's files should each cover a different period.  One whose
+    # period lies inside another's repeats times the other already holds, so
+    # one of the two is unwanted.
+    redundant_files = [
+        {
+            "variable": variable,
+            "redundant": str(redundant),
+            "covered_by": covering.name,
+        }
+        for variable, paths in sorted(produced_files.items())
+        for redundant, covering in redundant_pairs(paths)
+    ]
 
     return {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -1012,6 +1047,7 @@ def build_report(
             "variables_with_log_errors": len(variables_with_log_errors),
             "missing_variables": len(expected_but_not_produced),
             "inspection_errors": len(inspection_errors),
+            "redundant_files": len(redundant_files),
         },
         "expected_variables": expected_variables,
         "variables_with_log_errors": variables_with_log_errors,
@@ -1021,6 +1057,7 @@ def build_report(
         "variable_provenance": variable_provenance,
         "log_records": flattened_log_records,
         "inspection_errors": inspection_errors,
+        "redundant_files": redundant_files,
         "plots": plot_outputs,
     }
 
@@ -1041,6 +1078,16 @@ def print_summary(report: dict[str, Any]) -> None:
         print("Expected but not produced:")
         for variable in report["expected_but_not_produced"]:
             print(f"  - {variable}")
+    if report["redundant_files"]:
+        print(
+            "Files whose period another file of the same variable also covers, "
+            "so those times appear twice. A run killed while writing a variable "
+            "leaves one, and so does rerunning a variable with a different "
+            "window of years. Decide which file is wanted and delete the other:"
+        )
+        for item in report["redundant_files"]:
+            print(f"  - {item['redundant']}")
+            print(f"    covered by {item['covered_by']}")
 
 
 def main() -> int:
@@ -1077,7 +1124,7 @@ def main() -> int:
             args.frequency,
         )
 
-    log_records = collect_log_records(logs_dir, expected_variable_set)
+    log_records = collect_log_records(logs_dir, expected_variable_set, args.frequency)
     produced_files, inventory_records, inspection_errors = scan_output_tree(
         cmip_root,
         model=args.model,
@@ -1139,6 +1186,7 @@ def main() -> int:
         report["dimension_inventory"], report_dir / "dimension_inventory.csv"
     )
     write_csv_rows(report["inspection_errors"], report_dir / "inspection_errors.csv")
+    write_csv_rows(report["redundant_files"], report_dir / "redundant_files.csv")
     write_markdown_summary(report, report_dir / "validation_summary.md")
 
     print_summary(report)
@@ -1155,7 +1203,9 @@ def main() -> int:
         print(f"HTML interface written to {index_path}")
 
     if args.strict and (
-        report["variables_with_log_errors"] or report["expected_but_not_produced"]
+        report["variables_with_log_errors"]
+        or report["expected_but_not_produced"]
+        or report["redundant_files"]
     ):
         return RAN_AND_FOUND_PROBLEMS
     return RAN_AND_PASSED

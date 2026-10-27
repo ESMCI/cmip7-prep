@@ -10,11 +10,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from run_reference_case import (
     completed_path,
     counts_as_done,
+    outcome_label,
     period_tag,
     read_completed,
     record_completed,
+    should_stop,
+    step_label,
     step_log_dir,
 )
+from cmip7_prep.reference_run import Step
 
 
 class TestCountsAsDone:
@@ -45,6 +49,102 @@ class TestCountsAsDone:
     def test_any_other_ending_is_not_done(self, returncode):
         """An argument error, a kill, a signal: none of them ran."""
         assert counts_as_done("validate", returncode) is False
+
+    def test_a_time_series_step_missing_a_frequency_is_done(self):
+        """Exit 4 says a frequency has no output, which a rerun cannot change."""
+        assert counts_as_done("timeseries", 4) is True
+
+    def test_a_cmor_step_with_nothing_to_write_is_done(self):
+        """Exit 5 says the data request asked for nothing this realm supplies."""
+        assert counts_as_done("cmor", 5) is True
+
+    def test_exit_5_from_another_stage_is_not_done(self):
+        """Only the CMOR step gives exit 5 that meaning."""
+        assert counts_as_done("timeseries", 5) is False
+
+    def test_exit_4_from_another_stage_is_not_done(self):
+        """Only the time series step gives exit 4 that meaning."""
+        assert counts_as_done("cmor", 4) is False
+
+
+class TestStepLabel:
+    """Tests for how a step reads in the list of what a run will do."""
+
+    def test_a_step_with_a_frequency_names_it(self):
+        """A CMOR step runs one realm at one frequency."""
+        step = Step(
+            key="cmor-atmos-mon",
+            stage="cmor",
+            realm="atmos",
+            command=[],
+            frequency="mon",
+        )
+        assert step_label(step) == "atmos mon"
+
+    def test_a_time_series_step_names_only_the_realm(self):
+        """It covers every frequency of the realm, so it carries none."""
+        step = Step(
+            key="timeseries-atmos", stage="timeseries", realm="atmos", command=[]
+        )
+        assert step_label(step) == "atmos"
+
+
+class TestOutcomeLabel:
+    """Tests for how a finished step reads in the summary table."""
+
+    @pytest.mark.parametrize("stage", ["timeseries", "cmor", "validate"])
+    def test_success_is_ok(self, stage):
+        """Whatever the stage."""
+        assert outcome_label(stage, 0) == "ok"
+
+    def test_a_time_series_step_missing_a_frequency_is_a_warning(self):
+        """Not ok, because something is absent; not a failure, because the
+        case never wrote it."""
+        assert outcome_label("timeseries", 4) == "warning"
+
+    def test_a_cmor_step_with_nothing_to_write_is_a_warning(self):
+        """The data request asks for nothing this realm and frequency has."""
+        assert outcome_label("cmor", 5) == "warning"
+
+    def test_a_cmor_step_that_wrote_none_of_its_variables_fails(self):
+        """Exit 1 means every variable it tried broke, which is not a warning."""
+        assert outcome_label("cmor", 1) == "FAILED (1)"
+
+    def test_validation_finding_problems_is_a_report(self):
+        """Reporting is what it is for."""
+        assert outcome_label("validate", 1) == "reported problems"
+
+    @pytest.mark.parametrize(
+        "stage,returncode", [("timeseries", 1), ("cmor", 4), ("validate", 3)]
+    )
+    def test_anything_else_is_a_failure(self, stage, returncode):
+        """Including exit 4 from a stage that does not define it."""
+        assert outcome_label(stage, returncode) == f"FAILED ({returncode})"
+
+
+class TestShouldStop:
+    """Tests for which results end the rest of the run."""
+
+    @pytest.mark.parametrize("stage", ["timeseries", "cmor", "validate"])
+    def test_success_never_stops(self, stage):
+        """Whatever the stage."""
+        assert should_stop(stage, 0, keep_going=False) is False
+
+    def test_a_time_series_step_missing_a_frequency_does_not_stop(self):
+        """The remaining realms are unaffected by it."""
+        assert should_stop("timeseries", 4, keep_going=False) is False
+
+    def test_a_cmor_step_with_nothing_to_write_does_not_stop(self):
+        """A realm the data request asks nothing of should not end the run."""
+        assert should_stop("cmor", 5, keep_going=False) is False
+
+    def test_a_failed_time_series_step_stops(self):
+        """Everything after it would read input that is not there."""
+        assert should_stop("timeseries", 1, keep_going=False) is True
+
+    def test_keep_going_overrides_a_failure(self):
+        """That is what it is for."""
+        assert should_stop("timeseries", 1, keep_going=True) is False
 
 
 class TestPeriodTag:

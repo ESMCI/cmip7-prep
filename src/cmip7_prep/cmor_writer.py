@@ -1576,8 +1576,11 @@ class CmorSession(
         ds: xr.Dataset,
         cmip_var: object,
         vdef: Any,
-    ) -> None:
-        """Write one variable from ds to a CMOR-compliant NetCDF file."""
+    ) -> Path:
+        """Write one variable from ds to a CMOR-compliant NetCDF file.
+
+        Returns the path CMOR wrote.
+        """
         # Pick CMOR table: prefer vdef.table, else vdef.realm (default Amon)
         self.primarytable = (
             getattr(vdef, "table", None) or getattr(vdef, "realm", None) or "atmos"
@@ -1772,4 +1775,9 @@ class CmorSession(
                 cmor.write(ps_id, np.asarray(ps_filled), store_with=var_id)
             self._pending_ps = None
 
-        cmor.close(var_id)
+        # file_name=True makes close return the name of the file it just
+        # wrote, which it always does when given a variable id.
+        written_path = cmor.close(var_id, file_name=True)
+        if not written_path:
+            raise RuntimeError(f"CMOR closed {bvn} without naming the file it wrote")
+        return Path(written_path)

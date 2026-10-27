@@ -126,6 +126,16 @@ def get_include_patterns(
     return patterns
 
 
+def frequencies_for_realm(model: str, realm: str) -> list[str]:
+    """The frequencies one model writes for one realm, in the order defined."""
+    try:
+        return list(_load_cached(model)[realm])
+    except KeyError:
+        raise ValueError(
+            f"No include_patterns defined for model={model}, realm={realm}"
+        ) from None
+
+
 def all_include_patterns(
     model: str,
     realm: str,
