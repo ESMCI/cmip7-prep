@@ -47,6 +47,11 @@ from cmip7_prep.include_patterns import (
     patterns_for_variable,
 )
 from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.mapping_ownership import (
+    classify_mapping_ownership,
+    load_mapping_catalog,
+    mapping_owners,
+)
 from cmip7_prep.grids import MODEL_RESOLUTIONS, CICE_GRID_VARS, resolution_for
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
@@ -965,12 +970,53 @@ def main():
                     v.branded_variable_name.name for v in cmip_vars
                 ]:
                     cmip_vars.append(var)
+
+    mappings = load_mapping_catalog(
+        model,
+        REALM_YAML_MAP,
+        selected_realm=realm,
+        selected_mapping=mapping,
+    )
+    owners = mapping_owners(mappings, frequency)
+    requested_names = {var.branded_variable_name.name for var in cmip_vars}
+    ownership = classify_mapping_ownership(requested_names, owners, realm)
+    results: list[tuple[str, str]] = []
+
+    # Report requested variables mapped to exactly one different realm.
+    for varname, owner_realms in sorted(ownership.mapped_elsewhere.items()):
+        logger.info(
+            "Skipping %s: mapping owner is realm %s, not %s",
+            varname,
+            owner_realms[0],
+            realm,
+        )
+        results.append((varname, f"INFO: mapped in realm {owner_realms[0]}"))
+    # Report requested variables that do not appear in any realm mapping.
+    for varname in sorted(ownership.unmapped):
+        logger.warning(
+            "No mapping for requested variable %s in any %s realm YAML",
+            varname,
+            model,
+        )
+        results.append((varname, "ERROR: no mapping in any realm YAML"))
+    # Report requested variables found in multiple realm mappings.
+    for varname, owner_realms in sorted(ownership.ambiguous.items()):
+        logger.error(
+            "Skipping %s: it is mapped in multiple realms: %s",
+            varname,
+            ", ".join(owner_realms),
+        )
+        results.append((varname, "ERROR: mapped in multiple realms"))
+
+    cmip_vars = [
+        var
+        for var in cmip_vars
+        if var.branded_variable_name.name in ownership.owned_here
+    ]
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
 
     # One entry per variable, each saying "ok" or why it was not written.
     # Checked at the end of main to decide whether the run succeeded.
-    results: list[tuple[str, str]] = []
-
     # Load requested variables
     if len(cmip_vars) > 0:
         # Glob the union of every time sampling for this realm and frequency.
@@ -1208,11 +1254,21 @@ def main():
             _peak_memory_gb(),
         )
 
-    # Writing no variables at all is a failure, even when every variable was
-    # skipped for a reason that was reported at the time.  A run that produces
-    # nothing should not report success.
+    # Treat requests mapped only to other realms as a successful no-op; otherwise fail if nothing was written.
     written = [name for name, status in results if status == "ok"]
     if not written:
+        if (
+            not cmip_vars
+            and ownership.mapped_elsewhere
+            and not ownership.unmapped
+            and not ownership.ambiguous
+        ):
+            logger.info(
+                "No variables are owned by realm %s; requested variables are "
+                "mapped to other realms.",
+                realm,
+            )
+            return
         logger.error(
             "No variables were written. %d were attempted; see the warnings "
             "and errors above for each.",
