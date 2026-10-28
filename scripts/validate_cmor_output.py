@@ -7,6 +7,7 @@ has run. It reports:
 
 * variables with CMOR log errors
 * variables expected for the selected subset that were not produced
+* requested variables mapped to another realm, unmapped, or ambiguously mapped
 * dimension inventory for variables that were produced
 
 It can also optionally create:
@@ -39,6 +40,12 @@ from cmip7_prep.validation_exit import (
     RAN_AND_PASSED,
 )
 from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
+from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.mapping_ownership import (
+    classify_mapping_ownership,
+    load_mapping_catalog,
+    mapping_owners,
+)
 
 from cmor_driver import REALM_YAML_MAP
 
@@ -348,6 +355,12 @@ def filter_expected_variables(
     return sorted(yaml_names)
 
 
+def _cmip_short_name(branded_name: str) -> str:
+    """Return the CMIP variable component preceding its temporal branding."""
+    match = re.search(r"_t[a-z0-9]+-", branded_name)
+    return branded_name[: match.start()] if match else branded_name
+
+
 def relative_to_report(path: str | Path, report_dir: Path) -> str:
     """Return a path relative to the report dir, or unchanged if outside it."""
     try:
@@ -470,6 +483,7 @@ def scan_output_tree(
     frequency: str,
     expected_variables: set[str],
     ensemble_member: str | None = None,
+    expected_basenames: set[str] | None = None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
     """Scan the CMIP7 tree and inventory produced files for the selected subset."""
     produced: dict[str, list[Path]] = defaultdict(list)
@@ -515,7 +529,10 @@ def scan_output_tree(
         # realms write their output into one CMIP7 output directory, and a
         # file's path records its variable but not the realm that produced it,
         # so the variable name is the only way to tell whose file this is.
-        if f"{variable}_{dimension_folder}" not in expected_variables:
+        if (
+            f"{variable}_{dimension_folder}" not in expected_variables
+            and variable not in (expected_basenames or set())
+        ):
             logger.debug("Not expected here, skipping: %s", variable)
             continue
         produced[f"{variable}_{dimension_folder}"].append(file_path)
@@ -624,6 +641,12 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
         f"- Produced variables: {report['counts']['produced_variables']}",
         f"- Variables with log errors: {report['counts']['variables_with_log_errors']}",
         f"- Missing variables: {report['counts']['missing_variables']}",
+        f"- Mapped to another realm: {report['counts']['mapped_elsewhere']}",
+        f"- Mapped elsewhere but not found in output: "
+        f"{report['counts']['mapped_elsewhere_missing']}",
+        f"- Requested but unmapped: "
+        f"{report['counts']['unmapped_requested_variables']}",
+        f"- Ambiguous mappings: {report['counts']['ambiguous_mapping_variables']}",
         "",
         "## Variables With Log Errors",
         "",
@@ -633,6 +656,21 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     lines.extend(["", "## Missing Variables", ""])
     for variable in report["expected_but_not_produced"]:
         lines.append(f"- {variable}")
+    lines.extend(["", "## Variables Mapped to Another Realm", ""])
+    for item in report["mapped_elsewhere"]:
+        status = "found in shared output" if item["found_in_output"] else "not found"
+        lines.append(
+            f"- {item['variable']} (owner: {', '.join(item['owner_realms'])}; "
+            f"{status})"
+        )
+    lines.extend(["", "## Requested Variables Without a Mapping", ""])
+    for variable in report["unmapped_requested_variables"]:
+        lines.append(f"- {variable}")
+    lines.extend(["", "## Variables With Ambiguous Mapping Ownership", ""])
+    for item in report["ambiguous_mapping_variables"]:
+        lines.append(
+            f"- {item['variable']} (mappings: {', '.join(item['owner_realms'])})"
+        )
     lines.extend(["", "## Produced Variable Inventory", ""])
     for item in report["dimension_inventory"]:
         dims = "; ".join(item["dims"])
@@ -979,6 +1017,9 @@ def build_report(
     inspection_errors: list[dict[str, str]],
     plot_outputs: dict[str, dict[str, str]],
     variable_provenance: dict[str, dict[str, Any]],
+    mapped_elsewhere: list[dict[str, Any]],
+    unmapped_requested_variables: list[str],
+    ambiguous_mapping_variables: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Build the structured validation report payload."""
     variables_with_log_errors = sorted(
@@ -1012,10 +1053,19 @@ def build_report(
             "variables_with_log_errors": len(variables_with_log_errors),
             "missing_variables": len(expected_but_not_produced),
             "inspection_errors": len(inspection_errors),
+            "mapped_elsewhere": len(mapped_elsewhere),
+            "mapped_elsewhere_missing": sum(
+                not item["found_in_output"] for item in mapped_elsewhere
+            ),
+            "unmapped_requested_variables": len(unmapped_requested_variables),
+            "ambiguous_mapping_variables": len(ambiguous_mapping_variables),
         },
         "expected_variables": expected_variables,
         "variables_with_log_errors": variables_with_log_errors,
         "expected_but_not_produced": expected_but_not_produced,
+        "mapped_elsewhere": mapped_elsewhere,
+        "unmapped_requested_variables": unmapped_requested_variables,
+        "ambiguous_mapping_variables": ambiguous_mapping_variables,
         "produced_variables": produced_variables,
         "dimension_inventory": dimension_inventory,
         "variable_provenance": variable_provenance,
@@ -1032,6 +1082,13 @@ def print_summary(report: dict[str, Any]) -> None:
         f"found {report['counts']['produced_variables']} produced, "
         f"{report['counts']['variables_with_log_errors']} with log errors, "
         f"{report['counts']['missing_variables']} missing."
+    )
+    print(
+        f"Mapped to another realm: {report['counts']['mapped_elsewhere']}; "
+        f"not found in shared output: "
+        f"{report['counts']['mapped_elsewhere_missing']}; "
+        f"unmapped: {report['counts']['unmapped_requested_variables']}; "
+        f"ambiguous: {report['counts']['ambiguous_mapping_variables']}."
     )
     if report["variables_with_log_errors"]:
         print("Variables with log errors:")
@@ -1062,12 +1119,33 @@ def main() -> int:
 
     yaml_path = get_yaml_path(args.model, args.realm, args.custom_yaml)
     yaml_variables = load_yaml_variables(yaml_path)
+    selected_mapping = Mapping.from_yaml(yaml_path)
+    selected_mapping.default_freq = args.frequency
+    mappings = load_mapping_catalog(
+        args.model,
+        REALM_YAML_MAP,
+        selected_realm=args.realm,
+        selected_mapping=selected_mapping,
+    )
+    owners = mapping_owners(mappings, args.frequency)
     requested_variables = get_requested_variables(
         args.realm, args.experiment, args.frequency
     )
-    expected_variables = filter_expected_variables(
-        yaml_variables, requested_variables, args.variables
+    candidate_names = (
+        set(requested_variables)
+        if requested_variables is not None
+        else set(yaml_variables)
     )
+    if args.variables:
+        candidate_names &= set(args.variables)
+    ownership = classify_mapping_ownership(candidate_names, owners, args.realm)
+    expected_variables = sorted(ownership.owned_here & set(yaml_variables))
+    mapped_elsewhere_names = set(ownership.mapped_elsewhere)
+    unmapped_requested_variables = sorted(ownership.unmapped)
+    ambiguous_mapping_variables = [
+        {"variable": name, "owner_realms": list(realms)}
+        for name, realms in sorted(ownership.ambiguous.items())
+    ]
     expected_variable_set = set(expected_variables)
     if not expected_variable_set:
         logger.warning(
@@ -1077,16 +1155,57 @@ def main() -> int:
             args.frequency,
         )
 
+    expected_basenames = {
+        _cmip_short_name(variable) for variable in expected_variables
+    }
     log_records = collect_log_records(logs_dir, expected_variable_set)
-    produced_files, inventory_records, inspection_errors = scan_output_tree(
+    scanned_files, inventory_records, inspection_errors = scan_output_tree(
         cmip_root,
         model=args.model,
         experiment=args.experiment,
         frequency=args.frequency,
-        expected_variables=expected_variable_set,
+        expected_variables=set(),
         ensemble_member=args.ensemble_member,
+        expected_basenames=expected_basenames
+        | {_cmip_short_name(name) for name in mapped_elsewhere_names},
     )
-    dimension_inventory = summarize_dimension_inventory(inventory_records)
+    produced_files = {
+        variable: [
+            path
+            for key, paths in scanned_files.items()
+            if key.startswith(f"{_cmip_short_name(variable)}_")
+            for path in paths
+        ]
+        for variable in expected_variables
+        if any(
+            key.startswith(f"{_cmip_short_name(variable)}_")
+            for key in scanned_files
+        )
+    }
+    dimension_inventory = summarize_dimension_inventory(
+        [
+            record
+            for record in inventory_records
+            if record.variable in expected_basenames
+        ]
+    )
+    mapped_elsewhere = []
+    for variable, owner_realms in sorted(ownership.mapped_elsewhere.items()):
+        short_name = _cmip_short_name(variable)
+        matches = [
+            str(path)
+            for key, paths in scanned_files.items()
+            if key.startswith(f"{short_name}_")
+            for path in paths
+        ]
+        mapped_elsewhere.append(
+            {
+                "variable": variable,
+                "owner_realms": list(owner_realms),
+                "found_in_output": bool(matches),
+                "files": matches,
+            }
+        )
 
     plot_outputs = {"timeseries": {}, "maps": {}, "zonal": {}}
     if args.plot_timeseries or args.plot_maps:
@@ -1127,6 +1246,9 @@ def main() -> int:
         inspection_errors,
         plot_outputs,
         variable_provenance,
+        mapped_elsewhere,
+        unmapped_requested_variables,
+        ambiguous_mapping_variables,
     )
 
     write_json_report(report, report_dir / "validation_summary.json")
@@ -1134,6 +1256,15 @@ def main() -> int:
     write_csv_rows(
         [{"variable": variable} for variable in report["expected_but_not_produced"]],
         report_dir / "missing_variables.csv",
+    )
+    write_csv_rows(report["mapped_elsewhere"], report_dir / "mapped_elsewhere.csv")
+    write_csv_rows(
+        [{"variable": variable} for variable in report["unmapped_requested_variables"]],
+        report_dir / "unmapped_variables.csv",
+    )
+    write_csv_rows(
+        report["ambiguous_mapping_variables"],
+        report_dir / "ambiguous_mapping_variables.csv",
     )
     write_csv_rows(
         report["dimension_inventory"], report_dir / "dimension_inventory.csv"
@@ -1155,7 +1286,11 @@ def main() -> int:
         print(f"HTML interface written to {index_path}")
 
     if args.strict and (
-        report["variables_with_log_errors"] or report["expected_but_not_produced"]
+        report["variables_with_log_errors"]
+        or report["expected_but_not_produced"]
+        or report["counts"]["mapped_elsewhere_missing"]
+        or report["unmapped_requested_variables"]
+        or report["ambiguous_mapping_variables"]
     ):
         return RAN_AND_FOUND_PROBLEMS
     return RAN_AND_PASSED

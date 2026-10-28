@@ -18,6 +18,7 @@ from validate_cmor_output import (  # pylint: disable=wrong-import-position
     scan_output_tree,
     summarize_dimension_inventory,
 )
+from build_validation_html import build_site_data  # pylint: disable=wrong-import-position
 
 
 def test_resolve_cmip_root_accepts_parent(tmp_path):
@@ -104,3 +105,88 @@ def test_scan_output_tree_inventories_dims(tmp_path):
     assert summary[0]["variable"] == "tas"
     assert summary[0]["dims"] == ["time, lat, lon"]
     assert summary[0]["grid_types"] == ["gr"]
+
+
+def test_scan_output_tree_can_find_a_cross_realm_variable_by_short_name(
+    tmp_path, monkeypatch
+):
+    """Cross-realm brands are checked against the shared CMIP variable path."""
+    import validate_cmor_output
+
+    cmip_root = tmp_path / "CMIP7"
+    file_path = (
+        cmip_root
+        / "CMIP"
+        / "NCC"
+        / "NorESM3-LM"
+        / "piControl"
+        / "r1i1p1f1"
+        / "glb"
+        / "mon"
+        / "abs550bc"
+        / "hxy"
+        / "gr"
+        / "abs550bc_Amon_noresm_piControl_r1i1p1f1_gr_185001-185012.nc"
+    )
+    original_glob = Path.glob
+
+    def fake_glob(path, pattern):
+        if path == cmip_root:
+            return iter([file_path])
+        return original_glob(path, pattern)
+
+    monkeypatch.setattr(Path, "glob", fake_glob)
+    monkeypatch.setattr(
+        validate_cmor_output,
+        "open_dataset_inventory",
+        lambda path, variable: (variable, ["time", "lat", "lon"], {}),
+    )
+
+    produced, inventory, errors = scan_output_tree(
+        cmip_root,
+        model="noresm",
+        experiment="piControl",
+        frequency="mon",
+        expected_variables=set(),
+        expected_basenames={"abs550bc"},
+    )
+
+    assert list(produced) == ["abs550bc_hxy"]
+    assert inventory[0].variable == "abs550bc"
+    assert not errors
+
+
+def test_validation_site_data_carries_realm_ownership_categories():
+    """The HTML report receives cross-realm and mapping-error classifications."""
+    data = build_site_data(
+        [
+            {
+                "subset_id": "noresm_atmosChem_historical_mon",
+                "mapped_elsewhere": [
+                    {
+                        "variable": "abs550bc_tavg-u-hxy-u",
+                        "owner_realms": ["aerosol"],
+                        "found_in_output": True,
+                        "files": ["abs550bc.nc"],
+                    }
+                ],
+                "unmapped_requested_variables": ["ccldncl_tavg-u-hxy-ccl"],
+                "ambiguous_mapping_variables": [],
+                "expected_variables": [],
+                "produced_variables": [],
+            }
+        ]
+    )
+
+    subset = data["subsets"][0]
+    assert subset["mapped_elsewhere"][0]["found_in_output"] is True
+    assert subset["unmapped_requested_variables"] == ["ccldncl_tavg-u-hxy-ccl"]
+    mapped_variable = next(
+        variable
+        for variable in subset["variables"]
+        if variable["name"] == "abs550bc_tavg-u-hxy-u"
+    )
+    assert mapped_variable["status"] == "mapped_elsewhere"
+    assert mapped_variable["mapping_owner"] == ["aerosol"]
+    assert mapped_variable["found_in_output"] is True
+    assert mapped_variable["output_files"] == ["abs550bc.nc"]

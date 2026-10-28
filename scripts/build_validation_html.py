@@ -171,6 +171,28 @@ def build_variable_rows(
                 "zonal_plot": _plot_href(subset_prefix, zonal_plots.get(variable)),
             }
         )
+    for item in report.get("mapped_elsewhere", []):
+        variable = item["variable"]
+        rows.append(
+            {
+                "name": variable,
+                "short_name": variable.split("_")[0],
+                "status": "mapped_elsewhere",
+                "produced": bool(item.get("found_in_output")),
+                "error_lines": [],
+                "zero_dims": [],
+                "dims": [],
+                "grid_types": [],
+                "sample_path": None,
+                "provenance": None,
+                "mapping_owner": item.get("owner_realms", []),
+                "found_in_output": bool(item.get("found_in_output")),
+                "output_files": item.get("files", []),
+                "timeseries_plot": None,
+                "map_plot": None,
+                "zonal_plot": None,
+            }
+        )
     return rows
 
 
@@ -186,6 +208,13 @@ def build_site_data(subsets: list[dict[str, Any]]) -> dict[str, Any]:
                 "scope": report.get("scope", {}),
                 "counts": report.get("counts", {}),
                 "inspection_errors": report.get("inspection_errors", []),
+                "mapped_elsewhere": report.get("mapped_elsewhere", []),
+                "unmapped_requested_variables": report.get(
+                    "unmapped_requested_variables", []
+                ),
+                "ambiguous_mapping_variables": report.get(
+                    "ambiguous_mapping_variables", []
+                ),
                 "variables": build_variable_rows(report, subset_prefix),
             }
         )
@@ -386,7 +415,13 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 (function () {
   "use strict";
   var DATA = window.CMOR_VALIDATION_DATA || { subsets: [] };
-  var STATUS_LABELS = { ok: "OK", error: "Error", missing: "Missing", empty: "Empty" };
+  var STATUS_LABELS = {
+    ok: "OK",
+    error: "Error",
+    missing: "Missing",
+    empty: "Empty",
+    mapped_elsewhere: "Mapped elsewhere"
+  };
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
@@ -475,6 +510,10 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       var errors = subset.variables.filter(function (v) { return v.status === "error"; });
       var missing = subset.variables.filter(function (v) { return v.status === "missing"; });
       var empty = subset.variables.filter(function (v) { return v.status === "empty"; });
+      var elsewhere = subset.mapped_elsewhere || [];
+      var unmapped = subset.unmapped_requested_variables || [];
+      var ambiguous = subset.ambiguous_mapping_variables || [];
+      var elsewhereMissing = elsewhere.filter(function (v) { return !v.found_in_output; });
       var body = el("div", { "class": "panel" });
 
       body.appendChild(el("div", { "class": "scopeline", text: "Output root: " + (scope.root_output_path || "unknown") }));
@@ -493,6 +532,28 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
           return el("li", {}, [el("span", { "class": "mono", text: v.name })]);
         })));
       }
+      if (elsewhere.length > 0) {
+        body.appendChild(el("h3", { text: "Mapped to another realm (" + elsewhere.length + ")" }));
+        body.appendChild(el("ul", { "class": "issue-list" }, elsewhere.map(function (v) {
+          var entry = el("li", {}, [el("span", { "class": "mono", text: v.variable })]);
+          entry.appendChild(el("span", { "class": "reason", text: "Owner: " + v.owner_realms.join(", ") + (v.found_in_output ? "; found in shared output" : "; not found in shared output") }));
+          return entry;
+        })));
+      }
+      if (unmapped.length > 0) {
+        body.appendChild(el("h3", { text: "Requested but unmapped (" + unmapped.length + ")" }));
+        body.appendChild(el("ul", { "class": "issue-list" }, unmapped.map(function (name) {
+          return el("li", {}, [el("span", { "class": "mono", text: name })]);
+        })));
+      }
+      if (ambiguous.length > 0) {
+        body.appendChild(el("h3", { text: "Ambiguous mapping ownership (" + ambiguous.length + ")" }));
+        body.appendChild(el("ul", { "class": "issue-list" }, ambiguous.map(function (v) {
+          var entry = el("li", {}, [el("span", { "class": "mono", text: v.variable })]);
+          entry.appendChild(el("span", { "class": "reason", text: "Mappings: " + v.owner_realms.join(", ") }));
+          return entry;
+        })));
+      }
       if (empty.length > 0) {
         body.appendChild(el("h3", { text: "Produced but with zero-length dimensions (" + empty.length + ")" }));
         body.appendChild(el("ul", { "class": "issue-list" }, empty.map(function (v) {
@@ -509,17 +570,20 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
           return entry;
         })));
       }
-      if (errors.length === 0 && missing.length === 0 && empty.length === 0 && (subset.inspection_errors || []).length === 0) {
+      if (errors.length === 0 && missing.length === 0 && empty.length === 0 && unmapped.length === 0 && ambiguous.length === 0 && elsewhereMissing.length === 0 && (subset.inspection_errors || []).length === 0) {
         body.appendChild(el("p", { text: "No problems found in this subset." }));
       }
 
       var summaryText = subsetLabel(subset) + " — " + errors.length + " errors, " + missing.length + " missing";
       if (empty.length > 0) { summaryText += ", " + empty.length + " empty"; }
+      if (elsewhere.length > 0) { summaryText += ", " + elsewhere.length + " mapped elsewhere"; }
+      if (unmapped.length > 0) { summaryText += ", " + unmapped.length + " unmapped"; }
+      if (ambiguous.length > 0) { summaryText += ", " + ambiguous.length + " ambiguous"; }
       var details = el("details", { "class": "subset" }, [
         el("summary", { text: summaryText }),
         body
       ]);
-      if (errors.length > 0 || missing.length > 0 || empty.length > 0) { details.setAttribute("open", ""); }
+      if (errors.length > 0 || missing.length > 0 || empty.length > 0 || unmapped.length > 0 || ambiguous.length > 0 || elsewhere.length > 0) { details.setAttribute("open", ""); }
       container.appendChild(details);
     });
   }
@@ -553,7 +617,14 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     });
 
     var statusSelect = el("select");
-    [["", "All"], ["ok", "OK"], ["error", "Error"], ["missing", "Missing"], ["empty", "Empty"]].forEach(function (pair) {
+    [
+      ["", "All"],
+      ["ok", "OK"],
+      ["error", "Error"],
+      ["missing", "Missing"],
+      ["empty", "Empty"],
+      ["mapped_elsewhere", "Mapped elsewhere"]
+    ].forEach(function (pair) {
       statusSelect.appendChild(el("option", { value: pair[0], text: pair[1] }));
     });
     statusSelect.value = filters.status;
@@ -606,7 +677,24 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       el("span", { "class": "badge neutral", text: subsetLabel(subset) })
     ]);
     card.appendChild(head);
-    card.appendChild(el("div", { "class": "prov", text: provenanceText(variable.provenance) }));
+    if (variable.status === "mapped_elsewhere") {
+      card.appendChild(
+        el("div", {
+          "class": "prov",
+          text: "Mapping owner: " + (variable.mapping_owner || []).join(", ")
+        })
+      );
+      card.appendChild(
+        el("div", {
+          "class": "prov",
+          text: variable.found_in_output
+            ? "Found in shared output."
+            : "Not found in shared output."
+        })
+      );
+    } else {
+      card.appendChild(el("div", { "class": "prov", text: provenanceText(variable.provenance) }));
+    }
 
     if (variable.error_lines.length > 0 || (variable.zero_dims || []).length > 0) {
       var errbox = el("div", { "class": "errbox" });
@@ -640,6 +728,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     detailRow("Dimensions", variable.dims);
     detailRow("Grids", variable.grid_types);
     detailRow("Sample file", variable.sample_path);
+    detailRow("Output files", variable.output_files);
     if (variable.provenance && variable.provenance.description) {
       detailRow("Description", variable.provenance.description);
     }
@@ -678,7 +767,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
   var totalVars = DATA.subsets.reduce(function (sum, subset) { return sum + subset.variables.length; }, 0);
   document.getElementById("site-meta").textContent =
     DATA.subsets.length + " validation subset" + (DATA.subsets.length === 1 ? "" : "s") +
-    " · " + totalVars + " variables · built " + (DATA.built_at || "unknown");
+    " · " + totalVars + " variable entries · built " + (DATA.built_at || "unknown");
 
   renderOverviewTable();
   renderOverviewSubsets();
