@@ -1202,9 +1202,7 @@ def main() -> int:
             args.frequency,
         )
 
-    expected_basenames = {
-        _cmip_short_name(variable) for variable in expected_variables
-    }
+    expected_basenames = {_cmip_short_name(variable) for variable in expected_variables}
     log_records = collect_log_records(logs_dir, expected_variable_set, args.frequency)
     scanned_files, inventory_records, inspection_errors = scan_output_tree(
         cmip_root,
@@ -1225,8 +1223,7 @@ def main() -> int:
         ]
         for variable in expected_variables
         if any(
-            key.startswith(f"{_cmip_short_name(variable)}_")
-            for key in scanned_files
+            key.startswith(f"{_cmip_short_name(variable)}_") for key in scanned_files
         )
     }
     dimension_inventory = summarize_dimension_inventory(

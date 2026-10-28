@@ -1,5 +1,7 @@
 """Tests for scripts/validate_cmor_output.py."""
 
+# pylint: disable=wrong-import-position
+
 from __future__ import annotations
 
 import os
@@ -11,14 +13,15 @@ import xarray as xr
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from validate_cmor_output import (  # pylint: disable=wrong-import-position
+import validate_cmor_output
+from validate_cmor_output import (
     collect_log_records,
     parse_log_variable,
     resolve_cmip_root,
     scan_output_tree,
     summarize_dimension_inventory,
 )
-from build_validation_html import build_site_data  # pylint: disable=wrong-import-position
+from build_validation_html import build_site_data
 
 
 def test_resolve_cmip_root_accepts_parent(tmp_path):
@@ -126,8 +129,6 @@ def test_scan_output_tree_can_find_a_cross_realm_variable_by_short_name(
     tmp_path, monkeypatch
 ):
     """Cross-realm brands are checked against the shared CMIP variable path."""
-    import validate_cmor_output
-
     cmip_root = tmp_path / "CMIP7"
     file_path = (
         cmip_root
