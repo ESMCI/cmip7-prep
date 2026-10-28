@@ -11,7 +11,6 @@ script: generate time series for all input files in a direcory
 import os
 import logging
 import sys
-import glob
 import argparse
 import logging
 from concurrent.futures import ProcessPoolExecutor
@@ -22,14 +21,20 @@ _LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
 from pathlib import Path
 
 from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.step_exit import A_FREQUENCY_IS_EMPTY
+from cmip7_prep.worker_lifetime import die_with_parent
 from cmip7_prep.pipeline import _collect_required_model_vars
 
 # Time series generation imports
 import xarray as xr
-from gents.hfcollection import HFCollection
+from gents.hfcollection import HFCollection, find_files, sort_hf_groups
 from gents.timeseries import TSCollection
 
-from cmip7_prep.include_patterns import all_include_patterns, load_include_patterns
+from cmip7_prep.include_patterns import (
+    all_include_patterns,
+    frequencies_for_realm,
+    load_include_patterns,
+)
 
 MODELS = ["cesm", "noresm"]
 
@@ -71,7 +76,9 @@ def _time_record_counts(paths, workers):
     environments refuse to create one at all.
     """
     if workers > 1 and len(paths) > 1:
-        with ProcessPoolExecutor(max_workers=min(workers, len(paths))) as executor:
+        with ProcessPoolExecutor(
+            max_workers=min(workers, len(paths)), initializer=die_with_parent
+        ) as executor:
             return list(executor.map(time_record_count, paths))
     return [time_record_count(path) for path in paths]
 
@@ -213,36 +220,65 @@ def _execute_or_report_complete(ts_collection, logger, workers=1, budget_gb=16.0
         logger.info("Wrote %d time series", count)
 
 
-def find_unusable_files(inputdir, include_patterns, workers, logger):
-    """
-    Returns the history files GenTS cannot derive time bounds from: those with
-    zero time records, and those that will not open.
+def timeseries_per_frequency(outputdir, model, realm, ice_sheet, frequencies):
+    """Count the time series each requested frequency has in the output directory.
 
-    GenTS takes a minimum over each file's time coordinate to order the files
-    into a series, so a file with no records raises a zero-size reduction in
-    gents.meta.  Files like that are written when a run segment opens a history
-    stream but ends before any sample reaches it.  They hold no data, so they
-    are dropped here instead of being left for GenTS to warn about one logged
-    traceback at a time.
+    A frequency is covered when any of its history streams produced output.
+    NorESM land writes monthly output to both clm2.h0a and clm2.h0i, and only
+    the first holds variables CMIP7 asks for.
+
+    The patterns are the ones cmor_driver.py uses to find its input, so a
+    frequency at zero is one CMORization would find nothing for.
+    """
+    counts = {}
+    for frequency in frequencies:
+        patterns = all_include_patterns(model, realm, ice_sheet, None, [frequency])
+        counts[frequency] = sum(
+            len(list(Path(outputdir).glob(f"*{pattern}*.nc"))) for pattern in patterns
+        )
+    return counts
+
+
+def find_unusable_files(inputdir, include_patterns, workers, logger):
+    """Return the history files GenTS cannot derive a time step from.
+
+    These are a file with no time records, a file that will not open, and every
+    file of a group holding fewer than two time records between them.
     """
     candidates = sorted(
         {
-            path
+            str(path)
             for pattern in include_patterns
-            for path in glob.glob(os.path.join(inputdir, pattern))
+            for path in find_files(inputdir, pattern)
         }
     )
     if not candidates:
         return []
 
+    records = dict(zip(candidates, _time_record_counts(candidates, workers)))
+
     unusable = []
-    for path, count in zip(candidates, _time_record_counts(candidates, workers)):
+    for path, count in records.items():
         if count == 0:
             logger.warning("Skipping %s: zero time records", path)
             unusable.append(path)
         elif count == -1:
             logger.warning("Skipping %s: cannot be opened", path)
             unusable.append(path)
+
+    usable = {path: count for path, count in records.items() if path not in unusable}
+    for group, paths in sort_hf_groups([Path(path) for path in usable]).items():
+        in_group = sum(usable[str(path)] for path in paths)
+        if in_group < 2:
+            logger.warning(
+                "Skipping %d file(s) of %s: %d time record(s) between them, "
+                "too few to measure a time step from. Files from another case "
+                "in this directory group separately and look like this.",
+                len(paths),
+                group,
+                in_group,
+            )
+            unusable.extend(str(path) for path in paths)
 
     if unusable:
         logger.warning(
@@ -454,7 +490,7 @@ def main():
     filtered = []
     all_patterns = list(include_patterns)
     for include_pattern in include_patterns:
-        num = len(glob.glob(os.path.join(inputdir, include_pattern)))
+        num = len(find_files(inputdir, include_pattern))
         if num == 0:
             logger.info(
                 "No files match %s; this stream was not written, skipping it",
@@ -532,33 +568,32 @@ def main():
         hf_collection = HFCollection(inputdir, num_processes=workers)
         if unusable_files:
             hf_collection = hf_collection.exclude(unusable_files)
-        # Set once any stream produces work.  Checked after the loop, so that
-        # one empty stream is survivable but a run that matched nothing at all
-        # is still an error.
-        matched_anything = False
-
         for include_pattern in include_patterns:
             logger.info("Processing files with pattern: %s", include_pattern)
 
             for year in range(year_first, year_last + 1, nyears):
-                logger.info(f"Processing from year {year} to year {year+nyears-1}")
                 hfp_collection = hf_collection.include([include_pattern])
                 hfp_collection = hfp_collection.include_years(year, year + nyears - 1)
 
-                logger.info(f"files to process for year {year} are")
-                for item in list(hfp_collection):
-                    logger.info(f"{item}")
+                history_files = list(hfp_collection)
+                logger.info(
+                    "%s years %d-%d: %d history file(s)",
+                    include_pattern,
+                    year,
+                    year + nyears - 1,
+                    len(history_files),
+                )
+                for item in history_files:
+                    logger.debug("%s", item)
 
                 # Reads metadata from all files matching this pattern
                 # Gets variable names, dimensions, time information, etc.
                 hfp_collection.pull_metadata()
 
                 # Set up the time series generation for this pattern's files
-                logger.info("Calling ts_collection")
                 ts_collection = TSCollection(
                     hfp_collection, outputdir, ts_orders=None, num_processes=workers
                 )
-                logger.info("Finished ts_collection")
 
                 # Perform the time series generation for this pattern
                 if varlist:
@@ -573,7 +608,6 @@ def main():
                         include_pattern,
                     )
                     continue
-                matched_anything = True
 
                 ts_collection = _overwrite_or_resume(
                     ts_collection, args.overwrite_timeseries, logger
@@ -587,12 +621,37 @@ def main():
                 _execute_or_report_complete(
                     ts_collection, logger, workers, args.memory_budget_gb
                 )
-                logger.info("Timeseries processing complete")
+                logger.debug("Timeseries processing complete")
 
-        if not matched_anything:
-            raise RuntimeError(
-                "No matching variables/files found for time series generation"
-            )
+    # The last thing in the log, so the end of the file says what this step
+    # produced without reading the rest of it.
+    requested = args.frequency or frequencies_for_realm(args.model, args.realm)
+    counts = timeseries_per_frequency(
+        outputdir, args.model, args.realm, args.ice_sheet, requested
+    )
+    logger.info("Time series in %s for realm %s:", outputdir, args.realm)
+    for frequency, count in counts.items():
+        logger.info(
+            "  %-4s %6d file(s)%s", frequency, count, "" if count else "  <-- none"
+        )
+
+    # A frequency with no output is a warning rather than a failure: the case
+    # either wrote no history files at that frequency or wrote none holding the
+    # variables this realm needs, and neither is something this run can fix.
+    # run_reference_case.py reads the exit code, says so in its summary, and
+    # carries on with the next realm.
+    empty = [frequency for frequency, count in counts.items() if not count]
+    if empty:
+        logger.warning(
+            "No time series for realm %s at %s frequency. The case wrote no "
+            "history files at %s frequency, or none holding the variables %s "
+            "needs. Nothing after this step can use that frequency.",
+            args.realm,
+            ", ".join(empty),
+            ", ".join(empty),
+            args.realm,
+        )
+        sys.exit(A_FREQUENCY_IS_EMPTY)
 
 
 if __name__ == "__main__":

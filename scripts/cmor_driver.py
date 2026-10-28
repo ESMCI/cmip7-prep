@@ -62,6 +62,9 @@ from cmip7_prep.pipeline import (
 )
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.mom6_static import ocean_fx_fields
+from cmip7_prep.output_files import remove_superseded
+from cmip7_prep.step_exit import NOTHING_TO_WRITE
+from cmip7_prep.worker_lifetime import die_with_parent
 from cmip7_prep.variable_selection import assemble_yaml_defined_cmip_vars
 from cmip7_prep.time_windows import select_years, year_windows
 from cmip7_prep.variable_ref import VariableRef
@@ -80,9 +83,8 @@ logging.basicConfig(
 
 logger = logging.getLogger("cmip7_prep.cmor_driver")
 
-# Path for cmor tables
-# TODO: the following TABLES_cesm is no longer valid - can the TABLES_noresm be used?
-# TABLES_cesm = "/glade/derecho/scratch/jedwards/cmip7-prep/cmip7-cmor-tables/"
+# Path for cmor tables.  CESM uses the same checkout: its CV already holds the
+# NCAR institution and the CESM3 source.
 TABLES_noresm = str(Path(__file__).parent.parent / "cmip7-cmor-tables")
 
 
@@ -97,9 +99,13 @@ REALM_YAML_MAP = {
     },
     "cesm": {
         "atmos": "cesm_to_cmip7_atmos.yaml",
+        "atmosChem": "cesm_to_cmip7_atmosChem.yaml",
+        "aerosol": "cesm_to_cmip7_aerosol.yaml",
         "land": "cesm_to_cmip7_land.yaml",
         "seaIce": "cesm_to_cmip7_seaIce.yaml",
+        "landIce": "cesm_to_cmip7_landIce.yaml",
         "ocean": "cesm_to_cmip7_ocean.yaml",
+        "ocnBgchem": "cesm_to_cmip7_ocnBgchem.yaml",
     },
 }
 
@@ -748,16 +754,18 @@ def process_one_var(
                     tables_root=tables_root,
                     realm=realm,
                 )
+                # A rerun overwrites the log it replaces.
+                region = write_cfg.get("region", "glb")
+                span = f"_{window[0]}-{window[1]}" if window else ""
                 with CmorSession(
                     tables_root=tables_root,
                     log_dir=log_dir,
-                    log_name=f"cmor_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{varname}.log",
+                    log_name=f"cmor_{varname}_{region}_{frequency}{span}.log",
                     dataset_attrs=dataset_cfg,
                     outdir=outdir,
                     ice_sheet=ice_sheet,
                     realm=realm,
                 ) as cm:
-                    region = write_cfg.get("region", "glb")
                     set_cur_dataset_attribute("region", region)
 
                     logger.info(
@@ -780,7 +788,11 @@ def process_one_var(
                         },
                     )()
                     # Now use CMOR utility to write out netcdf variable
-                    cm.write_variable(ds_cmor_write, cmip_var, vdef)
+                    written_path = cm.write_variable(ds_cmor_write, cmip_var, vdef)
+
+                # Done after the write, so a file is only ever removed once
+                # its replacement is on disk.
+                remove_superseded(written_path)
 
                 # A high-water mark for the process, so this is the largest any
                 # variable has needed so far, not this one alone. A jump from the
@@ -1034,8 +1046,6 @@ def main():
             if not Path(tables_root).exists:
                 logger.error(f"input tables-root path {tables_root} does not exist")
                 sys.exit(1)
-        elif model == "cesm" and Path(TABLES_cesm).exists():
-            tables_root = Path(TABLES_cesm)
         elif model == "noresm" and Path(TABLES_noresm).exists():
             tables_root = Path(TABLES_noresm)
         else:
@@ -1210,7 +1220,11 @@ def main():
             )
             context = multiprocessing.get_context("spawn")
             with ProcessPoolExecutor(
-                max_workers=min(args.workers, len(pending)), mp_context=context
+                max_workers=min(args.workers, len(pending)),
+                mp_context=context,
+                # So that killing this run does not leave workers behind
+                # holding their memory.
+                initializer=die_with_parent,
             ) as pool:
                 # Labelled with the window as well as the variable: the same
                 # variable is submitted once per window, so the name alone
@@ -1256,6 +1270,16 @@ def main():
 
     # Treat requests mapped only to other realms as a successful no-op; otherwise fail if nothing was written.
     written = [name for name, status in results if status == "ok"]
+    if not results:
+        logger.warning(
+            "Nothing to write for realm %s at %s frequency. The mapping file "
+            "has none of the variables the data request asks for.",
+            args.realm,
+            frequency,
+        )
+        sys.exit(NOTHING_TO_WRITE)
+
+    # Every variable that was tried failed.
     if not written:
         if (
             not cmip_vars
