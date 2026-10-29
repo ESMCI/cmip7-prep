@@ -17,12 +17,6 @@ conda activate /projects/NS9560K/diagnostics/cmordev_env_312/
 export PYTHONPATH=/path/to/cmip7-prep/src:$PYTHONPATH
 ```
 
-:::{warning}
-Give `PYTHONPATH` an absolute path. A relative one such as `../src` resolves
-only when your working directory happens to be `scripts/`, and the import then
-fails from anywhere else with no obvious reason.
-:::
-
 `run_reference_case.py` needs no `PYTHONPATH` at all: it adds `src` to the path
 itself, by absolute path, so it works from any directory. The other three
 scripts rely on the environment.
@@ -94,5 +88,7 @@ git submodule update --init --recursive
 
 The driver reads `cmip7-cmor-tables/` at the root of this repository by
 default, and `--tables-root` points it at a different checkout. The tables
-decide which variables the data request asks for, so an out-of-date submodule
-changes what a run produces.
+decide how each variable is written, and the controlled vocabulary beside them
+decides which experiment, model and grid names are accepted. An out-of-date
+submodule therefore changes what a run produces, and can make a run stop
+because the experiment it was given is not in the vocabulary.
