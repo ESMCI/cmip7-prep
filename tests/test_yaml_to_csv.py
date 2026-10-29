@@ -426,7 +426,7 @@ class TestYamlToCsv:
         yaml_to_csv(ypath, cpath)
 
         cfg = MODEL_CONFIGS["cesm"]
-        result = read_csv(cpath, cfg)
+        result = read_csv(cpath, cfg, short_format=False)
 
         atmos = result["atmos"]["variables"]
         tas = atmos["tas"]
