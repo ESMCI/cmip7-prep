@@ -25,7 +25,7 @@ from typing import Sequence
 
 from .grids import MODEL_RESOLUTIONS
 from .include_patterns import all_include_patterns, load_include_patterns
-from .regrid_maps import load_regrid_maps
+from .regrid_maps import load_regrid_maps, resolve_by_resolution
 
 # Which component directory holds each realm's history files.  Mirrors
 # REALM_COMPONENT_MAP in scripts/cmor_driver.py.
@@ -148,14 +148,13 @@ def history_dir(case_dir: os.PathLike | str, realm: str) -> Path:
 def source_id_for_resolution(model: str, model_res: str) -> str:
     """Return the dataset source ID CMOR writes for one model resolution."""
     dataset = load_regrid_maps(model).get("dataset") or {}
-    source_ids = dataset.get("source_ids") or {}
     default_source_id = dataset.get("default_source_id") or dataset.get(
         "base_source_id"
     )
-    source_id = (
-        source_ids.get(model_res, default_source_id)
-        if isinstance(source_ids, dict)
-        else default_source_id
+    source_id = resolve_by_resolution(
+        dataset.get("source_ids"),
+        model_res,
+        default_source_id,
     )
     if not isinstance(source_id, str) or not source_id:
         raise ValueError(

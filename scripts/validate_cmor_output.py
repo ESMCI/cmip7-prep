@@ -7,7 +7,7 @@ has run. It reports:
 
 * variables with CMOR log errors
 * variables expected for the selected subset that were not produced
-* requested variables mapped to another realm, unmapped, or ambiguously mapped
+* requested variables mapped to another realm or unmapped
 * dimension inventory for variables that were produced
 * files whose period another file of the same variable already covers
 
@@ -49,8 +49,6 @@ from cmip7_prep.mapping_ownership import (
     mapping_owners,
 )
 from cmip7_prep.output_files import redundant_pairs
-from cmip7_prep.regrid_maps import load_regrid_maps
-
 from cmor_driver import REALM_YAML_MAP
 
 logger = logging.getLogger("cmip7_prep.validate_cmor_output")
@@ -373,6 +371,17 @@ def classify_validation_variables(
     ownership = classify_mapping_ownership(candidate_names, owners, realm)
     expected_variables = sorted(ownership.owned_here & set(yaml_variables))
     return ownership, expected_variables
+
+
+def select_produced_files(
+    expected_variables: list[str], scanned_files: dict[str, list[Path]]
+) -> dict[str, list[Path]]:
+    """Keep scanned files for variables expected in this validation subset."""
+    return {
+        variable: scanned_files[variable]
+        for variable in expected_variables
+        if variable in scanned_files
+    }
 
 
 def relative_to_report(path: str | Path, report_dir: Path) -> str:
@@ -1211,11 +1220,7 @@ def main() -> int:
         expected_variables=expected_variable_set | mapped_elsewhere_names,
         ensemble_member=args.ensemble_member,
     )
-    produced_files = {
-        variable: scanned_files[variable]
-        for variable in expected_variables
-        if variable in scanned_files
-    }
+    produced_files = select_produced_files(expected_variables, scanned_files)
     dimension_inventory = summarize_dimension_inventory(
         [
             record

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -22,9 +23,10 @@ from validate_cmor_output import (
     parse_log_variable,
     resolve_cmip_root,
     scan_output_tree,
+    select_produced_files,
     summarize_dimension_inventory,
 )
-from build_validation_html import build_site_data
+from build_validation_html import build_site_data, collect_reports
 
 
 def test_resolve_cmip_root_accepts_parent(tmp_path):
@@ -208,11 +210,7 @@ def test_missing_branded_variable_is_not_hidden_by_shared_root_name(tmp_path):
         frequency="mon",
         expected_variables=set(expected_variables),
     )
-    produced_files = {
-        variable: scanned_files[variable]
-        for variable in (produced_brand, missing_brand)
-        if variable in scanned_files
-    }
+    produced_files = select_produced_files(expected_variables, scanned_files)
     report = validate_cmor_output.build_report(
         args=SimpleNamespace(
             model="noresm",
@@ -240,6 +238,35 @@ def test_missing_branded_variable_is_not_hidden_by_shared_root_name(tmp_path):
     assert inventory[0].variable == "hur"
     assert report["produced_variables"] == [produced_brand]
     assert report["expected_but_not_produced"] == [missing_brand]
+
+
+def test_collect_reports_prefers_source_specific_over_legacy_reports(tmp_path):
+    """Old pooled reports do not appear beside their source-specific replacement."""
+    reports = tmp_path / "validation_reports"
+    legacy = reports / "noresm_atmos_piControl_mon"
+    current = reports / "noresm_NorESM3-LM_atmos_piControl_mon"
+    legacy.mkdir(parents=True)
+    current.mkdir(parents=True)
+    base_scope = {
+        "model": "noresm",
+        "realm": "atmos",
+        "experiment": "piControl",
+        "frequency": "mon",
+        "ensemble_member": None,
+    }
+    (legacy / "validation_summary.json").write_text(
+        json.dumps({"scope": base_scope}), encoding="utf-8"
+    )
+    (current / "validation_summary.json").write_text(
+        json.dumps({"scope": {**base_scope, "source_id": "NorESM3-LM"}}),
+        encoding="utf-8",
+    )
+
+    collected = collect_reports(reports)
+
+    assert [report["subset_id"] for report in collected] == [
+        "noresm_NorESM3-LM_atmos_piControl_mon"
+    ]
 
 
 def test_scan_output_tree_uses_only_selected_source_id(tmp_path):
@@ -334,7 +361,6 @@ def test_validation_site_data_carries_realm_ownership_categories():
                     }
                 ],
                 "unmapped_requested_variables": ["ccldncl_tavg-u-hxy-ccl"],
-                "ambiguous_mapping_variables": [],
                 "expected_variables": [],
                 "produced_variables": [],
             }
