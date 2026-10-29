@@ -368,8 +368,7 @@ def _peak_worker_memory_gb() -> float:
 
     RUSAGE_SELF counts only the process that asks, so with --workers the
     variables are processed in children and this process reports almost
-    nothing -- 0.3 GB against the 10.6 GB the same work takes when run
-    serially.  This reports the children instead.
+    nothing.  This reports the children instead.
 
     It is the largest single worker, not their total: the kernel keeps one
     high-water mark for all children together.  Multiply by the worker count
