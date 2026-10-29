@@ -1010,7 +1010,7 @@ def main():
             model,
         )
         results.append((varname, "ERROR: no mapping in any realm YAML"))
-    # Report requested variables found in multiple realm mappings.
+    # Report multiply mapped variables that are not owned by this realm.
     for varname, owner_realms in sorted(ownership.ambiguous.items()):
         logger.error(
             "Skipping %s: it is mapped in multiple realms: %s",

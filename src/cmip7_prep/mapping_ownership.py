@@ -17,12 +17,14 @@ class MappingOwnership:
     """Classify requested branded variable names by their mapping realm.
 
     Attributes:
-        owned_here: Variables mapped in exactly the realm being processed.
+        owned_here: Variables mapped in the realm being processed, including
+            variables also listed in other realms.
         mapped_elsewhere: Variables mapped in exactly one other realm, with
             that realm stored as a one-item tuple.
         unmapped: Variables absent from all realm mappings.
-        ambiguous: Variables present in multiple realm mappings, with all
-            matching realms stored as a tuple.
+        ambiguous: Variables present in multiple realm mappings but not in
+            the realm being processed, with all matching realms stored as a
+            tuple.
     """
 
     owned_here: set[str]
@@ -104,9 +106,11 @@ def classify_mapping_ownership(
 ) -> MappingOwnership:
     """Classify variables relative to the realm currently being processed.
 
-    A variable is classified as owned here if its sole mapped realm is
-    ``realm``, mapped elsewhere if it has exactly one different owner, unmapped
-    if it has no owners, or ambiguous if it has multiple owners. The ownership
+    A variable is classified as owned here if ``realm`` is among its mapped
+    realms, mapped elsewhere if it has exactly one different owner, unmapped
+    if it has no owners, or ambiguous if it has multiple owners and none is
+    ``realm``. This lets each configured owner process a multiply mapped
+    variable without treating it as missing from every realm. The ownership
     lookup is typically produced by :func:`mapping_owners` from the model's
     realm YAML mappings.
 
@@ -129,10 +133,10 @@ def classify_mapping_ownership(
         variable_owners = owners.get(variable, ())
         if not variable_owners:
             unmapped.add(variable)
+        elif realm in variable_owners:
+            owned_here.add(variable)
         elif len(variable_owners) > 1:
             ambiguous[variable] = variable_owners
-        elif variable_owners[0] == realm:
-            owned_here.add(variable)
         else:
             mapped_elsewhere[variable] = variable_owners
 

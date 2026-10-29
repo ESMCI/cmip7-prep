@@ -249,10 +249,29 @@ def test_missing_branded_variable_is_not_hidden_by_shared_root_name(
     assert report["expected_but_not_produced"] == [missing_brand]
 
 
-def test_configured_source_ids_include_resolution_and_default_ids():
-    """Validator accepts the source IDs that each model's CMOR config can emit."""
+def test_configured_source_ids_include_resolution_and_default_ids(monkeypatch):
+    """Validator collects source IDs from resolution and default config entries."""
+    model_configs = {
+        "noresm": {
+            "dataset": {
+                "source_ids": {
+                    "NorESM3-LM": "NorESM3-LM",
+                    "NorESM3-MM": "NorESM3-MM",
+                },
+                "default_source_id": "NorESM3",
+            }
+        },
+        "cesm": {"dataset": {"source_ids": {}, "base_source_id": "CESM3"}},
+    }
+    monkeypatch.setattr(
+        validate_cmor_output,
+        "load_regrid_maps",
+        lambda model: model_configs[model],
+    )
+
     assert validate_cmor_output._configured_source_ids("noresm") == {
         "NorESM3",
+        "NorESM3-LM",
         "NorESM3-MM",
     }
     assert validate_cmor_output._configured_source_ids("cesm") == {"CESM3"}
