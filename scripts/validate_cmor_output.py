@@ -48,6 +48,7 @@ from cmip7_prep.mapping_ownership import (
     mapping_owners,
 )
 from cmip7_prep.output_files import redundant_pairs
+from cmip7_prep.regrid_maps import load_regrid_maps
 
 from cmor_driver import REALM_YAML_MAP
 
@@ -244,6 +245,24 @@ def _looks_like_cmip_root(path: Path) -> bool:
     )
 
 
+def _configured_source_ids(model: str) -> set[str]:
+    """Return all source IDs this model's CMOR dataset configuration can emit."""
+    dataset = load_regrid_maps(model).get("dataset") or {}
+    source_ids = {
+        source_id
+        for source_id in (dataset.get("source_ids") or {}).values()
+        if isinstance(source_id, str) and source_id
+    }
+    default_source_id = dataset.get("default_source_id") or dataset.get(
+        "base_source_id"
+    )
+    if isinstance(default_source_id, str) and default_source_id:
+        source_ids.add(default_source_id)
+    if not source_ids:
+        raise ValueError(f"No output source IDs configured for model={model!r}")
+    return source_ids
+
+
 def resolve_cmip_root(root_output_path: str | Path) -> Path:
     """Resolve the CMIP7 root directory from either a parent or direct path."""
     root = Path(root_output_path).expanduser().resolve()
@@ -362,12 +381,6 @@ def filter_expected_variables(
     if selected_variables:
         yaml_names &= set(selected_variables)
     return sorted(yaml_names)
-
-
-def _cmip_short_name(branded_name: str) -> str:
-    """Return the CMIP variable component preceding its temporal branding."""
-    match = re.search(r"_t[a-z0-9]+-", branded_name)
-    return branded_name[: match.start()] if match else branded_name
 
 
 def relative_to_report(path: str | Path, report_dir: Path) -> str:
@@ -502,19 +515,23 @@ def scan_output_tree(
     frequency: str,
     expected_variables: set[str],
     ensemble_member: str | None = None,
-    expected_basenames: set[str] | None = None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
-    """Scan the CMIP7 tree and inventory produced files for the selected subset."""
+    """Scan output matching full branded names in the selected subset.
+
+    A file is included only when its variable directory and dimension-folder
+    names joined by an underscore match an entry in ``expected_variables``.
+    """
     produced: dict[str, list[Path]] = defaultdict(list)
     inventory: list[ProducedFileRecord] = []
     inspection_errors: list[dict[str, str]] = []
     institution_id = MODEL_NAMING_MAPS[model][0]
+    source_ids = _configured_source_ids(model)
     pattern = cmip_root.glob(
         # The region level is not always 'glb': the hemispheric sea-ice
         # aggregates (siarea, siextent, sivol, sisnmass) are written under 'nh'
         # and 'sh'.  Pinning it to 'glb' made those files invisible here, so
         # they were reported missing while sitting on disk.
-        f"*/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/*/{frequency}/*/*/*/*.nc"
+        f"*/{institution_id}/*/{experiment}/*/*/{frequency}/*/*/*/*.nc"
     )
     for file_path in sorted(pattern):
         relative = file_path.relative_to(cmip_root)
@@ -541,20 +558,26 @@ def scan_output_tree(
         if institution_id and consortium != institution_id:
             logger.debug("Skipping due to institution_id filter: %s", institution_id)
             continue
+        if path_model not in source_ids:
+            logger.debug(
+                "Skipping source_id %s; configured for %s: %s",
+                path_model,
+                model,
+                sorted(source_ids),
+            )
+            continue
         if ensemble_member and path_ensemble != ensemble_member:
             logger.debug("Skipping due to ensemble filter: %s", ensemble_member)
             continue
         # Keep only the variables that this realm and frequency expect.  All
         # realms write their output into one CMIP7 output directory, and a
         # file's path records its variable but not the realm that produced it,
-        # so the variable name is the only way to tell whose file this is.
-        if (
-            f"{variable}_{dimension_folder}" not in expected_variables
-            and variable not in (expected_basenames or set())
-        ):
+        # so its full branded name is the only way to distinguish variables.
+        branded_variable = f"{variable}_{dimension_folder}"
+        if branded_variable not in expected_variables:
             logger.debug("Not expected here, skipping: %s", variable)
             continue
-        produced[f"{variable}_{dimension_folder}"].append(file_path)
+        produced[branded_variable].append(file_path)
         try:
             data_var, dims, sizes = open_dataset_inventory(file_path, variable)
         except Exception as exc:  # pylint: disable=broad-except
@@ -1202,46 +1225,30 @@ def main() -> int:
             args.frequency,
         )
 
-    expected_basenames = {_cmip_short_name(variable) for variable in expected_variables}
     log_records = collect_log_records(logs_dir, expected_variable_set, args.frequency)
     scanned_files, inventory_records, inspection_errors = scan_output_tree(
         cmip_root,
         model=args.model,
         experiment=args.experiment,
         frequency=args.frequency,
-        expected_variables=set(),
+        expected_variables=expected_variable_set | mapped_elsewhere_names,
         ensemble_member=args.ensemble_member,
-        expected_basenames=expected_basenames
-        | {_cmip_short_name(name) for name in mapped_elsewhere_names},
     )
     produced_files = {
-        variable: [
-            path
-            for key, paths in scanned_files.items()
-            if key.startswith(f"{_cmip_short_name(variable)}_")
-            for path in paths
-        ]
+        variable: scanned_files[variable]
         for variable in expected_variables
-        if any(
-            key.startswith(f"{_cmip_short_name(variable)}_") for key in scanned_files
-        )
+        if variable in scanned_files
     }
     dimension_inventory = summarize_dimension_inventory(
         [
             record
             for record in inventory_records
-            if record.variable in expected_basenames
+            if f"{record.variable}_{record.dimension_folder}" in expected_variable_set
         ]
     )
     mapped_elsewhere = []
     for variable, owner_realms in sorted(ownership.mapped_elsewhere.items()):
-        short_name = _cmip_short_name(variable)
-        matches = [
-            str(path)
-            for key, paths in scanned_files.items()
-            if key.startswith(f"{short_name}_")
-            for path in paths
-        ]
+        matches = [str(path) for path in scanned_files.get(variable, [])]
         mapped_elsewhere.append(
             {
                 "variable": variable,

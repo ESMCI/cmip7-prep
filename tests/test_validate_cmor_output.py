@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import xarray as xr
@@ -82,7 +83,7 @@ def test_scan_output_tree_inventories_dims(tmp_path):
         / "CMIP7"
         / "CMIP"
         / "NCC"
-        / "NorESM3-LM"
+        / "NorESM3"
         / "piControl"
         / "r1i1p1f1"
         / "glb"
@@ -125,7 +126,7 @@ def test_scan_output_tree_inventories_dims(tmp_path):
     assert summary[0]["grid_types"] == ["gr"]
 
 
-def test_scan_output_tree_can_find_a_cross_realm_variable_by_short_name(
+def test_scan_output_tree_can_find_a_cross_realm_variable_by_full_brand(
     tmp_path, monkeypatch
 ):
     """Cross-realm brands are checked against the shared CMIP variable path."""
@@ -134,13 +135,13 @@ def test_scan_output_tree_can_find_a_cross_realm_variable_by_short_name(
         cmip_root
         / "CMIP"
         / "NCC"
-        / "NorESM3-LM"
+        / "NorESM3"
         / "piControl"
         / "r1i1p1f1"
         / "glb"
         / "mon"
         / "abs550bc"
-        / "hxy"
+        / "tavg-u-hxy-u"
         / "gr"
         / "abs550bc_Amon_noresm_piControl_r1i1p1f1_gr_185001-185012.nc"
     )
@@ -163,13 +164,98 @@ def test_scan_output_tree_can_find_a_cross_realm_variable_by_short_name(
         model="noresm",
         experiment="piControl",
         frequency="mon",
-        expected_variables=set(),
-        expected_basenames={"abs550bc"},
+        expected_variables={"abs550bc_tavg-u-hxy-u"},
     )
 
-    assert list(produced) == ["abs550bc_hxy"]
+    assert list(produced) == ["abs550bc_tavg-u-hxy-u"]
     assert inventory[0].variable == "abs550bc"
     assert not errors
+
+
+def test_missing_branded_variable_is_not_hidden_by_shared_root_name(
+    tmp_path, monkeypatch
+):
+    """A produced hur brand must not make a different missing hur brand appear."""
+    cmip_root = tmp_path / "CMIP7"
+    produced_brand = "hur_tavg-p19-hxy-air"
+    missing_brand = "hur_tavg-p19-hxy-u"
+    file_path = (
+        cmip_root
+        / "CMIP"
+        / "NCC"
+        / "NorESM3"
+        / "piControl"
+        / "r1i1p1f1"
+        / "glb"
+        / "mon"
+        / "hur"
+        / "tavg-p19-hxy-air"
+        / "gr"
+        / "hur_Amon_noresm_piControl_r1i1p1f1_gr_000101-000112.nc"
+    )
+    file_path.parent.mkdir(parents=True)
+    file_path.touch()
+    original_glob = Path.glob
+
+    def fake_glob(path, pattern):
+        if path == cmip_root:
+            return iter([file_path])
+        return original_glob(path, pattern)
+
+    monkeypatch.setattr(Path, "glob", fake_glob)
+    monkeypatch.setattr(
+        validate_cmor_output,
+        "open_dataset_inventory",
+        lambda path, variable: (variable, ["time", "plev", "lat", "lon"], {}),
+    )
+
+    scanned_files, inventory, errors = scan_output_tree(
+        cmip_root,
+        model="noresm",
+        experiment="piControl",
+        frequency="mon",
+        expected_variables={produced_brand, missing_brand},
+    )
+    produced_files = {
+        variable: scanned_files[variable]
+        for variable in (produced_brand, missing_brand)
+        if variable in scanned_files
+    }
+    report = validate_cmor_output.build_report(
+        args=SimpleNamespace(
+            model="noresm",
+            realm="atmos",
+            experiment="piControl",
+            frequency="mon",
+            ensemble_member="r1i1p1f1",
+            root_output_path=str(tmp_path),
+        ),
+        yaml_path=tmp_path / "mapping.yaml",
+        expected_variables=sorted({produced_brand, missing_brand}),
+        log_records={},
+        produced_files=produced_files,
+        dimension_inventory=[],
+        inspection_errors=errors,
+        plot_outputs={"timeseries": {}, "maps": {}, "zonal": {}},
+        variable_provenance={},
+        mapped_elsewhere=[],
+        unmapped_requested_variables=[],
+        ambiguous_mapping_variables=[],
+    )
+
+    assert list(scanned_files) == [produced_brand]
+    assert inventory[0].variable == "hur"
+    assert report["produced_variables"] == [produced_brand]
+    assert report["expected_but_not_produced"] == [missing_brand]
+
+
+def test_configured_source_ids_include_resolution_and_default_ids():
+    """Validator accepts the source IDs that each model's CMOR config can emit."""
+    assert validate_cmor_output._configured_source_ids("noresm") == {
+        "NorESM3",
+        "NorESM3-MM",
+    }
+    assert validate_cmor_output._configured_source_ids("cesm") == {"CESM3"}
 
 
 def test_validation_site_data_carries_realm_ownership_categories():
