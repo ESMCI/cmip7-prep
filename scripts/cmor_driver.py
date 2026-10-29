@@ -1001,9 +1001,7 @@ def main():
             ", ".join(owner_realms),
             realm,
         )
-        results.append(
-            (varname, f"INFO: mapped in realm(s) {', '.join(owner_realms)}")
-        )
+        results.append((varname, f"INFO: mapped in realm(s) {', '.join(owner_realms)}"))
     # Report requested variables that do not appear in any realm mapping.
     for varname in sorted(ownership.unmapped):
         logger.warning(
@@ -1273,11 +1271,7 @@ def main():
 
     # Every variable that was tried failed.
     if not written:
-        if (
-            not cmip_vars
-            and ownership.mapped_elsewhere
-            and not ownership.unmapped
-        ):
+        if not cmip_vars and ownership.mapped_elsewhere and not ownership.unmapped:
             logger.info(
                 "No variables are owned by realm %s; requested variables are "
                 "mapped to other realms.",

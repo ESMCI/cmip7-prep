@@ -14,6 +14,7 @@ from cmip7_prep.reference_run import (
     frequencies_for,
     history_dir,
     realms_for,
+    source_id_for_resolution,
 )
 
 
@@ -106,6 +107,22 @@ def test_history_dir_follows_the_archive_layout(tmp_path):
     """History lives under <case>/<component>/hist."""
     assert history_dir(tmp_path, "seaIce") == tmp_path / "ice" / "hist"
     assert history_dir(tmp_path, "atmosChem") == tmp_path / "atm" / "hist"
+
+
+def test_source_id_for_resolution_uses_configured_default(monkeypatch):
+    """Runner uses the exact per-resolution or default CMOR source ID."""
+    config = {
+        "dataset": {
+            "source_ids": {"NorESM3-LM": "NorESM3-LM", "NorESM3-MM": "NorESM3-MM"},
+            "default_source_id": "NorESM3",
+        }
+    }
+    monkeypatch.setattr(
+        "cmip7_prep.reference_run.load_regrid_maps", lambda model: config
+    )
+
+    assert source_id_for_resolution("noresm", "NorESM3-LM") == "NorESM3-LM"
+    assert source_id_for_resolution("noresm", "custom") == "NorESM3"
 
 
 # ---------------------------------------------------------------- plan shape

@@ -13,8 +13,6 @@ from types import SimpleNamespace
 import numpy as np
 import xarray as xr
 
-from cmip7_prep import reference_run
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import validate_cmor_output
@@ -149,9 +147,9 @@ def test_scan_output_tree_can_find_a_cross_realm_variable_by_full_brand(tmp_path
         / "abs550bc_Amon_noresm_piControl_r1i1p1f1_gr_185001-185012.nc"
     )
     file_path.parent.mkdir(parents=True)
-    xr.Dataset(
-        {"abs550bc": (("time", "lat", "lon"), np.ones((1, 2, 2)))}
-    ).to_netcdf(file_path)
+    xr.Dataset({"abs550bc": (("time", "lat", "lon"), np.ones((1, 2, 2)))}).to_netcdf(
+        file_path
+    )
 
     produced, inventory, errors = scan_output_tree(
         cmip_root,
@@ -307,22 +305,6 @@ def test_scan_output_tree_uses_only_selected_source_id(tmp_path):
     assert produced[expected] == [paths[0]]
     assert len(inventory) == 1
     assert not errors
-
-
-def test_source_id_for_resolution_uses_configured_default(monkeypatch):
-    """Runner uses the exact per-resolution or default CMOR source ID."""
-    config = {
-        "dataset": {
-            "source_ids": {"NorESM3-LM": "NorESM3-LM", "NorESM3-MM": "NorESM3-MM"},
-            "default_source_id": "NorESM3",
-        }
-    }
-    monkeypatch.setattr(reference_run, "load_regrid_maps", lambda model: config)
-
-    assert reference_run.source_id_for_resolution("noresm", "NorESM3-LM") == (
-        "NorESM3-LM"
-    )
-    assert reference_run.source_id_for_resolution("noresm", "custom") == "NorESM3"
 
 
 def test_default_report_dir_separates_source_ids(tmp_path):
