@@ -196,10 +196,10 @@ def parse_arguments():
         default=CMOR_WORKERS,
         help=(
             f"Worker processes for CMORization (default: {CMOR_WORKERS}). "
-            "Counted separately from --workers because a CMOR worker holds a "
-            "variable's regridded arrays -- measured at 3.4 to 6.7 GB each on "
-            "a two-year ne16 atmosphere run -- so memory, not cores, is "
-            "usually what limits how many are useful."
+            "Counted separately from --ts-workers because a CMOR worker "
+            "holds one variable's regridded arrays for the window being "
+            "written, around 350 MB for a ten-year window. Cores rather than "
+            "memory usually limit how many are useful."
         ),
     )
     behaviour.add_argument(

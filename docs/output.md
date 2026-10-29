@@ -2,32 +2,72 @@
 
 ## The output directory
 
-Everything a run writes goes under `--outdir`:
+Everything a run writes goes under `--outdir`, in four places:
 
 ```text
 <outdir>/
-  timeseries/<realm>/            one file per variable, from the history files
+  timeseries/
   cmor/
-    CMIP7/MIP-DRS7/...           the CMOR output, in the CMIP7 directory structure
-    logs/<realm>/                one CMOR log per variable, region and frequency
-    validation_reports/
-      index.html                 the browsable index, covering every realm
-      <model>_<realm>_<experiment>_<frequency>/
-        validation_summary.md    the plain-text summary
-        validation_summary.json  the same thing for machines
-        missing_variables.csv    variables the request asked for and did not get
-        log_records.csv          one row per CMOR log, with its error lines
-        dimension_inventory.csv  what dimensions each variable came out with
-        redundant_files.csv      files whose period another file already covers
-        plots/                   the time series, map and zonal plots
   logs/
-    run.log                      the driver's own account of the whole run
-    <period>/<step>.log          each step's output, e.g. 1-50/cmor-atmos-day.log
-  completed_steps_<period>.json  which steps finished, for resuming
+  completed_steps_<period>.json
 ```
 
-The `<period>` comes from `--years` - `1:50:10` gives `1-50`. The output tree
-and the time series are shared between periods, because they are one dataset.
+The `<period>` in a name comes from `--years`, so `1:50:10` gives `1-50`. The
+output tree and the time series are shared between periods, because the
+periods are one dataset.
+
+### The time series
+
+| path | holds |
+|---|---|
+| `timeseries/<realm>/` | one file per model variable, each covering the whole period |
+
+These are written by the time series stage from the case's history files, and
+they are what the CMORization stage reads. They are not CMIP7 output, so they
+carry the model's own variable names.
+
+### The CMOR output
+
+| path | holds |
+|---|---|
+| `cmor/CMIP7/MIP-DRS7/...` | the CMORized files, in the CMIP7 directory structure |
+| `cmor/logs/<realm>/` | one CMOR log per variable, region and frequency |
+
+A CMOR log is named for what it covers, such as
+`cmor_ta_tavg-p19-hxy-air_glb_mon_1-10.log`. The directory structure under
+`CMIP7/` is described under [The CMOR output structure](#the-cmor-output-structure)
+below.
+
+### The validation reports
+
+These live under `cmor/validation_reports/`. Each realm and frequency gets its
+own directory, named `<model>_<realm>_<experiment>_<frequency>`, and one index
+covers them all.
+
+| file | holds |
+|---|---|
+| `index.html` | the browsable index, covering every realm and frequency validated so far |
+| `validation_summary.md` | the counts, and the variables behind each count |
+| `validation_summary.json` | the same content, for a machine to read |
+| `missing_variables.csv` | the variables the data request asked for that were not produced |
+| `log_records.csv` | one row per CMOR log, with its error lines |
+| `dimension_inventory.csv` | the dimensions and sizes each produced variable came out with |
+| `redundant_files.csv` | files whose period another file already covers |
+| `plots/` | the time series, map and zonal plots, when plotting was asked for |
+
+`index.html` sits at the top of `validation_reports/` and the rest sit inside
+each subset directory.
+
+### The run logs
+
+| path | holds |
+|---|---|
+| `logs/run.log` | the driver's own account of the whole run |
+| `logs/<period>/<step>.log` | one step's output, such as `1-50/cmor-atmos-day.log` |
+| `completed_steps_<period>.json` | which steps finished, so that a repeated run resumes rather than starting over |
+
+Each period keeps its own step logs and its own record of what finished, so
+running years 51-100 cannot overwrite what years 1-50 left behind.
 
 ## Where the logs go
 
