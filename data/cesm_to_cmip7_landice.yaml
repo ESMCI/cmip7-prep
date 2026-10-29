@@ -1,7 +1,0 @@
-grids: [gn]
-
-variables: {}
-
-# NOTE: the following belongs in the land yaml file and needs to have an entry
-# in the CESM CSV file:
-#   mrfso_tavg-u-hxy-lnd: verticalsum(SOILICE, capped_at=5000)
