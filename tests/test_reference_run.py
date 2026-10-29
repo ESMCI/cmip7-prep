@@ -301,6 +301,7 @@ class TestCommands:
             wrote[wrote.index("--outdir") + 1]
             == reads[reads.index("--root-output-path") + 1]
         )
+        assert reads[reads.index("--source-id") + 1] == "NorESM3-LM"
 
     def test_validate_is_strict(self, case_dir, tmp_path):
         """Validation fails the run on missing variables or log errors."""
@@ -322,8 +323,10 @@ class TestCommands:
             experiment="historical",
         )
         command = _command_of(plan, "cmor-atmos-mon")
+        validate = _command_of(plan, "validate-atmos-mon")
         assert command[command.index("--model-res") + 1] == "NorESM3-MM"
         assert command[command.index("--experiment") + 1] == "historical"
+        assert validate[validate.index("--source-id") + 1] == "NorESM3-MM"
 
     def test_variant_label_reaches_both_later_stages(self, case_dir, tmp_path):
         """The ensemble member labels the output and the validation of it.

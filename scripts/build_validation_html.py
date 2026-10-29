@@ -516,6 +516,9 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       var elsewhereMissing = elsewhere.filter(function (v) { return !v.found_in_output; });
       var body = el("div", { "class": "panel" });
 
+      if (scope.source_id) {
+        body.appendChild(el("div", { "class": "scopeline", text: "Source ID: " + scope.source_id }));
+      }
       body.appendChild(el("div", { "class": "scopeline", text: "Output root: " + (scope.root_output_path || "unknown") }));
       body.appendChild(el("div", { "class": "scopeline", text: "Mapping YAML: " + (scope.yaml_path || "unknown") }));
       if (scope.ensemble_member) {

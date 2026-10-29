@@ -25,6 +25,7 @@ from typing import Sequence
 
 from .grids import MODEL_RESOLUTIONS
 from .include_patterns import all_include_patterns, load_include_patterns
+from .regrid_maps import load_regrid_maps
 
 # Which component directory holds each realm's history files.  Mirrors
 # REALM_COMPONENT_MAP in scripts/cmor_driver.py.
@@ -142,6 +143,26 @@ def history_dir(case_dir: os.PathLike | str, realm: str) -> Path:
     """Return the history directory holding one realm's output."""
     component = REALM_COMPONENT[realm]
     return Path(case_dir) / component / "hist"
+
+
+def source_id_for_resolution(model: str, model_res: str) -> str:
+    """Return the dataset source ID CMOR writes for one model resolution."""
+    dataset = load_regrid_maps(model).get("dataset") or {}
+    source_ids = dataset.get("source_ids") or {}
+    default_source_id = dataset.get("default_source_id") or dataset.get(
+        "base_source_id"
+    )
+    source_id = (
+        source_ids.get(model_res, default_source_id)
+        if isinstance(source_ids, dict)
+        else default_source_id
+    )
+    if not isinstance(source_id, str) or not source_id:
+        raise ValueError(
+            f"No output source_id configured for model={model!r}, "
+            f"resolution={model_res!r}"
+        )
+    return source_id
 
 
 def build_plan(
@@ -293,6 +314,7 @@ def build_plan(
                         frequency=frequency,
                         cmor_root=cmor_root,
                         model=model,
+                        source_id=source_id_for_resolution(model, model_res),
                         experiment=experiment,
                         variant_label=variant_label,
                         plots=plots,
@@ -418,6 +440,7 @@ def _validate_step(
     frequency,
     cmor_root,
     model,
+    source_id,
     experiment,
     variant_label=None,
     plots=False,
@@ -430,6 +453,8 @@ def _validate_step(
         str(Path(scripts_dir) / "validate_cmor_output.py"),
         "--model",
         model,
+        "--source-id",
+        source_id,
         "--realm",
         realm,
         "--frequency",

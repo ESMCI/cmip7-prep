@@ -19,18 +19,14 @@ class MappingOwnership:
     Attributes:
         owned_here: Variables mapped in the realm being processed, including
             variables also listed in other realms.
-        mapped_elsewhere: Variables mapped in exactly one other realm, with
-            that realm stored as a one-item tuple.
+        mapped_elsewhere: Variables mapped in one or more other realms, with
+            all owning realms stored as a tuple.
         unmapped: Variables absent from all realm mappings.
-        ambiguous: Variables present in multiple realm mappings but not in
-            the realm being processed, with all matching realms stored as a
-            tuple.
     """
 
     owned_here: set[str]
     mapped_elsewhere: dict[str, tuple[str, ...]]
     unmapped: set[str]
-    ambiguous: dict[str, tuple[str, ...]]
 
 
 def load_mapping_catalog(
@@ -107,12 +103,11 @@ def classify_mapping_ownership(
     """Classify variables relative to the realm currently being processed.
 
     A variable is classified as owned here if ``realm`` is among its mapped
-    realms, mapped elsewhere if it has exactly one different owner, unmapped
-    if it has no owners, or ambiguous if it has multiple owners and none is
-    ``realm``. This lets each configured owner process a multiply mapped
-    variable without treating it as missing from every realm. The ownership
-    lookup is typically produced by :func:`mapping_owners` from the model's
-    realm YAML mappings.
+    realms, mapped elsewhere if it has one or more different owners but is not
+    mapped here, or unmapped if it has no owners. This lets each configured
+    owner process a multiply mapped variable without treating it as missing
+    from every realm. The ownership lookup is typically produced by
+    :func:`mapping_owners` from the model's realm YAML mappings.
 
     Args:
         variables: Branded variable names to classify, such as names requested
@@ -122,22 +117,18 @@ def classify_mapping_ownership(
         realm: Realm whose processing run is being considered.
 
     Returns:
-        A ``MappingOwnership`` containing the four disjoint classifications.
+        A ``MappingOwnership`` containing the three disjoint classifications.
     """
     owned_here = set()
     mapped_elsewhere = {}
     unmapped = set()
-    ambiguous = {}
-
     for variable in variables:
         variable_owners = owners.get(variable, ())
         if not variable_owners:
             unmapped.add(variable)
         elif realm in variable_owners:
             owned_here.add(variable)
-        elif len(variable_owners) > 1:
-            ambiguous[variable] = variable_owners
         else:
             mapped_elsewhere[variable] = variable_owners
 
-    return MappingOwnership(owned_here, mapped_elsewhere, unmapped, ambiguous)
+    return MappingOwnership(owned_here, mapped_elsewhere, unmapped)

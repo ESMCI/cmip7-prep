@@ -12,6 +12,8 @@ from types import SimpleNamespace
 import numpy as np
 import xarray as xr
 
+from cmip7_prep import reference_run
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import validate_cmor_output
@@ -112,6 +114,7 @@ def test_scan_output_tree_inventories_dims(tmp_path):
     produced, inventory, errors = scan_output_tree(
         tmp_path / "CMIP7",
         model="noresm",
+        source_id="NorESM3",
         experiment="piControl",
         frequency="mon",
         expected_variables={"tas_hxy"},
@@ -126,9 +129,7 @@ def test_scan_output_tree_inventories_dims(tmp_path):
     assert summary[0]["grid_types"] == ["gr"]
 
 
-def test_scan_output_tree_can_find_a_cross_realm_variable_by_full_brand(
-    tmp_path, monkeypatch
-):
+def test_scan_output_tree_can_find_a_cross_realm_variable_by_full_brand(tmp_path):
     """Cross-realm brands are checked against the shared CMIP variable path."""
     cmip_root = tmp_path / "CMIP7"
     file_path = (
@@ -145,23 +146,15 @@ def test_scan_output_tree_can_find_a_cross_realm_variable_by_full_brand(
         / "gr"
         / "abs550bc_Amon_noresm_piControl_r1i1p1f1_gr_185001-185012.nc"
     )
-    original_glob = Path.glob
-
-    def fake_glob(path, pattern):
-        if path == cmip_root:
-            return iter([file_path])
-        return original_glob(path, pattern)
-
-    monkeypatch.setattr(Path, "glob", fake_glob)
-    monkeypatch.setattr(
-        validate_cmor_output,
-        "open_dataset_inventory",
-        lambda path, variable: (variable, ["time", "lat", "lon"], {}),
-    )
+    file_path.parent.mkdir(parents=True)
+    xr.Dataset(
+        {"abs550bc": (("time", "lat", "lon"), np.ones((1, 2, 2)))}
+    ).to_netcdf(file_path)
 
     produced, inventory, errors = scan_output_tree(
         cmip_root,
         model="noresm",
+        source_id="NorESM3",
         experiment="piControl",
         frequency="mon",
         expected_variables={"abs550bc_tavg-u-hxy-u"},
@@ -172,9 +165,7 @@ def test_scan_output_tree_can_find_a_cross_realm_variable_by_full_brand(
     assert not errors
 
 
-def test_missing_branded_variable_is_not_hidden_by_shared_root_name(
-    tmp_path, monkeypatch
-):
+def test_missing_branded_variable_is_not_hidden_by_shared_root_name(tmp_path):
     """A produced hur brand must not make a different missing hur brand appear."""
     cmip_root = tmp_path / "CMIP7"
     produced_brand = "hur_tavg-p19-hxy-air"
@@ -194,27 +185,28 @@ def test_missing_branded_variable_is_not_hidden_by_shared_root_name(
         / "hur_Amon_noresm_piControl_r1i1p1f1_gr_000101-000112.nc"
     )
     file_path.parent.mkdir(parents=True)
-    file_path.touch()
-    original_glob = Path.glob
-
-    def fake_glob(path, pattern):
-        if path == cmip_root:
-            return iter([file_path])
-        return original_glob(path, pattern)
-
-    monkeypatch.setattr(Path, "glob", fake_glob)
-    monkeypatch.setattr(
-        validate_cmor_output,
-        "open_dataset_inventory",
-        lambda path, variable: (variable, ["time", "plev", "lat", "lon"], {}),
+    xr.Dataset(
+        {
+            "hur": (
+                ("time", "plev", "lat", "lon"),
+                np.ones((1, 1, 2, 2)),
+            )
+        }
+    ).to_netcdf(file_path)
+    ownership, expected_variables = validate_cmor_output.classify_validation_variables(
+        {produced_brand, missing_brand},
+        {produced_brand: ("atmos",), missing_brand: ("atmos",)},
+        "atmos",
+        {produced_brand: {}, missing_brand: {}},
     )
 
     scanned_files, inventory, errors = scan_output_tree(
         cmip_root,
         model="noresm",
+        source_id="NorESM3",
         experiment="piControl",
         frequency="mon",
-        expected_variables={produced_brand, missing_brand},
+        expected_variables=set(expected_variables),
     )
     produced_files = {
         variable: scanned_files[variable]
@@ -224,6 +216,7 @@ def test_missing_branded_variable_is_not_hidden_by_shared_root_name(
     report = validate_cmor_output.build_report(
         args=SimpleNamespace(
             model="noresm",
+            source_id="NorESM3",
             realm="atmos",
             experiment="piControl",
             frequency="mon",
@@ -231,7 +224,7 @@ def test_missing_branded_variable_is_not_hidden_by_shared_root_name(
             root_output_path=str(tmp_path),
         ),
         yaml_path=tmp_path / "mapping.yaml",
-        expected_variables=sorted({produced_brand, missing_brand}),
+        expected_variables=expected_variables,
         log_records={},
         produced_files=produced_files,
         dimension_inventory=[],
@@ -240,41 +233,90 @@ def test_missing_branded_variable_is_not_hidden_by_shared_root_name(
         variable_provenance={},
         mapped_elsewhere=[],
         unmapped_requested_variables=[],
-        ambiguous_mapping_variables=[],
     )
 
+    assert ownership.owned_here == {produced_brand, missing_brand}
     assert list(scanned_files) == [produced_brand]
     assert inventory[0].variable == "hur"
     assert report["produced_variables"] == [produced_brand]
     assert report["expected_but_not_produced"] == [missing_brand]
 
 
-def test_configured_source_ids_include_resolution_and_default_ids(monkeypatch):
-    """Validator collects source IDs from resolution and default config entries."""
-    model_configs = {
-        "noresm": {
-            "dataset": {
-                "source_ids": {
-                    "NorESM3-LM": "NorESM3-LM",
-                    "NorESM3-MM": "NorESM3-MM",
-                },
-                "default_source_id": "NorESM3",
-            }
-        },
-        "cesm": {"dataset": {"source_ids": {}, "base_source_id": "CESM3"}},
-    }
-    monkeypatch.setattr(
-        validate_cmor_output,
-        "load_regrid_maps",
-        lambda model: model_configs[model],
+def test_scan_output_tree_uses_only_selected_source_id(tmp_path):
+    """Files from other resolutions are excluded from validation and overlap checks."""
+    cmip_root = tmp_path / "CMIP7"
+    expected = "tas_hxy"
+    paths = []
+    for source_id in ("NorESM3-LM", "NorESM3-MM"):
+        file_path = (
+            cmip_root
+            / "CMIP"
+            / "NCC"
+            / source_id
+            / "piControl"
+            / "r1i1p1f1"
+            / "glb"
+            / "mon"
+            / "tas"
+            / "hxy"
+            / "gr"
+            / f"tas_Amon_noresm_piControl_r1i1p1f1_gr_{source_id}.nc"
+        )
+        file_path.parent.mkdir(parents=True)
+        xr.Dataset({"tas": (("time", "lat", "lon"), np.ones((1, 2, 2)))}).to_netcdf(
+            file_path
+        )
+        paths.append(file_path)
+
+    produced, inventory, errors = scan_output_tree(
+        cmip_root,
+        model="noresm",
+        source_id="NorESM3-LM",
+        experiment="piControl",
+        frequency="mon",
+        expected_variables={expected},
     )
 
-    assert validate_cmor_output._configured_source_ids("noresm") == {
-        "NorESM3",
-        "NorESM3-LM",
-        "NorESM3-MM",
+    assert produced[expected] == [paths[0]]
+    assert len(inventory) == 1
+    assert not errors
+
+
+def test_source_id_for_resolution_uses_configured_default(monkeypatch):
+    """Runner uses the exact per-resolution or default CMOR source ID."""
+    config = {
+        "dataset": {
+            "source_ids": {"NorESM3-LM": "NorESM3-LM", "NorESM3-MM": "NorESM3-MM"},
+            "default_source_id": "NorESM3",
+        }
     }
-    assert validate_cmor_output._configured_source_ids("cesm") == {"CESM3"}
+    monkeypatch.setattr(reference_run, "load_regrid_maps", lambda model: config)
+
+    assert reference_run.source_id_for_resolution("noresm", "NorESM3-LM") == (
+        "NorESM3-LM"
+    )
+    assert reference_run.source_id_for_resolution("noresm", "custom") == "NorESM3"
+
+
+def test_default_report_dir_separates_source_ids(tmp_path):
+    """Resolution-specific validation reports do not overwrite each other."""
+    base_args = {
+        "root_output_path": str(tmp_path),
+        "model": "noresm",
+        "realm": "atmos",
+        "experiment": "piControl",
+        "frequency": "mon",
+    }
+
+    lm_dir = validate_cmor_output.default_report_dir(
+        SimpleNamespace(**base_args, source_id="NorESM3-LM")
+    )
+    mm_dir = validate_cmor_output.default_report_dir(
+        SimpleNamespace(**base_args, source_id="NorESM3-MM")
+    )
+
+    assert lm_dir != mm_dir
+    assert "NorESM3-LM" in lm_dir.name
 
 
 def test_validation_site_data_carries_realm_ownership_categories():
