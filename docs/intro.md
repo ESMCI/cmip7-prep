@@ -30,11 +30,21 @@ frequencies for that realm that have been validated.
 
 ## The driver
 
-`run_reference_case.py` runs all three stages, for every realm the model
+`run_reference_case.py` runs all four stages (time series, fx, CMORization,
+validation), for every realm the model
 declares and every frequency each realm declares, and prints one table at the
 end saying what succeeded, what did not, and how long each step took. It is
 what you normally use; the three scripts are there for when you want one realm
 or one stage on its own.
+
+The fx stage writes the time-invariant (`_ti-`) variables such as `sftlf`,
+`areacella` and `slthick`. It runs `cmor_driver.py --frequency fx` against the
+raw history directory, reading the first time-averaged history file. It reads
+history files because the time series generator gives a field without a time
+axis no file of its own, and CLM writes some of these fields only to the first
+history file. A variable already in the output tree is skipped, so the stage
+writes each one once per experiment and variant; pass `--overwrite` to
+`cmor_driver.py` to write them again.
 
 A full fifty-year NorESM case over every realm takes around seven hours. About
 two of those are time series generation and CMORization; the rest is validation

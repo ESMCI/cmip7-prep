@@ -42,7 +42,7 @@ REALM_COMPONENT = {
 # The ice sheet to process when a realm is per-ice-sheet and none was named.
 DEFAULT_ICE_SHEET = "gris"
 
-STAGES = ("timeseries", "cmor", "validate")
+STAGES = ("timeseries", "fx", "cmor", "validate")
 
 # Frequencies are processed coarsest first, so the cheapest and most used
 # output exists soonest.  Alphabetical order would put 'day' before 'mon' and
@@ -267,6 +267,45 @@ def build_plan(
                 )
             )
 
+        # Time-invariant variables, once per realm.  They are read from the
+        # raw history files rather than the time series -- the generator gives
+        # a field without a time axis no file of its own, and CLM writes some
+        # only to the first history file -- and cmor_driver.py skips any
+        # already in the output tree, so repeating this step is cheap.
+        if "fx" in stages:
+            plan.steps.append(
+                _cmor_step(
+                    scripts_dir=scripts_dir,
+                    realm=realm,
+                    frequency="fx",
+                    workers=cmor_workers,
+                    ts_dir=inputdir,
+                    cmor_root=cmor_root,
+                    model=model,
+                    model_res=model_res,
+                    experiment=experiment,
+                    sheet=sheet,
+                    variant_label=variant_label,
+                    tables_root=tables_root,
+                    stage="fx",
+                )
+            )
+        if "fx" in stages and "validate" in stages:
+            plan.steps.append(
+                _validate_step(
+                    scripts_dir=scripts_dir,
+                    realm=realm,
+                    frequency="fx",
+                    cmor_root=cmor_root,
+                    model=model,
+                    experiment=experiment,
+                    variant_label=variant_label,
+                    plots=False,
+                    html=html,
+                    max_plots=max_plots,
+                )
+            )
+
         for frequency in realm_frequencies:
             if "cmor" in stages:
                 plan.steps.append(
@@ -371,8 +410,13 @@ def _cmor_step(
     sheet,
     variant_label=None,
     tables_root=None,
+    stage="cmor",
 ) -> Step:
-    """Return the cmor_driver.py step for one realm and frequency."""
+    """Return the cmor_driver.py step for one realm and frequency.
+
+    For frequency 'fx', ``ts_dir`` is the raw history directory and the step
+    belongs to the 'fx' stage.
+    """
     command = [
         PYTHON,
         str(Path(scripts_dir) / "cmor_driver.py"),
@@ -405,7 +449,7 @@ def _cmor_step(
         command += ["--tables-root", str(tables_root)]
     return Step(
         key=f"cmor-{realm}-{frequency}",
-        stage="cmor",
+        stage=stage,
         realm=realm,
         frequency=frequency,
         command=command,

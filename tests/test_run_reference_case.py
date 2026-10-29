@@ -138,6 +138,20 @@ class TestShouldStop:
         """A realm the data request asks nothing of should not end the run."""
         assert should_stop("cmor", 5, keep_going=False) is False
 
+    def test_a_failed_fx_step_does_not_stop(self):
+        """The time-dependent steps after it read the time series, not fx."""
+        assert should_stop("fx", 1, keep_going=False) is False
+
+    def test_an_fx_step_with_nothing_to_write_is_a_warning(self):
+        """A realm whose mapping has no time-invariant variables."""
+        assert outcome_label("fx", 5) == "warning"
+        assert counts_as_done("fx", 5) is True
+
+    def test_a_failed_fx_step_is_reported_and_rerun(self):
+        """Reported as a failure, and not recorded, so a resume retries it."""
+        assert outcome_label("fx", 1) == "FAILED (1)"
+        assert counts_as_done("fx", 1) is False
+
     def test_a_failed_time_series_step_stops(self):
         """Everything after it would read input that is not there."""
         assert should_stop("timeseries", 1, keep_going=False) is True

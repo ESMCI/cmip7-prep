@@ -214,6 +214,62 @@ def open_native_for_cmip_vars(
     return ds, new_cmip_vars
 
 
+def open_native_static(
+    cmip_var: str,
+    files: Sequence[Union[str, Path]],
+    mapping: Mapping,
+    *,
+    use_cftime: bool = True,
+    open_kwargs: Optional[Dict] = None,
+):
+    """Open the fields a time-invariant CMIP variable needs from a history file.
+
+    Unlike :func:`open_native_for_cmip_vars` this reads raw history files, not
+    time series: a field with no time axis never gets a time series file of its
+    own, and some (CLM's ZSOI, DZSOI, SUCSAT ...) are only in the first
+    history file of a run.  Only the first of ``files`` is read.
+
+    Sources that do carry a time axis (PHIS, LANDFRAC, PCT_LANDUNIT) are
+    reduced to their first record, and time is dropped, so the result is
+    written without a time axis.
+
+    Returns ``(dataset, [cmip_var])``, or ``(None, None)`` when a source the
+    variable needs is not in the file.
+    """
+    if not files:
+        return None, None
+    path = files[0]
+    time_coder = xr.coders.CFDatetimeCoder(use_cftime=use_cftime)
+    ds = xr.open_dataset(path, decode_times=time_coder, **dict(open_kwargs or {}))
+
+    cfg = mapping.get_cfg(cmip_var) or {}
+    sources = (
+        [cfg["source"]] if cfg.get("source") else list(cfg.get("raw_variables") or [])
+    )
+    missing = [v for v in sources if v not in ds.variables]
+    if missing:
+        logger.warning(
+            "Skipping '%s': %s not in %s", cmip_var, missing, Path(path).name
+        )
+        ds.close()
+        return None, None
+
+    required = _collect_required_model_vars(mapping, [cmip_var])
+    ds = ds[[v for v in required if v in ds.variables]]
+    if "time" in ds.dims:
+        ds = ds.isel(time=0, drop=True)
+    ds = ds.drop_vars(
+        [v for v in ("time", "time_bounds", "time_bnds", "time_bnd") if v in ds.variables]
+    )
+
+    if "lev" in ds:
+        ds["lev"] = ds["lev"] / 1000
+    if "ilev" in ds:
+        ds["ilev"] = ds["ilev"] / 1000
+    logger.info("Read time-invariant inputs for %s from %s", cmip_var, path)
+    return ds, [cmip_var]
+
+
 # ----------------------- realization / vertical -----------------------
 
 

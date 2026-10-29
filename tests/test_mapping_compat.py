@@ -198,6 +198,34 @@ variables:
     assert mapping.iter_variable_names(freq="day") == ["pr", "ps"]
 
 
+def test_iter_variable_names_keeps_time_invariant_to_fx(tmp_path):
+    """A ``_ti-`` variable is offered for fx alone, and fx offers nothing else.
+
+    Untagged, it used to be written again by every frequency and year window.
+    """
+    yaml_str = """
+variables:
+  sftlf_ti-u-hxy-u:
+    table: atmos
+    sources:
+      - model_var: LANDFRAC
+  tas_tavg-h2m-hxy-u:
+    table: atmos
+    sources:
+      - model_var: TREFHT
+"""
+    path = tmp_path / "ti_filter.yaml"
+    path.write_text(yaml_str)
+    mapping = Mapping(path)
+
+    assert mapping.iter_variable_names(freq="fx") == ["sftlf_ti-u-hxy-u"]
+    assert mapping.iter_variable_names(freq="mon") == ["tas_tavg-h2m-hxy-u"]
+    assert mapping.iter_variable_names() == [
+        "sftlf_ti-u-hxy-u",
+        "tas_tavg-h2m-hxy-u",
+    ]
+
+
 def test_realize_mon_picks_correct_var(
     cice_mapping,
 ):  # pylint: disable=redefined-outer-name

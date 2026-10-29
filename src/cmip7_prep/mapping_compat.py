@@ -729,10 +729,18 @@ class Mapping:
         When ``freq`` is provided, variables whose sources are only tagged for
         other frequencies are excluded. Untagged sources remain eligible for
         all frequencies.
+
+        Time-invariant variables (``_ti-`` in the branded name) belong to the
+        ``fx`` frequency alone, and ``fx`` holds nothing else: without this a
+        static field was rewritten by every frequency and every year window.
         """
         effective_freq = freq if freq is not None else self.default_freq
         names = []
         for cmip_name, internal_keys in self._variant_keys.items():
+            if effective_freq is not None and (
+                is_time_invariant(cmip_name) != (effective_freq == "fx")
+            ):
+                continue
             if any(
                 _mapping_entry_supports_frequency(self._raw.get(key), effective_freq)
                 for key in internal_keys
@@ -861,6 +869,19 @@ def _filter_sources(sources: List[Any], freq: Optional[str]) -> List[Any]:
     if matched:
         return matched + untagged
     return untagged if untagged else sources
+
+
+def is_time_invariant(branded_name: str) -> bool:
+    """Return True for a CMIP7 branded name whose temporal part is ``ti``.
+
+    >>> is_time_invariant("sftlf_ti-u-hxy-u")
+    True
+    >>> is_time_invariant("tas_tavg-u-hxy-u")
+    False
+    >>> is_time_invariant("tas")
+    False
+    """
+    return "_ti-" in str(branded_name)
 
 
 def _mapping_entry_supports_frequency(

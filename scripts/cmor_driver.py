@@ -10,11 +10,25 @@ Preserves all comments and error handling from both atm_monthly.py and lnd_month
 """
 
 from __future__ import annotations
+import os
+
+# Must precede the numpy import. OpenBLAS otherwise starts one thread per core
+# (128 on a NIRD login node) in this process and in every spawned worker, which
+# exceeds the per-user process limit and kills the workers during import.
+# Parallelism comes from --workers, so one thread each loses nothing.
+# An explicit setting in the environment still wins.
+for _var in (
+    "OPENBLAS_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ.setdefault(_var, "1")
+
 import argparse
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import os
 from pathlib import Path
 import logging
 import re
@@ -41,8 +55,10 @@ from cmip7_prep.cmor_utils import (
     bounds_from_centers_1d,
     roll_for_monotonic_with_bounds,
     build_dataset_cfg,
+    existing_fx_files,
 )
 from cmip7_prep.include_patterns import (
+    first_history_file_for_fx,
     get_include_patterns,
     patterns_for_variable,
 )
@@ -52,6 +68,7 @@ from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
     realize_regrid_prepare,
     open_native_for_cmip_vars,
+    open_native_static,
     _collect_required_model_vars,
     _filename_contains_var,
 )
@@ -77,6 +94,13 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("cmip7_prep.cmor_driver")
+
+# Result statuses that are neither a write nor a failure.  A variable with no
+# input is reported, so the summary names what was lost, but does not count as
+# an attempt: a frequency the case has nothing for stays a warning (exit 5).
+# One already on disk counts as done.
+NO_INPUT = "WARNING: no input files"
+ALREADY_PRESENT = "present"
 
 # Path for cmor tables.  CESM uses the same checkout: its CV already holds the
 # NCAR institution and the CESM3 source.
@@ -139,8 +163,12 @@ def parse_args():
         "--frequency",
         type=str,
         required=True,
-        choices=["mon", "day", "6hr", "3hr", "1hr", "yr"],
-        help="Frequency of the data being translated",
+        choices=["mon", "day", "6hr", "3hr", "1hr", "yr", "fx"],
+        help=(
+            "Frequency of the data being translated. 'fx' writes the "
+            "time-invariant variables, read from the first raw history file "
+            "in --tsdir, and skips any already in --outdir unless --overwrite"
+        ),
     )
     required.add_argument(
         "--tsdir",
@@ -148,7 +176,8 @@ def parse_args():
         required=True,
         help=(
             "Directory of time series files to CMORize, as produced by "
-            "gen_timeseries.py or another time series utility"
+            "gen_timeseries.py or another time series utility. With "
+            "--frequency fx, the directory of raw history files instead"
         ),
     )
     required.add_argument(
@@ -610,14 +639,19 @@ def process_one_var(
             logger.debug("Opening native data for variable %s", varname)
 
             # ds_native is an xarray dataset for the CESM/NorESM time series files
-            # open_native_for_cmip_vars is in pipeline.py
-            ds_native, var = open_native_for_cmip_vars(
+            # open_native_for_cmip_vars is in pipeline.py.  An fx variable is
+            # read from a raw history file instead; see open_native_static.
+            opener = (
+                open_native_static if frequency == "fx" else open_native_for_cmip_vars
+            )
+            extra = {} if frequency == "fx" else {"parallel": False}
+            ds_native, var = opener(
                 varname,
                 inputfiles,
                 mapping,
                 use_cftime=True,
-                parallel=False,
                 open_kwargs=open_kwargs,
+                **extra,
             )
             if ds_native is None:
                 logger.debug(f"Source variable(s) not found for {varname}, skipping")
@@ -989,8 +1023,12 @@ def main():
         # Each variable is narrowed to its own sampling inside the loop below,
         # using the signifier in its branded name -- CMIP7 frequency alone
         # cannot tell a time-averaged variable from an instantaneous one.
-        include_patterns = get_include_patterns(
-            model, realm, frequency, ice_sheet=args.ice_sheet, sampling=None
+        include_patterns = (
+            []
+            if frequency == "fx"
+            else get_include_patterns(
+                model, realm, frequency, ice_sheet=args.ice_sheet, sampling=None
+            )
         )
 
         # Determine TABLES directory
@@ -1012,14 +1050,25 @@ def main():
         mapping.tables_root = tables_root
         mapping.realm = realm
 
-        # Determine time series files
-        all_ts_files = sorted(
-            {
-                path
-                for pattern in include_patterns
-                for path in Path(TSDIR).glob(f"*{pattern}*.nc")
-            }
-        )
+        # Determine time series files.  An fx run reads one raw history file
+        # instead: see first_history_file_for_fx for why.
+        fx_mode = frequency == "fx"
+        if fx_mode:
+            first = first_history_file_for_fx(
+                model, realm, TSDIR, ice_sheet=args.ice_sheet
+            )
+            all_ts_files = [first] if first is not None else []
+            include_patterns = ["(first time-averaged history file)"]
+            if first is not None:
+                logger.info("Reading time-invariant fields from %s", first)
+        else:
+            all_ts_files = sorted(
+                {
+                    path
+                    for pattern in include_patterns
+                    for path in Path(TSDIR).glob(f"*{pattern}*.nc")
+                }
+            )
         logger.info(
             f"Found {len(all_ts_files)} candidate timeseries files "
             f"matching {include_patterns}"
@@ -1032,7 +1081,10 @@ def main():
 
         # One window per output file.  None means no splitting: every time
         # found goes into one file per variable, as before --years existed.
-        if args.years:
+        # A time-invariant field has no years to split.
+        if args.years and fx_mode:
+            logger.info("Ignoring --years: fx variables have no time axis")
+        if args.years and not fx_mode:
             try:
                 windows = year_windows(args.years)
             except ValueError as exc:
@@ -1062,26 +1114,46 @@ def main():
             if not model_vars:
                 results.append((varname, "ERROR: no mapping in YAML"))
                 continue
-            # Narrow to the history files this variable's sampling lives in.
-            # Without this an instantaneous variable would be built from
-            # time-averaged input: well-formed output, silently wrong values.
-            try:
-                var_patterns = patterns_for_variable(
-                    model, realm, frequency, varname, ice_sheet=args.ice_sheet
+            if fx_mode:
+                # Written once per dataset: a later run, another period or a
+                # repeat of this one finds it in place and leaves it.
+                present = existing_fx_files(
+                    OUTDIR, varname, args.experiment, ripf_index
                 )
-            except ValueError as exc:
-                logger.warning("Skipping %s: %s", varname, exc)
-                continue
-            ts_files = sorted(
-                {
-                    p
-                    for p in all_ts_files
-                    if any(pattern in p.name for pattern in var_patterns)
-                    and any(_filename_contains_var(p, mv) for mv in model_vars)
-                }
-            )
+                if present and not args.overwrite:
+                    logger.info(
+                        "%s already written (%s); skipping. Pass --overwrite "
+                        "to write it again.",
+                        varname,
+                        present[0],
+                    )
+                    results.append((varname, ALREADY_PRESENT))
+                    continue
+                ts_files = list(all_ts_files)
+            else:
+                # Narrow to the history files this variable's sampling lives
+                # in.  Without this an instantaneous variable would be built
+                # from time-averaged input: well-formed output, silently
+                # wrong values.
+                try:
+                    var_patterns = patterns_for_variable(
+                        model, realm, frequency, varname, ice_sheet=args.ice_sheet
+                    )
+                except ValueError as exc:
+                    logger.warning("Skipping %s: %s", varname, exc)
+                    results.append((varname, NO_INPUT))
+                    continue
+                ts_files = sorted(
+                    {
+                        p
+                        for p in all_ts_files
+                        if any(pattern in p.name for pattern in var_patterns)
+                        and any(_filename_contains_var(p, mv) for mv in model_vars)
+                    }
+                )
             if not ts_files:
                 logger.warning(f"No timeseries files found for variable {varname}")
+                results.append((varname, NO_INPUT))
                 continue
             else:
                 logger.debug(
@@ -1223,6 +1295,15 @@ def main():
         )
 
     # If there is nothing to write a warning should be issued.
+    no_input = sorted({name for name, status in results if status == NO_INPUT})
+    if no_input:
+        logger.warning(
+            "%d variable(s) had no input files and were not written: %s",
+            len(no_input),
+            ", ".join(no_input),
+        )
+    present = sorted({name for name, status in results if status == ALREADY_PRESENT})
+    results = [(name, status) for name, status in results if status != NO_INPUT]
     written = [name for name, status in results if status == "ok"]
     if not results:
         logger.warning(
@@ -1233,8 +1314,15 @@ def main():
         )
         sys.exit(NOTHING_TO_WRITE)
 
+    # Every variable needed was already on disk from an earlier run.
+    if present and len(present) == len({name for name, _ in results}):
+        logger.info(
+            "All %d variable(s) were already written; nothing to do", len(present)
+        )
+        return
+
     # Every variable that was tried failed.
-    if not written:
+    if not written and not present:
         logger.error(
             "No variables were written. %d were attempted; see the warnings "
             "and errors above for each.",

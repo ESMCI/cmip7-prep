@@ -4,8 +4,10 @@
 
     python scripts/run_reference_case.py --case-dir <archive> --outdir <where>
 
-For each realm the model declares, this runs gen_timeseries.py, then
-cmor_driver.py and validate_cmor_output.py for each of that realm's
+For each realm the model declares, this runs gen_timeseries.py, then the fx
+stage (cmor_driver.py --frequency fx, which writes the time-invariant fields
+straight from the first history file and skips any already in the output
+tree), then cmor_driver.py and validate_cmor_output.py for each of that realm's
 frequencies, and prints one table at the end saying what succeeded, what
 failed, and how much was produced.
 
@@ -134,7 +136,7 @@ def parse_arguments():
         nargs="+",
         choices=list(STAGES),
         default=list(STAGES),
-        help="Stages to run (default: all three)",
+        help="Stages to run (default: all four)",
     )
     selection.add_argument(
         "--variant-label",
@@ -279,6 +281,7 @@ NOTED_OUTCOMES = {
     ("validate", RAN_AND_FOUND_PROBLEMS): "reported problems",
     ("timeseries", A_FREQUENCY_IS_EMPTY): "warning",
     ("cmor", NOTHING_TO_WRITE): "warning",
+    ("fx", NOTHING_TO_WRITE): "warning",
 }
 
 
@@ -319,10 +322,13 @@ def should_stop(stage: str, returncode: int, keep_going: bool) -> bool:
     A noted outcome never stops a run either. It says the case has nothing to
     give rather than that something is wrong.
 
+    Nor does the fx stage: the time-dependent steps after it read the time
+    series, not anything it writes, so its failure is reported and no more.
+
     Any other failure stops the run unless --keep-going. Everything after it
     would read input that is not there.
     """
-    if returncode == 0 or stage == "validate":
+    if returncode == 0 or stage in ("validate", "fx"):
         return False
     if (stage, returncode) in NOTED_OUTCOMES:
         return False

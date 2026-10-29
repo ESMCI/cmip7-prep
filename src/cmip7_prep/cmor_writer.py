@@ -1609,7 +1609,10 @@ class CmorSession(
         data = ds[str(bvn)]
 
         logger.debug("Ensure fx variables are written and cached")  # debug
-        self.ensure_fx_written_and_cached(ds)
+        # Without the variable being written: when it is itself an fx field
+        # (an fx run), the side path would write it a second time to the same
+        # file before the main write below.
+        self.ensure_fx_written_and_cached(ds.drop_vars(str(bvn), errors="ignore"))
 
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_root, self.primarytable)

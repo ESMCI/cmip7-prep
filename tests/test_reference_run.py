@@ -129,9 +129,23 @@ class TestPlanShape:
             "cmor-seaIce-day",
         ]
         assert [step.key for step in plan.for_stage("validate")] == [
+            "validate-seaIce-fx",
             "validate-seaIce-mon",
             "validate-seaIce-day",
         ]
+
+    def test_fx_is_one_step_per_realm(self, case_dir, tmp_path):
+        """Time-invariant fields are written once per realm, not per frequency."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce", "land"])
+        assert [step.key for step in plan.for_stage("fx")] == [
+            "cmor-seaIce-fx",
+            "cmor-land-fx",
+        ]
+
+    def test_fx_without_validate_plans_no_fx_validation(self, case_dir, tmp_path):
+        """Validation of fx follows the validate stage like any other."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], stages=["fx"])
+        assert [step.key for step in plan.steps] == ["cmor-seaIce-fx"]
 
     def test_coarse_frequencies_are_processed_first(self, case_dir, tmp_path):
         """Monthly output is produced before daily, and daily before hourly.
@@ -306,6 +320,27 @@ class TestCommands:
         """Validation fails the run on missing variables or log errors."""
         plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
         assert "--strict" in _command_of(plan, "validate-seaIce-mon")
+
+    def test_fx_reads_the_raw_history_files(self, case_dir, tmp_path):
+        """The time series generator gives fields without a time axis no file
+        of their own, and CLM writes some only to the first history file, so
+        the fx step reads the history directory rather than the time series."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["land"])
+        command = _command_of(plan, "cmor-land-fx")
+        assert command[command.index("--tsdir") + 1] == str(case_dir / "lnd" / "hist")
+        assert command[command.index("--frequency") + 1] == "fx"
+
+    def test_fx_writes_where_the_other_cmor_steps_write(self, case_dir, tmp_path):
+        """So the check for an existing file looks where the file would be."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["land"])
+        fx = _command_of(plan, "cmor-land-fx")
+        mon = _command_of(plan, "cmor-land-mon")
+        assert fx[fx.index("--outdir") + 1] == mon[mon.index("--outdir") + 1]
+
+    def test_fx_is_never_split_into_years(self, case_dir, tmp_path):
+        """A field without a time axis has no years to split."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["land"], years="1:50:10")
+        assert "--years" not in _command_of(plan, "cmor-land-fx")
 
     def test_resolution_and_experiment_reach_cmor(self, case_dir, tmp_path):
         """The atmosphere resolution and experiment are passed to the CMOR step.

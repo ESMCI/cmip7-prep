@@ -254,3 +254,43 @@ def patterns_for_variable(
         return get_include_patterns(
             model, realm, frequency, ice_sheet=ice_sheet, sampling="tavg"
         )
+
+
+# Streams to read time-invariant fields from, most preferred first.  Monthly is
+# the stream every component writes and the one its static fields are on.
+_FX_SOURCE_ORDER = ("mon", "yr", "day", "6hr", "3hr", "1hr")
+
+
+def first_history_file_for_fx(
+    model: str,
+    realm: str,
+    inputdir: Path | str,
+    ice_sheet: str | None = None,
+) -> Path | None:
+    """Return the history file to read a realm's time-invariant fields from.
+
+    The table has no ``fx`` entry: fx fields are not a stream of their own but
+    ride along in the time-averaged history files.  The earliest file of the
+    most preferred stream the case wrote is returned, because some are only
+    there: CLM writes its time-constant 3-D fields (ZSOI, DZSOI, WATSAT,
+    SUCSAT ...) to the first history file of a run and to no other, and the
+    time series generator never gives a field without a time axis a file of
+    its own.  None when the case wrote no time-averaged stream for the realm.
+    """
+    inputdir = Path(inputdir)
+    declared = frequencies_for_realm(model, realm)
+    ordered = [f for f in _FX_SOURCE_ORDER if f in declared]
+    ordered += [f for f in declared if f not in ordered]
+    for frequency in ordered:
+        try:
+            patterns = get_include_patterns(
+                model, realm, frequency, ice_sheet=ice_sheet, sampling="tavg"
+            )
+        except ValueError:
+            continue
+        files = sorted(
+            {path for pattern in patterns for path in inputdir.glob(f"*{pattern}*.nc")}
+        )
+        if files:
+            return files[0]
+    return None

@@ -620,24 +620,57 @@ def resolve_table_filename(tables_path: Path, key: str) -> str:
 def _fx_glob_pattern(name: str) -> str:
     """Return a glob pattern for finding fx files for a given variable name.
 
-    >>> _fx_glob_pattern("sftlf")
-    '**/*_sftlf_fx_*.nc'
-    >>> _fx_glob_pattern("areacella")
-    '**/*_areacella_fx_*.nc'
+    CMIP7 file names start with the branded variable name
+    (``<variable_id>_<branding_suffix>_<frequency>_...``), so the name must
+    begin the pattern: a leading ``*_`` never matched a real file.
+
+    >>> _fx_glob_pattern("sftlf_ti-u-hxy-u")
+    '**/sftlf_ti-u-hxy-u_fx_*.nc'
+    >>> _fx_glob_pattern("areacella_ti-u-hxy-u")
+    '**/areacella_ti-u-hxy-u_fx_*.nc'
     """
-    # CMOR filenames vary; this finds most fx files for this var
-    # e.g., *_sftlf_fx_*.nc  or sftlf_fx_*.nc
-    return f"**/*_{name}_fx_*.nc"
+    return f"**/{name}_fx_*.nc"
+
+
+def existing_fx_files(
+    outdir: Path | str,
+    name: str,
+    experiment: str | None = None,
+    variant_label: str | None = None,
+) -> list[Path]:
+    """Return fx files already written for one branded variable under outdir.
+
+    ``experiment`` and ``variant_label`` narrow the match to one dataset, since
+    the file name ends ``_<experiment_id>_<variant_label>.nc``.  Only names are
+    compared; nothing is opened.
+    """
+    outdir = Path(outdir)
+    if not outdir.is_dir():
+        return []
+    suffix = "".join(f"_{part}" for part in (experiment, variant_label) if part)
+    return sorted(
+        path
+        for path in outdir.glob(_fx_glob_pattern(name))
+        if path.name.endswith(f"{suffix}.nc")
+    )
 
 
 def open_existing_fx(outdir: Path, name: str) -> xr.DataArray | None:
-    """Search recursively for an existing fx file for this variable name."""
-    # Search recursively for an existing fx file for this var
-    for p in outdir.rglob(_fx_glob_pattern(name)):
+    """Search recursively for an existing fx file for this variable name.
+
+    ``name`` is the branded name the file is named by; inside the file CMOR
+    stores the data under the variable_id (``sftlf`` for ``sftlf_ti-u-hxy-u``),
+    so both are looked for.
+    """
+    candidates = [name]
+    if "_" in name:
+        candidates.append(name.rsplit("_", 1)[0])
+    for p in Path(outdir).rglob(_fx_glob_pattern(name)):
         try:
             ds = xr.open_dataset(p, engine="netcdf4")
-            if name in ds:
-                return ds[name]
+            for candidate in candidates:
+                if candidate in ds:
+                    return ds[candidate]
         except FileNotFoundError:
             return None
         except (OSError, ValueError) as e:

@@ -6,6 +6,7 @@ import xarray as xr
 
 from cmip7_prep.cmor_utils import (
     bounds_from_centers_1d,
+    existing_fx_files,
     filled_for_cmor,
     open_existing_fx,
     resolve_table_filename,
@@ -215,22 +216,54 @@ class TestOpenExistingFx:
         assert open_existing_fx(tmp_path, "sftlf") is None
 
     def test_no_match_for_nonconforming_name(self, tmp_path):
-        """File without the required underscore prefix token returns None."""
+        """A file whose name does not start with the branded name is not it."""
         sub = tmp_path / "subdir"
         sub.mkdir()
-        nc_path = sub / "sftlf_fx_v1.nc"  # lacks a leading '_sftlf_' glob match
+        nc_path = sub / "r1i1p1_sftlf_ti-u-hxy-u_fx_v1.nc"
         ds = xr.Dataset({"sftlf": xr.DataArray(np.ones((4, 8)), dims=["lat", "lon"])})
         ds.to_netcdf(nc_path)
-        assert open_existing_fx(tmp_path, "sftlf") is None
+        assert open_existing_fx(tmp_path, "sftlf_ti-u-hxy-u") is None
 
     def test_finds_fx_with_correct_glob_pattern(self, tmp_path):
-        """File matching **/*_sftlf_fx_*.nc is returned as a DataArray."""
-        nc_path = tmp_path / "r1i1p1_sftlf_fx_test.nc"
+        """A CMIP7-named fx file is found, and its variable_id read from it."""
+        sub = tmp_path / "CMIP7" / "fx" / "sftlf"
+        sub.mkdir(parents=True)
+        nc_path = sub / "sftlf_ti-u-hxy-u_fx_glb_gr_NorESM3-LM_piControl_r1i1p1f1.nc"
         da = xr.DataArray(np.ones((4, 8)), dims=["lat", "lon"])
         xr.Dataset({"sftlf": da}).to_netcdf(nc_path)
-        result = open_existing_fx(tmp_path, "sftlf")
+        result = open_existing_fx(tmp_path, "sftlf_ti-u-hxy-u")
         assert result is not None
         assert result.dims == ("lat", "lon")
+
+
+class TestExistingFxFiles:
+    """Tests for finding fx output already on disk, by name only."""
+
+    NAME = "sftlf_ti-u-hxy-u_fx_glb_gr_NorESM3-LM_piControl_r1i1p1f1.nc"
+
+    def test_nothing_in_an_absent_directory(self, tmp_path):
+        """A first run has no output directory yet."""
+        assert not existing_fx_files(tmp_path / "missing", "sftlf_ti-u-hxy-u")
+
+    def test_found_anywhere_below(self, tmp_path):
+        """The DRS tree puts the file several levels down."""
+        sub = tmp_path / "a" / "b"
+        sub.mkdir(parents=True)
+        (sub / self.NAME).touch()
+        assert existing_fx_files(tmp_path, "sftlf_ti-u-hxy-u") == [sub / self.NAME]
+
+    def test_narrowed_to_one_dataset(self, tmp_path):
+        """Another experiment's or member's file does not count."""
+        (tmp_path / self.NAME).touch()
+        assert existing_fx_files(
+            tmp_path, "sftlf_ti-u-hxy-u", "piControl", "r1i1p1f1"
+        )
+        assert not existing_fx_files(
+            tmp_path, "sftlf_ti-u-hxy-u", "historical", "r1i1p1f1"
+        )
+        assert not existing_fx_files(
+            tmp_path, "sftlf_ti-u-hxy-u", "piControl", "r2i1p1f1"
+        )
 
 
 # ---------------------------------------------------------------------------
