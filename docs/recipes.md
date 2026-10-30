@@ -88,7 +88,8 @@ Validate one realm and frequency:
 
 ```bash
 python validate_cmor_output.py \
-  --model noresm --realm seaIce --experiment piControl --frequency mon \
+  --model noresm --source-id NorESM3-LM \
+  --realm seaIce --experiment piControl --frequency mon \
   --root-output-path <outdir>/cmor \
   --strict --plot-timeseries --plot-maps --html
 ```
