@@ -25,6 +25,8 @@ import time
 from datetime import datetime, UTC
 import glob
 import json
+from typing import Sequence
+
 import numpy as np
 import xarray as xr
 
@@ -48,6 +50,7 @@ from cmip7_prep.include_patterns import (
 )
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.mapping_ownership import (
+    MappingOwnership,
     classify_mapping_ownership,
     load_mapping_catalog,
     mapping_owners,
@@ -540,8 +543,18 @@ def _prepare_regridded(
 def _job_name(kwargs) -> str:
     """Name one submitted job: the variable, and its window when there is one."""
     window = kwargs.get("window")
-    name = str(kwargs["cmip_var"])
+    name = _job_variable_name(kwargs["cmip_var"])
     return f"{name} years {window[0]}-{window[1]}" if window else name
+
+
+def _job_variable_name(cmip_var: VariableRef) -> str:
+    """Return the branded name a job is reported under."""
+    return cmip_var.branded_variable_name.name
+
+
+def _attempted_variable_count(variables: Sequence[VariableRef]) -> int:
+    """Count unique variables represented by the submitted processing jobs."""
+    return len({_job_variable_name(variable) for variable in variables})
 
 
 def process_one_var(
@@ -814,6 +827,21 @@ def process_one_var(
     return results
 
 
+def _cmor_exit_code(
+    owned_variables: Sequence[object],
+    written_variables: list[str],
+    ownership: MappingOwnership,
+) -> int:
+    """Choose the driver exit code from eligible and written variables."""
+    if written_variables:
+        return 0
+    if not owned_variables:
+        if ownership.mapped_elsewhere and not ownership.unmapped:
+            return 0
+        return NOTHING_TO_WRITE
+    return 1
+
+
 def main():
     run_start = time.monotonic()
     args = parse_args()
@@ -992,6 +1020,7 @@ def main():
     requested_names = {var.branded_variable_name.name for var in cmip_vars}
     ownership = classify_mapping_ownership(requested_names, owners, realm)
     results: list[tuple[str, str]] = []
+    attempted_jobs: list[VariableRef] = []
 
     # Report requested variables mapped to one or more different realms.
     for varname, owner_realms in sorted(ownership.mapped_elsewhere.items()):
@@ -1132,6 +1161,7 @@ def main():
             # writes its own file, and each holds only that window's data, so
             # five windows is five smaller jobs rather than one large one.
             for window in windows:
+                attempted_jobs.append(var_ref)
                 if args.workers == 1:
                     try:
                         res = process_one_var(
@@ -1258,33 +1288,38 @@ def main():
             _peak_memory_gb(),
         )
 
-    # Treat requests mapped only to other realms as a successful no-op; otherwise fail if nothing was written.
+    # Mapped-elsewhere-only requests are a successful no-op; no eligible
+    # variables return the runner's no-work code, while failed writes are fatal.
     written = [name for name, status in results if status == "ok"]
-    if not results:
+    exit_code = _cmor_exit_code(cmip_vars, written, ownership)
+    if exit_code == NOTHING_TO_WRITE:
         logger.warning(
-            "Nothing to write for realm %s at %s frequency. The mapping file "
-            "has none of the variables the data request asks for.",
+            "Nothing to write for realm %s at %s frequency: no requested "
+            "variables are mapped to this realm.",
             args.realm,
             frequency,
         )
-        sys.exit(NOTHING_TO_WRITE)
+        sys.exit(exit_code)
 
-    # Every variable that was tried failed.
-    if not written:
-        if not cmip_vars and ownership.mapped_elsewhere and not ownership.unmapped:
+    if exit_code == 0:
+        if not written:
             logger.info(
                 "No variables are owned by realm %s; requested variables are "
                 "mapped to other realms.",
                 realm,
             )
-            return
-        logger.error(
-            "No variables were written. %d were attempted; see the warnings "
-            "and errors above for each.",
-            len({name for name, _ in results}),
-        )
-        sys.exit(1)
-    logger.info("Wrote %d variable(s)", len(written))
+        else:
+            logger.info("Wrote %d variable(s)", len(written))
+        return
+
+    # Every eligible variable was skipped or failed before producing output.
+    logger.error(
+        "No variables were written. Attempted %d of %d realm-owned "
+        "variables; see the warnings and errors above for details.",
+        _attempted_variable_count(attempted_jobs),
+        len(cmip_vars),
+    )
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
