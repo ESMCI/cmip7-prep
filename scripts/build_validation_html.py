@@ -77,7 +77,7 @@ def resolve_reports_dir(root_output_path: str | None, reports_dir: str | None) -
 
 
 def collect_reports(reports_dir: Path) -> list[dict[str, Any]]:
-    """Load every per-subset validation summary under the reports directory."""
+    """Load reports, preferring source-specific reports over legacy reports."""
     subsets = []
     for summary_path in sorted(reports_dir.glob("*/validation_summary.json")):
         try:
@@ -87,7 +87,26 @@ def collect_reports(reports_dir: Path) -> list[dict[str, Any]]:
             continue
         payload["subset_id"] = summary_path.parent.name
         subsets.append(payload)
-    return subsets
+
+    def scope_key(report: dict[str, Any]) -> tuple[Any, ...] | None:
+        scope = report.get("scope") or {}
+        identity = ("model", "realm", "experiment", "frequency")
+        if not all(scope.get(key) is not None for key in identity):
+            return None
+        return (*[scope[key] for key in identity], scope.get("ensemble_member"))
+
+    source_specific_scopes = {
+        key
+        for report in subsets
+        if (report.get("scope") or {}).get("source_id")
+        and (key := scope_key(report)) is not None
+    }
+    return [
+        report
+        for report in subsets
+        if (report.get("scope") or {}).get("source_id")
+        or scope_key(report) not in source_specific_scopes
+    ]
 
 
 def _plot_href(subset_prefix: str, plot_path: str | None) -> str | None:
@@ -211,9 +230,6 @@ def build_site_data(subsets: list[dict[str, Any]]) -> dict[str, Any]:
                 "mapped_elsewhere": report.get("mapped_elsewhere", []),
                 "unmapped_requested_variables": report.get(
                     "unmapped_requested_variables", []
-                ),
-                "ambiguous_mapping_variables": report.get(
-                    "ambiguous_mapping_variables", []
                 ),
                 "variables": build_variable_rows(report, subset_prefix),
             }
@@ -512,10 +528,12 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       var empty = subset.variables.filter(function (v) { return v.status === "empty"; });
       var elsewhere = subset.mapped_elsewhere || [];
       var unmapped = subset.unmapped_requested_variables || [];
-      var ambiguous = subset.ambiguous_mapping_variables || [];
       var elsewhereMissing = elsewhere.filter(function (v) { return !v.found_in_output; });
       var body = el("div", { "class": "panel" });
 
+      if (scope.source_id) {
+        body.appendChild(el("div", { "class": "scopeline", text: "Source ID: " + scope.source_id }));
+      }
       body.appendChild(el("div", { "class": "scopeline", text: "Output root: " + (scope.root_output_path || "unknown") }));
       body.appendChild(el("div", { "class": "scopeline", text: "Mapping YAML: " + (scope.yaml_path || "unknown") }));
       if (scope.ensemble_member) {
@@ -546,14 +564,6 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
           return el("li", {}, [el("span", { "class": "mono", text: name })]);
         })));
       }
-      if (ambiguous.length > 0) {
-        body.appendChild(el("h3", { text: "Ambiguous mapping ownership (" + ambiguous.length + ")" }));
-        body.appendChild(el("ul", { "class": "issue-list" }, ambiguous.map(function (v) {
-          var entry = el("li", {}, [el("span", { "class": "mono", text: v.variable })]);
-          entry.appendChild(el("span", { "class": "reason", text: "Mappings: " + v.owner_realms.join(", ") }));
-          return entry;
-        })));
-      }
       if (empty.length > 0) {
         body.appendChild(el("h3", { text: "Produced but with zero-length dimensions (" + empty.length + ")" }));
         body.appendChild(el("ul", { "class": "issue-list" }, empty.map(function (v) {
@@ -570,7 +580,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
           return entry;
         })));
       }
-      if (errors.length === 0 && missing.length === 0 && empty.length === 0 && unmapped.length === 0 && ambiguous.length === 0 && elsewhereMissing.length === 0 && (subset.inspection_errors || []).length === 0) {
+      if (errors.length === 0 && missing.length === 0 && empty.length === 0 && unmapped.length === 0 && elsewhereMissing.length === 0 && (subset.inspection_errors || []).length === 0) {
         body.appendChild(el("p", { text: "No problems found in this subset." }));
       }
 
@@ -578,12 +588,11 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       if (empty.length > 0) { summaryText += ", " + empty.length + " empty"; }
       if (elsewhere.length > 0) { summaryText += ", " + elsewhere.length + " mapped elsewhere"; }
       if (unmapped.length > 0) { summaryText += ", " + unmapped.length + " unmapped"; }
-      if (ambiguous.length > 0) { summaryText += ", " + ambiguous.length + " ambiguous"; }
       var details = el("details", { "class": "subset" }, [
         el("summary", { text: summaryText }),
         body
       ]);
-      if (errors.length > 0 || missing.length > 0 || empty.length > 0 || unmapped.length > 0 || ambiguous.length > 0 || elsewhere.length > 0) { details.setAttribute("open", ""); }
+      if (errors.length > 0 || missing.length > 0 || empty.length > 0 || unmapped.length > 0 || elsewhere.length > 0) { details.setAttribute("open", ""); }
       container.appendChild(details);
     });
   }

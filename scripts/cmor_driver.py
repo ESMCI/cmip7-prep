@@ -993,15 +993,15 @@ def main():
     ownership = classify_mapping_ownership(requested_names, owners, realm)
     results: list[tuple[str, str]] = []
 
-    # Report requested variables mapped to exactly one different realm.
+    # Report requested variables mapped to one or more different realms.
     for varname, owner_realms in sorted(ownership.mapped_elsewhere.items()):
         logger.info(
-            "Skipping %s: mapping owner is realm %s, not %s",
+            "Skipping %s: mapping owners are realm(s) %s, not %s",
             varname,
-            owner_realms[0],
+            ", ".join(owner_realms),
             realm,
         )
-        results.append((varname, f"INFO: mapped in realm {owner_realms[0]}"))
+        results.append((varname, f"INFO: mapped in realm(s) {', '.join(owner_realms)}"))
     # Report requested variables that do not appear in any realm mapping.
     for varname in sorted(ownership.unmapped):
         logger.warning(
@@ -1010,15 +1010,6 @@ def main():
             model,
         )
         results.append((varname, "ERROR: no mapping in any realm YAML"))
-    # Report requested variables found in multiple realm mappings.
-    for varname, owner_realms in sorted(ownership.ambiguous.items()):
-        logger.error(
-            "Skipping %s: it is mapped in multiple realms: %s",
-            varname,
-            ", ".join(owner_realms),
-        )
-        results.append((varname, "ERROR: mapped in multiple realms"))
-
     cmip_vars = [
         var
         for var in cmip_vars
@@ -1280,12 +1271,7 @@ def main():
 
     # Every variable that was tried failed.
     if not written:
-        if (
-            not cmip_vars
-            and ownership.mapped_elsewhere
-            and not ownership.unmapped
-            and not ownership.ambiguous
-        ):
+        if not cmip_vars and ownership.mapped_elsewhere and not ownership.unmapped:
             logger.info(
                 "No variables are owned by realm %s; requested variables are "
                 "mapped to other realms.",
