@@ -55,10 +55,9 @@ FREQUENCY_ORDER = ("yr", "mon", "day", "6hr", "3hr", "1hr")
 PYTHON = sys.executable or "python"
 
 # CMORization gets its own worker count rather than sharing the timeseries
-# one.  Both stages spread work over processes, but a CMOR worker holds a
-# variable's regridded arrays -- 10.6 GB at peak on a two-year ne16 atmosphere
-# run -- while a timeseries worker only reads files.  One number for both would
-# either waste the timeseries stage or run the CMOR one out of memory.
+# one.  Both stages spread work over processes, but a CMOR worker holds one
+# variable's regridded arrays for the window being written, around 350 MB for a
+# ten-year window, while a timeseries worker only reads files.
 CMOR_WORKERS = 4
 
 
