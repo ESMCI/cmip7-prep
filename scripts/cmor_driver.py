@@ -543,8 +543,18 @@ def _prepare_regridded(
 def _job_name(kwargs) -> str:
     """Name one submitted job: the variable, and its window when there is one."""
     window = kwargs.get("window")
-    name = str(kwargs["cmip_var"])
+    name = _job_variable_name(kwargs["cmip_var"])
     return f"{name} years {window[0]}-{window[1]}" if window else name
+
+
+def _job_variable_name(cmip_var: VariableRef) -> str:
+    """Return the branded name a job is reported under."""
+    return cmip_var.branded_variable_name.name
+
+
+def _attempted_variable_count(variables: Sequence[VariableRef]) -> int:
+    """Count unique variables represented by the submitted processing jobs."""
+    return len({_job_variable_name(variable) for variable in variables})
 
 
 def process_one_var(
@@ -1010,6 +1020,7 @@ def main():
     requested_names = {var.branded_variable_name.name for var in cmip_vars}
     ownership = classify_mapping_ownership(requested_names, owners, realm)
     results: list[tuple[str, str]] = []
+    attempted_jobs: list[VariableRef] = []
 
     # Report requested variables mapped to one or more different realms.
     for varname, owner_realms in sorted(ownership.mapped_elsewhere.items()):
@@ -1150,6 +1161,7 @@ def main():
             # writes its own file, and each holds only that window's data, so
             # five windows is five smaller jobs rather than one large one.
             for window in windows:
+                attempted_jobs.append(var_ref)
                 if args.workers == 1:
                     try:
                         res = process_one_var(
@@ -1300,11 +1312,12 @@ def main():
             logger.info("Wrote %d variable(s)", len(written))
         return
 
-    # Every variable that was tried failed.
+    # Every eligible variable was skipped or failed before producing output.
     logger.error(
-        "No variables were written. %d were attempted; see the warnings "
-        "and errors above for each.",
-        len({name for name, _ in results}),
+        "No variables were written. Attempted %d of %d realm-owned "
+        "variables; see the warnings and errors above for details.",
+        _attempted_variable_count(attempted_jobs),
+        len(cmip_vars),
     )
     sys.exit(exit_code)
 
