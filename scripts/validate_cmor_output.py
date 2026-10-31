@@ -221,7 +221,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="Exit with code 1 if missing variables or log errors are found",
+        help="Exit with code 1 if log errors, missing variables, or redundant "
+        "files are found.  Requested variables that no YAML maps are listed in "
+        "the report but do not fail the run.",
     )
     parser.add_argument(
         "--log-level",
@@ -732,11 +734,12 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
         f"- Expected variables: {report['counts']['expected_variables']}",
         f"- Produced variables: {report['counts']['produced_variables']}",
         f"- Variables with log errors: {report['counts']['variables_with_log_errors']}",
-        f"- Missing variables: {report['counts']['missing_variables']}",
+        f"- Mapping exists but variable not written: "
+        f"{report['counts']['missing_variables']}",
         f"- Mapped to another realm: {report['counts']['mapped_elsewhere']}",
         f"- Mapped elsewhere but not found in output: "
         f"{report['counts']['mapped_elsewhere_missing']}",
-        f"- Requested but unmapped: "
+        f"- No mapping exists for variable: "
         f"{report['counts']['unmapped_requested_variables']}",
         f"- Redundant files: {report['counts']['redundant_files']}",
         "",
@@ -745,7 +748,7 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     ]
     for variable in report["variables_with_log_errors"]:
         lines.append(f"- {variable}")
-    lines.extend(["", "## Missing Variables", ""])
+    lines.extend(["", "## Mapping Exists But Variable Not Written", ""])
     for variable in report["expected_but_not_produced"]:
         lines.append(f"- {variable}")
     lines.extend(["", "## Variables Mapped to Another Realm", ""])
@@ -755,7 +758,7 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
             f"- {item['variable']} (owner: {', '.join(item['owner_realms'])}; "
             f"{status})"
         )
-    lines.extend(["", "## Requested Variables Without a Mapping", ""])
+    lines.extend(["", "## No Mapping Exists For Variable", ""])
     for variable in report["unmapped_requested_variables"]:
         lines.append(f"- {variable}")
     lines.extend(["", "## Redundant Files", ""])
@@ -1196,7 +1199,7 @@ def print_summary(report: dict[str, Any]) -> None:
         for variable in report["variables_with_log_errors"]:
             print(f"  - {variable}")
     if report["expected_but_not_produced"]:
-        print("Expected but not produced:")
+        print("Mapping exists but variable not written:")
         for variable in report["expected_but_not_produced"]:
             print(f"  - {variable}")
     if report["redundant_files"]:
@@ -1367,11 +1370,13 @@ def main() -> int:
         index_path = build_site(report_dir.parent, args.html_dir)
         print(f"HTML interface written to {index_path}")
 
+    # An unmapped variable means no YAML maps it yet, which is a gap in the
+    # mappings rather than a fault in this run's output.  The report lists them;
+    # failing on them would make --strict fail for every realm that has one.
     if args.strict and (
         report["variables_with_log_errors"]
         or report["expected_but_not_produced"]
         or report["counts"]["mapped_elsewhere_missing"]
-        or report["unmapped_requested_variables"]
         or report["redundant_files"]
     ):
         return RAN_AND_FOUND_PROBLEMS

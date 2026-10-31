@@ -545,7 +545,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
         body.appendChild(el("ul", { "class": "issue-list" }, errors.map(issueItem)));
       }
       if (missing.length > 0) {
-        body.appendChild(el("h3", { text: "Expected but not produced (" + missing.length + ")" }));
+        body.appendChild(el("h3", { text: "Mapping exists but variable not written (" + missing.length + ")" }));
         body.appendChild(el("ul", { "class": "issue-list" }, missing.map(function (v) {
           return el("li", {}, [el("span", { "class": "mono", text: v.name })]);
         })));
@@ -559,7 +559,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
         })));
       }
       if (unmapped.length > 0) {
-        body.appendChild(el("h3", { text: "Requested but unmapped (" + unmapped.length + ")" }));
+        body.appendChild(el("h3", { text: "No mapping exists for variable (" + unmapped.length + ")" }));
         body.appendChild(el("ul", { "class": "issue-list" }, unmapped.map(function (name) {
           return el("li", {}, [el("span", { "class": "mono", text: name })]);
         })));
