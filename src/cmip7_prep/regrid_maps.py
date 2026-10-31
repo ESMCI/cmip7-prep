@@ -25,16 +25,29 @@ needs to know which quantities are intensive.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import copy
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
+
+
+def resolve_by_resolution(
+    values: Mapping[str, Any] | None,
+    resolution: str,
+    default: Any = None,
+) -> Any:
+    """Return a resolution-specific value, falling back when it is absent."""
+    if isinstance(values, Mapping):
+        return values.get(resolution, default)
+    return default
 
 
 @lru_cache(maxsize=None)

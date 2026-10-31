@@ -15,7 +15,11 @@ import numpy as np
 import xarray as xr
 
 # Local imports avoid an import cycle with regrid_maps.
-from .regrid_maps import load_regrid_maps, get_realm_row
+from .regrid_maps import (
+    get_realm_row,
+    load_regrid_maps,
+    resolve_by_resolution,
+)
 
 _FILL_DEFAULT = 1.0e20
 
@@ -67,13 +71,6 @@ def _first(value, default=None):
     if isinstance(value, (list, tuple)):
         return value[0] if value else default
     return value if value is not None else default
-
-
-def _resolve_by_resolution(mapping, resolution: str, default):
-    """Return mapping[resolution] when mapping is a dict with that key, else default."""
-    if isinstance(mapping, dict):
-        return mapping.get(resolution, default)
-    return default
 
 
 def _format_license(license_cv: dict, license_id: str, institution_id: str) -> str:
@@ -138,12 +135,12 @@ def build_dataset_cfg(
     grid_desc = (cv.get("grid_label") or {}).get(grid_label, "")
 
     # Branded source_id/nominal_resolution written to the output, by resolution.
-    source_id = _resolve_by_resolution(
+    source_id = resolve_by_resolution(
         meta.get("source_ids"),
         resolution,
         meta.get("default_source_id", base_source_id),
     )
-    nominal_resolution = _resolve_by_resolution(
+    nominal_resolution = resolve_by_resolution(
         meta.get("nominal_resolution"),
         resolution,
         meta.get("default_nominal_resolution"),
