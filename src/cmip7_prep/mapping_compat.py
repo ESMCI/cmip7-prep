@@ -161,20 +161,21 @@ class VarConfig:
     standard_name:
         CF standard name.
     grids:
-        CMIP grid labels to produce for this variable.  The 'g' is *grid*, not
-        global::
+        Whether the variable is regridded before it is written::
 
-            gn   grid, native      -- written on the grid the data arrives on
-            gr   grid, regridded   -- interpolated to the target grid
-            gm   global mean       -- no horizontal grid at all
+            gn   written on the grid the data arrives on
+            gr   interpolated to the target latitude-longitude grid
 
         One entry per output, so ``["gn", "gr"]`` writes the variable twice,
-        once on each grid.  Defaults to ``["gr"]``, which is what every
-        variable without the key gets.
+        once each way.  Defaults to ``["gr"]``, which is what every variable
+        without the key gets.
 
-        These are the CMIP controlled-vocabulary values that appear as
-        ``grid_label`` in the output path and filename, so they are spelled the
-        same here to avoid a translation step.
+        A global sum takes ``gn``, because the formula has already collapsed
+        the horizontal grid and there is nothing left to interpolate.
+
+        This is not the published ``grid_label``.  That is the gNNN code in
+        ``data/<model>_grids.yaml``, read per realm by
+        :func:`cmip7_prep.cmor_utils.build_dataset_cfg`.
     source_aliases:
         Mapping of formula token → native model variable name.  Allows the
         formula to use short alias names that differ from the actual variable
@@ -332,12 +333,313 @@ def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
     return (arr * weights).sum(dim=levelname)
 
 
+# The radius CAM uses for its own grid, so that a cell area given in
+# steradians becomes the area in square metres that CAM itself would report.
+EARTH_RADIUS_M = 6371220.0
+
+# The cell-area units a model writes, as the factor that converts them to
+# square metres.  CAM writes 'area' in steradians, CLM writes 'area' in km^2
+# and CICE writes 'tarea' in m^2.
+_AREA_TO_M2: Dict[str, float] = {
+    "m2": 1.0,
+    "m^2": 1.0,
+    "km2": 1.0e6,
+    "km^2": 1.0e6,
+    "sr": EARTH_RADIUS_M**2,
+    "steradian": EARTH_RADIUS_M**2,
+    "steradians": EARTH_RADIUS_M**2,
+}
+
+
+def _area_in_m2(area: xr.DataArray, area_units: Optional[str], caller: str):
+    """Return the cell area converted to square metres.
+
+    The units come from `area_units` when it is given, and from the array's
+    own `units` attribute otherwise.
+    """
+    if not isinstance(area, xr.DataArray):
+        raise TypeError(
+            f"{caller} expected xr.DataArray for area, got {type(area).__name__}"
+        )
+    units = area_units if area_units is not None else area.attrs.get("units")
+    if units is None:
+        raise ValueError(
+            f"{caller}: the cell area {area.name!r} has no 'units' attribute. "
+            f"Give its units as area_units, one of {sorted(_AREA_TO_M2)}."
+        )
+    key = str(units).strip().lower().replace(" ", "")
+    if key not in _AREA_TO_M2:
+        raise ValueError(
+            f"{caller}: cell area units {units!r} are not recognised. "
+            f"The units it accepts are {sorted(_AREA_TO_M2)}."
+        )
+    return area.astype("float64") * _AREA_TO_M2[key]
+
+
+def global_2d_sum(
+    arr: xr.DataArray, area: xr.DataArray, area_units: Optional[str] = None
+) -> xr.DataArray:
+    """Integrate a quantity given per unit area over the whole globe.
+
+    The quantity is multiplied by the area of each cell in square metres and
+    summed over the dimensions the cell area has.  A field in kg m-2 becomes
+    a total in kg, which is how the CMIP7 tables define an ``-hm-`` variable
+    such as ``co2mass_tavg-u-hm-u``.  Every other dimension is left alone, so
+    the result keeps one value per time.
+
+    Cells where the quantity is missing are left out of the sum.  Masking the
+    quantity in the formula therefore restricts the integral, and
+    ``global_2d_sum(imass.where(sftgif > 0), area)`` covers the ice sheet alone.
+
+    The arithmetic is done in double precision.  Model output is single
+    precision, and a total over tens of thousands of cells loses several
+    digits if it is summed that way.
+
+    Parameters
+    ----------
+    arr        : xr.DataArray holding a quantity per unit area
+    area       : xr.DataArray holding the area of each cell
+    area_units : the units of `area`, for an area that carries no `units`
+                 attribute.  Scaling or masking the area inside the formula
+                 drops that attribute, so an expression such as
+                 ``area * landfrac`` has to name its units here.
+
+    >>> import numpy as np
+    >>> area = xr.DataArray(np.full(4, 0.25), dims=("ncol",),
+    ...                     attrs={"units": "m2"})
+    >>> field = xr.DataArray(np.ones((2, 4)), dims=("time", "ncol"))
+    >>> global_2d_sum(field, area).values
+    array([1., 1.])
+    >>> masked = field.where(xr.DataArray([True, True, False, False],
+    ...                                   dims=("ncol",)))
+    >>> global_2d_sum(masked, area).values
+    array([0.5, 0.5])
+    """
+    if not isinstance(arr, xr.DataArray):
+        raise TypeError(
+            f"global_2d_sum expected xr.DataArray, got {type(arr).__name__}"
+        )
+    weights = _area_in_m2(area, area_units, "global_2d_sum")
+
+    missing = [dim for dim in area.dims if dim not in arr.dims]
+    if missing:
+        raise ValueError(
+            f"global_2d_sum: the cell area has dimensions {list(area.dims)} and the "
+            f"field has {list(arr.dims)}, so {missing} cannot be summed over."
+        )
+
+    return (arr.astype("float64") * weights).sum(dim=area.dims, skipna=True)
+
+
+def global_2d_mean(
+    arr: xr.DataArray, area: xr.DataArray, area_units: Optional[str] = None
+) -> xr.DataArray:
+    """Average a field over the globe, weighting each cell by its area.
+
+    The weighted sum is divided by the area it was taken over, so the units
+    are the field's own and do not change.  That is what the CMIP7 tables ask
+    for from an ``-hm-`` variable whose cell method is ``area: mean``, such as
+    ``cfc11_tavg-u-hm-air``.  Every other dimension is left alone.
+
+    Cells where the field is missing are left out of both the sum and the
+    area, so ``global_2d_mean(tas.where(sftgif > 0), area)`` is the mean over the
+    ice sheet rather than the globe.
+
+    The weighting is by area.  Where a table asks for a different weight, such
+    as the moles of air in each sample, the two agree only for a field that
+    holds the same value everywhere.
+
+    Parameters
+    ----------
+    arr        : xr.DataArray holding the field to average
+    area       : xr.DataArray holding the area of each cell
+    area_units : the units of `area`, for an area that carries no `units`
+                 attribute
+
+    >>> import numpy as np
+    >>> area = xr.DataArray(np.array([1.0, 3.0]), dims=("ncol",),
+    ...                     attrs={"units": "m2"})
+    >>> field = xr.DataArray(np.array([[0.0, 4.0]]), dims=("time", "ncol"))
+    >>> global_2d_mean(field, area).values
+    array([3.])
+    >>> uniform = xr.DataArray(np.full((2, 2), 7.0), dims=("time", "ncol"))
+    >>> global_2d_mean(uniform, area).values
+    array([7., 7.])
+    """
+    if not isinstance(arr, xr.DataArray):
+        raise TypeError(
+            f"global_2d_mean expected xr.DataArray, got {type(arr).__name__}"
+        )
+    weights = _area_in_m2(area, area_units, "global_2d_mean")
+
+    missing = [dim for dim in area.dims if dim not in arr.dims]
+    if missing:
+        raise ValueError(
+            f"global_2d_mean: the cell area has dimensions {list(area.dims)} and the "
+            f"field has {list(arr.dims)}, so {missing} cannot be averaged over."
+        )
+
+    values = arr.astype("float64")
+    counted = weights.where(values.notnull())
+    return (values * weights).sum(dim=area.dims, skipna=True) / counted.sum(
+        dim=area.dims, skipna=True
+    )
+
+
+def global_3d_mean(
+    arr: xr.DataArray,
+    thickness: xr.DataArray,
+    area: xr.DataArray,
+    area_units: Optional[str] = None,
+    levelname: str = "lev",
+) -> xr.DataArray:
+    """Average a field over the whole atmosphere, weighting by the air in each cell.
+
+    The vertical and the horizontal are collapsed together, each cell counting
+    in proportion to the air it holds.  That is what the CMIP7 tables ask for
+    from an ``-hm-`` variable whose cell method reads ``height: area: time:
+    mean (with all samples weighted by the number of moles of air in the
+    sample)``, such as ``ch4_tavg-u-hm-air``.  Every other dimension is left
+    alone, so the result keeps one value per time.
+
+    The weight is ``thickness * area``.  For CAM that is ``PDELDRY``, the dry
+    air pressure thickness of each layer, times the cell area.  The moles of
+    air in a cell are that product divided by the gravitational acceleration
+    and the molar mass of air, and both are constants that cancel between the
+    numerator and the denominator.  Any weight proportional to the air mass
+    therefore gives the same answer, and the units of `thickness` do not
+    matter.
+
+    Cells where the field is missing are left out of both sums, so the mean is
+    taken over the cells that have a value.
+
+    Parameters
+    ----------
+    arr        : xr.DataArray holding the field to average
+    thickness  : xr.DataArray holding a per-cell quantity proportional to the
+                 mass of air, such as CAM's `PDELDRY`
+    area       : xr.DataArray holding the area of each cell
+    area_units : the units of `area`, for an area that carries no `units`
+                 attribute
+    levelname  : name of the vertical dimension to collapse
+
+    >>> import numpy as np
+    >>> area = xr.DataArray(np.array([1.0]), dims=("ncol",),
+    ...                     attrs={"units": "m2"})
+    >>> thickness = xr.DataArray(np.array([[1.0], [3.0]]),
+    ...                          dims=("lev", "ncol"))
+    >>> field = xr.DataArray(np.array([[0.0], [4.0]]), dims=("lev", "ncol"))
+    >>> float(global_3d_mean(field, thickness, area).values)
+    3.0
+    >>> uniform = xr.DataArray(np.full((2, 2, 1), 7.0),
+    ...                        dims=("time", "lev", "ncol"))
+    >>> thick2 = xr.DataArray(np.array([[1.0], [3.0]]), dims=("lev", "ncol"))
+    >>> global_3d_mean(uniform, thick2, area).values
+    array([7., 7.])
+    """
+    if not isinstance(arr, xr.DataArray):
+        raise TypeError(
+            f"global_3d_mean expected xr.DataArray, got {type(arr).__name__}"
+        )
+    if not isinstance(thickness, xr.DataArray):
+        raise TypeError(
+            f"global_3d_mean expected xr.DataArray for thickness, got "
+            f"{type(thickness).__name__}"
+        )
+    weights = _area_in_m2(area, area_units, "global_3d_mean") * thickness.astype(
+        "float64"
+    )
+
+    if levelname not in arr.dims:
+        raise ValueError(
+            f"global_3d_mean: the field has dimensions {list(arr.dims)}, which do not "
+            f"include the vertical dimension {levelname!r}."
+        )
+    if levelname not in thickness.dims:
+        raise ValueError(
+            f"global_3d_mean: the layer thickness has dimensions {list(thickness.dims)}, "
+            f"which do not include the vertical dimension {levelname!r}."
+        )
+    missing = [dim for dim in area.dims if dim not in arr.dims]
+    if missing:
+        raise ValueError(
+            f"global_3d_mean: the cell area has dimensions {list(area.dims)} and the "
+            f"field has {list(arr.dims)}, so {missing} cannot be averaged over."
+        )
+
+    collapse = (levelname,) + tuple(area.dims)
+    values = arr.astype("float64")
+    counted = weights.where(values.notnull())
+    return (values * weights).sum(dim=collapse, skipna=True) / counted.sum(
+        dim=collapse, skipna=True
+    )
+
+
+def layer_thickness(
+    pint: xr.DataArray, levelname: str = "ilev", outname: str = "lev"
+) -> xr.DataArray:
+    """Return the pressure thickness of each layer from the interface pressures.
+
+    CAM writes ``PINT``, the pressure on the layer interfaces, which has one
+    more value along its vertical dimension than the layers themselves.  The
+    thickness of a layer is the difference between the two interfaces that
+    bound it, so the result is one shorter and sits on the layer dimension.
+
+    The interface coordinate is dropped rather than renamed, because its
+    values belong to the interfaces and not to the layers between them.  The
+    result therefore broadcasts against a field on ``lev`` by dimension name.
+
+    The difference is taken as a magnitude, so the answer does not depend on
+    whether the interfaces run from the top of the atmosphere downwards or
+    the other way.
+
+    This is the total pressure, so the thickness it gives is the moist one.
+    A field defined against dry air is weighted about 0.25% too heavily in
+    the moist layers, which is the water vapour the dry thickness leaves out.
+
+    Parameters
+    ----------
+    pint      : xr.DataArray holding the pressure on the layer interfaces
+    levelname : name of the interface dimension
+    outname   : name the layer dimension should take
+
+    >>> import numpy as np
+    >>> pint = xr.DataArray(np.array([0.0, 1.0, 3.0]), dims=("ilev",))
+    >>> layer_thickness(pint).values
+    array([1., 2.])
+    >>> layer_thickness(pint).dims
+    ('lev',)
+    """
+    if not isinstance(pint, xr.DataArray):
+        raise TypeError(
+            f"layer_thickness expected xr.DataArray, got {type(pint).__name__}"
+        )
+    if levelname not in pint.dims:
+        raise ValueError(
+            f"layer_thickness: the interface pressure has dimensions "
+            f"{list(pint.dims)}, which do not include {levelname!r}."
+        )
+    if pint.sizes[levelname] < 2:
+        raise ValueError(
+            f"layer_thickness needs at least 2 interfaces, got "
+            f"{pint.sizes[levelname]}."
+        )
+
+    thickness = abs(pint.astype("float64").diff(dim=levelname))
+    thickness = thickness.rename({levelname: outname})
+    return thickness.drop_vars(outname, errors="ignore")
+
+
 FORMULA_NAMESPACE: Dict[str, Any] = {
     "np": np,
     "xr": xr,
     "verticalsum": verticalsum,
     "sumover_index": sumover_index,
     "verticalmean": verticalmean,
+    "global_2d_sum": global_2d_sum,
+    "global_2d_mean": global_2d_mean,
+    "global_3d_mean": global_3d_mean,
+    "layer_thickness": layer_thickness,
 }
 
 

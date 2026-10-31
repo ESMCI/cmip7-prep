@@ -103,7 +103,9 @@ variables:
 
   co2_tavg-p19-hxy-air: CO2
 
-  co2mass_tavg-u-hm-u: TMCO2 * AREA
+  co2mass_tavg-u-hm-u:
+    formula: global_2d_sum(TMCO2, area)
+    grids: [gn]
 
   dmc_tavg-alh-hxy-u: ZMMU
 

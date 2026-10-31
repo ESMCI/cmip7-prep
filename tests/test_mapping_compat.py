@@ -543,6 +543,128 @@ def test_verticalmean_rejects_bad_dim(
 
 
 # ---------------------------------------------------------------------------
+# global_2d_sum: a quantity per unit area integrated over the globe
+# ---------------------------------------------------------------------------
+# Four cells of pi steradians each cover the whole sphere, so a field of 1.0
+# integrates to the area of the Earth.
+EARTH_AREA_M2 = 4.0 * np.pi * 6371220.0**2
+
+
+@pytest.fixture(name="tmco2")
+def tmco2_fixture():
+    """A (time, ncol) column burden of 1 kg m-2 on a four-cell grid."""
+    return xr.DataArray(
+        np.ones((3, 4), dtype="f4"),
+        dims=("time", "ncol"),
+        name="TMCO2",
+    )
+
+
+def _area(values, units, dims=("ncol",)):
+    """A cell area carrying the units attribute a model writes."""
+    return xr.DataArray(
+        np.asarray(values, dtype="f8"), dims=dims, name="area", attrs={"units": units}
+    )
+
+
+def test_global_2d_sum_converts_steradians(
+    tmco2,
+):  # pylint: disable=redefined-outer-name
+    """CAM writes 'area' in steradians, and the total comes out in kg."""
+    area = _area(np.full(4, np.pi), "steradians")
+    out = _safe_eval("global_2d_sum(TMCO2, area)", {"TMCO2": tmco2, "area": area})
+    assert out.dims == ("time",)
+    assert float(out[0]) == pytest.approx(EARTH_AREA_M2)
+
+
+def test_global_2d_sum_converts_square_kilometres(
+    tmco2,
+):  # pylint: disable=redefined-outer-name
+    """CLM writes 'area' in km^2, which is a million square metres."""
+    area = _area(np.full(4, 2.0), "km^2")
+    out = _safe_eval("global_2d_sum(TMCO2, area)", {"TMCO2": tmco2, "area": area})
+    assert float(out[0]) == pytest.approx(8.0e6)
+
+
+def test_global_2d_sum_leaves_square_metres_alone(
+    tmco2,
+):  # pylint: disable=redefined-outer-name
+    """CICE writes 'tarea' in m^2, and those areas are summed as they are."""
+    area = _area(np.full(4, 2.0), "m2")
+    out = _safe_eval("global_2d_sum(TMCO2, tarea)", {"TMCO2": tmco2, "tarea": area})
+    assert float(out[0]) == pytest.approx(8.0)
+
+
+def test_global_2d_sum_sums_two_horizontal_dimensions():
+    """A CICE field on (nj, ni) collapses to one value per time."""
+    field = xr.DataArray(np.ones((2, 3, 5)), dims=("time", "nj", "ni"))
+    area = _area(np.full((3, 5), 4.0), "m2", dims=("nj", "ni"))
+    out = _safe_eval("global_2d_sum(field, tarea)", {"field": field, "tarea": area})
+    assert out.dims == ("time",)
+    assert float(out[0]) == pytest.approx(60.0)
+
+
+def test_global_2d_sum_leaves_out_masked_cells(
+    tmco2,
+):  # pylint: disable=redefined-outer-name
+    """Masking the field in the formula restricts the integral to what is left."""
+    area = _area(np.full(4, 2.0), "m2")
+    masked = tmco2.where(xr.DataArray([True, True, False, False], dims=("ncol",)))
+    out = _safe_eval("global_2d_sum(masked, area)", {"masked": masked, "area": area})
+    assert float(out[0]) == pytest.approx(4.0)
+
+
+def test_global_2d_sum_keeps_one_value_per_time(
+    tmco2,
+):  # pylint: disable=redefined-outer-name
+    """Each time is integrated on its own."""
+    field = tmco2 * xr.DataArray([1.0, 2.0, 3.0], dims=("time",))
+    area = _area(np.full(4, 0.25), "m2")
+    out = _safe_eval("global_2d_sum(field, area)", {"field": field, "area": area})
+    assert out.sizes["time"] == 3
+    assert out.values == pytest.approx([1.0, 2.0, 3.0])
+
+
+def test_global_2d_sum_works_in_double_precision(
+    tmco2,
+):  # pylint: disable=redefined-outer-name
+    """Model output is single precision, and a total over many cells is not."""
+    area = _area(np.full(4, 1.0), "m2")
+    out = _safe_eval("global_2d_sum(TMCO2, area)", {"TMCO2": tmco2, "area": area})
+    assert tmco2.dtype == np.dtype("f4")
+    assert out.dtype == np.dtype("f8")
+
+
+def test_global_2d_sum_needs_area_units(tmco2):  # pylint: disable=redefined-outer-name
+    """Scaling the area in a formula drops its units, so they have to be named."""
+    area = xr.DataArray(np.full(4, 1.0), dims=("ncol",), name="area")
+    with pytest.raises(ValueError, match="no 'units' attribute"):
+        _safe_eval("global_2d_sum(TMCO2, area)", {"TMCO2": tmco2, "area": area})
+    out = _safe_eval(
+        "global_2d_sum(TMCO2, area, area_units='m2')", {"TMCO2": tmco2, "area": area}
+    )
+    assert float(out[0]) == pytest.approx(4.0)
+
+
+def test_global_2d_sum_rejects_unknown_area_units(
+    tmco2,
+):  # pylint: disable=redefined-outer-name
+    """Units nobody has written a conversion for stop the variable."""
+    area = _area(np.full(4, 1.0), "hectares")
+    with pytest.raises(ValueError, match="not recognised"):
+        _safe_eval("global_2d_sum(TMCO2, area)", {"TMCO2": tmco2, "area": area})
+
+
+def test_global_2d_sum_rejects_a_mismatched_grid(
+    tmco2,
+):  # pylint: disable=redefined-outer-name
+    """An area on a grid the field is not on is a mapping bug, not a broadcast."""
+    area = _area(np.full((3, 5), 1.0), "m2", dims=("nj", "ni"))
+    with pytest.raises(ValueError, match="cannot be summed over"):
+        _safe_eval("global_2d_sum(TMCO2, area)", {"TMCO2": tmco2, "area": area})
+
+
+# ---------------------------------------------------------------------------
 # Minimal mapping form (data/schemas/mapping.schema.yaml)
 # ---------------------------------------------------------------------------
 _MINIMAL_YAML = """

@@ -670,12 +670,12 @@ def process_one_var(
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
 
-            # 'gn' and 'gm' both mean "do not regrid": write the data on
-            # the grid it arrives on, or with no horizontal grid at all.  The
-            # realm still decides what has to ride along -- sea ice needs its
-            # NH/SH variants and the CICE grid definition, land ice its
-            # projected axes -- so the realm dispatch sits inside this arm.
-            if grid in ("gn", "gm"):
+            # 'gn' means write the data on the grid it arrives on, which
+            # covers a global sum whose formula has already collapsed that
+            # grid.  The realm still decides what has to ride along -- sea ice
+            # needs its NH/SH variants and the CICE grid definition, land ice
+            # its projected axes -- so the realm dispatch sits inside this arm.
+            if grid == "gn":
                 if realm == "seaIce":
                     cmor_items, status = _prepare_seaice_native(
                         mapping, ds_native, varname, frequency
@@ -699,7 +699,7 @@ def process_one_var(
                 )
             else:
                 logger.error(
-                    "unrecognised grid label %r for %s; expected gn, gr or gm",
+                    "unrecognised grid label %r for %s; expected gn or gr",
                     grid,
                     varname,
                 )
