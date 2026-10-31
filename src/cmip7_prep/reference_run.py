@@ -148,6 +148,16 @@ def history_dir(case_dir: os.PathLike | str, realm: str) -> Path:
 def source_id_for_resolution(model: str, model_res: str) -> str:
     """Return the dataset source ID CMOR writes for one model resolution."""
     dataset = load_regrid_maps(model).get("dataset") or {}
+    configured = dataset.get("source_ids")
+    # A resolution absent from 'source_ids' now stops the run before any work,
+    # saying to add one to data/<model>_grids.yaml.
+    if isinstance(configured, dict) and configured and model_res not in configured:
+        raise ValueError(
+            f"No output source_id configured for model={model!r}, "
+            f"resolution={model_res!r}; add one under 'dataset: source_ids' in "
+            f"data/{model}_grids.yaml, which names "
+            f"{', '.join(sorted(configured))}"
+        )
     default_source_id = dataset.get("default_source_id") or dataset.get(
         "base_source_id"
     )

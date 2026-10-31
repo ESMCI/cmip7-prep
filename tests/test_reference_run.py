@@ -110,7 +110,7 @@ def test_history_dir_follows_the_archive_layout(tmp_path):
 
 
 def test_source_id_for_resolution_uses_configured_default(monkeypatch):
-    """Runner uses the exact per-resolution or default CMOR source ID."""
+    """Runner uses the source ID configured for the run's resolution."""
     config = {
         "dataset": {
             "source_ids": {"NorESM3-LM": "NorESM3-LM", "NorESM3-MM": "NorESM3-MM"},
@@ -122,7 +122,32 @@ def test_source_id_for_resolution_uses_configured_default(monkeypatch):
     )
 
     assert source_id_for_resolution("noresm", "NorESM3-LM") == "NorESM3-LM"
-    assert source_id_for_resolution("noresm", "custom") == "NorESM3"
+
+
+def test_source_id_for_resolution_rejects_an_unconfigured_resolution(monkeypatch):
+    """A resolution absent from 'source_ids' fails where it is asked for."""
+    config = {
+        "dataset": {
+            "source_ids": {"NorESM3-LM": "NorESM3-LM", "NorESM3-MM": "NorESM3-MM"},
+            "default_source_id": "NorESM3",
+        }
+    }
+    monkeypatch.setattr(
+        "cmip7_prep.reference_run.load_regrid_maps", lambda model: config
+    )
+
+    with pytest.raises(ValueError, match="noresm_grids.yaml"):
+        source_id_for_resolution("noresm", "custom")
+
+
+def test_source_id_for_resolution_uses_the_default_without_a_list(monkeypatch):
+    """A model that names no per-resolution source IDs uses its default."""
+    config = {"dataset": {"source_ids": {}, "default_source_id": "CESM3"}}
+    monkeypatch.setattr(
+        "cmip7_prep.reference_run.load_regrid_maps", lambda model: config
+    )
+
+    assert source_id_for_resolution("cesm", "ne30") == "CESM3"
 
 
 # ---------------------------------------------------------------- plan shape
