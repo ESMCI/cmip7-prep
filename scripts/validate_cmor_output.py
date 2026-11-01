@@ -546,6 +546,7 @@ def scan_output_tree(
     experiment: str,
     frequency: str,
     expected_variables: set[str],
+    located_variables: set[str] | None = None,
     ensemble_member: str | None = None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
     """Find and inspect CMOR files for the requested validation subset.
@@ -553,14 +554,13 @@ def scan_output_tree(
     The scan is restricted to the model's institution, exact source ID,
     experiment, frequency, and optional ensemble member. A file is retained
     only when its variable directory and dimension-folder form an exact
-    branded name in ``expected_variables`` (``variable_dimension``). This
-    prevents similarly rooted variable brands from being mistaken for one
-    another and avoids pooling output from different resolutions.
+    branded name in ``expected_variables`` or ``located_variables``, as
+    ``hur`` and ``tavg-p19-hxy-air`` form ``hur_tavg-p19-hxy-air``.
 
-    Every retained path is added to the produced-file mapping. Its NetCDF
-    dimensions and sizes are then inspected and recorded in the inventory;
-    inspection failures are captured separately so one unreadable file does
-    not stop the rest of the scan.
+    Every retained path is added to the produced-file mapping. A file is
+    opened and its dimensions recorded only when its branded name is in
+    ``expected_variables``. Inspection failures are captured separately so one
+    unreadable file does not stop the scan.
 
     Args:
         cmip_root: Root of the CMIP output tree, usually the ``CMIP7``
@@ -569,7 +569,11 @@ def scan_output_tree(
         source_id: Exact CMIP source ID directory to include.
         experiment: Experiment ID to include.
         frequency: Output frequency to include.
-        expected_variables: Exact branded variable names to scan for.
+        expected_variables: Exact branded variable names to scan for and
+            inspect.
+        located_variables: Optional branded variable names to record the paths
+            of without opening them, for variables another realm owns where
+            the report needs only to know whether output exists.
         ensemble_member: Optional ensemble label filter, such as
             ``r1i1p1f1``.
 
@@ -582,6 +586,7 @@ def scan_output_tree(
     inventory: list[ProducedFileRecord] = []
     inspection_errors: list[dict[str, str]] = []
     institution_id = MODEL_NAMING_MAPS[model][0]
+    retained_variables = set(expected_variables) | set(located_variables or ())
     pattern = cmip_root.glob(
         # The region level is not always 'glb': the hemispheric sea-ice
         # aggregates (siarea, siextent, sivol, sisnmass) are written under 'nh'
@@ -625,10 +630,14 @@ def scan_output_tree(
         # file's path records its variable but not the realm that produced it,
         # so its full branded name is the only way to distinguish variables.
         branded_variable = f"{variable}_{dimension_folder}"
-        if branded_variable not in expected_variables:
+        if branded_variable not in retained_variables:
             logger.debug("Not expected here, skipping: %s", variable)
             continue
         produced[branded_variable].append(file_path)
+        # A variable another realm owns is listed but not opened, because the
+        # report records only whether its output exists.
+        if branded_variable not in expected_variables:
+            continue
         try:
             data_var, dims, sizes = open_dataset_inventory(file_path, variable)
         except Exception as exc:  # pylint: disable=broad-except
@@ -1273,17 +1282,12 @@ def main() -> int:
         source_id=args.source_id,
         experiment=args.experiment,
         frequency=args.frequency,
-        expected_variables=expected_variable_set | mapped_elsewhere_names,
+        expected_variables=expected_variable_set,
+        located_variables=mapped_elsewhere_names,
         ensemble_member=args.ensemble_member,
     )
     produced_files = select_produced_files(expected_variables, scanned_files)
-    dimension_inventory = summarize_dimension_inventory(
-        [
-            record
-            for record in inventory_records
-            if f"{record.variable}_{record.dimension_folder}" in expected_variable_set
-        ]
-    )
+    dimension_inventory = summarize_dimension_inventory(inventory_records)
     mapped_elsewhere = []
     for variable, owner_realms in sorted(ownership.mapped_elsewhere.items()):
         matches = [str(path) for path in scanned_files.get(variable, [])]
