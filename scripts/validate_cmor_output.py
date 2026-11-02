@@ -587,14 +587,15 @@ def scan_output_tree(
     inspection_errors: list[dict[str, str]] = []
     institution_id = MODEL_NAMING_MAPS[model][0]
     retained_variables = set(expected_variables) | set(located_variables or ())
-    pattern = cmip_root.glob(
-        # The region level is not always 'glb': the hemispheric sea-ice
-        # aggregates (siarea, siextent, sivol, sisnmass) are written under 'nh'
-        # and 'sh'.  Pinning it to 'glb' made those files invisible here, so
-        # they were reported missing while sitting on disk.
-        f"*/{institution_id}/{source_id}/{experiment}/*/*/{frequency}/*/*/*/*.nc"
-    )
-    for file_path in sorted(pattern):
+    # The glob matches a path such as
+    # CMIP/NCC/NorESM3-LM/esm-hist/r1i1p1f1/glb/mon/tas/tavg-h2m-hxy-u/g253.
+    # The region is '*' rather than 'glb' because siarea, siextent, sivol and
+    # sisnmass are written under 'nh' and 'sh'.
+    head = f"*/{institution_id}/{source_id}/{experiment}/*/*/{frequency}/*/*/*"
+    # A file sits in a data version directory below the grid label, such as
+    # v20261102, or directly below the grid label.
+    found = set(cmip_root.glob(f"{head}/*/*.nc")) | set(cmip_root.glob(f"{head}/*.nc"))
+    for file_path in sorted(found):
         relative = file_path.relative_to(cmip_root)
         # sys.exit(4)
         parts = relative.parts
@@ -602,6 +603,8 @@ def scan_output_tree(
             logger.debug("Skipping unexpected output path layout: %s", file_path)
             continue
 
+        # The first ten parts are the activity id down to the grid label,
+        # whether or not a data version directory follows them.
         (
             _,
             consortium,
@@ -613,8 +616,7 @@ def scan_output_tree(
             variable,
             dimension_folder,
             grid_type,
-            _,
-        ) = parts[:11]
+        ) = parts[:10]
 
         if institution_id and consortium != institution_id:
             logger.debug("Skipping due to institution_id filter: %s", institution_id)
