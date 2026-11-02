@@ -18,16 +18,23 @@ variables:
   cLeaf_tavg-u-hxy-lnd: (FATES_LEAFC)*FATES_FRACTION
 
   cLitterCwd_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1],
-    dimname='fates_levelem'))*FATES_FRACTION
+    dimname='fates_levelem')  + (sumover_index(FATES_LITTER_AG_CWD_EL, indexlist=[1],
+    dimname='fates_levelem')  
 
   cLitterSubSurf_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_BG_FINE_EL, indexlist=[1],
     dimname='fates_levelem') + sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1],
     dimname='fates_levelem'))*FATES_FRACTION
 
-  cLitterSurf_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_AG_FINE_EL, indexlist=[1],
+  cLitterSurf_tavg-u-hxy-lnd: sumover_index(FATES_LITTER_AG_FINE_EL, indexlist=[1],
+    dimname='fates_levelem') + sumover_index(FATES_LITTER_AG_CWD_EL, indexlist=[1],
     dimname='fates_levelem'))*FATES_FRACTION
 
-  cLitter_tavg-u-hxy-lnd: TOTLITC
+
+  cLitter_tavg-u-hxy-lnd: sumover_index(FATES_LITTER_AG_FINE_EL, indexlist=[1],
+    dimname='fates_levelem') + sumover_index(FATES_LITTER_AG_CWD_EL, indexlist=[1],
+    dimname='fates_levelem'))*FATES_FRACTION + (sumover_index(FATES_LITTER_BG_FINE_EL, indexlist=[1],
+    dimname='fates_levelem') + sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1],
+    dimname='fates_levelem'))*FATES_FRACTION
 
   cOther_tavg-u-hxy-lnd: (FATES_SEED_BANK + FATES_REPROC + FATES_STOREC)*FATES_FRACTION
 
