@@ -3,7 +3,7 @@ variables:
 
   baresoilFrac_tavg-u-hxy-u: (1-FATES_AREA_PLANTS)*FATES_FRACTION*100
 
-  burntFractionAll_tavg-u-hxy-u: (FATES_BURNFRAC *3600*24*30*100)*FATES_FRACTION
+  burntFractionAll_tavg-u-hxy-u: (FATES_BURNFRAC *3600*24*365/12*100)*FATES_FRACTION
 
   c3PftFrac_tavg-u-hxy-u: (FATES_AREA_PLANTS-sumover_index(FATES_CANOPYCROWNAREA_PF,
     indexlist=[14], dimname='fates_levpft'))*FATES_FRACTION*100
