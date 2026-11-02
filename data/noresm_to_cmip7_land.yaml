@@ -11,7 +11,9 @@ variables:
   c4PftFrac_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[14],
     dimname='fates_levpft')*FATES_FRACTION*100
 
-  cLand_tavg-u-hxy-lnd: TOTECOSYSC / 1000
+  cLand_tavg-u-hxy-lnd: (FATES_VEGC + FATES_SEED_BANK + FATES_LITTER_AG_FINE_EL(1:1)
+  + FATES_LITTER_BG_FINE_EL(1:1) + FATES_LITTER_BG_CWD_EL(1:1) + FATES_LITTER_AG_CWD_EL(1:1) )
+  * FATES_FRACTION + ((TOT_WOODPRODC  +TOTSOMC) / 1000)
 
   cLeaf_tavg-u-hxy-lnd: (FATES_LEAFC)*FATES_FRACTION
 
