@@ -35,11 +35,11 @@ variables:
     dimname='fates_levelem') + sumover_index(FATES_LITTER_BG_CWD_EL, indexlist=[1],
     dimname='fates_levelem'))*FATES_FRACTION + TOTLITC/1000
 
-  cOther_tavg-u-hxy-lnd: (FATES_SEED_BANK + FATES_REPROC + FATES_STOREC)*FATES_FRACTION
+  cOther_tavg-u-hxy-lnd: (FATES_SEED_BANK + FATES_REPROC)*FATES_FRACTION
 
   cProduct_tavg-u-hxy-lnd: TOT_WOODPRODC / 1000
 
-  cRoot_tavg-u-hxy-lnd: (FATES_VEGC - FATES_VEGC_ABOVEGROUND) * FATES_FRACTION
+  cRoot_tavg-u-hxy-lnd: (FATES_VEGC - FATES_VEGC_ABOVEGROUND - FATES_REPROC) * FATES_FRACTION
 
   cSoilPools_tavg-u-hxy-lnd: '[SOM_ACT_C, SOM_PAS_C, SOM_SLO_C]'
 
@@ -49,7 +49,7 @@ variables:
 
   cSoil_tavg-u-hxy-lnd: TOTSOMC / 1000
 
-  cStem_tavg-u-hxy-lnd: (FATES_VEGC_ABOVEGROUND - FATES_LEAFC - FATES_REPROC - FATES_STOREC)*FATES_FRACTION
+  cStem_tavg-u-hxy-lnd: (FATES_VEGC_ABOVEGROUND - FATES_LEAFC)*FATES_FRACTION
 
   cVegLut_tpt-u-hxy-multi: (FATES_VEGC_LU)*FATES_FRACTION
 
