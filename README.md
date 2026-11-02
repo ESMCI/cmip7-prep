@@ -48,6 +48,7 @@ python scripts/run_reference_case.py \
   --outdir <where the output should go> \
   --model noresm --model-res NorESM3-LM \
   --experiment piControl \
+  --data-version v20260401 \
   --years 1:50:10 \
   --dry-run
 ```

@@ -30,13 +30,18 @@ carry the model's own variable names.
 
 | path | holds |
 |---|---|
-| `cmor/CMIP7/MIP-DRS7/...` | the CMORized files, in the CMIP7 directory structure |
+| `cmor/MIP-DRS7/CMIP7/...` | the CMORized files, in the CMIP7 directory structure |
 | `cmor/logs/<realm>/` | one CMOR log per variable, region and frequency |
+| `cmor/data_versions.md` | one line per data version, with the date and what it was for |
 
 A CMOR log is named for what it covers, such as
 `cmor_ta_tavg-p19-hxy-air_glb_mon_1-10.log`. The directory structure under
-`CMIP7/` is described under [The CMOR output structure](#the-cmor-output-structure)
-below.
+`MIP-DRS7/` is described under
+[The CMOR output structure](#the-cmor-output-structure) below.
+
+`data_versions.md` sits beside that tree rather than inside it, so it is not
+part of what gets published. A run adds a line the first time it sees a
+version, giving the version, the date and whatever `--data-version-note` said.
 
 ### The validation reports
 
@@ -105,13 +110,17 @@ records which steps finished, and a rerun reads it to decide what to skip.
 CMIP7 prescribes the directory structure, and there is no realm level in it:
 
 ```text
-CMIP7/MIP-DRS7/CMIP/NCC/NorESM3-LM/piControl/r1i1p1f1/glb/mon/tas/tavg-h2m-hxy-u/g202/
+MIP-DRS7/CMIP7/CMIP/NCC/NorESM3-LM/piControl/r1i1p1f1/glb/mon/tas/tavg-h2m-hxy-u/g202/v20260401/
     tas_tavg-h2m-hxy-u_mon_glb_g202_NorESM3-LM_piControl_r1i1p1f1_000101-001012.nc
 ```
 
 Every realm writes into the same tree, and a file's path records its variable
 but not which realm produced it. The region level is `glb` for most variables,
 and `nh` or `sh` for the hemispheric sea-ice aggregates.
+
+The last level is the data version, given by `--data-version`. Every time range
+of a variable belongs in one version directory, so a run split into year chunks
+gives all of them the same value.
 
 Each filename ends with the period it covers, so `--years 1:50:10` gives five
 files per variable whose periods join up with no gap or overlap.
