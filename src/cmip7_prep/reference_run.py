@@ -16,6 +16,7 @@ into an archive it may not own.
 
 from __future__ import annotations
 
+import datetime as dt
 import glob
 import os
 import sys
@@ -185,6 +186,7 @@ def build_plan(
     stages: Sequence[str] = STAGES,
     model_res: str | None = None,
     experiment: str,
+    data_version: str,
     ts_workers: int = 4,
     cmor_workers: int = CMOR_WORKERS,
     ice_sheet: str | None = None,
@@ -217,6 +219,11 @@ def build_plan(
 
     ``years`` is passed through to gen_timeseries.py as ``--years-spec`` and so
     uses its format, ``first:last:increment``.
+
+    ``data_version`` is the vYYYYMMDD edition the output belongs to, and is
+    passed to CMORization unchanged. Separate runs covering different years of
+    one case have to be given the same value, because the DRS keeps every time
+    range of a variable in one version directory.
     """
     unknown = [stage for stage in stages if stage not in STAGES]
     if unknown:
@@ -310,6 +317,7 @@ def build_plan(
                         model=model,
                         model_res=model_res,
                         experiment=experiment,
+                        data_version=data_version,
                         sheet=sheet,
                         variant_label=variant_label,
                         tables_root=tables_root,
@@ -386,6 +394,42 @@ def _timeseries_step(
     )
 
 
+DATA_VERSION_RECORD = "data_versions.md"
+
+
+def record_data_version(
+    cmor_root: os.PathLike | str,
+    data_version: str,
+    note: str | None = None,
+) -> bool:
+    """Append one line for a data version to the record beside the output tree.
+
+    The record says what each edition of the dataset was for, which the
+    version directory cannot say on its own. It sits in the CMOR root, above
+    the DRS tree, so nothing stray lands in what is published.
+
+    A version already in the file is left alone and False is returned, so the
+    chunks of one run add one line between them rather than one each.
+    """
+    path = Path(cmor_root) / DATA_VERSION_RECORD
+    recorded = path.read_text(encoding="utf-8") if path.exists() else ""
+    if any(
+        line.split(" ", 1)[0] == data_version
+        for line in recorded.splitlines()
+        if line.strip()
+    ):
+        return False
+
+    today = dt.date.today().isoformat()
+    line = f"{data_version}  {today}"
+    if note:
+        line += f"  {note.strip()}"
+    header = recorded.rstrip() if recorded.strip() else "# Data versions\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{header}\n{line}\n", encoding="utf-8")
+    return True
+
+
 def _cmor_step(
     *,
     scripts_dir,
@@ -398,6 +442,7 @@ def _cmor_step(
     model,
     model_res,
     experiment,
+    data_version,
     sheet,
     variant_label=None,
     tables_root=None,
@@ -418,6 +463,8 @@ def _cmor_step(
         model,
         "--experiment",
         experiment,
+        "--data-version",
+        data_version,
         "--workers",
         str(workers),
     ]

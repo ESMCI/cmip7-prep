@@ -44,6 +44,7 @@ from cmip7_prep.cmor_utils import (
     roll_for_monotonic_with_bounds,
     build_dataset_cfg,
 )
+from cmip7_prep.data_version import checked_data_version
 from cmip7_prep.include_patterns import (
     get_include_patterns,
     patterns_for_variable,
@@ -175,6 +176,19 @@ def parse_args():
         type=str,
         required=True,
         help="CMIP7 experiment_id of the case",
+    )
+    required.add_argument(
+        "--data-version",
+        type=str,
+        required=True,
+        metavar="vYYYYMMDD",
+        help=(
+            "Edition of the dataset this output belongs to, as the date "
+            "vYYYYMMDD. It is the <version> directory the DRS path ends "
+            "in. Every "
+            "invocation writing one dataset needs the same value, so a run "
+            "split into year chunks is given it once and keeps it."
+        ),
     )
 
     case = parser.add_argument_group("other properties of the case")
@@ -572,6 +586,7 @@ def process_one_var(
     ocn_fx_fields=None,
     ice_sheet=None,
     experiment=None,
+    data_version=None,
     window=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples.
@@ -764,6 +779,7 @@ def process_one_var(
                     frequency=frequency,
                     ripf=ripf_index,
                     tables_root=tables_root,
+                    data_version=data_version,
                     realm=realm,
                 )
                 # A rerun overwrites the log it replaces.
@@ -851,6 +867,14 @@ def main():
     logging.getLogger("cmip7_prep").setLevel(getattr(logging, args.log_level))
     logger.setLevel(getattr(logging, args.log_level))
     logger.debug(f"Parsed arguments: {args}")
+
+    # Checked here as well as where it is used, so a mistyped version fails
+    # before any variable is read rather than in a worker.
+    try:
+        checked_data_version(args.data_version)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(2)
 
     # Set variables used below
     OUTDIR = args.outdir
@@ -1179,6 +1203,7 @@ def main():
                             ripf_index=ripf_index,
                             ice_sheet=args.ice_sheet,
                             experiment=args.experiment,
+                            data_version=args.data_version,
                             window=window,
                         )
                         results.extend(res)
@@ -1212,6 +1237,7 @@ def main():
                             "ocn_fx_fields": ocn_fx_fields,
                             "ice_sheet": args.ice_sheet,
                             "experiment": args.experiment,
+                            "data_version": args.data_version,
                             "window": window,
                         }
                     )
