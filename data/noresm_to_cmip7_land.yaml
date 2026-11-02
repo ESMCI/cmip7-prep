@@ -282,8 +282,6 @@ variables:
 
   vegFrac_tavg-u-hxy-u: (FATES_AREA_PLANTS)*FATES_FRACTION
 
-  vegHeight_tavg-u-hxy-ng: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
-
   vegHeight_tavg-u-hxy-veg: (FATES_CA_WEIGHTED_HEIGHT)*FATES_FRACTION
 
   wetlandCH4_tavg-u-hxy-lnd: (CH4_SURF_DIFF_SAT+CH4_SURF_EBUL_SAT+CH4_SURF_AERE_SAT)
