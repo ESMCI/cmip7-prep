@@ -255,9 +255,7 @@ class TestExistingFxFiles:
     def test_narrowed_to_one_dataset(self, tmp_path):
         """Another experiment's or member's file does not count."""
         (tmp_path / self.NAME).touch()
-        assert existing_fx_files(
-            tmp_path, "sftlf_ti-u-hxy-u", "piControl", "r1i1p1f1"
-        )
+        assert existing_fx_files(tmp_path, "sftlf_ti-u-hxy-u", "piControl", "r1i1p1f1")
         assert not existing_fx_files(
             tmp_path, "sftlf_ti-u-hxy-u", "historical", "r1i1p1f1"
         )

@@ -259,7 +259,11 @@ def open_native_static(
     if "time" in ds.dims:
         ds = ds.isel(time=0, drop=True)
     ds = ds.drop_vars(
-        [v for v in ("time", "time_bounds", "time_bnds", "time_bnd") if v in ds.variables]
+        [
+            v
+            for v in ("time", "time_bounds", "time_bnds", "time_bnd")
+            if v in ds.variables
+        ]
     )
 
     if "lev" in ds:
