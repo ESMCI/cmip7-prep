@@ -163,10 +163,12 @@ def build_variable_rows(
                 if size == 0
             }
         )
-        if variable in missing:
-            status = "missing"
-        elif variable in with_errors:
+        # Tested before 'missing', because a variable CMOR failed on was never
+        # written and so is in both sets.  The log error is the useful half.
+        if variable in with_errors:
             status = "error"
+        elif variable in missing:
+            status = "missing"
         elif zero_dims:
             status = "empty"
         else:
