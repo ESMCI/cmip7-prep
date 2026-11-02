@@ -47,7 +47,10 @@ tail -f ~/reference_run.log
 : The archived case root, holding `atm/`, `lnd/`, `ice/`, `glc/` and `ocn/`.
 
 `--outdir`
-: Where `timeseries/` and `cmor/` are written. Put it on scratch.
+: Where `timeseries/` and `cmor/` are written. Put it beside the case it came
+  from, as `<case>.cmor`, so the output lives with the case rather than on
+  scratch. Each validation report records the path it scanned, so choose the
+  final location before the run rather than moving the tree afterwards.
 
 `--model`
 : `noresm` or `cesm`. This selects the variable mappings and the history file

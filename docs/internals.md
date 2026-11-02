@@ -93,7 +93,7 @@ and every field it depends on has to be in the model output.
 | `cmor_utils` | fill values, time encoding, bounds and monotonicity |
 | `cache_tools` | caches regridders and fx fields across variables |
 | `mom6_static` | reads the MOM6 static grid for the ocean fx fields |
-| `include_patterns` | resolves a realm and frequency to its history streams |
+| `include_patterns` | resolves a realm and frequency to its history time slice files |
 | `time_windows` | turns `--years` into windows and takes one out of a dataset |
 | `output_files` | finds output files whose period another file already covers |
 | `worker_lifetime` | asks the kernel to kill a pool worker when the run dies |
@@ -104,7 +104,7 @@ and every field it depends on has to be in the model output.
 | file | what it holds |
 |---|---|
 | `<model>_to_cmip7_<realm>.yaml` | the variable mapping, one per model and realm |
-| `<model>_include_patterns.yaml` | the history streams per realm, frequency and sampling |
+| `<model>_include_patterns.yaml` | the history time slice files per realm, frequency and sampling |
 | `<model>_grids.yaml` | the regrid weight files and the grid label per realm |
 | `intensive_vars.yaml` | the variables regridded bilinearly rather than conservatively |
 | `CMIP7_data_request_*.csv` | the data request, as exported |

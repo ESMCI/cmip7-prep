@@ -44,14 +44,17 @@ from cmip7_prep.step_exit import (
     RAN_AND_FOUND_PROBLEMS,
     RAN_AND_PASSED,
 )
+from cmip7_prep.data_version import checked_data_version
 from cmip7_prep.cv_lookup import validate as validate_cv
 from cmip7_prep.grids import MODEL_RESOLUTIONS
 from cmip7_prep.reference_run import (
     CMOR_WORKERS,
+    DATA_VERSION_RECORD,
     STAGES,
     Plan,
     Step,
     build_plan,
+    record_data_version,
 )
 
 logger = logging.getLogger("run_reference_case")
@@ -107,6 +110,19 @@ def parse_arguments():
             "the controlled vocabulary before any work starts."
         ),
     )
+    required.add_argument(
+        "--data-version",
+        required=True,
+        metavar="vYYYYMMDD",
+        help=(
+            "Edition of the dataset this output belongs to, as the date "
+            "vYYYYMMDD. It is the <version> directory the DRS path ends "
+            "in. Separate "
+            "runs covering different years of one case need the same value, "
+            "because the DRS keeps every time range of a variable in one "
+            "version directory."
+        ),
+    )
 
     selection = parser.add_argument_group("selecting what to run")
     selection.add_argument(
@@ -156,6 +172,18 @@ def parse_arguments():
         help="Ice sheet for the landIce realm (default: gris)",
     )
 
+    selection.add_argument(
+        "--data-version-note",
+        default=None,
+        metavar="TEXT",
+        help=(
+            "What this data version is for, e.g. 'starting the cmorization'. "
+            "Recorded with the version and the date in data_versions.md in "
+            "the CMOR root, which is what says why one edition replaced "
+            "another. A version already recorded there keeps its note."
+        ),
+    )
+
     reporting = parser.add_argument_group("what to report")
     reporting.add_argument(
         "--plots",
@@ -198,10 +226,10 @@ def parse_arguments():
         default=CMOR_WORKERS,
         help=(
             f"Worker processes for CMORization (default: {CMOR_WORKERS}). "
-            "Counted separately from --workers because a CMOR worker holds a "
-            "variable's regridded arrays -- measured at 3.4 to 6.7 GB each on "
-            "a two-year ne16 atmosphere run -- so memory, not cores, is "
-            "usually what limits how many are useful."
+            "Counted separately from --ts-workers because a CMOR worker "
+            "holds one variable's regridded arrays for the window being "
+            "written, around 350 MB for a ten-year window. Cores rather than "
+            "memory usually limit how many are useful."
         ),
     )
     behaviour.add_argument(
@@ -554,6 +582,7 @@ def main():
     tables_root = Path(args.tables_root or _LOCAL_PATH.parent / "cmip7-cmor-tables")
     try:
         validate_cv(tables_root, "experiment_id", args.experiment)
+        checked_data_version(args.data_version)
     except (ValueError, KeyError, FileNotFoundError) as exc:
         logger.error("%s", exc)
         sys.exit(2)
@@ -569,6 +598,7 @@ def main():
             stages=args.stages,
             model_res=args.model_res,
             experiment=args.experiment,
+            data_version=args.data_version,
             ts_workers=args.ts_workers,
             cmor_workers=args.cmor_workers,
             ice_sheet=args.ice_sheet,
@@ -591,6 +621,17 @@ def main():
     if args.dry_run:
         print_plan(plan)
         return
+
+    if "cmor" in args.stages:
+        added = record_data_version(
+            plan.cmor_root, args.data_version, args.data_version_note
+        )
+        if added:
+            logger.info(
+                "Recorded %s in %s",
+                args.data_version,
+                Path(plan.cmor_root) / DATA_VERSION_RECORD,
+            )
 
     outdir = Path(args.outdir)
     # Per-period, so finishing years 51-100 cannot overwrite the step logs or

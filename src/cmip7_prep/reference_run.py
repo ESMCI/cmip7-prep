@@ -16,6 +16,7 @@ into an archive it may not own.
 
 from __future__ import annotations
 
+import datetime as dt
 import glob
 import os
 import sys
@@ -25,6 +26,7 @@ from typing import Sequence
 
 from .grids import MODEL_RESOLUTIONS
 from .include_patterns import all_include_patterns, load_include_patterns
+from .regrid_maps import load_regrid_maps, resolve_by_resolution
 
 # Which component directory holds each realm's history files.  Mirrors
 # REALM_COMPONENT_MAP in scripts/cmor_driver.py.
@@ -55,10 +57,9 @@ FREQUENCY_ORDER = ("yr", "mon", "day", "6hr", "3hr", "1hr")
 PYTHON = sys.executable or "python"
 
 # CMORization gets its own worker count rather than sharing the timeseries
-# one.  Both stages spread work over processes, but a CMOR worker holds a
-# variable's regridded arrays -- 10.6 GB at peak on a two-year ne16 atmosphere
-# run -- while a timeseries worker only reads files.  One number for both would
-# either waste the timeseries stage or run the CMOR one out of memory.
+# one.  Both stages spread work over processes, but a CMOR worker holds one
+# variable's regridded arrays for the window being written, around 350 MB for a
+# ten-year window, while a timeseries worker only reads files.
 CMOR_WORKERS = 4
 
 
@@ -145,6 +146,35 @@ def history_dir(case_dir: os.PathLike | str, realm: str) -> Path:
     return Path(case_dir) / component / "hist"
 
 
+def source_id_for_resolution(model: str, model_res: str) -> str:
+    """Return the dataset source ID CMOR writes for one model resolution."""
+    dataset = load_regrid_maps(model).get("dataset") or {}
+    configured = dataset.get("source_ids")
+    # A resolution absent from 'source_ids' now stops the run before any work,
+    # saying to add one to data/<model>_grids.yaml.
+    if isinstance(configured, dict) and configured and model_res not in configured:
+        raise ValueError(
+            f"No output source_id configured for model={model!r}, "
+            f"resolution={model_res!r}; add one under 'dataset: source_ids' in "
+            f"data/{model}_grids.yaml, which names "
+            f"{', '.join(sorted(configured))}"
+        )
+    default_source_id = dataset.get("default_source_id") or dataset.get(
+        "base_source_id"
+    )
+    source_id = resolve_by_resolution(
+        dataset.get("source_ids"),
+        model_res,
+        default_source_id,
+    )
+    if not isinstance(source_id, str) or not source_id:
+        raise ValueError(
+            f"No output source_id configured for model={model!r}, "
+            f"resolution={model_res!r}"
+        )
+    return source_id
+
+
 def build_plan(
     case_dir: os.PathLike | str,
     outdir: os.PathLike | str,
@@ -156,6 +186,7 @@ def build_plan(
     stages: Sequence[str] = STAGES,
     model_res: str | None = None,
     experiment: str,
+    data_version: str,
     ts_workers: int = 4,
     cmor_workers: int = CMOR_WORKERS,
     ice_sheet: str | None = None,
@@ -188,6 +219,11 @@ def build_plan(
 
     ``years`` is passed through to gen_timeseries.py as ``--years-spec`` and so
     uses its format, ``first:last:increment``.
+
+    ``data_version`` is the vYYYYMMDD edition the output belongs to, and is
+    passed to CMORization unchanged. Separate runs covering different years of
+    one case have to be given the same value, because the DRS keeps every time
+    range of a variable in one version directory.
     """
     unknown = [stage for stage in stages if stage not in STAGES]
     if unknown:
@@ -320,6 +356,7 @@ def build_plan(
                         model=model,
                         model_res=model_res,
                         experiment=experiment,
+                        data_version=data_version,
                         sheet=sheet,
                         variant_label=variant_label,
                         tables_root=tables_root,
@@ -333,6 +370,7 @@ def build_plan(
                         frequency=frequency,
                         cmor_root=cmor_root,
                         model=model,
+                        source_id=source_id_for_resolution(model, model_res),
                         experiment=experiment,
                         variant_label=variant_label,
                         plots=plots,
@@ -395,6 +433,42 @@ def _timeseries_step(
     )
 
 
+DATA_VERSION_RECORD = "data_versions.md"
+
+
+def record_data_version(
+    cmor_root: os.PathLike | str,
+    data_version: str,
+    note: str | None = None,
+) -> bool:
+    """Append one line for a data version to the record beside the output tree.
+
+    The record says what each edition of the dataset was for, which the
+    version directory cannot say on its own. It sits in the CMOR root, above
+    the DRS tree, so nothing stray lands in what is published.
+
+    A version already in the file is left alone and False is returned, so the
+    chunks of one run add one line between them rather than one each.
+    """
+    path = Path(cmor_root) / DATA_VERSION_RECORD
+    recorded = path.read_text(encoding="utf-8") if path.exists() else ""
+    if any(
+        line.split(" ", 1)[0] == data_version
+        for line in recorded.splitlines()
+        if line.strip()
+    ):
+        return False
+
+    today = dt.date.today().isoformat()
+    line = f"{data_version}  {today}"
+    if note:
+        line += f"  {note.strip()}"
+    header = recorded.rstrip() if recorded.strip() else "# Data versions\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{header}\n{line}\n", encoding="utf-8")
+    return True
+
+
 def _cmor_step(
     *,
     scripts_dir,
@@ -407,6 +481,7 @@ def _cmor_step(
     model,
     model_res,
     experiment,
+    data_version,
     sheet,
     variant_label=None,
     tables_root=None,
@@ -432,6 +507,8 @@ def _cmor_step(
         model,
         "--experiment",
         experiment,
+        "--data-version",
+        data_version,
         "--workers",
         str(workers),
     ]
@@ -463,6 +540,7 @@ def _validate_step(
     frequency,
     cmor_root,
     model,
+    source_id,
     experiment,
     variant_label=None,
     plots=False,
@@ -475,6 +553,8 @@ def _validate_step(
         str(Path(scripts_dir) / "validate_cmor_output.py"),
         "--model",
         model,
+        "--source-id",
+        source_id,
         "--realm",
         realm,
         "--frequency",

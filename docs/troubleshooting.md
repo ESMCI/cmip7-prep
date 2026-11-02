@@ -8,9 +8,10 @@ ValueError: Expected time array of size 2 or greater, got 1. Group with paths:
 ```
 
 A history file belonging to a *different* case is sitting in this case's input
-directory. Time series generation matches files by stream, as in `*cam.h0a*`,
-which any case's monthly atmosphere files match. Files are then grouped by the
-case name in the filename, so the stray file forms a group of its own, and one
+directory. Time series generation matches history time slice files by name, as
+in `*cam.h0a*`, which any case's monthly atmosphere files match. Files are then
+grouped by the case name in the filename, so the stray file forms a group of
+its own, and one
 file with one time record gives nothing to measure a time step against.
 
 The traceback names the file. Compare its case name with the directory's:
@@ -42,9 +43,9 @@ Time series in .../timeseries for realm seaIce:
   day       0 file(s)  <-- none
 ```
 
-Either the case wrote no history files at that frequency, or the streams it
-wrote hold none of the variables the realm needs. Neither is something a rerun
-can fix, so the run carries on and a resume skips the step.
+Either the case wrote no history time slice files at that frequency, or the
+ones it wrote may not contain any of the variables the realm needs. Neither is
+something a rerun can fix, so the run carries on and a resume skips the step.
 
 ## Validation reports errors you cannot account for
 

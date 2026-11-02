@@ -79,7 +79,9 @@ variables:
 
   co2_tavg-p19-hxy-air: CO2
 
-  co2mass_tavg-u-hm-u: TMCO2
+  co2mass_tavg-u-hm-u:
+    formula: global_2d_sum(TMCO2, area)
+    grids: [gn]
 
   evspsbl_tavg-u-hxy-lnd: QVEGT+QVEGE+QSOIL
 

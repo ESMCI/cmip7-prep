@@ -39,6 +39,8 @@ import time
 from datetime import datetime, UTC
 import glob
 import json
+from typing import Sequence
+
 import numpy as np
 import xarray as xr
 
@@ -57,12 +59,19 @@ from cmip7_prep.cmor_utils import (
     build_dataset_cfg,
     existing_fx_files,
 )
+from cmip7_prep.data_version import checked_data_version
 from cmip7_prep.include_patterns import (
     first_history_file_for_fx,
     get_include_patterns,
     patterns_for_variable,
 )
 from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.mapping_ownership import (
+    MappingOwnership,
+    classify_mapping_ownership,
+    load_mapping_catalog,
+    mapping_owners,
+)
 from cmip7_prep.grids import MODEL_RESOLUTIONS, CICE_GRID_VARS, resolution_for
 from cmip7_prep.regrid import zonal_mean_on_pressure_grid, regrid_to_latlon_ds
 from cmip7_prep.pipeline import (
@@ -196,6 +205,19 @@ def parse_args():
         type=str,
         required=True,
         help="CMIP7 experiment_id of the case",
+    )
+    required.add_argument(
+        "--data-version",
+        type=str,
+        required=True,
+        metavar="vYYYYMMDD",
+        help=(
+            "Edition of the dataset this output belongs to, as the date "
+            "vYYYYMMDD. It is the <version> directory the DRS path ends "
+            "in. Every "
+            "invocation writing one dataset needs the same value, so a run "
+            "split into year chunks is given it once and keeps it."
+        ),
     )
 
     case = parser.add_argument_group("other properties of the case")
@@ -392,8 +414,7 @@ def _peak_worker_memory_gb() -> float:
 
     RUSAGE_SELF counts only the process that asks, so with --workers the
     variables are processed in children and this process reports almost
-    nothing -- 0.3 GB against the 10.6 GB the same work takes when run
-    serially.  This reports the children instead.
+    nothing.  This reports the children instead.
 
     It is the largest single worker, not their total: the kernel keeps one
     high-water mark for all children together.  Multiply by the worker count
@@ -565,8 +586,18 @@ def _prepare_regridded(
 def _job_name(kwargs) -> str:
     """Name one submitted job: the variable, and its window when there is one."""
     window = kwargs.get("window")
-    name = str(kwargs["cmip_var"])
+    name = _job_variable_name(kwargs["cmip_var"])
     return f"{name} years {window[0]}-{window[1]}" if window else name
+
+
+def _job_variable_name(cmip_var: VariableRef) -> str:
+    """Return the branded name a job is reported under."""
+    return cmip_var.branded_variable_name.name
+
+
+def _attempted_variable_count(variables: Sequence[VariableRef]) -> int:
+    """Count unique variables represented by the submitted processing jobs."""
+    return len({_job_variable_name(variable) for variable in variables})
 
 
 def process_one_var(
@@ -584,6 +615,7 @@ def process_one_var(
     ocn_fx_fields=None,
     ice_sheet=None,
     experiment=None,
+    data_version=None,
     window=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples.
@@ -705,12 +737,12 @@ def process_one_var(
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
 
-            # 'gn' and 'gm' both mean "do not regrid": write the data on
-            # the grid it arrives on, or with no horizontal grid at all.  The
-            # realm still decides what has to ride along -- sea ice needs its
-            # NH/SH variants and the CICE grid definition, land ice its
-            # projected axes -- so the realm dispatch sits inside this arm.
-            if grid in ("gn", "gm"):
+            # 'gn' means write the data on the grid it arrives on, which
+            # covers a global sum whose formula has already collapsed that
+            # grid.  The realm still decides what has to ride along -- sea ice
+            # needs its NH/SH variants and the CICE grid definition, land ice
+            # its projected axes -- so the realm dispatch sits inside this arm.
+            if grid == "gn":
                 if realm == "seaIce":
                     cmor_items, status = _prepare_seaice_native(
                         mapping, ds_native, varname, frequency
@@ -734,7 +766,7 @@ def process_one_var(
                 )
             else:
                 logger.error(
-                    "unrecognised grid label %r for %s; expected gn, gr or gm",
+                    "unrecognised grid label %r for %s; expected gn or gr",
                     grid,
                     varname,
                 )
@@ -781,6 +813,7 @@ def process_one_var(
                     frequency=frequency,
                     ripf=ripf_index,
                     tables_root=tables_root,
+                    data_version=data_version,
                     realm=realm,
                 )
                 # A rerun overwrites the log it replaces.
@@ -844,6 +877,21 @@ def process_one_var(
     return results
 
 
+def _cmor_exit_code(
+    owned_variables: Sequence[object],
+    written_variables: list[str],
+    ownership: MappingOwnership,
+) -> int:
+    """Choose the driver exit code from eligible and written variables."""
+    if written_variables:
+        return 0
+    if not owned_variables:
+        if ownership.mapped_elsewhere and not ownership.unmapped:
+            return 0
+        return NOTHING_TO_WRITE
+    return 1
+
+
 def main():
     run_start = time.monotonic()
     args = parse_args()
@@ -853,6 +901,14 @@ def main():
     logging.getLogger("cmip7_prep").setLevel(getattr(logging, args.log_level))
     logger.setLevel(getattr(logging, args.log_level))
     logger.debug(f"Parsed arguments: {args}")
+
+    # Checked here as well as where it is used, so a mistyped version fails
+    # before any variable is read rather than in a worker.
+    try:
+        checked_data_version(args.data_version)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        sys.exit(2)
 
     # Set variables used below
     OUTDIR = args.outdir
@@ -1011,12 +1067,45 @@ def main():
                     v.branded_variable_name.name for v in cmip_vars
                 ]:
                     cmip_vars.append(var)
+
+    mappings = load_mapping_catalog(
+        model,
+        REALM_YAML_MAP,
+        selected_realm=realm,
+        selected_mapping=mapping,
+    )
+    owners = mapping_owners(mappings, frequency)
+    requested_names = {var.branded_variable_name.name for var in cmip_vars}
+    ownership = classify_mapping_ownership(requested_names, owners, realm)
+    results: list[tuple[str, str]] = []
+    attempted_jobs: list[VariableRef] = []
+
+    # Report requested variables mapped to one or more different realms.
+    for varname, owner_realms in sorted(ownership.mapped_elsewhere.items()):
+        logger.info(
+            "Skipping %s: mapping owners are realm(s) %s, not %s",
+            varname,
+            ", ".join(owner_realms),
+            realm,
+        )
+        results.append((varname, f"INFO: mapped in realm(s) {', '.join(owner_realms)}"))
+    # Report requested variables that do not appear in any realm mapping.
+    for varname in sorted(ownership.unmapped):
+        logger.warning(
+            "No mapping for requested variable %s in any %s realm YAML",
+            varname,
+            model,
+        )
+        results.append((varname, "ERROR: no mapping in any realm YAML"))
+    cmip_vars = [
+        var
+        for var in cmip_vars
+        if var.branded_variable_name.name in ownership.owned_here
+    ]
     logger.info(f"CMORIZING {len(cmip_vars)} variables")
 
     # One entry per variable, each saying "ok" or why it was not written.
     # Checked at the end of main to decide whether the run succeeded.
-    results: list[tuple[str, str]] = []
-
     # Load requested variables
     if len(cmip_vars) > 0:
         # Glob the union of every time sampling for this realm and frequency.
@@ -1168,6 +1257,7 @@ def main():
             # writes its own file, and each holds only that window's data, so
             # five windows is five smaller jobs rather than one large one.
             for window in windows:
+                attempted_jobs.append(var_ref)
                 if args.workers == 1:
                     try:
                         res = process_one_var(
@@ -1185,6 +1275,7 @@ def main():
                             ripf_index=ripf_index,
                             ice_sheet=args.ice_sheet,
                             experiment=args.experiment,
+                            data_version=args.data_version,
                             window=window,
                         )
                         results.extend(res)
@@ -1218,6 +1309,7 @@ def main():
                             "ocn_fx_fields": ocn_fx_fields,
                             "ice_sheet": args.ice_sheet,
                             "experiment": args.experiment,
+                            "data_version": args.data_version,
                             "window": window,
                         }
                     )
@@ -1304,15 +1396,18 @@ def main():
         )
     present = sorted({name for name, status in results if status == ALREADY_PRESENT})
     results = [(name, status) for name, status in results if status != NO_INPUT]
+    # Mapped-elsewhere-only requests are a successful no-op; no eligible
+    # variables return the runner's no-work code, while failed writes are fatal.
     written = [name for name, status in results if status == "ok"]
-    if not results:
+    exit_code = _cmor_exit_code(cmip_vars, written, ownership)
+    if exit_code == NOTHING_TO_WRITE:
         logger.warning(
-            "Nothing to write for realm %s at %s frequency. The mapping file "
-            "has none of the variables the data request asks for.",
+            "Nothing to write for realm %s at %s frequency: no requested "
+            "variables are mapped to this realm.",
             args.realm,
             frequency,
         )
-        sys.exit(NOTHING_TO_WRITE)
+        sys.exit(exit_code)
 
     # Every variable needed was already on disk from an earlier run.
     if present and len(present) == len({name for name, _ in results}):
@@ -1321,15 +1416,25 @@ def main():
         )
         return
 
-    # Every variable that was tried failed.
-    if not written and not present:
-        logger.error(
-            "No variables were written. %d were attempted; see the warnings "
-            "and errors above for each.",
-            len({name for name, _ in results}),
-        )
-        sys.exit(1)
-    logger.info("Wrote %d variable(s)", len(written))
+    if exit_code == 0:
+        if not written:
+            logger.info(
+                "No variables are owned by realm %s; requested variables are "
+                "mapped to other realms.",
+                realm,
+            )
+        else:
+            logger.info("Wrote %d variable(s)", len(written))
+        return
+
+    # Every eligible variable was skipped or failed before producing output.
+    logger.error(
+        "No variables were written. Attempted %d of %d realm-owned "
+        "variables; see the warnings and errors above for details.",
+        _attempted_variable_count(attempted_jobs),
+        len(cmip_vars),
+    )
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

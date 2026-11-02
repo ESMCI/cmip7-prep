@@ -429,7 +429,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "mon",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert "atmos" in data
         var = data["atmos"]["variables"]["tas"]
         assert var["table"] == "atmos"
@@ -452,7 +456,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         var = data["atmos"]["variables"]["pr"]
         assert var["formula"] == "PRECC + PRECL"
         assert {"model_var": "PRECC"} in var["sources"]
@@ -472,7 +480,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         var = data["atmos"]["variables"]["ta"]
         assert "levels" in var
         assert var["levels"]["name"] == "standard_hybrid_sigma"
@@ -493,7 +505,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert "levels" not in data["atmos"]["variables"]["tos"]
 
     def test_no_levels_without_lev_dim(self, tmp_path):
@@ -510,7 +526,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert "levels" not in data["atmos"]["variables"]["tas"]
 
     def test_ocean_rows_filtered(self, tmp_path):
@@ -527,7 +547,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert all(len(rd["variables"]) == 0 for rd in data.values())
 
     def test_skip_phrases_filter_rows(self, tmp_path):
@@ -564,7 +588,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             },
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert list(data["atmos"]["variables"].keys()) == ["v3"]
 
     def test_dataset_overrides_noresm(self, tmp_path):
@@ -581,7 +609,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert data["atmos"]["dataset_overrides"]["institution_id"] == "NCC"
         assert data["atmos"]["dataset_overrides"]["source_id"] == "NorESM3-LM"
 
@@ -603,7 +635,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         entry = data["atmos"]["variables"]["tas"]
         assert "dims" not in entry
         assert "levels" not in entry  # no lev or plevN in the dimensions
@@ -622,7 +658,11 @@ class TestReadCsvNorESM:
                 "CMIP7 Freq.": "",
             }
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         levels = data["atmos"]["variables"]["ta"]["levels"]
         assert levels["name"] == "standard_hybrid_sigma"
 
@@ -695,7 +735,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         var = data["atmos"]["variables"]["tas"]
         assert var["table"] == "atmos"
         assert var["long_name"] == "Near-Surface Air Temperature"
@@ -744,7 +788,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert data["atmos"]["variables"]["pr"]["standard_name"] == "precipitation_flux"
 
     def test_cell_methods_stored(self, tmp_path):
@@ -762,7 +810,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert data["atmos"]["variables"]["cl"]["cell_methods"] == "time: mean"
 
     def test_regrid_method_stored(self, tmp_path):
@@ -779,7 +831,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert data["atmos"]["variables"]["pr"]["regrid_method"] == "conservative"
 
     def test_levels_added_for_lev_dim(self, tmp_path):
@@ -796,7 +852,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert "levels" in data["atmos"]["variables"]["cl"]
         assert data["atmos"]["variables"]["cl"]["levels"]["src_axis_name"] == "lev"
 
@@ -811,7 +871,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert data["atmos"]["dataset_overrides"]["institution_id"] == "NCAR"
         assert data["atmos"]["dataset_overrides"]["source_id"] == "CESM3"
 
@@ -826,7 +890,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         assert len(data["atmos"]["variables"]) == 0
 
     def test_formula_expression(self, tmp_path):
@@ -843,7 +911,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         var = data["atmos"]["variables"]["clt"]
         assert var["formula"] == "CLDTOT * 100"
         assert var["sources"] == [{"model_var": "CLDTOT"}]
@@ -862,7 +934,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         var = data["atmos"]["variables"]["evspsbl"]
         assert var["sources"] == [{"model_var": "QFLX"}]
 
@@ -880,7 +956,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         sources = data["seaIce"]["variables"]["siarea"]["sources"]
         assert sources == [
             {"model_var": "siconc_d", "freq": "day"},
@@ -902,7 +982,11 @@ class TestReadCsvCESM:
                 }
             )
         ]
-        data = read_csv(_write_temp_csv(tmp_path, self.FIELDNAMES, rows), self.CFG)
+        data = read_csv(
+            _write_temp_csv(tmp_path, self.FIELDNAMES, rows),
+            self.CFG,
+            short_format=False,
+        )
         sources = data["seaIce"]["variables"]["siarea"]["sources"]
         assert sources[0] == {"model_var": "siconc_d", "freq": "day", "alias": "siconc"}
         assert sources[1] == {"model_var": "siconc", "freq": "mon"}
