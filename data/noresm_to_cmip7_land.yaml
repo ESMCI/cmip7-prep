@@ -193,8 +193,6 @@ variables:
 
   prveg_tavg-u-hxy-lnd: QINTR
 
-  qgwr_tavg-u-hxy-lnd: QCHARGE
-
   raLeaf_tavg-u-hxy-lnd: (FATES_LEAFMAINTAR + (FATES_GROWTH_RESP * FATES_LEAFC_ALLOC
     / FATES_NPP))*FATES_FRACTION
 
