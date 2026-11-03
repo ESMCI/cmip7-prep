@@ -129,6 +129,9 @@ def build_variable_rows(
     missing = set(report.get("expected_but_not_produced", []))
     with_errors = set(report.get("variables_with_log_errors", []))
     provenance = report.get("variable_provenance", {})
+    diagnosis = {
+        item["variable"]: item for item in report.get("missing_variable_diagnosis", [])
+    }
 
     error_lines: dict[str, list[str]] = {}
     for record in report.get("log_records", []):
@@ -185,6 +188,13 @@ def build_variable_rows(
                 "grid_types": inventory.get("grid_types", []),
                 "sample_path": inventory.get("sample_path"),
                 "provenance": provenance.get(variable),
+                "missing_reason": (diagnosis.get(variable) or {}).get("reason"),
+                "fields_absent": (diagnosis.get(variable) or {}).get(
+                    "fields_absent", []
+                ),
+                "include_patterns": (diagnosis.get(variable) or {}).get(
+                    "include_patterns", []
+                ),
                 "timeseries_plot": _plot_href(
                     subset_prefix, timeseries_plots.get(variable)
                 ),
@@ -549,7 +559,11 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       if (missing.length > 0) {
         body.appendChild(el("h3", { text: "Mapping exists but variable not written (" + missing.length + ")" }));
         body.appendChild(el("ul", { "class": "issue-list" }, missing.map(function (v) {
-          return el("li", {}, [el("span", { "class": "mono", text: v.name })]);
+          var entry = el("li", {}, [el("span", { "class": "mono", text: v.name })]);
+          if (v.missing_reason) {
+            entry.appendChild(el("span", { "class": "reason", text: v.missing_reason }));
+          }
+          return entry;
         })));
       }
       if (elsewhere.length > 0) {
@@ -705,6 +719,11 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
       );
     } else {
       card.appendChild(el("div", { "class": "prov", text: provenanceText(variable.provenance) }));
+      if (variable.missing_reason) {
+        card.appendChild(el("div", { "class": "errbox" }, [
+          el("div", { text: variable.missing_reason })
+        ]));
+      }
     }
 
     if (variable.error_lines.length > 0 || (variable.zero_dims || []).length > 0) {
@@ -740,6 +759,8 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
     detailRow("Grids", variable.grid_types);
     detailRow("Sample file", variable.sample_path);
     detailRow("Output files", variable.output_files);
+    detailRow("Source fields not in the time series", variable.fields_absent);
+    detailRow("History files read", variable.include_patterns);
     if (variable.provenance && variable.provenance.description) {
       detailRow("Description", variable.provenance.description);
     }

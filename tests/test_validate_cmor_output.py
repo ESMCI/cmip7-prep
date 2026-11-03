@@ -19,8 +19,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import validate_cmor_output
 from validate_cmor_output import (
     collect_log_records,
+    diagnose_missing_variables,
     parse_log_variable,
     resolve_cmip_root,
+    resolve_timeseries_dir,
     scan_output_tree,
     select_produced_files,
     summarize_dimension_inventory,
@@ -279,6 +281,7 @@ def test_missing_branded_variable_is_not_hidden_by_shared_root_name(tmp_path):
         variable_provenance={},
         mapped_elsewhere=[],
         unmapped_requested_variables=[],
+        missing_variable_diagnosis=[],
     )
 
     assert ownership.owned_here == {produced_brand, missing_brand}
@@ -411,3 +414,70 @@ def test_validation_site_data_carries_realm_ownership_categories():
     assert mapped_variable["mapping_owner"] == ["aerosol"]
     assert mapped_variable["found_in_output"] is True
     assert mapped_variable["output_files"] == ["abs550bc.nc"]
+
+
+class _StubMapping:  # pylint: disable=too-few-public-methods
+    """A mapping that reports source fields from a dict."""
+
+    def __init__(self, fields):
+        self._fields = fields
+
+    def timeseries_source_vars(self, cmip_name, _freq=None):
+        """Return the time-varying source fields for one variable."""
+        return list(self._fields.get(cmip_name, []))
+
+
+def test_resolve_timeseries_dir_finds_the_directory_beside_the_output_tree(tmp_path):
+    """timeseries/<realm> is a sibling of the cmor/ directory."""
+    (tmp_path / "timeseries" / "aerosol").mkdir(parents=True)
+    (tmp_path / "cmor").mkdir()
+
+    found = resolve_timeseries_dir(tmp_path / "cmor", "aerosol")
+
+    assert found == (tmp_path / "timeseries" / "aerosol").resolve()
+
+
+def test_resolve_timeseries_dir_returns_none_when_there_is_no_directory(tmp_path):
+    """A run without time series on disk gives no directory to check."""
+    assert resolve_timeseries_dir(tmp_path / "cmor", "aerosol") is None
+
+
+def test_diagnose_missing_variables_names_the_absent_source_field(tmp_path):
+    """od550aer needs DOD550 and DAYFOC, and only DAYFOC is on disk."""
+    (tmp_path / "case.cam.h0.DAYFOC.185001-185912.nc").touch()
+    mapping = _StubMapping({"od550aer_tavg-u-hxy-u": ["DOD550", "DAYFOC"]})
+
+    diagnosis = diagnose_missing_variables(
+        ["od550aer_tavg-u-hxy-u"], mapping, tmp_path, "noresm", "aerosol", "mon"
+    )
+
+    assert diagnosis[0]["fields_absent"] == ["DOD550"]
+    assert "DOD550" in diagnosis[0]["reason"]
+
+
+def test_diagnose_missing_variables_points_at_the_step_log_when_nothing_is_absent(
+    tmp_path,
+):
+    """A variable whose fields all arrived failed somewhere CMOR records."""
+    (tmp_path / "case.cam.h0.DOD550.185001-185912.nc").touch()
+    mapping = _StubMapping({"od550aer_tavg-u-hxy-u": ["DOD550"]})
+
+    diagnosis = diagnose_missing_variables(
+        ["od550aer_tavg-u-hxy-u"], mapping, tmp_path, "noresm", "aerosol", "mon"
+    )
+
+    assert diagnosis[0]["fields_absent"] == []
+    assert "step log" in diagnosis[0]["reason"]
+
+
+def test_diagnose_missing_variables_separates_fields_on_another_history_file(tmp_path):
+    """A field written only to another history tape is not an absent field."""
+    (tmp_path / "case.cam.h1.DOD550.185001-185912.nc").touch()
+    mapping = _StubMapping({"od550aer_tavg-u-hxy-u": ["DOD550"]})
+
+    diagnosis = diagnose_missing_variables(
+        ["od550aer_tavg-u-hxy-u"], mapping, tmp_path, "noresm", "aerosol", "mon"
+    )
+
+    assert diagnosis[0]["fields_absent"] == []
+    assert diagnosis[0]["fields_in_other_history_files"] == ["DOD550"]

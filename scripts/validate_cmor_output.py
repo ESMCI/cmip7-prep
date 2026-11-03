@@ -40,6 +40,7 @@ from cmip7_prep.step_exit import (
     RAN_AND_FOUND_PROBLEMS,
     RAN_AND_PASSED,
 )
+from cmip7_prep.include_patterns import patterns_for_variable
 from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
 from cmip7_prep.mapping_compat import Mapping
 from cmip7_prep.mapping_ownership import (
@@ -49,6 +50,7 @@ from cmip7_prep.mapping_ownership import (
     mapping_owners,
 )
 from cmip7_prep.output_files import redundant_pairs
+from cmip7_prep.pipeline import _filename_contains_var
 from cmor_driver import REALM_YAML_MAP
 
 logger = logging.getLogger("cmip7_prep.validate_cmor_output")
@@ -171,6 +173,14 @@ def parse_args() -> argparse.Namespace:
         "--custom-yaml",
         default=None,
         help="Optional custom YAML mapping file",
+    )
+    parser.add_argument(
+        "--timeseries-dir",
+        default=None,
+        help=(
+            "Directory of time series files the CMORization read. The default "
+            "is timeseries/<realm> beside the CMIP7 output tree."
+        ),
     )
     parser.add_argument(
         "--variables",
@@ -447,6 +457,105 @@ def build_variable_provenance(
             "description": entry.get("description"),
         }
     return provenance
+
+
+def resolve_timeseries_dir(
+    root_output_path: str | Path, realm: str, override: str | None = None
+) -> Path | None:
+    """Resolve the directory of time series files the CMORization read."""
+    if override:
+        return Path(override).expanduser().resolve()
+    root = Path(root_output_path).expanduser().resolve()
+    # run_reference_case.py writes timeseries/ and cmor/ side by side under its
+    # --outdir, and --root-output-path is that cmor/ directory.
+    candidates = (root.parent / "timeseries" / realm, root / "timeseries" / realm)
+    return next((path for path in candidates if path.is_dir()), None)
+
+
+def diagnose_missing_variables(
+    missing_variables: list[str],
+    mapping: Mapping,
+    timeseries_dir: Path,
+    model: str,
+    realm: str,
+    frequency: str,
+) -> list[dict[str, Any]]:
+    """Say which source field stopped each variable that was not written.
+
+    cmor_driver.py reads a variable from the time series files whose name holds
+    one of its source fields as a dot-delimited token, such as '.DOD550.', and
+    only from the history files its sampling is written to. A variable with no
+    such file is skipped before CMOR starts and leaves no CMOR log, so the
+    reason is recorded here rather than read back from one.
+    """
+    file_names = [path.name for path in timeseries_dir.glob("*.nc")]
+    diagnosis = []
+    for variable in missing_variables:
+        fields = mapping.timeseries_source_vars(variable, frequency)
+        try:
+            include_patterns = patterns_for_variable(model, realm, frequency, variable)
+            no_pattern_reason = None
+        except ValueError as exc:
+            include_patterns = []
+            no_pattern_reason = str(exc)
+        absent = []
+        other_history_files = []
+        for field in fields:
+            matches = [
+                name for name in file_names if _filename_contains_var(name, field)
+            ]
+            if not matches:
+                absent.append(field)
+            elif include_patterns and not any(
+                pattern in name for name in matches for pattern in include_patterns
+            ):
+                other_history_files.append(field)
+        diagnosis.append(
+            {
+                "variable": variable,
+                "source_model_vars": fields,
+                "include_patterns": include_patterns,
+                "fields_absent": absent,
+                "fields_in_other_history_files": other_history_files,
+                "reason": _missing_variable_reason(
+                    fields,
+                    absent,
+                    other_history_files,
+                    include_patterns,
+                    no_pattern_reason,
+                ),
+            }
+        )
+    return diagnosis
+
+
+def _missing_variable_reason(
+    fields: list[str],
+    absent: list[str],
+    other_history_files: list[str],
+    include_patterns: list[str],
+    no_pattern_reason: str | None,
+) -> str:
+    """Word the reason one variable was not written."""
+    if no_pattern_reason:
+        return f"No history file is declared for this variable: {no_pattern_reason}"
+    if absent:
+        return (
+            f"The time series holds no {', '.join(absent)}, so this variable "
+            "could not be computed."
+        )
+    if other_history_files:
+        return (
+            f"{', '.join(other_history_files)} is in the time series, but not "
+            f"in the {', '.join(include_patterns)} history files this variable "
+            "is read from."
+        )
+    if not fields:
+        return "The mapping names no time-varying source field."
+    return (
+        "Every source field is in the time series, so this variable failed "
+        "later. The reason is in the cmor_driver.py step log."
+    )
 
 
 def parse_log_name(log_path: Path) -> tuple[str, str] | None:
@@ -747,6 +856,8 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
         f"- Variables with log errors: {report['counts']['variables_with_log_errors']}",
         f"- Mapping exists but variable not written: "
         f"{report['counts']['missing_variables']}",
+        f"- Of those, variables whose source field the model did not write: "
+        f"{report['counts'].get('missing_with_absent_source_fields', 0)}",
         f"- Mapped to another realm: {report['counts']['mapped_elsewhere']}",
         f"- Mapped elsewhere but not found in output: "
         f"{report['counts']['mapped_elsewhere_missing']}",
@@ -760,8 +871,13 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     for variable in report["variables_with_log_errors"]:
         lines.append(f"- {variable}")
     lines.extend(["", "## Mapping Exists But Variable Not Written", ""])
+    missing_reasons = {
+        item["variable"]: item["reason"]
+        for item in report.get("missing_variable_diagnosis", [])
+    }
     for variable in report["expected_but_not_produced"]:
-        lines.append(f"- {variable}")
+        reason = missing_reasons.get(variable)
+        lines.append(f"- {variable}" + (f" — {reason}" if reason else ""))
     lines.extend(["", "## Variables Mapped to Another Realm", ""])
     for item in report["mapped_elsewhere"]:
         status = "found in shared output" if item["found_in_output"] else "not found"
@@ -1123,6 +1239,7 @@ def build_report(
     variable_provenance: dict[str, dict[str, Any]],
     mapped_elsewhere: list[dict[str, Any]],
     unmapped_requested_variables: list[str],
+    missing_variable_diagnosis: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Build the structured validation report payload."""
     variables_with_log_errors = sorted(
@@ -1168,6 +1285,9 @@ def build_report(
             "produced_variables": len(produced_variables),
             "variables_with_log_errors": len(variables_with_log_errors),
             "missing_variables": len(expected_but_not_produced),
+            "missing_with_absent_source_fields": sum(
+                bool(item["fields_absent"]) for item in missing_variable_diagnosis
+            ),
             "inspection_errors": len(inspection_errors),
             "mapped_elsewhere": len(mapped_elsewhere),
             "mapped_elsewhere_missing": sum(
@@ -1179,6 +1299,7 @@ def build_report(
         "expected_variables": expected_variables,
         "variables_with_log_errors": variables_with_log_errors,
         "expected_but_not_produced": expected_but_not_produced,
+        "missing_variable_diagnosis": missing_variable_diagnosis,
         "mapped_elsewhere": mapped_elsewhere,
         "unmapped_requested_variables": unmapped_requested_variables,
         "produced_variables": produced_variables,
@@ -1210,9 +1331,15 @@ def print_summary(report: dict[str, Any]) -> None:
         for variable in report["variables_with_log_errors"]:
             print(f"  - {variable}")
     if report["expected_but_not_produced"]:
+        reasons = {
+            item["variable"]: item["reason"]
+            for item in report.get("missing_variable_diagnosis", [])
+        }
         print("Mapping exists but variable not written:")
         for variable in report["expected_but_not_produced"]:
             print(f"  - {variable}")
+            if variable in reasons:
+                print(f"    {reasons[variable]}")
     if report["redundant_files"]:
         print(
             "Files whose period another file of the same variable also covers, "
@@ -1331,6 +1458,29 @@ def main() -> int:
 
     variable_provenance = build_variable_provenance(yaml_variables, expected_variables)
 
+    missing_variables = sorted(expected_variable_set - set(produced_files))
+    timeseries_dir = resolve_timeseries_dir(
+        args.root_output_path, args.realm, args.timeseries_dir
+    )
+    missing_variable_diagnosis = []
+    if missing_variables and timeseries_dir is None:
+        logger.warning(
+            "No time series directory was found for realm %s, so the %d "
+            "variables that were not written are reported without a reason. "
+            "Pass --timeseries-dir to validate_cmor_output.py to name it.",
+            args.realm,
+            len(missing_variables),
+        )
+    elif missing_variables:
+        missing_variable_diagnosis = diagnose_missing_variables(
+            missing_variables,
+            selected_mapping,
+            timeseries_dir,
+            args.model,
+            args.realm,
+            args.frequency,
+        )
+
     report = build_report(
         args,
         yaml_path,
@@ -1343,12 +1493,26 @@ def main() -> int:
         variable_provenance,
         mapped_elsewhere,
         unmapped_requested_variables,
+        missing_variable_diagnosis,
     )
 
     write_json_report(report, report_dir / "validation_summary.json")
     write_csv_rows(report["log_records"], report_dir / "log_records.csv")
     write_csv_rows(
-        [{"variable": variable} for variable in report["expected_but_not_produced"]],
+        [
+            {
+                "variable": item["variable"],
+                "reason": item["reason"],
+                "source_model_vars": "; ".join(item["source_model_vars"]),
+                "fields_absent": "; ".join(item["fields_absent"]),
+                "fields_in_other_history_files": "; ".join(
+                    item["fields_in_other_history_files"]
+                ),
+                "include_patterns": "; ".join(item["include_patterns"]),
+            }
+            for item in report["missing_variable_diagnosis"]
+        ]
+        or [{"variable": variable} for variable in report["expected_but_not_produced"]],
         report_dir / "missing_variables.csv",
     )
     write_csv_rows(report["mapped_elsewhere"], report_dir / "mapped_elsewhere.csv")

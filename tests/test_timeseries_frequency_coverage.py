@@ -1,11 +1,13 @@
 """Tests for counting a time series step's output per frequency."""
 
+import logging
 import os
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 # pylint: disable=wrong-import-position
-from gen_timeseries import timeseries_per_frequency
+from gen_timeseries import timeseries_per_frequency, variables_the_realm_needs
 
 
 def touch_stream(outputdir, stream, variable="TREFHT"):
@@ -52,3 +54,25 @@ class TestTimeseriesPerFrequency:
         assert timeseries_per_frequency(
             tmp_path, "noresm", "seaIce", None, ["mon"]
         ) == {"mon": 0}
+
+
+class TestVariablesTheRealmNeeds:
+    """Which native variables a realm's time series step collects."""
+
+    def test_a_model_level_realm_needs_surface_pressure(self):
+        """mmrbc_tavg-al-hxy-u is on model levels, so aerosol needs PS."""
+        tables_root = Path(__file__).parent.parent / "cmip7-cmor-tables"
+        needed = variables_the_realm_needs(
+            "noresm", "aerosol", logging.getLogger(__name__), tables_root
+        )
+        assert "PS" in needed
+        assert "mmr_BC" in needed
+
+    def test_the_atmosphere_realms_all_need_surface_pressure(self):
+        """atmos, aerosol and atmosChem each write variables on model levels."""
+        tables_root = Path(__file__).parent.parent / "cmip7-cmor-tables"
+        for realm in ("atmos", "aerosol", "atmosChem"):
+            needed = variables_the_realm_needs(
+                "noresm", realm, logging.getLogger(__name__), tables_root
+            )
+            assert "PS" in needed, realm
