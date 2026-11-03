@@ -105,7 +105,7 @@ variables:
 
   hur_tpt-500hPa-hxy-air: RELHUM500
 
-  hur_tpt-850hPa-hxy-air: RELHUM850
+  hur_tpt-850hPa-hxy-air: RELHUM
 
   hur_tpt-al-hs-u: RELHUM
 
