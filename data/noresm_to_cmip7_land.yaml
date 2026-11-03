@@ -224,8 +224,6 @@ variables:
 
   rhSoil_tavg-u-hxy-lnd: SOILC_HR /1000
 
-  rhVgt_tavg-u-hxy-multi: (FATES_HET_RESP)*FATES_FRACTION
-
   rh_tavg-u-hxy-lnd: HR / 1000
 
   rsds_tavg-u-hxy-lnd: FSDS
