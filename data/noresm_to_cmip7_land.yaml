@@ -115,7 +115,7 @@ variables:
 
   gppLut_tavg-u-hxy-multi: (FATES_GPP_LU)*FATES_FRACTION
 
-  gppVgt_tavg-u-hxy-multi: (FATES_GPP_PF)*FATES_FRACTION
+  gppVgt_tavg-u-hxy-multi: map_multi_dimension(FATES_GPP_PF, fates_levpft)*FATES_FRACTION
 
   gpp_tavg-u-hxy-lnd: (FATES_GPP)*FATES_FRACTION
 
