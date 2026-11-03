@@ -608,7 +608,6 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
         el("summary", { text: summaryText }),
         body
       ]);
-      if (errors.length > 0 || missing.length > 0 || empty.length > 0 || unmapped.length > 0 || elsewhere.length > 0) { details.setAttribute("open", ""); }
       container.appendChild(details);
     });
   }

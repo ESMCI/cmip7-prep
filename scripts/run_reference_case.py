@@ -635,7 +635,12 @@ def main():
     log_dir = step_log_dir(outdir, tag)
     log_dir.mkdir(parents=True, exist_ok=True)
     completed_file = completed_path(outdir, tag)
-    completed = set() if args.force else read_completed(completed_file)
+    completed = read_completed(completed_file)
+    if args.force:
+        # --force reruns the steps in this plan, so only their keys are
+        # dropped.  Forcing one realm leaves the record of every other realm
+        # intact, and a later run still skips those.
+        completed -= {step.key for step in plan.steps}
 
     to_run = [step for step in plan.steps if step.key not in completed]
     done_already = len(plan.steps) - len(to_run)
