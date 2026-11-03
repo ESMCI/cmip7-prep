@@ -109,7 +109,8 @@ variables:
   fVegSoilMortality_tavg-u-hxy-lnd: (FATES_MORTALITY_CFLUX_CANOPY+FATES_MORTALITY_CFLUX_USTORY)*FATES_FRACTION
   fracInLut_tsum-u-hxy-lnd: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
 
-  fracLut_tpt-u-hxy-u: PCT_LANDUNIT
+  fracLut_tpt-u-hxy-u: FATES_PATCHAREA_LU*FATES_FRACTION
+  
   fracOutLut_tsum-u-hxy-lnd: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
 
   gppLut_tavg-u-hxy-multi: (FATES_GPP_LU)*FATES_FRACTION
@@ -136,8 +137,8 @@ variables:
 
   lai_tavg-u-hxy-lnd: (FATES_LAI)*FATES_FRACTION
 
-  landCoverFrac_tavg-u-hxy-u: PCT_LANDUNIT
-
+  landCoverFrac_tavg-u-hxy-u: FATES_PATCHAREA_LU*FATES_FRACTION
+  
   mrro_tavg-u-hxy-lnd: QRUNOFF
 
   mrrob_tavg-u-hxy-lnd: QDRAI
