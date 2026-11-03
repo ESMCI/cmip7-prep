@@ -175,7 +175,7 @@ variables:
 
   nppStem_tavg-u-hxy-lnd: (FATES_STEM_ALLOC)*FATES_FRACTION
 
-  nppVgt_tavg-u-hxy-multi: (FATES_NPP_PF)*FATES_FRACTION
+  nppVgt_tavg-u-hxy-multi: map_multi_dimension(FATES_NPP_PF, fates_levpft)*FATES_FRACTION
 
   npp_tavg-u-hxy-lnd: (FATES_NPP)*FATES_FRACTION
 
