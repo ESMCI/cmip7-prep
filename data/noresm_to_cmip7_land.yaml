@@ -95,12 +95,6 @@ variables:
 
   fLitterSoil_tavg-u-hxy-lnd: (sumover_index(FATES_LITTER_OUT_EL, indexlist=[1], dimname='fates_levelem'))*FATES_FRACTION
 
-  fLuc_tavg-u-hxy-lnd: LAND_USE_FLUX / 1000
-
-  fLulccAtmLut_tavg-u-hxy-multi: DWT_CONV_CFLUX
-
-  fNProduct_tavg-u-hxy-lnd: DWT_WOODPRODN_GAIN + DWT_CROPPROD1N_GAIN
-
   fProductDecomp_tavg-u-hxy-lnd: TOT_WOODPRODC_LOSS  /1000
 
   fVegFire_tavg-u-hxy-lnd: (FATES_FIRE_CLOSS)*FATES_FRACTION
