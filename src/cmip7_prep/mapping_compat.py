@@ -286,6 +286,64 @@ def sumover_index(arr: xr.DataArray, indexlist: list, dimname: str) -> xr.DataAr
     return arr.isel({dimname: indexlist}).sum(dim=dimname)
 
 
+@lru_cache(maxsize=1)
+def _load_dimension_mappings() -> dict[str, Any]:
+    """Read the source-dimension grouping definitions."""
+    path = Path(__file__).parent.parent.parent / "data" / "dimension_mappings.yaml"
+    with open(path, encoding="utf-8") as handle:
+        mappings = yaml.safe_load(handle)
+    if not isinstance(mappings, dict):
+        raise ValueError(f"Expected dimension mappings in {path}")
+    return mappings
+
+
+def map_multi_dimension(arr: xr.DataArray, dimname: str) -> xr.DataArray:
+    """Replace a source dimension by sums over its configured target groups.
+
+    Source indices are 1-based positions. Other dimensions, coordinates and
+    variable attributes are preserved. Missing values propagate within each
+    group, so missing source data cannot become a zero or a partial sum.
+    Groups with no source positions are filled with missing values.
+    """
+    if not isinstance(arr, xr.DataArray):
+        raise TypeError(f"Expected xr.DataArray, got {type(arr).__name__}")
+    if not isinstance(dimname, str):
+        raise TypeError("map_multi_dimension requires a dimension name string")
+    mappings = _load_dimension_mappings()
+    if dimname not in mappings:
+        raise ValueError(f"No multi-dimension mapping defined for {dimname!r}")
+    if dimname not in arr.dims:
+        raise ValueError(
+            f"Dimension {dimname!r} not found in array dimensions {list(arr.dims)}"
+        )
+    mapping = mappings[dimname]
+    target = mapping["target_dimension"]
+    if target in arr.dims or target in arr.coords:
+        raise ValueError(f"Target dimension {target!r} already exists in the array")
+    if arr.sizes[dimname] != mapping["source_size"]:
+        raise ValueError(
+            f"map_multi_dimension: {dimname!r} requires "
+            f"{mapping['source_size']} source entries, got {arr.sizes[dimname]}"
+        )
+    groups = mapping["groups"]
+    grouped = []
+    for indices in groups.values():
+        group = arr.isel({dimname: [index - 1 for index in indices]}).sum(
+            dim=dimname, skipna=False, keep_attrs=True
+        )
+        if not indices:
+            group = group.where(False)
+        grouped.append(group)
+    result = xr.concat(
+        grouped, dim=xr.IndexVariable(target, list(groups)), coords="minimal"
+    )
+    result = result.transpose(
+        *(target if dim == dimname else dim for dim in arr.dims)
+    )
+    result.attrs = arr.attrs.copy()
+    return result
+
+
 def verticalmean(arr: xr.DataArray, levelname: str = "level") -> xr.DataArray:
     """
     Sigma-weighted vertical mean over a non-uniformly spaced dimension.
@@ -635,12 +693,34 @@ FORMULA_NAMESPACE: Dict[str, Any] = {
     "xr": xr,
     "verticalsum": verticalsum,
     "sumover_index": sumover_index,
+    "map_multi_dimension": map_multi_dimension,
     "verticalmean": verticalmean,
     "global_2d_sum": global_2d_sum,
     "global_2d_mean": global_2d_mean,
     "global_3d_mean": global_3d_mean,
     "layer_thickness": layer_thickness,
 }
+
+
+def _formula_tree(expr: str) -> ast.Expression:
+    """Treat a bare mapping dimension argument as its name, not a source field."""
+    tree = ast.parse(expr, mode="eval")
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "map_multi_dimension"
+        ):
+            if len(node.args) >= 2 and isinstance(node.args[1], ast.Name):
+                node.args[1] = ast.copy_location(
+                    ast.Constant(node.args[1].id), node.args[1]
+                )
+            for keyword in node.keywords:
+                if keyword.arg == "dimname" and isinstance(keyword.value, ast.Name):
+                    keyword.value = ast.copy_location(
+                        ast.Constant(keyword.value.id), keyword.value
+                    )
+    return ast.fix_missing_locations(tree)
 
 
 def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
@@ -676,7 +756,11 @@ def _safe_eval(expr: str, local_names: Dict[str, Any]) -> Any:
     safe_locals = local_names.copy()
     safe_locals.update(FORMULA_NAMESPACE)
     # pylint: disable=eval-used
-    return eval(expr, safe_globals, safe_locals)
+    return eval(
+        compile(_formula_tree(expr), "<mapping formula>", "eval"),
+        safe_globals,
+        safe_locals,
+    )
 
 
 # ── minimal mapping form ─────────────────────────────────────────────────────
@@ -722,7 +806,7 @@ def formula_names(formula: str) -> List[str]:
     ['siconc', 'tarea']
     """
     try:
-        tree = ast.parse(formula, mode="eval")
+        tree = _formula_tree(formula)
     except SyntaxError as exc:
         raise ValueError(f"formula is not a valid expression: {formula!r}") from exc
     called = {

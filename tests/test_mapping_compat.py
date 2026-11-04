@@ -13,7 +13,205 @@ from cmip7_prep.mapping_compat import (
     _filter_sources,
     _safe_eval,
     _to_varconfig,
+    expand_entry,
+    formula_names,
+    map_multi_dimension,
 )
+
+
+@pytest.fixture
+def fates_pfts():
+    """Each of the 15 source positions carries its 1-based PFT number."""
+    return xr.DataArray(
+        np.broadcast_to(np.arange(1.0, 16.0)[None, :, None], (2, 15, 3)),
+        dims=("time", "fates_levpft", "ncol"),
+        coords={"time": [15, 45], "fates_levpft": np.arange(15), "ncol": [1, 2, 3]},
+        name="FATES_GPP_PF",
+        attrs={"units": "kg m-2 s-1"},
+    )
+
+
+@pytest.mark.parametrize(
+    "dimension_arg",
+    ["fates_levpft", "'fates_levpft'", "dimname=fates_levpft"],
+)
+def test_map_multi_dimension_formula(fates_pfts, dimension_arg):
+    """Dimension tokens are not sources and groups sum in CMIP order."""
+    formula = f"map_multi_dimension(FATES_GPP_PF, {dimension_arg})"
+    assert formula_names(formula) == ["FATES_GPP_PF"]
+    cfg = expand_entry("gppVgt_tavg-u-hxy-multi", formula, ["gr"])
+    assert cfg["sources"] == [{"model_var": "FATES_GPP_PF"}]
+    result = _safe_eval(formula, {"FATES_GPP_PF": fates_pfts})
+    assert result.dims == ("time", "vegtype", "ncol")
+    assert result["vegtype"].values.tolist() == [
+        "broadleaf_deciduous_trees",
+        "broadleaf_evergreen_trees",
+        "needleleaf_deciduous_trees",
+        "needleleaf_evergreen_tree",
+        "natural_grasses",
+        "crops",
+        "shrubs",
+    ]
+    np.testing.assert_array_equal(
+        result.values,
+        np.broadcast_to(np.array([11, 5, 3, 2, 39, 15, 45])[None, :, None], (2, 7, 3)),
+    )
+    xr.testing.assert_equal(result.sum("vegtype"), fates_pfts.sum("fates_levpft"))
+    xr.testing.assert_equal(result["time"], fates_pfts["time"])
+    xr.testing.assert_equal(result["ncol"], fates_pfts["ncol"])
+    assert result.attrs == fates_pfts.attrs
+    assert "fates_levpft" not in result.coords
+
+
+def test_map_multi_dimension_realization(fates_pfts):
+    """Minimal mapping expansion works through the normal realization path."""
+    formula = "map_multi_dimension(FATES_GPP_PF, fates_levpft)"
+    with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=True) as tmp:
+        tmp.write(f"variables:\n  gppVgt_tavg-u-hxy-multi: {formula}\n")
+        tmp.flush()
+        mapping = Mapping(tmp.name)
+        assert mapping.timeseries_source_vars("gppVgt_tavg-u-hxy-multi", "mon") == [
+            "FATES_GPP_PF"
+        ]
+        result = mapping.realize(fates_pfts.to_dataset(), "gppVgt_tavg-u-hxy-multi")
+    xr.testing.assert_equal(result, map_multi_dimension(fates_pfts, "fates_levpft"))
+
+
+def test_map_multi_dimension_preserves_dimension_order(fates_pfts):
+    """The target dimension occupies the position of the source dimension."""
+    arr = fates_pfts.transpose("ncol", "time", "fates_levpft")
+    result = map_multi_dimension(arr, "fates_levpft")
+    assert result.dims == ("ncol", "time", "vegtype")
+
+
+def test_map_multi_dimension_propagates_missing_values(fates_pfts):
+    """A missing member invalidates its group, not the unrelated groups."""
+    arr = fates_pfts.where(fates_pfts["fates_levpft"] != 4)
+    result = map_multi_dimension(arr, "fates_levpft")
+    assert result.sel(vegtype="broadleaf_deciduous_trees").isnull().all()
+    assert result.sel(vegtype="crops").notnull().all()
+
+
+def test_map_multi_dimension_stays_lazy(fates_pfts):
+    """Grouping a chunked field does not materialize the source data."""
+    pytest.importorskip("dask.array")
+    result = map_multi_dimension(
+        fates_pfts.chunk({"time": 1, "fates_levpft": 3}), "fates_levpft"
+    )
+    assert result.chunks is not None
+    xr.testing.assert_equal(
+        result.compute(), map_multi_dimension(fates_pfts, "fates_levpft")
+    )
+
+
+@pytest.mark.parametrize("size", [14, 16])
+def test_map_multi_dimension_rejects_incorrect_pft_count(size):
+    """Missing crops and extra unclassified PFTs both fail explicitly."""
+    arr = xr.DataArray(np.ones(size), dims="fates_levpft")
+    with pytest.raises(ValueError, match=f"requires 15 source entries, got {size}"):
+        map_multi_dimension(arr, "fates_levpft")
+
+
+def test_map_multi_dimension_rejects_invalid_input(fates_pfts):
+    """Unknown mappings, absent dimensions and target collisions are errors."""
+    with pytest.raises(TypeError, match="Expected xr.DataArray"):
+        map_multi_dimension(np.ones(15), "fates_levpft")
+    with pytest.raises(TypeError, match="dimension name string"):
+        map_multi_dimension(fates_pfts, 1)
+    with pytest.raises(ValueError, match="No multi-dimension mapping"):
+        map_multi_dimension(fates_pfts, "unknown")
+    with pytest.raises(ValueError, match="not found"):
+        map_multi_dimension(fates_pfts.isel(fates_levpft=0), "fates_levpft")
+    with pytest.raises(ValueError, match="already exists"):
+        map_multi_dimension(
+            fates_pfts.assign_coords(vegtype="existing"), "fates_levpft"
+        )
+
+
+@pytest.fixture
+def fates_landuse():
+    """Source labels deliberately differ from the 1-based mapping positions."""
+    return xr.DataArray(
+        np.broadcast_to(np.arange(1, 6)[None, :, None], (2, 5, 3)),
+        dims=("time", "fates_levlanduse", "ncol"),
+        coords={
+            "time": [15, 45],
+            "fates_levlanduse": [
+                "primary", "secondary", "rangeland", "pasture", "crops"
+            ],
+            "ncol": [1, 2, 3],
+        },
+        name="FATES_GPP_LU",
+        attrs={"units": "kg m-2 s-1"},
+    )
+
+
+@pytest.mark.parametrize(
+    "dimension_arg",
+    ["fates_levlanduse", "'fates_levlanduse'", "dimname=fates_levlanduse"],
+)
+def test_map_multi_dimension_landuse_formula(fates_landuse, dimension_arg):
+    """Land use sums the five source positions and leaves urban missing."""
+    formula = f"map_multi_dimension(FATES_GPP_LU, {dimension_arg})"
+    assert formula_names(formula) == ["FATES_GPP_LU"]
+    result = _safe_eval(formula, {"FATES_GPP_LU": fates_landuse})
+    assert result.dims == ("time", "landuse", "ncol")
+    assert result["landuse"].values.tolist() == [
+        "primary_and_secondary_land", "pastures", "crops", "urban"
+    ]
+    np.testing.assert_allclose(
+        result.values,
+        np.broadcast_to(np.array([3, 7, 5, np.nan])[None, :, None], (2, 4, 3)),
+        equal_nan=True,
+    )
+    xr.testing.assert_equal(result["time"], fates_landuse["time"])
+    xr.testing.assert_equal(result["ncol"], fates_landuse["ncol"])
+    assert result.attrs == fates_landuse.attrs
+    assert "fates_levlanduse" not in result.coords
+
+
+def test_map_multi_dimension_landuse_realization(fates_landuse):
+    """The configured land-use mapping works through normal realization."""
+    formula = "map_multi_dimension(FATES_GPP_LU, fates_levlanduse)"
+    with tempfile.NamedTemporaryFile("w+", suffix=".yaml", delete=True) as tmp:
+        tmp.write(f"variables:\n  gppLut_tavg-u-hxy-multi: {formula}\n")
+        tmp.flush()
+        mapping = Mapping(tmp.name)
+        result = mapping.realize(fates_landuse.to_dataset(), "gppLut_tavg-u-hxy-multi")
+    xr.testing.assert_equal(result, map_multi_dimension(fates_landuse, "fates_levlanduse"))
+
+
+def test_map_multi_dimension_landuse_missing_and_dimension_order(fates_landuse):
+    """Missing primary data does not affect pastures or the dimension order."""
+    arr = fates_landuse.where(
+        fates_landuse["fates_levlanduse"] != "primary"
+    ).transpose("ncol", "time", "fates_levlanduse")
+    result = map_multi_dimension(arr, "fates_levlanduse")
+    assert result.dims == ("ncol", "time", "landuse")
+    assert result.sel(landuse="primary_and_secondary_land").isnull().all()
+    assert result.sel(landuse="urban").isnull().all()
+    assert (result.sel(landuse="pastures") == 7).all()
+    assert (result.sel(landuse="crops") == 5).all()
+
+
+def test_map_multi_dimension_landuse_stays_lazy(fates_landuse):
+    """The missing urban group remains lazy along with the sums."""
+    pytest.importorskip("dask.array")
+    result = map_multi_dimension(
+        fates_landuse.chunk({"time": 1, "fates_levlanduse": 2}), "fates_levlanduse"
+    )
+    assert result.chunks is not None
+    xr.testing.assert_equal(
+        result.compute(), map_multi_dimension(fates_landuse, "fates_levlanduse")
+    )
+
+
+@pytest.mark.parametrize("size", [4, 6])
+def test_map_multi_dimension_rejects_incorrect_landuse_count(size):
+    """Land-use input must contain exactly the five FATES categories."""
+    arr = xr.DataArray(np.ones(size), dims="fates_levlanduse")
+    with pytest.raises(ValueError, match=f"requires 5 source entries, got {size}"):
+        map_multi_dimension(arr, "fates_levlanduse")
 
 
 def test_dict_style_sources_model_var():

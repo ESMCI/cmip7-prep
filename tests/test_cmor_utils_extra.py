@@ -1,17 +1,104 @@
 """Additional unit tests for cmor_utils.py (functions not covered by doctests)."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import xarray as xr
 
 from cmip7_prep.cmor_utils import (
     bounds_from_centers_1d,
+    build_dataset_cfg,
     filled_for_cmor,
     open_existing_fx,
     resolve_table_filename,
     roll_for_monotonic_with_bounds,
     sigma_mid_and_bounds,
 )
+from cmip7_prep.regrid_maps import get_realm_row
+
+
+@pytest.mark.parametrize("resolution", ["NorESM3-LM", "NorESM3-MM"])
+@pytest.mark.parametrize(
+    "realm",
+    ["atmos", "aerosol", "atmosChem", "land", "ocean", "ocnBgchem", "seaIce", "landIce"],
+)
+def test_noresm_cmip7_dataset_metadata(resolution, realm):
+    """All realms use CMIP7 identifiers and model-specific contact metadata."""
+    cfg = build_dataset_cfg(
+        model="noresm",
+        resolution=resolution,
+        experiment="piControl",
+        frequency="mon",
+        ripf="r2i3p4f5",
+        tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        data_version="v20261103",
+        realm=realm,
+    )
+    assert cfg["contact"] == (
+        "Please send any requests or bug reports to noresm-ncc@met.no."
+    )
+    assert cfg["EMD"] == (
+        f"https://emd.wcrp-cmip.org/docs/Model/?model={resolution.lower()}"
+    )
+    assert cfg["variant_label"] == "r2i3p4f5"
+    assert [
+        cfg[f"{index}_index"]
+        for index in ("realization", "initialization", "physics", "forcing")
+    ] == ["r2", "i3", "p4", "f5"]
+    assert cfg["source_id"] == resolution
+    assert cfg["grid_label"] == get_realm_row("noresm", resolution, realm)["grid_label"]
+    assert cfg["version"] == "v20261103"
+    assert "<variant_label>" in cfg["output_path_template"]
+    assert "<grid_label>" in cfg["output_path_template"]
+    assert "<variant_label>" in cfg["output_file_template"]
+    assert "<grid_label>" in cfg["output_file_template"]
+    assert {
+        "branch_method",
+        "grid",
+        "member_id",
+        "source_type",
+        "sub_experiment_id",
+        "sub_experiment",
+        "further_info_url",
+    }.isdisjoint(cfg)
+    assert cfg["parent_source_id"] == resolution
+    assert cfg["parent_variant_label"] == "r2i3p4f5"
+    assert cfg["branch_time_in_parent"] == 0.0
+    assert cfg["branch_time_in_child"] == 0.0
+
+
+def test_cesm_does_not_inherit_noresm_contact():
+    """Optional NorESM attributes are not added to CESM output."""
+    cfg = build_dataset_cfg(
+        model="cesm",
+        resolution="ne30",
+        experiment="piControl",
+        frequency="mon",
+        ripf="r1i1p1f1",
+        tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        data_version="v20261103",
+    )
+    assert {"contact", "EMD"}.isdisjoint(cfg)
+
+
+def test_unlisted_resolution_does_not_use_another_models_emd(caplog):
+    """An unlisted NorESM configuration keeps contact but omits the model URL."""
+    cfg = build_dataset_cfg(
+        model="noresm",
+        resolution="custom",
+        experiment="piControl",
+        frequency="mon",
+        ripf="r1i1p1f1",
+        tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        data_version="v20261103",
+    )
+    assert cfg["contact"] == (
+        "Please send any requests or bug reports to noresm-ncc@met.no."
+    )
+    assert "EMD" not in cfg
+    assert "No grid name" in caplog.text
+
 
 # ---------------------------------------------------------------------------
 # bounds_from_centers_1d
