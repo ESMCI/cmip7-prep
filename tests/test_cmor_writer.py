@@ -85,7 +85,10 @@ def test_cmor_session_basic(tmp_path, model, resolution):
 
     with xr.open_dataset(written_path) as written:
         with open(
-            tables_root / "tables-cvs" / "split-view" / "required_global_attributes.json",
+            tables_root
+            / "tables-cvs"
+            / "split-view"
+            / "required_global_attributes.json",
             encoding="utf-8",
         ) as handle:
             required_attrs = json.load(handle)

@@ -21,7 +21,16 @@ from cmip7_prep.regrid_maps import get_realm_row
 @pytest.mark.parametrize("resolution", ["NorESM3-LM", "NorESM3-MM"])
 @pytest.mark.parametrize(
     "realm",
-    ["atmos", "aerosol", "atmosChem", "land", "ocean", "ocnBgchem", "seaIce", "landIce"],
+    [
+        "atmos",
+        "aerosol",
+        "atmosChem",
+        "land",
+        "ocean",
+        "ocnBgchem",
+        "seaIce",
+        "landIce",
+    ],
 )
 def test_noresm_cmip7_dataset_metadata(resolution, realm):
     """All realms use CMIP7 identifiers and model-specific contact metadata."""

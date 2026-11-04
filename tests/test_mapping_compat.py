@@ -137,7 +137,11 @@ def fates_landuse():
         coords={
             "time": [15, 45],
             "fates_levlanduse": [
-                "primary", "secondary", "rangeland", "pasture", "crops"
+                "primary",
+                "secondary",
+                "rangeland",
+                "pasture",
+                "crops",
             ],
             "ncol": [1, 2, 3],
         },
@@ -157,7 +161,10 @@ def test_map_multi_dimension_landuse_formula(fates_landuse, dimension_arg):
     result = _safe_eval(formula, {"FATES_GPP_LU": fates_landuse})
     assert result.dims == ("time", "landuse", "ncol")
     assert result["landuse"].values.tolist() == [
-        "primary_and_secondary_land", "pastures", "crops", "urban"
+        "primary_and_secondary_land",
+        "pastures",
+        "crops",
+        "urban",
     ]
     np.testing.assert_allclose(
         result.values,
@@ -178,14 +185,16 @@ def test_map_multi_dimension_landuse_realization(fates_landuse):
         tmp.flush()
         mapping = Mapping(tmp.name)
         result = mapping.realize(fates_landuse.to_dataset(), "gppLut_tavg-u-hxy-multi")
-    xr.testing.assert_equal(result, map_multi_dimension(fates_landuse, "fates_levlanduse"))
+    xr.testing.assert_equal(
+        result, map_multi_dimension(fates_landuse, "fates_levlanduse")
+    )
 
 
 def test_map_multi_dimension_landuse_missing_and_dimension_order(fates_landuse):
     """Missing primary data does not affect pastures or the dimension order."""
-    arr = fates_landuse.where(
-        fates_landuse["fates_levlanduse"] != "primary"
-    ).transpose("ncol", "time", "fates_levlanduse")
+    arr = fates_landuse.where(fates_landuse["fates_levlanduse"] != "primary").transpose(
+        "ncol", "time", "fates_levlanduse"
+    )
     result = map_multi_dimension(arr, "fates_levlanduse")
     assert result.dims == ("ncol", "time", "landuse")
     assert result.sel(landuse="primary_and_secondary_land").isnull().all()

@@ -337,9 +337,7 @@ def map_multi_dimension(arr: xr.DataArray, dimname: str) -> xr.DataArray:
     result = xr.concat(
         grouped, dim=xr.IndexVariable(target, list(groups)), coords="minimal"
     )
-    result = result.transpose(
-        *(target if dim == dimname else dim for dim in arr.dims)
-    )
+    result = result.transpose(*(target if dim == dimname else dim for dim in arr.dims))
     result.attrs = arr.attrs.copy()
     return result
 
