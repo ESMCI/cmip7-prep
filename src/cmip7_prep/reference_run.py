@@ -213,9 +213,13 @@ def build_plan(
 
     ``variant_label`` and ``tables_root`` are passed to CMORization unchanged,
     so the same command can produce output for submission rather than only
-    exercising the chain.  ``plots`` and ``html`` ask validation for figures
-    and a browsable index of them, which is how a person judges whether the
-    output is sensible rather than merely complete.
+    exercising the chain.  ``tables_root`` also goes to gen_timeseries.py,
+    because the CMOR table is what says a variable is on model levels and so
+    needs surface pressure collected for it.
+
+    ``plots`` and ``html`` ask validation for figures and a browsable index of
+    them, which is how a person judges whether the output is sensible rather
+    than merely complete.
 
     ``years`` is passed through to gen_timeseries.py as ``--years-spec`` and so
     uses its format, ``first:last:increment``.
@@ -299,6 +303,7 @@ def build_plan(
                     years=years,
                     workers=ts_workers,
                     sheet=sheet,
+                    tables_root=tables_root,
                     overwrite=overwrite_timeseries,
                 )
             )
@@ -324,6 +329,7 @@ def build_plan(
                     variant_label=variant_label,
                     tables_root=tables_root,
                     stage="fx",
+                    data_version=data_version,
                 )
             )
         if "fx" in stages and "validate" in stages:
@@ -339,6 +345,7 @@ def build_plan(
                     plots=False,
                     html=html,
                     max_plots=max_plots,
+                    data_version=data_version,
                 )
             )
 
@@ -403,6 +410,7 @@ def _timeseries_step(
     years,
     workers,
     sheet,
+    tables_root=None,
     overwrite=False,
 ) -> Step:
     """Return the gen_timeseries.py step for one realm."""
@@ -426,6 +434,8 @@ def _timeseries_step(
         command += ["--years-spec", years]
     if sheet:
         command += ["--ice-sheet", sheet]
+    if tables_root:
+        command += ["--tables-root", str(tables_root)]
     if overwrite:
         command.append("--overwrite_timeseries")
     return Step(

@@ -150,7 +150,9 @@ def open_native_for_cmip_vars(
             if not any(_filename_contains_var(p, v) for p in files)
         ]
         if missing:
-            logger.warning(
+            # The level is error because the mapping asked for this variable,
+            # and the run continues to the next one.
+            logger.error(
                 "Skipping '%s': no time series files found for source vars %s",
                 var,
                 missing,
@@ -169,7 +171,7 @@ def open_native_for_cmip_vars(
         if selected:
             new_cmip_vars.append(var)
         else:
-            logger.warning(
+            logger.error(
                 "Skipping '%s': found in mapping but no time series files match "
                 "required model vars %s",
                 var,

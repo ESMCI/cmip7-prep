@@ -111,7 +111,7 @@ def _overwrite_or_resume(ts_collection, overwrite, logger):
     return resumed
 
 
-def variables_the_realm_needs(model, realm, logger):
+def variables_the_realm_needs(model, realm, logger, tables_root):
     """Return the native variables this realm's CMORization will read.
 
     Without this, every realm reading the same history files generates a time
@@ -123,6 +123,9 @@ def variables_the_realm_needs(model, realm, logger):
     pipeline uses to decide what to open, so it includes what a formula needs
     and the inputs vertical interpolation adds (PS, hyam, hybm, P0) rather than
     only the variables named directly.
+
+    The CMOR table is what says a variable is on model levels, through its
+    'alevel' dimension, so tables_root has to be set for PS to be collected.
 
     Returns None if the realm has no mapping, which leaves every variable to be
     generated -- the old behaviour, and the safe direction to fail in.
@@ -138,6 +141,8 @@ def variables_the_realm_needs(model, realm, logger):
             exc,
         )
         return None
+    mapping.tables_root = Path(tables_root)
+    mapping.realm = realm
     # Every frequency, not just the ones asked for: a variable left out here is
     # one CMORization will later fail to find, which is a far worse outcome
     # than generating a few time series that go unused.
@@ -380,6 +385,16 @@ def parse_arguments():
         ),
     )
     selection.add_argument(
+        "--tables-root",
+        type=str,
+        default=str(Path(_LOCAL_PATH).parent / "cmip7-cmor-tables"),
+        help=(
+            "CMIP7 CMOR tables checkout. A variable on model levels is read "
+            "from the table's 'alevel' dimension, and surface pressure is "
+            "collected for it. Pass the same checkout as cmor_driver.py."
+        ),
+    )
+    selection.add_argument(
         "--ice-sheet",
         choices=["gris", "ais"],
         default=None,
@@ -529,7 +544,9 @@ def main():
     elif args.all_variables:
         varlist = None
     else:
-        varlist = variables_the_realm_needs(args.model, args.realm, logger)
+        varlist = variables_the_realm_needs(
+            args.model, args.realm, logger, args.tables_root
+        )
 
     # Drop files GenTS cannot read time bounds from before they reach it
     unusable_files = find_unusable_files(inputdir, include_patterns, workers, logger)

@@ -733,7 +733,7 @@ def process_one_var(
             # raised: one unmappable variable should not cost the whole run.
             # The result list records it so the summary reports what was lost.
             if var is None:
-                logger.warning(f"Source variable(s) not found for {varname}")
+                logger.error(f"Source variable(s) not found for {varname}")
                 results.append((varname, "WARNING: Source variable(s) not found."))
                 continue
 
@@ -1241,8 +1241,7 @@ def main():
                     }
                 )
             if not ts_files:
-                logger.warning(f"No timeseries files found for variable {varname}")
-                results.append((varname, NO_INPUT))
+                logger.error(f"No timeseries files found for variable {varname}")
                 continue
             else:
                 logger.debug(

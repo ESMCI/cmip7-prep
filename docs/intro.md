@@ -38,6 +38,7 @@ The script [`run_reference_case.py`](tutorial.md#the-arguments) runs all three
 stages over every target realm and frequency and is discussed in more detail below.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 `run_reference_case.py` runs all four stages (time series, fx, CMORization,
 validation), for every realm the model
 declares and every frequency each realm declares, and prints one table at the
@@ -61,6 +62,10 @@ the plots out and the run is a fraction of that.
 =======
 ## The CMIP7 pieces it uses
 
+=======
+## The CMIP7 pieces it uses
+
+>>>>>>> main
 Four things come from CMIP7 rather than from this repository. Each one answers a
 different question.
 
@@ -226,7 +231,6 @@ that follows.
    same branded name.
 
 The sections below describe each of those files in turn.
->>>>>>> c0bf5bda3e2e843cf0b587bef8f3ea77af0a6a93
 
 ## The branded variable name
 

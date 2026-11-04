@@ -308,6 +308,19 @@ class TestTimeseriesCommand:
         at = command.index("--frequency")
         assert command[at + 1 : at + 5] == frequencies_for("noresm", "land")
 
+    def test_tables_root_reaches_the_timeseries_step(self, case_dir, tmp_path):
+        """The CMOR table says which variables need surface pressure."""
+        plan = _plan(
+            case_dir,
+            tmp_path / "out",
+            realms=["aerosol"],
+            tables_root="/scratch/cmip7-cmor-tables",
+        )
+        command = _command_of(plan, "timeseries-aerosol")
+        assert (
+            command[command.index("--tables-root") + 1] == "/scratch/cmip7-cmor-tables"
+        )
+
     def test_years_are_passed_through(self, case_dir, tmp_path):
         """--years reaches gen_timeseries.py as --years-spec."""
         plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], years="1526:1527:2")
