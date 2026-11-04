@@ -51,7 +51,7 @@ variables:
 
   cStem_tavg-u-hxy-lnd: (FATES_VEGC_ABOVEGROUND - FATES_LEAFC)*FATES_FRACTION
 
-  cVegLut_tpt-u-hxy-multi: (FATES_VEGC_LU)*FATES_FRACTION
+  cVegLut_tpt-u-hxy-multi: map_multi_dimension(FATES_VEGC_LU, fates_levlanduse)*FATES_FRACTION
 
   cVeg_tavg-u-hxy-lnd: FATES_VEGC *FATES_FRACTION
 
@@ -113,7 +113,7 @@ variables:
   
   fracOutLut_tsum-u-hxy-lnd: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
 
-  gppLut_tavg-u-hxy-multi: (FATES_GPP_LU)*FATES_FRACTION
+  gppLut_tavg-u-hxy-multi: map_multi_dimension(FATES_GPP_LU, fates_levlanduse)*FATES_FRACTION
 
   gppVgt_tavg-u-hxy-multi: map_multi_dimension(FATES_GPP_PF, fates_levpft)*FATES_FRACTION
 
@@ -167,7 +167,7 @@ variables:
 
   nppLeaf_tavg-u-hxy-lnd: (FATES_LEAF_ALLOC)*FATES_FRACTION
 
-  nppLut_tavg-u-hxy-multi: (FATES_NPP_LU)*FATES_FRACTION
+  nppLut_tavg-u-hxy-multi: map_multi_dimension(FATES_NPP_LU, fates_levlanduse)*FATES_FRACTION
 
   nppOther_tavg-u-hxy-lnd: (FATES_SEED_ALLOC+FATES_STORE_ALLOC)*FATES_FRACTION
 
@@ -197,7 +197,7 @@ variables:
   raLeaf_tavg-u-hxy-lnd: (FATES_LEAFMAINTAR + (FATES_GROWTH_RESP * FATES_LEAFC_ALLOC
     / FATES_NPP))*FATES_FRACTION
 
-  raLut_tavg-u-hxy-multi: (FATES_GPP_LU-FATES_NPP_LU)*FATES_FRACTION
+  raLut_tavg-u-hxy-multi: (map_multi_dimension(FATES_GPP_LU, fates_levlanduse)- map_multi_dimension(FATES_NPP_LU, fates_levlanduse))*FATES_FRACTION
 
   raRoot_tavg-u-hxy-lnd: ((FATES_FROOTMAINTAR+FATES_CROOTMAINTAR) + (FATES_GROWTH_RESP
     * (FATES_FROOT_ALLOC + FATES_CROOT_ALLOC) / FATES_NPP))*FATES_FRACTION
@@ -264,8 +264,6 @@ variables:
 
   treeFrac_tavg-u-hxy-u: sumover_index(FATES_CANOPYCROWNAREA_PF, indexlist=[1, 2,
     3, 4, 5, 6], dimname='fates_levpft') *FATES_FRACTION*100
-
-  tsLut_tavg-u-hxy-multi: TSKIN
 
   tsl_tavg-sl-hxy-lnd: TSOI
 
