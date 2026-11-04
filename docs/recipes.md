@@ -77,6 +77,7 @@ CMORize one realm and frequency:
 python cmor_driver.py \
   --realm atmos --frequency mon \
   --model noresm --model-res NorESM3-LM --experiment piControl \
+  --data-version v20260401 \
   --tsdir <outdir>/timeseries/atmos \
   --outdir <outdir>/cmor \
   --years 1:50:10 \

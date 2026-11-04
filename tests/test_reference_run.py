@@ -8,12 +8,14 @@ import pytest
 from cmip7_prep.include_patterns import all_include_patterns
 from cmip7_prep.reference_run import (
     CMOR_WORKERS,
+    DATA_VERSION_RECORD,
     REALM_COMPONENT,
     STAGES,
     build_plan,
     frequencies_for,
     history_dir,
     realms_for,
+    record_data_version,
     source_id_for_resolution,
 )
 
@@ -66,6 +68,7 @@ def _plan(case_dir, outdir, **kwargs):
     kwargs.setdefault("model", "noresm")
     kwargs.setdefault("model_res", "NorESM3-LM")
     kwargs.setdefault("experiment", "piControl")
+    kwargs.setdefault("data_version", "v20200101")
     return build_plan(case_dir, outdir, **kwargs)
 
 
@@ -110,7 +113,7 @@ def test_history_dir_follows_the_archive_layout(tmp_path):
 
 
 def test_source_id_for_resolution_uses_configured_default(monkeypatch):
-    """Runner uses the exact per-resolution or default CMOR source ID."""
+    """Runner uses the source ID configured for the run's resolution."""
     config = {
         "dataset": {
             "source_ids": {"NorESM3-LM": "NorESM3-LM", "NorESM3-MM": "NorESM3-MM"},
@@ -122,7 +125,32 @@ def test_source_id_for_resolution_uses_configured_default(monkeypatch):
     )
 
     assert source_id_for_resolution("noresm", "NorESM3-LM") == "NorESM3-LM"
-    assert source_id_for_resolution("noresm", "custom") == "NorESM3"
+
+
+def test_source_id_for_resolution_rejects_an_unconfigured_resolution(monkeypatch):
+    """A resolution absent from 'source_ids' fails where it is asked for."""
+    config = {
+        "dataset": {
+            "source_ids": {"NorESM3-LM": "NorESM3-LM", "NorESM3-MM": "NorESM3-MM"},
+            "default_source_id": "NorESM3",
+        }
+    }
+    monkeypatch.setattr(
+        "cmip7_prep.reference_run.load_regrid_maps", lambda model: config
+    )
+
+    with pytest.raises(ValueError, match="noresm_grids.yaml"):
+        source_id_for_resolution("noresm", "custom")
+
+
+def test_source_id_for_resolution_uses_the_default_without_a_list(monkeypatch):
+    """A model that names no per-resolution source IDs uses its default."""
+    config = {"dataset": {"source_ids": {}, "default_source_id": "CESM3"}}
+    monkeypatch.setattr(
+        "cmip7_prep.reference_run.load_regrid_maps", lambda model: config
+    )
+
+    assert source_id_for_resolution("cesm", "ne30") == "CESM3"
 
 
 # ---------------------------------------------------------------- plan shape
@@ -266,6 +294,19 @@ class TestTimeseriesCommand:
         at = command.index("--frequency")
         assert command[at + 1 : at + 5] == frequencies_for("noresm", "land")
 
+    def test_tables_root_reaches_the_timeseries_step(self, case_dir, tmp_path):
+        """The CMOR table says which variables need surface pressure."""
+        plan = _plan(
+            case_dir,
+            tmp_path / "out",
+            realms=["aerosol"],
+            tables_root="/scratch/cmip7-cmor-tables",
+        )
+        command = _command_of(plan, "timeseries-aerosol")
+        assert (
+            command[command.index("--tables-root") + 1] == "/scratch/cmip7-cmor-tables"
+        )
+
     def test_years_are_passed_through(self, case_dir, tmp_path):
         """--years reaches gen_timeseries.py as --years-spec."""
         plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], years="1526:1527:2")
@@ -344,6 +385,18 @@ class TestCommands:
         assert command[command.index("--model-res") + 1] == "NorESM3-MM"
         assert command[command.index("--experiment") + 1] == "historical"
         assert validate[validate.index("--source-id") + 1] == "NorESM3-MM"
+
+    def test_data_version_reaches_cmorization(self, case_dir, tmp_path):
+        """Every CMOR step is given the version it writes under."""
+        plan = _plan(
+            case_dir,
+            tmp_path / "out",
+            realms=["atmos"],
+            data_version="v20260315",
+        )
+        for frequency in ("mon", "day"):
+            command = _command_of(plan, f"cmor-atmos-{frequency}")
+            assert command[command.index("--data-version") + 1] == "v20260315"
 
     def test_variant_label_reaches_both_later_stages(self, case_dir, tmp_path):
         """The ensemble member labels the output and the validation of it.
@@ -465,19 +518,60 @@ class TestCommands:
         assert len(names) == len(set(names))
 
 
-@pytest.mark.parametrize("omitted", ["model", "experiment"])
+class TestTheDataVersionRecord:
+    """What each edition of the dataset was for, beside the output tree."""
+
+    def test_a_version_and_its_note_are_recorded(self, tmp_path):
+        """The line holds the version, the date and the note."""
+        assert record_data_version(tmp_path, "v20200101", "starting the cmorization")
+        written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
+        assert "v20200101" in written
+        assert "starting the cmorization" in written
+
+    def test_a_second_chunk_adds_nothing(self, tmp_path):
+        """Four chunks of one run leave one line between them."""
+        record_data_version(tmp_path, "v20200101", "starting the cmorization")
+        assert not record_data_version(tmp_path, "v20200101", "a later chunk")
+        written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
+        assert written.count("v20200101") == 1
+        assert "a later chunk" not in written
+
+    def test_a_later_version_is_appended(self, tmp_path):
+        """The earlier version stays, so the file reads as a history."""
+        record_data_version(tmp_path, "v20200101", "starting the cmorization")
+        record_data_version(tmp_path, "v20200215", "fixing the cice history files")
+        written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
+        assert written.index("v20200101") < written.index("v20200215")
+
+    def test_a_note_is_optional(self, tmp_path):
+        """A version with nothing to say about it is still recorded."""
+        assert record_data_version(tmp_path, "v20200101")
+        written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
+        assert "v20200101" in written
+
+    def test_the_record_sits_above_the_drs_tree(self, tmp_path):
+        """It is in the CMOR root, so it is not inside what gets published."""
+        cmor_root = tmp_path / "cmor"
+        record_data_version(cmor_root, "v20200101")
+        assert (cmor_root / DATA_VERSION_RECORD).exists()
+        assert not (cmor_root / "MIP-DRS7").exists()
+
+
+@pytest.mark.parametrize("omitted", ["model", "experiment", "data_version"])
 def test_case_properties_are_required(omitted):
     """build_plan refuses to guess a property of the case.
 
     Model and experiment change what the output means while leaving it looking
-    valid, so neither may be defaulted.  The resolution is not here only
-    because it is accepted as a keyword and refused later; see
-    TestAtmosResolutionIsAlwaysRequired.
+    valid, and a data version taken from the clock would split one dataset
+    across the days its chunks ran on, so none of the three may be defaulted.
+    The resolution is not here only because it is accepted as a keyword and
+    refused later; see TestAtmosResolutionIsAlwaysRequired.
     """
     supplied = {
         "model": "noresm",
         "model_res": "NorESM3-LM",
         "experiment": "piControl",
+        "data_version": "v20200101",
     }
     del supplied[omitted]
     with pytest.raises(TypeError, match=omitted):
@@ -501,6 +595,7 @@ class TestAtmosResolutionIsAlwaysRequired:
                 tmp_path / "out",
                 model="noresm",
                 experiment="piControl",
+                data_version="v20200101",
                 realms=["seaIce", "landIce"],
             )
 
@@ -516,6 +611,7 @@ class TestAtmosResolutionIsAlwaysRequired:
                 tmp_path / "out",
                 model="noresm",
                 experiment="piControl",
+                data_version="v20200101",
                 model_res="ne99",
             )
 

@@ -16,6 +16,7 @@ into an archive it may not own.
 
 from __future__ import annotations
 
+import datetime as dt
 import glob
 import os
 import sys
@@ -148,6 +149,16 @@ def history_dir(case_dir: os.PathLike | str, realm: str) -> Path:
 def source_id_for_resolution(model: str, model_res: str) -> str:
     """Return the dataset source ID CMOR writes for one model resolution."""
     dataset = load_regrid_maps(model).get("dataset") or {}
+    configured = dataset.get("source_ids")
+    # A resolution absent from 'source_ids' now stops the run before any work,
+    # saying to add one to data/<model>_grids.yaml.
+    if isinstance(configured, dict) and configured and model_res not in configured:
+        raise ValueError(
+            f"No output source_id configured for model={model!r}, "
+            f"resolution={model_res!r}; add one under 'dataset: source_ids' in "
+            f"data/{model}_grids.yaml, which names "
+            f"{', '.join(sorted(configured))}"
+        )
     default_source_id = dataset.get("default_source_id") or dataset.get(
         "base_source_id"
     )
@@ -175,6 +186,7 @@ def build_plan(
     stages: Sequence[str] = STAGES,
     model_res: str | None = None,
     experiment: str,
+    data_version: str,
     ts_workers: int = 4,
     cmor_workers: int = CMOR_WORKERS,
     ice_sheet: str | None = None,
@@ -201,12 +213,21 @@ def build_plan(
 
     ``variant_label`` and ``tables_root`` are passed to CMORization unchanged,
     so the same command can produce output for submission rather than only
-    exercising the chain.  ``plots`` and ``html`` ask validation for figures
-    and a browsable index of them, which is how a person judges whether the
-    output is sensible rather than merely complete.
+    exercising the chain.  ``tables_root`` also goes to gen_timeseries.py,
+    because the CMOR table is what says a variable is on model levels and so
+    needs surface pressure collected for it.
+
+    ``plots`` and ``html`` ask validation for figures and a browsable index of
+    them, which is how a person judges whether the output is sensible rather
+    than merely complete.
 
     ``years`` is passed through to gen_timeseries.py as ``--years-spec`` and so
     uses its format, ``first:last:increment``.
+
+    ``data_version`` is the vYYYYMMDD edition the output belongs to, and is
+    passed to CMORization unchanged. Separate runs covering different years of
+    one case have to be given the same value, because the DRS keeps every time
+    range of a variable in one version directory.
     """
     unknown = [stage for stage in stages if stage not in STAGES]
     if unknown:
@@ -282,6 +303,7 @@ def build_plan(
                     years=years,
                     workers=ts_workers,
                     sheet=sheet,
+                    tables_root=tables_root,
                     overwrite=overwrite_timeseries,
                 )
             )
@@ -300,6 +322,7 @@ def build_plan(
                         model=model,
                         model_res=model_res,
                         experiment=experiment,
+                        data_version=data_version,
                         sheet=sheet,
                         variant_label=variant_label,
                         tables_root=tables_root,
@@ -346,6 +369,7 @@ def _timeseries_step(
     years,
     workers,
     sheet,
+    tables_root=None,
     overwrite=False,
 ) -> Step:
     """Return the gen_timeseries.py step for one realm."""
@@ -369,11 +393,49 @@ def _timeseries_step(
         command += ["--years-spec", years]
     if sheet:
         command += ["--ice-sheet", sheet]
+    if tables_root:
+        command += ["--tables-root", str(tables_root)]
     if overwrite:
         command.append("--overwrite_timeseries")
     return Step(
         key=f"timeseries-{realm}", stage="timeseries", realm=realm, command=command
     )
+
+
+DATA_VERSION_RECORD = "data_versions.md"
+
+
+def record_data_version(
+    cmor_root: os.PathLike | str,
+    data_version: str,
+    note: str | None = None,
+) -> bool:
+    """Append one line for a data version to the record beside the output tree.
+
+    The record says what each edition of the dataset was for, which the
+    version directory cannot say on its own. It sits in the CMOR root, above
+    the DRS tree, so nothing stray lands in what is published.
+
+    A version already in the file is left alone and False is returned, so the
+    chunks of one run add one line between them rather than one each.
+    """
+    path = Path(cmor_root) / DATA_VERSION_RECORD
+    recorded = path.read_text(encoding="utf-8") if path.exists() else ""
+    if any(
+        line.split(" ", 1)[0] == data_version
+        for line in recorded.splitlines()
+        if line.strip()
+    ):
+        return False
+
+    today = dt.date.today().isoformat()
+    line = f"{data_version}  {today}"
+    if note:
+        line += f"  {note.strip()}"
+    header = recorded.rstrip() if recorded.strip() else "# Data versions\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{header}\n{line}\n", encoding="utf-8")
+    return True
 
 
 def _cmor_step(
@@ -388,6 +450,7 @@ def _cmor_step(
     model,
     model_res,
     experiment,
+    data_version,
     sheet,
     variant_label=None,
     tables_root=None,
@@ -408,6 +471,8 @@ def _cmor_step(
         model,
         "--experiment",
         experiment,
+        "--data-version",
+        data_version,
         "--workers",
         str(workers),
     ]

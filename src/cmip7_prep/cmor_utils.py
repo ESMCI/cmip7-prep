@@ -15,6 +15,7 @@ import numpy as np
 import xarray as xr
 
 # Local imports avoid an import cycle with regrid_maps.
+from .data_version import checked_data_version
 from .regrid_maps import (
     get_realm_row,
     load_regrid_maps,
@@ -44,13 +45,14 @@ _INSTITUTION_ID_BY_MODEL = {"noresm": "NCC", "cesm": "NCAR"}
 
 # DRS path/filename templates; structural, so they live here rather than in the
 # CV or the per-model config.
-# As the controlled vocabulary's directory_path_template gives it, except for
-# the trailing <version>: that is a dated directory identifying one published
-# edition of a dataset, and how it should be managed is a publication question
-# rather than a CMORization one.
+# As the controlled vocabulary's directory_path_template gives it.  The
+# trailing <version> is a dated directory naming one published edition of a
+# dataset; CMOR fills it from the 'version' dataset attribute, and dates it
+# from the clock when that attribute is absent.
 _OUTPUT_PATH_TEMPLATE = (
     "<drs_specs><mip_era><activity_id><institution_id><source_id><experiment_id>"
     "<variant_label><region><frequency><variable_id><branding_suffix><grid_label>"
+    "<version>"
 )
 _OUTPUT_FILE_TEMPLATE = (
     "<variable_id><branding_suffix><frequency><region><grid_label>"
@@ -105,6 +107,7 @@ def build_dataset_cfg(
     frequency: str,
     ripf: str,
     tables_root,
+    data_version: str,
     realm: str = "atmos",
     license_id: str = "CC-BY-4.0",
 ) -> dict:
@@ -114,6 +117,10 @@ def build_dataset_cfg(
     controlled vocabulary (cmor-cvs.json); the branded source_id and nominal
     resolution come from the per-model ``dataset`` block in
     ``data/<model>_grids.yaml``.  Replaces the packaged cmor_dataset*.json.
+
+    ``data_version`` is the vYYYYMMDD edition the output belongs to. It fills
+    the <version> directory at the end of the DRS path, and every invocation
+    writing one dataset has to be given the same value.
     """
     cv = _load_controlled_vocabulary(str(tables_root))
     meta = load_regrid_maps(model).get("dataset") or {}
@@ -169,6 +176,7 @@ def build_dataset_cfg(
     mip_era = cv.get("mip_era", "CMIP7")
 
     return {
+        "version": checked_data_version(data_version),
         "mip_era": mip_era,
         "activity_id": activity_id,
         "drs_specs": cv.get("drs_specs", "MIP-DRS7"),

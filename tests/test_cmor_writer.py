@@ -65,6 +65,7 @@ def test_cmor_session_basic(tmp_path):
         frequency="mon",
         ripf="r1i1p1f1",
         tables_root=tables_root,
+        data_version="v20200101",
     )
     log_dir = tmp_path
     log_name = "cmor_test.log"
@@ -145,6 +146,7 @@ def test_cmor_session_multiple_timeseries(tmp_path):
         frequency="mon",
         ripf="r1i1p1f1",
         tables_root=tables_root,
+        data_version="v20200101",
     )
     log_dir = tmp_path
     log_name = "cmor_test_multi.log"
@@ -218,6 +220,7 @@ def test_cmor_session_zonal_mean_plev39(tmp_path):
         frequency="mon",
         ripf="r1i1p1f1",
         tables_root=tables_root,
+        data_version="v20200101",
     )
     with CmorSession(
         tables_root=tables_root,
@@ -277,6 +280,7 @@ def _session(tmp_path, realm):
         frequency="month",
         ripf="r1i1p1f1",
         tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        data_version="v20200101",
         realm=realm,
     )
     return CmorSession(

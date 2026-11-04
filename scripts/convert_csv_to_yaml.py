@@ -23,10 +23,10 @@ from cmip7_prep.mapping_compat import load_intensive_vars
 
 
 # ── Grid labels ──────────────────────────────────────────────────────────────
-# Which CMIP grid_label(s) each realm's variables are written on.  'gn' is the
-# model's native grid, 'gr' the regridded target grid, 'gm' a global mean with
-# no horizontal grid.  Realms whose output is regridded from an unstructured
-# grid get 'gr'; those kept on their native grid get 'gn'.
+# Whether each realm's variables are regridded before they are written.  'gr'
+# regrids to the target latitude-longitude grid, 'gn' writes the data on the
+# grid it arrives on.  This is not the published grid_label, which is the gNNN
+# code in data/<model>_grids.yaml.
 #
 # Realm spellings differ between the two model CSVs, so both are listed.
 REALM_GRIDS: dict[str, list[str]] = {
@@ -43,18 +43,15 @@ REALM_GRIDS: dict[str, list[str]] = {
 }
 
 # Per-variable exceptions to REALM_GRIDS, keyed by branded variable name.
-# The MOM6 fields below are published on both grids; the sea-ice entries are
-# global means with no horizontal grid.
+# The MOM6 fields are written twice, once on each grid.  The global sums are
+# computed on the grid the model wrote, so nothing is regridded for them.
 GRIDS_OVERRIDES: dict[str, list[str]] = {
     "sos_tavg-u-hxy-sea": ["gn", "gr"],
     "thetao_tavg-ol-hxy-sea": ["gn", "gr"],
     "tos_tavg-u-hxy-sea": ["gn", "gr"],
     "vo_tavg-ol-hxy-sea": ["gn", "gr"],
     "wo_tavg-ol-hxy-sea": ["gn", "gr"],
-    "siarea_tavg-u-hm-u": ["gm"],
-    "siextent_tavg-u-hm-u": ["gm"],
-    "sisnmass_tavg-u-hm-si": ["gm"],
-    "sivol_tavg-u-hm-u": ["gm"],
+    "co2mass_tavg-u-hm-u": ["gn"],
 }
 
 # ── model configurations ─────────────────────────────────────────────────────
