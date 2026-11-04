@@ -345,7 +345,7 @@ def build_plan(
                     plots=False,
                     html=html,
                     max_plots=max_plots,
-                    data_version=data_version,
+                    source_id=source_id_for_resolution(model, model_res),
                 )
             )
 
