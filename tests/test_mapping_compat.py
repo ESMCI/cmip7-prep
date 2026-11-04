@@ -19,8 +19,8 @@ from cmip7_prep.mapping_compat import (
 )
 
 
-@pytest.fixture
-def fates_pfts():
+@pytest.fixture(name="fates_pfts")
+def fixture_fates_pfts():
     """Each of the 15 source positions carries its 1-based PFT number."""
     return xr.DataArray(
         np.broadcast_to(np.arange(1.0, 16.0)[None, :, None], (2, 15, 3)),
@@ -128,8 +128,8 @@ def test_map_multi_dimension_rejects_invalid_input(fates_pfts):
         )
 
 
-@pytest.fixture
-def fates_landuse():
+@pytest.fixture(name="fates_landuse")
+def fixture_fates_landuse():
     """Source labels deliberately differ from the 1-based mapping positions."""
     return xr.DataArray(
         np.broadcast_to(np.arange(1, 6)[None, :, None], (2, 5, 3)),

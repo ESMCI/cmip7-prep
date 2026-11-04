@@ -122,7 +122,7 @@ def test_cmor_session_basic(tmp_path, model, resolution):
     ],
 )
 def test_cmor_writes_mapped_vegetation_types(
-    tmp_path, source_dim, source_size, target_dim, output_dim, variable_name
+    tmp_path, *, source_dim, source_size, target_dim, output_dim, variable_name
 ):
     """CMOR preserves mapped category labels, grouped values and missing urban."""
     source = xr.DataArray(
