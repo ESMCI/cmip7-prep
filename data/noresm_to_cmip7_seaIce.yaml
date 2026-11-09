@@ -61,7 +61,7 @@ variables:
 
   sidconcth_tavg-u-hxy-sea: sidconcth
 
-  sidivvel_tpt-u-hxy-si: sidivvel
+  sidivvel_tpt-u-hxy-si: sidivvel_n
 
   sidmassdyn_tavg-u-hxy-si: sidmassdyn
 
@@ -149,13 +149,13 @@ variables:
 
   siitdconc_tavg-u-hxy-si:
     formula:
-      day: sitdconc_d
-      mon: sitdconc
+      day: siitdconc_d
+      mon: siitdconc
 
   siitdsnconc_tavg-u-hxy-si:
     formula:
-      day: sitdsnconc_d
-      mon: sitdsnconc
+      day: siitdsnconc_d
+      mon: siitdsnconc
 
   siitdsnthick_tavg-u-hxy-si:
     formula:
@@ -205,7 +205,7 @@ variables:
       day: sisaltmass_d
       mon: sisaltmass
 
-  sishearvel_tpt-u-hxy-si: sishearvel
+  sishearvel_tpt-u-hxy-si: sishearvel_n
 
   sisndmassdyn_tavg-u-hxy-si: sisndmassdyn
 
@@ -232,9 +232,9 @@ variables:
       day: sispeed_d
       mon: sispeed
 
-  sistressave_tpt-u-hxy-si: sistressave
+  sistressave_tpt-u-hxy-si: sistressave_n
 
-  sistressmax_tpt-u-hxy-si: sistressmax
+  sistressmax_tpt-u-hxy-si: sistressmax_n
 
   sistrxdtop_tavg-u-hxy-si: sistrxdtop
 
@@ -254,6 +254,11 @@ variables:
       day: sitempsnic_d
       mon: sitempsnic
 
+  sihc_tavg-u-hxy-sea:
+    formula:
+      day: sihc_d
+      mon: sihc
+
   sithick_tavg-u-hxy-si:
     formula:
       day: sithick_d
@@ -261,8 +266,8 @@ variables:
 
   sithick_tavg-u-hxy-sir:
     formula:
-      day: sithick_d
-      mon: sithick
+      day: sirdgthick_d
+      mon: sirdgthick
 
   sitimefrac_tavg-u-hxy-sea:
     formula:
