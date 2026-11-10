@@ -157,13 +157,13 @@ variables:
 
   siitdconc_tavg-u-hxy-si:
     formula:
-      day: sitdconc_d
-      mon: sitdconc
+      day: siitdconc_d
+      mon: siitdconc
 
   siitdsnconc_tavg-u-hxy-si:
     formula:
-      day: sitdsnconc_d
-      mon: sitdsnconc
+      day: siitdsnconc_d
+      mon: siitdsnconc
 
   siitdsnthick_tavg-u-hxy-si:
     formula:
