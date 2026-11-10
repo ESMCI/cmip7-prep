@@ -14,7 +14,7 @@ import tempfile
 
 import fcntl
 from contextlib import AbstractContextManager, contextmanager
-from typing import Any, Optional, Union
+from typing import Any, Optional, Tuple, Union
 import datetime as dt
 
 import logging
@@ -39,6 +39,37 @@ from .cmor_utils import (
 # from .mom6_static import compute_cell_bounds_from_corners
 
 logger = logging.getLogger(__name__)
+
+# An ice thickness category whose maximum is above this is CICE's open top
+# category, which it records as 1e+08 m.
+OPEN_ICE_CATEGORY_M = 100.0
+
+
+def iceband_values_and_bounds(ncat) -> Tuple[np.ndarray, np.ndarray]:
+    """Return the iceband axis values and cell bounds for CICE's categories.
+
+    CICE's NCAT holds each ice thickness category's maximum thickness in
+    metres, so the cell edges are 0 followed by those maxima.  iceband in
+    CMIP7_coordinate.json has must_have_bounds, so the bounds go to cmor.axis
+    with the values.
+
+    A category's value is the middle of its bounds.  CICE leaves the thickest
+    category open and records its maximum as 1e+08, which puts that middle at
+    5e+07, so the open category takes its lower bound as its value instead.
+
+    >>> values, bounds = iceband_values_and_bounds([0.6445072, 1.391433, 1e08])
+    >>> bounds[2]
+    array([1.391433e+00, 1.000000e+08])
+    >>> float(values[2])
+    1.391433
+    """
+    maxima = np.asarray(ncat, dtype="f8").ravel()
+    edges = np.concatenate(([0.0], maxima))
+    bounds = np.column_stack((edges[:-1], edges[1:]))
+    values = bounds.mean(axis=1)
+    open_category = bounds[:, 1] > OPEN_ICE_CATEGORY_M
+    values[open_category] = bounds[open_category, 0]
+    return values, bounds
 
 
 @lru_cache(maxsize=None)
@@ -644,6 +675,27 @@ class CmorSession(
             longitude_vertices=lon_vert,
         )
 
+    def _define_iceband(self, ds: xr.Dataset) -> int:
+        """Register the iceband axis from CICE's ice thickness categories.
+
+        CICE writes siitdconc, siitdsnconc, siitdsnthick and siitdthick on the
+        dimension nc, one value per ice thickness category, and records the
+        categories in NCAT.
+        """
+        if "NCAT" not in ds:
+            raise KeyError(
+                "The iceband axis is built from CICE's NCAT variable, which is "
+                "not in the dataset."
+            )
+        values, bounds = iceband_values_and_bounds(ds["NCAT"].values)
+        logger.debug("Setting iceband axis with bounds %s", bounds.tolist())
+        return cmor.axis(
+            table_entry="iceband",
+            units="m",
+            coord_vals=values,
+            cell_bounds=bounds,
+        )
+
     def _define_cism_grid(self, ds, var_name, var_da):
         """Register a native CISM (land-ice) projected grid via cmor.grid().
 
@@ -864,6 +916,7 @@ class CmorSession(
         sdepth_id = None
         lev_id = None
         funcax_id = None
+        iceband_id = None
 
         logger.debug("[CMOR axis debug] var_dims: %s", var_dims)
         has_latlon_dims = "lat" in var_dims and "lon" in var_dims
@@ -1299,6 +1352,12 @@ class CmorSession(
             )
 
         # -------------------------
+        # --- ice thickness categories: nc
+        # -------------------------
+        elif "nc" in var_dims:
+            iceband_id = self._define_iceband(ds)
+
+        # -------------------------
         # Map dimension names to axis IDs
         # -------------------------
         dim_to_axis = {
@@ -1321,6 +1380,7 @@ class CmorSession(
             "yq": lat_id,  # MOM6
             "fates_levpft": funcax_id,
             "fates_levfuel": funcax_id,
+            "nc": iceband_id,
         }
         axes_ids = []
         for d in var_dims:

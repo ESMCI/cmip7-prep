@@ -40,9 +40,13 @@ variables:
 
   siarea_tavg-u-hm-u:
     variants:
-    - formula: (siconc * tarea / 100.).where(siconc.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+    - formula:
+        day: (siconc_d * tarea / 100.).where(siconc_d.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+        mon: (siconc * tarea / 100.).where(siconc.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
       region: nh
-    - formula: (siconc * tarea / 100.).where(siconc.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+    - formula:
+        day: (siconc_d * tarea / 100.).where(siconc_d.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+        mon: (siconc * tarea / 100.).where(siconc.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
       region: sh
 
   sicompstren_tavg-u-hxy-si: sicompstren
@@ -91,9 +95,13 @@ variables:
 
   siextent_tavg-u-hm-u:
     variants:
-    - formula: (tarea.where(siconc > 15., 0.0)).where(siconc.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+    - formula:
+        day: (tarea.where(siconc_d > 15., 0.0)).where(siconc_d.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+        mon: (tarea.where(siconc > 15., 0.0)).where(siconc.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
       region: nh
-    - formula: (tarea.where(siconc > 15., 0.0)).where(siconc.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+    - formula:
+        day: (tarea.where(siconc_d > 15., 0.0)).where(siconc_d.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+        mon: (tarea.where(siconc > 15., 0.0)).where(siconc.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
       region: sh
 
   sifb_tavg-u-hxy-si:
@@ -149,13 +157,13 @@ variables:
 
   siitdconc_tavg-u-hxy-si:
     formula:
-      day: sitdconc_d
-      mon: sitdconc
+      day: siitdconc_d
+      mon: siitdconc
 
   siitdsnconc_tavg-u-hxy-si:
     formula:
-      day: sitdsnconc_d
-      mon: sitdsnconc
+      day: siitdsnconc_d
+      mon: siitdsnconc
 
   siitdsnthick_tavg-u-hxy-si:
     formula:
@@ -220,9 +228,13 @@ variables:
 
   sisnmass_tavg-u-hm-si:
     variants:
-    - formula: (sisnmass * tarea).where(sisnmass.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+    - formula:
+        day: (sisnmass_d * tarea).where(sisnmass_d.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+        mon: (sisnmass * tarea).where(sisnmass.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
       region: nh
-    - formula: (sisnmass * tarea).where(sisnmass.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+    - formula:
+        day: (sisnmass_d * tarea).where(sisnmass_d.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+        mon: (sisnmass * tarea).where(sisnmass.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
       region: sh
 
   sisnmassacrossline_tavg-u-ht-u: sisnmassacrossline
