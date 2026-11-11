@@ -63,7 +63,11 @@ def iceband_values_and_bounds(ncat) -> Tuple[np.ndarray, np.ndarray]:
     >>> float(values[2])
     1.391433
     """
-    maxima = np.asarray(ncat, dtype="f8").ravel()
+    maxima = np.asarray(ncat, dtype="f8")
+    if maxima.ndim != 1:
+        raise ValueError(
+            f"NCAT must have one dimension, nc, and has shape {maxima.shape}."
+        )
     edges = np.concatenate(([0.0], maxima))
     bounds = np.column_stack((edges[:-1], edges[1:]))
     values = bounds.mean(axis=1)
@@ -687,7 +691,10 @@ class CmorSession(
                 "The iceband axis is built from CICE's NCAT variable, which is "
                 "not in the dataset."
             )
-        values, bounds = iceband_values_and_bounds(ds["NCAT"].values)
+        # NCAT is one of the field's coordinates, so the multi-file merge can
+        # give it a time dimension.  The categories do not change in time.
+        ncat = _horizontal_only(ds["NCAT"], ("nc",))
+        values, bounds = iceband_values_and_bounds(ncat.values)
         logger.debug("Setting iceband axis with bounds %s", bounds.tolist())
         return cmor.axis(
             table_entry="iceband",

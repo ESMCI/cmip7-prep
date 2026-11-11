@@ -6,6 +6,7 @@ the dimension nc and records the categories in NCAT, as issue #131 reports.
 """
 
 import numpy as np
+import pytest
 
 from cmip7_prep.cmor_writer import iceband_values_and_bounds
 
@@ -51,3 +52,9 @@ def test_the_values_increase_and_lie_within_their_bounds():
     assert np.all(np.diff(values) > 0)
     assert np.all(values >= bounds[:, 0])
     assert np.all(values <= bounds[:, 1])
+
+
+def test_ncat_with_a_time_dimension_is_rejected():
+    """NCAT repeated along time would give an axis that does not increase."""
+    with pytest.raises(ValueError, match="one dimension"):
+        iceband_values_and_bounds([NCAT, NCAT])
