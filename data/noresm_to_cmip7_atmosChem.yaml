@@ -1,27 +1,40 @@
 
 variables:
 
-  cfc11_tavg-u-hm-air: f11vmr
+  # PINT gives the thickness of each layer, which weights it by the air it holds.
+  cfc11_tavg-u-hm-air:
+    formula: global_3d_mean(CFC11, layer_thickness(PINT), area)
+    grids: [gn]
+    units: mol mol-1
 
-  cfc12_tavg-u-hm-air: f12vmr
+  cfc12_tavg-u-hm-air:
+    formula: global_3d_mean(CFC12, layer_thickness(PINT), area)
+    grids: [gn]
+    units: mol mol-1
 
-  ch4_tavg-al-hxy-u: ch4vmr
+  ch4_tavg-al-hxy-u: CH4
 
-  ch4_tavg-p19-hxy-air: ch4vmr
+  ch4_tavg-p19-hxy-air: CH4
 
-  ch4_tavg-p39-hy-air: ch4vmr
+  ch4_tavg-p39-hy-air: CH4
 
-  ch4_tavg-u-hm-air: ch4vmr
+  ch4_tavg-u-hm-air:
+    formula: global_3d_mean(CH4, layer_thickness(PINT), area)
+    grids: [gn]
+    units: mol mol-1
 
   dms_tavg-al-hxy-u: DMS
 
-  n2o_tavg-al-hxy-u: n2ovmr
+  n2o_tavg-al-hxy-u: N2O
 
-  n2o_tavg-p19-hxy-air: n2ovmr
+  n2o_tavg-p19-hxy-air: N2O
 
-  n2o_tavg-p39-hy-air: n2ovmr
+  n2o_tavg-p39-hy-air: N2O
 
-  n2o_tavg-u-hm-air: n2ovmr
+  n2o_tavg-u-hm-air:
+    formula: global_3d_mean(N2O, layer_thickness(PINT), area)
+    grids: [gn]
+    units: mol mol-1
 
   o3_tavg-al-hxy-u: ozone
 

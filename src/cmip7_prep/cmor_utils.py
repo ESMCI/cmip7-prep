@@ -15,7 +15,12 @@ import numpy as np
 import xarray as xr
 
 # Local imports avoid an import cycle with regrid_maps.
-from .regrid_maps import load_regrid_maps, get_realm_row
+from .data_version import checked_data_version
+from .regrid_maps import (
+    get_realm_row,
+    load_regrid_maps,
+    resolve_by_resolution,
+)
 
 _FILL_DEFAULT = 1.0e20
 
@@ -40,13 +45,14 @@ _INSTITUTION_ID_BY_MODEL = {"noresm": "NCC", "cesm": "NCAR"}
 
 # DRS path/filename templates; structural, so they live here rather than in the
 # CV or the per-model config.
-# As the controlled vocabulary's directory_path_template gives it, except for
-# the trailing <version>: that is a dated directory identifying one published
-# edition of a dataset, and how it should be managed is a publication question
-# rather than a CMORization one.
+# As the controlled vocabulary's directory_path_template gives it.  The
+# trailing <version> is a dated directory naming one published edition of a
+# dataset; CMOR fills it from the 'version' dataset attribute, and dates it
+# from the clock when that attribute is absent.
 _OUTPUT_PATH_TEMPLATE = (
     "<drs_specs><mip_era><activity_id><institution_id><source_id><experiment_id>"
     "<variant_label><region><frequency><variable_id><branding_suffix><grid_label>"
+    "<version>"
 )
 _OUTPUT_FILE_TEMPLATE = (
     "<variable_id><branding_suffix><frequency><region><grid_label>"
@@ -67,13 +73,6 @@ def _first(value, default=None):
     if isinstance(value, (list, tuple)):
         return value[0] if value else default
     return value if value is not None else default
-
-
-def _resolve_by_resolution(mapping, resolution: str, default):
-    """Return mapping[resolution] when mapping is a dict with that key, else default."""
-    if isinstance(mapping, dict):
-        return mapping.get(resolution, default)
-    return default
 
 
 def _format_license(license_cv: dict, license_id: str, institution_id: str) -> str:
@@ -108,6 +107,7 @@ def build_dataset_cfg(
     frequency: str,
     ripf: str,
     tables_root,
+    data_version: str,
     realm: str = "atmos",
     license_id: str = "CC-BY-4.0",
 ) -> dict:
@@ -117,13 +117,16 @@ def build_dataset_cfg(
     controlled vocabulary (cmor-cvs.json); the branded source_id and nominal
     resolution come from the per-model ``dataset`` block in
     ``data/<model>_grids.yaml``.  Replaces the packaged cmor_dataset*.json.
+
+    ``data_version`` is the vYYYYMMDD edition the output belongs to. It fills
+    the <version> directory at the end of the DRS path, and every invocation
+    writing one dataset has to be given the same value.
     """
     cv = _load_controlled_vocabulary(str(tables_root))
     meta = load_regrid_maps(model).get("dataset") or {}
     base_source_id = meta.get("base_source_id")
 
-    # grid_label is the per-realm grid code from the model grid table; its
-    # human-readable description comes from the CV keyed by that same code.
+    # grid_label is the per-realm grid code from the model grid table.
     try:
         grid_label = get_realm_row(model, resolution, realm)["grid_label"]
     except (ValueError, KeyError):
@@ -135,15 +138,14 @@ def build_dataset_cfg(
             realm,
         )
         grid_label = "gr"
-    grid_desc = (cv.get("grid_label") or {}).get(grid_label, "")
 
     # Branded source_id/nominal_resolution written to the output, by resolution.
-    source_id = _resolve_by_resolution(
+    source_id = resolve_by_resolution(
         meta.get("source_ids"),
         resolution,
         meta.get("default_source_id", base_source_id),
     )
-    nominal_resolution = _resolve_by_resolution(
+    nominal_resolution = resolve_by_resolution(
         meta.get("nominal_resolution"),
         resolution,
         meta.get("default_nominal_resolution"),
@@ -171,7 +173,8 @@ def build_dataset_cfg(
     )
     mip_era = cv.get("mip_era", "CMIP7")
 
-    return {
+    cfg = {
+        "version": checked_data_version(data_version),
         "mip_era": mip_era,
         "activity_id": activity_id,
         "drs_specs": cv.get("drs_specs", "MIP-DRS7"),
@@ -183,7 +186,6 @@ def build_dataset_cfg(
         "institution": institution,
         "source_id": source_id,
         "source": source,
-        "source_type": meta.get("source_type", "AOGCM"),
         "nominal_resolution": nominal_resolution,
         "license_id": license_id,
         "license": license_str,
@@ -191,15 +193,11 @@ def build_dataset_cfg(
         "frequency": frequency,
         "experiment_id": experiment,
         "experiment": experiment_entry.get("experiment", experiment),
-        "sub_experiment_id": "none",
-        "sub_experiment": "none",
         "realization_index": realization_index,
         "initialization_index": initialization_index,
         "physics_index": physics_index,
         "forcing_index": forcing_index,
         "variant_label": ripf,
-        "member_id": ripf,
-        "branch_method": "no parent",
         "branch_time_in_parent": 0.0,
         "branch_time_in_child": 0.0,
         "parent_mip_era": mip_era,
@@ -214,12 +212,17 @@ def build_dataset_cfg(
         "area_label": "u",
         "branding_suffix": "tavg-l-hxy-u",
         "grid_label": grid_label,
-        "grid": grid_desc,
         "region": "glb",
         "tracking_prefix": cv.get("tracking_prefix", "hdl:21.14107"),
         "output_path_template": _OUTPUT_PATH_TEMPLATE,
         "output_file_template": _OUTPUT_FILE_TEMPLATE,
     }
+    if meta.get("contact"):
+        cfg["contact"] = meta["contact"]
+    emd_url = resolve_by_resolution(meta.get("emd_urls"), resolution)
+    if emd_url:
+        cfg["EMD"] = emd_url
+    return cfg
 
 
 def filled_for_cmor(

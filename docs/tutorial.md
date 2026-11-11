@@ -16,6 +16,7 @@ python run_reference_case.py \
   --model noresm --model-res NorESM3-LM \
   --years 1:50:10 \
   --experiment piControl --variant-label r1i1p1f1 \
+  --data-version v20260401 \
   --plots --html \
   --dry-run
 ```
@@ -33,6 +34,7 @@ nohup python run_reference_case.py \
   --model noresm --model-res NorESM3-LM \
   --years 1:50:10 \
   --experiment piControl --variant-label r1i1p1f1 \
+  --data-version v20260401 --data-version-note "starting the cmorization" \
   --plots --html \
   > ~/reference_run.log 2>&1 &
 ```
@@ -66,6 +68,21 @@ tail -f ~/reference_run.log
 : The CMIP7 `experiment_id`, such as `piControl`. It is checked against the
   controlled vocabulary before any work starts, so a typo fails in seconds
   rather than hours.
+
+`--data-version vYYYYMMDD`
+: The edition of the dataset this output belongs to, as a date. It is the last
+  directory of every output path, after the grid label. There is no default,
+  because one taken from the clock would put a run split over several days into
+  several version directories, and the DRS keeps every time range of a variable
+  in one of them. Separate runs covering different years of one case have to be
+  given the same value.
+
+`--data-version-note`
+: What this version is for, such as `"starting the cmorization"` or `"fixing a
+  problem in the cice history files"`. It is recorded with the version and the
+  date in `cmor/data_versions.md`, which is what says why one edition replaced
+  another. A version already recorded there keeps the note it has, so the
+  chunks of one run add one line between them.
 
 `--years FIRST:LAST:INCREMENT`
 : The years to process, and how many go in each output file. `1:50:10` gives

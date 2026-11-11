@@ -30,13 +30,18 @@ carry the model's own variable names.
 
 | path | holds |
 |---|---|
-| `cmor/CMIP7/MIP-DRS7/...` | the CMORized files, in the CMIP7 directory structure |
+| `cmor/MIP-DRS7/CMIP7/...` | the CMORized files, in the CMIP7 directory structure |
 | `cmor/logs/<realm>/` | one CMOR log per variable, region and frequency |
+| `cmor/data_versions.md` | one line per data version, with the date and what it was for |
 
 A CMOR log is named for what it covers, such as
 `cmor_ta_tavg-p19-hxy-air_glb_mon_1-10.log`. The directory structure under
-`CMIP7/` is described under [The CMOR output structure](#the-cmor-output-structure)
-below.
+`MIP-DRS7/` is described under
+[The CMOR output structure](#the-cmor-output-structure) below.
+
+`data_versions.md` sits beside that tree rather than inside it, so it is not
+part of what gets published. A run adds a line the first time it sees a
+version, giving the version, the date and whatever `--data-version-note` said.
 
 ### The validation reports
 
@@ -105,7 +110,7 @@ records which steps finished, and a rerun reads it to decide what to skip.
 CMIP7 prescribes the directory structure, and there is no realm level in it:
 
 ```text
-CMIP7/MIP-DRS7/CMIP/NCC/NorESM3-LM/piControl/r1i1p1f1/glb/mon/tas/tavg-h2m-hxy-u/g202/
+MIP-DRS7/CMIP7/CMIP/NCC/NorESM3-LM/piControl/r1i1p1f1/glb/mon/tas/tavg-h2m-hxy-u/g202/v20260401/
     tas_tavg-h2m-hxy-u_mon_glb_g202_NorESM3-LM_piControl_r1i1p1f1_000101-001012.nc
 ```
 
@@ -113,8 +118,38 @@ Every realm writes into the same tree, and a file's path records its variable
 but not which realm produced it. The region level is `glb` for most variables,
 and `nh` or `sh` for the hemispheric sea-ice aggregates.
 
+The last level is the data version, given by `--data-version`. Every time range
+of a variable belongs in one version directory, so a run split into year chunks
+gives all of them the same value.
+
 Each filename ends with the period it covers, so `--years 1:50:10` gives five
 files per variable whose periods join up with no gap or overlap.
+
+### Global metadata
+
+The shared CMIP7 dataset builder uses `variant_label` for the ensemble member
+and `grid_label` for the output grid. It does not emit the legacy attributes
+`member_id`, `grid`, `branch_method`, `source_type`, `sub_experiment_id` or
+`sub_experiment`. Fixed-field writing also leaves `grid` unset. Parent-experiment
+attributes and branch times are unchanged by this metadata update.
+
+NorESM output from every realm includes:
+
+```text
+contact = "Please send any requests or bug reports to noresm-ncc@met.no."
+EMD = "https://emd.wcrp-cmip.org/docs/Model/?model=noresm3-lm"
+```
+
+The `EMD` URL above is for NorESM3-LM; NorESM3-MM uses `model=noresm3-mm`.
+These optional attributes come from `contact` and the resolution-keyed
+`emd_urls` in the `dataset` block of
+[`noresm_grids.yaml`](../data/noresm_grids.yaml). An unlisted resolution has no
+`EMD` attribute, rather than pointing to a different model configuration.
+CESM does not inherit NorESM's contact or documentation URL.
+
+This policy applies to newly generated output using the shared builder.
+Existing files are not modified, and callers supplying their own dataset JSON
+remain responsible for its attributes.
 
 ## The end-of-run table
 

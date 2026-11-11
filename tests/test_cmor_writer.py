@@ -8,9 +8,14 @@ import xarray as xr
 
 from cmip7_prep.cmor_writer import CmorSession
 from cmip7_prep.cmor_utils import build_dataset_cfg
+from cmip7_prep.mapping_compat import _safe_eval
 
 
-def test_cmor_session_basic(tmp_path):
+@pytest.mark.parametrize(
+    ("model", "resolution"),
+    [("cesm", "ne30"), ("noresm", "NorESM3-LM"), ("noresm", "NorESM3-MM")],
+)
+def test_cmor_session_basic(tmp_path, model, resolution):
     """Test CmorSession context manager and basic variable writing using real CMOR."""
     tables_root = Path(__file__).parent.parent / "cmip7-cmor-tables"
     tables_root.mkdir(parents=True, exist_ok=True)
@@ -59,12 +64,13 @@ def test_cmor_session_basic(tmp_path):
         branded_variable_name = BrandedName()
 
     dataset_cfg = build_dataset_cfg(
-        model="cesm",
-        resolution="ne30",
+        model=model,
+        resolution=resolution,
         experiment="piControl",
         frequency="mon",
         ripf="r1i1p1f1",
         tables_root=tables_root,
+        data_version="v20200101",
     )
     log_dir = tmp_path
     log_name = "cmor_test.log"
@@ -73,8 +79,135 @@ def test_cmor_session_basic(tmp_path):
         dataset_attrs=dataset_cfg,
         log_dir=log_dir,
         log_name=log_name,
+        outdir=tmp_path / "cmor",
     ) as session:
-        session.write_variable(ds, CMIPVar(), VDef())
+        written_path = session.write_variable(ds, CMIPVar(), VDef())
+
+    with xr.open_dataset(written_path) as written:
+        with open(
+            tables_root
+            / "tables-cvs"
+            / "split-view"
+            / "required_global_attributes.json",
+            encoding="utf-8",
+        ) as handle:
+            required_attrs = json.load(handle)
+        assert set(required_attrs).issubset(written.attrs)
+        assert {
+            "branch_method",
+            "grid",
+            "member_id",
+            "source_type",
+            "sub_experiment_id",
+            "sub_experiment",
+        }.isdisjoint(written.attrs)
+        assert written.attrs["variant_label"] == dataset_cfg["variant_label"]
+        assert written.attrs["grid_label"] == dataset_cfg["grid_label"]
+        assert written.attrs["source_id"] == dataset_cfg["source_id"]
+        if model == "noresm":
+            assert written.attrs["contact"] == dataset_cfg["contact"]
+            assert written.attrs["EMD"] == dataset_cfg["EMD"]
+        else:
+            assert {"contact", "EMD"}.isdisjoint(written.attrs)
+        np.testing.assert_allclose(
+            written["tas"].squeeze(drop=True).values, data, rtol=1e-6
+        )
+
+
+@pytest.mark.parametrize(
+    ("source_dim", "source_size", "target_dim", "output_dim", "variable_name"),
+    [
+        ("fates_levpft", 15, "vegtype", "type", "gppVgt"),
+        ("fates_levlanduse", 5, "landuse", "landuse", "gppLut"),
+    ],
+)
+def test_cmor_writes_mapped_vegetation_types(
+    tmp_path, *, source_dim, source_size, target_dim, output_dim, variable_name
+):
+    """CMOR preserves mapped category labels, grouped values and missing urban."""
+    source = xr.DataArray(
+        np.broadcast_to(
+            np.arange(1.0, source_size + 1)[None, :, None, None],
+            (2, source_size, 4, 8),
+        ),
+        dims=("time", source_dim, "lat", "lon"),
+        coords={
+            "time": [15, 45],
+            source_dim: np.arange(source_size),
+            "lat": np.linspace(-90, 90, 4),
+            "lon": np.linspace(0, 360, 8, endpoint=False),
+        },
+    )
+    grouped = _safe_eval(
+        f"map_multi_dimension(FATES_GPP_PF, {source_dim})",
+        {"FATES_GPP_PF": source},
+    )
+    branded = f"{variable_name}_tavg-u-hxy-multi"
+    ds = grouped.to_dataset(name=branded)
+    ds["time_bnds"] = (("time", "bnds"), [[0, 30], [30, 60]])
+    ds["time"].attrs.update(
+        units="days since 2000-01-01", calendar="noleap", bounds="time_bnds"
+    )
+    ds["lat"].attrs["units"] = "degrees_north"
+    ds["lon"].attrs["units"] = "degrees_east"
+
+    class VDef:  # pylint: disable=too-few-public-methods
+        """Land GPP on mapped categories."""
+
+        name = variable_name
+        branded_variable_name = branded
+        units = "kg m-2 s-1"
+        table = "land"
+        levels = {}
+
+    class CMIPVar:  # pylint: disable=too-few-public-methods
+        """Branded variable identifier."""
+
+        class BrandedName:  # pylint: disable=too-few-public-methods
+            """Name wrapper used by the writer."""
+
+            name = branded
+
+        branded_variable_name = BrandedName()
+
+    tables_root = Path(__file__).parent.parent / "cmip7-cmor-tables"
+    cfg = build_dataset_cfg(
+        model="noresm",
+        resolution="NorESM3-LM",
+        experiment="piControl",
+        frequency="mon",
+        ripf="r1i1p1f1",
+        tables_root=tables_root,
+        data_version="v20261103",
+        realm="land",
+    )
+    with CmorSession(
+        tables_root=tables_root,
+        dataset_attrs=cfg,
+        log_dir=tmp_path,
+        log_name=f"cmor_{variable_name}.log",
+        outdir=tmp_path / "cmor",
+        realm="land",
+    ) as session:
+        written_path = session.write_variable(ds, CMIPVar(), VDef())
+
+    with xr.open_dataset(written_path) as written:
+        with open(
+            tables_root / "tables" / "CMIP7_coordinate.json", encoding="utf-8"
+        ) as handle:
+            requested = json.load(handle)["axis_entry"][target_dim]["requested"]
+        labels = [
+            value.decode() if isinstance(value, bytes) else str(value)
+            for value in written["sector"].values
+        ]
+        assert written["sector"].dims == (output_dim,)
+        assert labels == requested == grouped[target_dim].values.tolist()
+        assert source_dim not in written.dims
+        np.testing.assert_allclose(
+            written[variable_name].transpose("time", output_dim, "lat", "lon").values,
+            grouped.values,
+            equal_nan=True,
+        )
 
 
 def test_cmor_session_multiple_timeseries(tmp_path):
@@ -145,6 +278,7 @@ def test_cmor_session_multiple_timeseries(tmp_path):
         frequency="mon",
         ripf="r1i1p1f1",
         tables_root=tables_root,
+        data_version="v20200101",
     )
     log_dir = tmp_path
     log_name = "cmor_test_multi.log"
@@ -218,6 +352,7 @@ def test_cmor_session_zonal_mean_plev39(tmp_path):
         frequency="mon",
         ripf="r1i1p1f1",
         tables_root=tables_root,
+        data_version="v20200101",
     )
     with CmorSession(
         tables_root=tables_root,
@@ -277,6 +412,7 @@ def _session(tmp_path, realm):
         frequency="month",
         ripf="r1i1p1f1",
         tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        data_version="v20200101",
         realm=realm,
     )
     return CmorSession(

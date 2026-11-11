@@ -77,6 +77,7 @@ CMORize one realm and frequency:
 python cmor_driver.py \
   --realm atmos --frequency mon \
   --model noresm --model-res NorESM3-LM --experiment piControl \
+  --data-version v20260401 \
   --tsdir <outdir>/timeseries/atmos \
   --outdir <outdir>/cmor \
   --years 1:50:10 \
@@ -88,7 +89,8 @@ Validate one realm and frequency:
 
 ```bash
 python validate_cmor_output.py \
-  --model noresm --realm seaIce --experiment piControl --frequency mon \
+  --model noresm --source-id NorESM3-LM \
+  --realm seaIce --experiment piControl --frequency mon \
   --root-output-path <outdir>/cmor \
   --strict --plot-timeseries --plot-maps --html
 ```

@@ -7,6 +7,7 @@ has run. It reports:
 
 * variables with CMOR log errors
 * variables expected for the selected subset that were not produced
+* requested variables mapped to another realm or unmapped
 * dimension inventory for variables that were produced
 * files whose period another file of the same variable already covers
 
@@ -39,16 +40,24 @@ from cmip7_prep.step_exit import (
     RAN_AND_FOUND_PROBLEMS,
     RAN_AND_PASSED,
 )
+from cmip7_prep.include_patterns import patterns_for_variable
 from cmip7_prep.mapping_compat import expand_entry, packaged_mapping_resource
+from cmip7_prep.mapping_compat import Mapping
+from cmip7_prep.mapping_ownership import (
+    MappingOwnership,
+    classify_mapping_ownership,
+    load_mapping_catalog,
+    mapping_owners,
+)
 from cmip7_prep.output_files import redundant_pairs
-
+from cmip7_prep.pipeline import _filename_contains_var
 from cmor_driver import REALM_YAML_MAP
 
 logger = logging.getLogger("cmip7_prep.validate_cmor_output")
 
 MODEL_NAMING_MAPS = {
-    "noresm": ["NCC", "NorESM3-LM"],
-    "cesm": ["NCAR", "CESM3"],
+    "noresm": ("NCC", ("NorESM3-LM", "NorESM3-MM")),
+    "cesm": ("NCAR", ("CESM3",)),
 }
 
 CANONICAL_REALM_MAP = {
@@ -111,6 +120,19 @@ def parse_args() -> argparse.Namespace:
         help="Model whose CMIP7 output should be validated",
     )
     parser.add_argument(
+        "--source-id",
+        choices=sorted(
+            source_id
+            for _, source_ids in MODEL_NAMING_MAPS.values()
+            for source_id in source_ids
+        ),
+        required=True,
+        help=(
+            "Exact CMIP source_id directory to validate; keeps runs at "
+            "different resolutions separate"
+        ),
+    )
+    parser.add_argument(
         "--realm",
         choices=[
             "atmos",
@@ -151,6 +173,14 @@ def parse_args() -> argparse.Namespace:
         "--custom-yaml",
         default=None,
         help="Optional custom YAML mapping file",
+    )
+    parser.add_argument(
+        "--timeseries-dir",
+        default=None,
+        help=(
+            "Directory of time series files the CMORization read. The default "
+            "is timeseries/<realm> beside the CMIP7 output tree."
+        ),
     )
     parser.add_argument(
         "--variables",
@@ -201,7 +231,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="Exit with code 1 if missing variables or log errors are found",
+        help="Exit with code 1 if log errors, missing variables, or redundant "
+        "files are found.  Requested variables that no YAML maps are listed in "
+        "the report but do not fail the run.",
     )
     parser.add_argument(
         "--log-level",
@@ -209,7 +241,14 @@ def parse_args() -> argparse.Namespace:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    valid_source_ids = MODEL_NAMING_MAPS[args.model][1]
+    if args.source_id not in valid_source_ids:
+        parser.error(
+            f"--source-id {args.source_id!r} is not valid for --model "
+            f"{args.model!r}; choose from {', '.join(valid_source_ids)}"
+        )
+    return args
 
 
 def canonical_realm(realm: str) -> str:
@@ -268,7 +307,10 @@ def resolve_logs_dir(root_output_path: str | Path, cmip_root: Path) -> Path:
 def default_report_dir(args: argparse.Namespace) -> Path:
     """Compute the default report directory for a validation subset."""
     root = Path(args.root_output_path).expanduser().resolve()
-    subset = f"{args.model}_{args.realm}_{args.experiment}_{args.frequency}"
+    subset = (
+        f"{args.model}_{args.source_id}_{args.realm}_"
+        f"{args.experiment}_{args.frequency}"
+    )
     return root / "validation_reports" / subset
 
 
@@ -343,18 +385,43 @@ def get_requested_variables(
     return {var.branded_variable_name.name for var in cmip_vars}
 
 
-def filter_expected_variables(
+def classify_validation_variables(
+    candidate_names: set[str],
+    owners: dict[str, tuple[str, ...]],
+    realm: str,
     yaml_variables: dict[str, dict[str, Any]],
-    requested_variables: set[str] | None,
-    selected_variables: list[str] | None,
-) -> list[str]:
-    """Resolve the expected variable list for this validation subset."""
-    yaml_names = set(yaml_variables)
-    if requested_variables is not None:
-        yaml_names &= requested_variables
-    if selected_variables:
-        yaml_names &= set(selected_variables)
-    return sorted(yaml_names)
+) -> tuple[MappingOwnership, list[str]]:
+    """Classify candidate variables and identify those expected in this realm.
+
+    Candidate names are classified using the model-wide mapping owners. A name
+    is expected only if this realm is one of its owners and the name is present
+    in this realm's YAML mapping. Other candidates remain categorized in the
+    returned ownership result (for example, as mapped elsewhere or unmapped).
+
+    Args:
+        candidate_names: Branded variable names requested for validation.
+        owners: Mapping from each variable name to its owning realm names.
+        realm: Realm whose output is being validated.
+        yaml_variables: Variables defined in this realm's mapping YAML.
+
+    Returns:
+        The ownership classification and a sorted list of variable names
+        expected in this realm.
+    """
+    ownership = classify_mapping_ownership(candidate_names, owners, realm)
+    expected_variables = sorted(ownership.owned_here & set(yaml_variables))
+    return ownership, expected_variables
+
+
+def select_produced_files(
+    expected_variables: list[str], scanned_files: dict[str, list[Path]]
+) -> dict[str, list[Path]]:
+    """Keep scanned files for variables expected in this validation subset."""
+    return {
+        variable: scanned_files[variable]
+        for variable in expected_variables
+        if variable in scanned_files
+    }
 
 
 def relative_to_report(path: str | Path, report_dir: Path) -> str:
@@ -390,6 +457,105 @@ def build_variable_provenance(
             "description": entry.get("description"),
         }
     return provenance
+
+
+def resolve_timeseries_dir(
+    root_output_path: str | Path, realm: str, override: str | None = None
+) -> Path | None:
+    """Resolve the directory of time series files the CMORization read."""
+    if override:
+        return Path(override).expanduser().resolve()
+    root = Path(root_output_path).expanduser().resolve()
+    # run_reference_case.py writes timeseries/ and cmor/ side by side under its
+    # --outdir, and --root-output-path is that cmor/ directory.
+    candidates = (root.parent / "timeseries" / realm, root / "timeseries" / realm)
+    return next((path for path in candidates if path.is_dir()), None)
+
+
+def diagnose_missing_variables(
+    missing_variables: list[str],
+    mapping: Mapping,
+    timeseries_dir: Path,
+    model: str,
+    realm: str,
+    frequency: str,
+) -> list[dict[str, Any]]:
+    """Say which source field stopped each variable that was not written.
+
+    cmor_driver.py reads a variable from the time series files whose name holds
+    one of its source fields as a dot-delimited token, such as '.DOD550.', and
+    only from the history files its sampling is written to. A variable with no
+    such file is skipped before CMOR starts and leaves no CMOR log, so the
+    reason is recorded here rather than read back from one.
+    """
+    file_names = [path.name for path in timeseries_dir.glob("*.nc")]
+    diagnosis = []
+    for variable in missing_variables:
+        fields = mapping.timeseries_source_vars(variable, frequency)
+        try:
+            include_patterns = patterns_for_variable(model, realm, frequency, variable)
+            no_pattern_reason = None
+        except ValueError as exc:
+            include_patterns = []
+            no_pattern_reason = str(exc)
+        absent = []
+        other_history_files = []
+        for field in fields:
+            matches = [
+                name for name in file_names if _filename_contains_var(name, field)
+            ]
+            if not matches:
+                absent.append(field)
+            elif include_patterns and not any(
+                pattern in name for name in matches for pattern in include_patterns
+            ):
+                other_history_files.append(field)
+        diagnosis.append(
+            {
+                "variable": variable,
+                "source_model_vars": fields,
+                "include_patterns": include_patterns,
+                "fields_absent": absent,
+                "fields_in_other_history_files": other_history_files,
+                "reason": _missing_variable_reason(
+                    fields,
+                    absent,
+                    other_history_files,
+                    include_patterns,
+                    no_pattern_reason,
+                ),
+            }
+        )
+    return diagnosis
+
+
+def _missing_variable_reason(
+    fields: list[str],
+    absent: list[str],
+    other_history_files: list[str],
+    include_patterns: list[str],
+    no_pattern_reason: str | None,
+) -> str:
+    """Word the reason one variable was not written."""
+    if no_pattern_reason:
+        return f"No history file is declared for this variable: {no_pattern_reason}"
+    if absent:
+        return (
+            f"The time series holds no {', '.join(absent)}, so this variable "
+            "could not be computed."
+        )
+    if other_history_files:
+        return (
+            f"{', '.join(other_history_files)} is in the time series, but not "
+            f"in the {', '.join(include_patterns)} history files this variable "
+            "is read from."
+        )
+    if not fields:
+        return "The mapping names no time-varying source field."
+    return (
+        "Every source field is in the time series, so this variable failed "
+        "later. The reason is in the cmor_driver.py step log."
+    )
 
 
 def parse_log_name(log_path: Path) -> tuple[str, str] | None:
@@ -485,24 +651,60 @@ def scan_output_tree(
     cmip_root: Path,
     *,
     model: str,
+    source_id: str,
     experiment: str,
     frequency: str,
     expected_variables: set[str],
+    located_variables: set[str] | None = None,
     ensemble_member: str | None = None,
 ) -> tuple[dict[str, list[Path]], list[ProducedFileRecord], list[dict[str, str]]]:
-    """Scan the CMIP7 tree and inventory produced files for the selected subset."""
+    """Find and inspect CMOR files for the requested validation subset.
+
+    The scan is restricted to the model's institution, exact source ID,
+    experiment, frequency, and optional ensemble member. A file is retained
+    only when its variable directory and dimension-folder form an exact
+    branded name in ``expected_variables`` or ``located_variables``, as
+    ``hur`` and ``tavg-p19-hxy-air`` form ``hur_tavg-p19-hxy-air``.
+
+    Every retained path is added to the produced-file mapping. A file is
+    opened and its dimensions recorded only when its branded name is in
+    ``expected_variables``. Inspection failures are captured separately so one
+    unreadable file does not stop the scan.
+
+    Args:
+        cmip_root: Root of the CMIP output tree, usually the ``CMIP7``
+            directory.
+        model: Model key used to determine the institution ID.
+        source_id: Exact CMIP source ID directory to include.
+        experiment: Experiment ID to include.
+        frequency: Output frequency to include.
+        expected_variables: Exact branded variable names to scan for and
+            inspect.
+        located_variables: Optional branded variable names to record the paths
+            of without opening them, for variables another realm owns where
+            the report needs only to know whether output exists.
+        ensemble_member: Optional ensemble label filter, such as
+            ``r1i1p1f1``.
+
+    Returns:
+        A tuple containing paths grouped by branded variable name, one
+        inventory record per successfully inspected file, and inspection
+        errors for files that could not be opened or inspected.
+    """
     produced: dict[str, list[Path]] = defaultdict(list)
     inventory: list[ProducedFileRecord] = []
     inspection_errors: list[dict[str, str]] = []
     institution_id = MODEL_NAMING_MAPS[model][0]
-    pattern = cmip_root.glob(
-        # The region level is not always 'glb': the hemispheric sea-ice
-        # aggregates (siarea, siextent, sivol, sisnmass) are written under 'nh'
-        # and 'sh'.  Pinning it to 'glb' made those files invisible here, so
-        # they were reported missing while sitting on disk.
-        f"*/{institution_id}/{MODEL_NAMING_MAPS[model][1]}/{experiment}/*/*/{frequency}/*/*/*/*.nc"
-    )
-    for file_path in sorted(pattern):
+    retained_variables = set(expected_variables) | set(located_variables or ())
+    # The glob matches a path such as
+    # CMIP/NCC/NorESM3-LM/esm-hist/r1i1p1f1/glb/mon/tas/tavg-h2m-hxy-u/g253.
+    # The region is '*' rather than 'glb' because siarea, siextent, sivol and
+    # sisnmass are written under 'nh' and 'sh'.
+    head = f"*/{institution_id}/{source_id}/{experiment}/*/*/{frequency}/*/*/*"
+    # A file sits in a data version directory below the grid label, such as
+    # v20261102, or directly below the grid label.
+    found = set(cmip_root.glob(f"{head}/*/*.nc")) | set(cmip_root.glob(f"{head}/*.nc"))
+    for file_path in sorted(found):
         relative = file_path.relative_to(cmip_root)
         # sys.exit(4)
         parts = relative.parts
@@ -510,6 +712,8 @@ def scan_output_tree(
             logger.debug("Skipping unexpected output path layout: %s", file_path)
             continue
 
+        # The first ten parts are the activity id down to the grid label,
+        # whether or not a data version directory follows them.
         (
             _,
             consortium,
@@ -521,11 +725,13 @@ def scan_output_tree(
             variable,
             dimension_folder,
             grid_type,
-            _,
-        ) = parts[:11]
+        ) = parts[:10]
 
         if institution_id and consortium != institution_id:
             logger.debug("Skipping due to institution_id filter: %s", institution_id)
+            continue
+        if path_model != source_id:
+            logger.debug("Skipping source_id %s; expected %s", path_model, source_id)
             continue
         if ensemble_member and path_ensemble != ensemble_member:
             logger.debug("Skipping due to ensemble filter: %s", ensemble_member)
@@ -533,11 +739,16 @@ def scan_output_tree(
         # Keep only the variables that this realm and frequency expect.  All
         # realms write their output into one CMIP7 output directory, and a
         # file's path records its variable but not the realm that produced it,
-        # so the variable name is the only way to tell whose file this is.
-        if f"{variable}_{dimension_folder}" not in expected_variables:
+        # so its full branded name is the only way to distinguish variables.
+        branded_variable = f"{variable}_{dimension_folder}"
+        if branded_variable not in retained_variables:
             logger.debug("Not expected here, skipping: %s", variable)
             continue
-        produced[f"{variable}_{dimension_folder}"].append(file_path)
+        produced[branded_variable].append(file_path)
+        # A variable another realm owns is listed but not opened, because the
+        # report records only whether its output exists.
+        if branded_variable not in expected_variables:
+            continue
         try:
             data_var, dims, sizes = open_dataset_inventory(file_path, variable)
         except Exception as exc:  # pylint: disable=broad-except
@@ -636,13 +847,22 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
         "# CMOR Validation Summary",
         "",
         f"- Model: {report['scope']['model']}",
+        f"- Source ID: {report['scope']['source_id']}",
         f"- Realm: {report['scope']['realm']}",
         f"- Experiment: {report['scope']['experiment']}",
         f"- Frequency: {report['scope']['frequency']}",
         f"- Expected variables: {report['counts']['expected_variables']}",
         f"- Produced variables: {report['counts']['produced_variables']}",
         f"- Variables with log errors: {report['counts']['variables_with_log_errors']}",
-        f"- Missing variables: {report['counts']['missing_variables']}",
+        f"- Mapping exists but variable not written: "
+        f"{report['counts']['missing_variables']}",
+        f"- Of those, variables whose source field the model did not write: "
+        f"{report['counts'].get('missing_with_absent_source_fields', 0)}",
+        f"- Mapped to another realm: {report['counts']['mapped_elsewhere']}",
+        f"- Mapped elsewhere but not found in output: "
+        f"{report['counts']['mapped_elsewhere_missing']}",
+        f"- No mapping exists for variable: "
+        f"{report['counts']['unmapped_requested_variables']}",
         f"- Redundant files: {report['counts']['redundant_files']}",
         "",
         "## Variables With Log Errors",
@@ -650,8 +870,23 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     ]
     for variable in report["variables_with_log_errors"]:
         lines.append(f"- {variable}")
-    lines.extend(["", "## Missing Variables", ""])
+    lines.extend(["", "## Mapping Exists But Variable Not Written", ""])
+    missing_reasons = {
+        item["variable"]: item["reason"]
+        for item in report.get("missing_variable_diagnosis", [])
+    }
     for variable in report["expected_but_not_produced"]:
+        reason = missing_reasons.get(variable)
+        lines.append(f"- {variable}" + (f" — {reason}" if reason else ""))
+    lines.extend(["", "## Variables Mapped to Another Realm", ""])
+    for item in report["mapped_elsewhere"]:
+        status = "found in shared output" if item["found_in_output"] else "not found"
+        lines.append(
+            f"- {item['variable']} (owner: {', '.join(item['owner_realms'])}; "
+            f"{status})"
+        )
+    lines.extend(["", "## No Mapping Exists For Variable", ""])
+    for variable in report["unmapped_requested_variables"]:
         lines.append(f"- {variable}")
     lines.extend(["", "## Redundant Files", ""])
     for item in report["redundant_files"]:
@@ -1002,6 +1237,9 @@ def build_report(
     inspection_errors: list[dict[str, str]],
     plot_outputs: dict[str, dict[str, str]],
     variable_provenance: dict[str, dict[str, Any]],
+    mapped_elsewhere: list[dict[str, Any]],
+    unmapped_requested_variables: list[str],
+    missing_variable_diagnosis: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Build the structured validation report payload."""
     variables_with_log_errors = sorted(
@@ -1037,7 +1275,8 @@ def build_report(
             "experiment": args.experiment,
             "frequency": args.frequency,
             "ensemble_member": args.ensemble_member,
-            "institution_id": MODEL_NAMING_MAPS.get(args.model, [None, None])[0],
+            "institution_id": MODEL_NAMING_MAPS.get(args.model, (None, ()))[0],
+            "source_id": args.source_id,
             "root_output_path": str(Path(args.root_output_path).expanduser().resolve()),
             "yaml_path": str(yaml_path),
         },
@@ -1046,12 +1285,23 @@ def build_report(
             "produced_variables": len(produced_variables),
             "variables_with_log_errors": len(variables_with_log_errors),
             "missing_variables": len(expected_but_not_produced),
+            "missing_with_absent_source_fields": sum(
+                bool(item["fields_absent"]) for item in missing_variable_diagnosis
+            ),
             "inspection_errors": len(inspection_errors),
+            "mapped_elsewhere": len(mapped_elsewhere),
+            "mapped_elsewhere_missing": sum(
+                not item["found_in_output"] for item in mapped_elsewhere
+            ),
+            "unmapped_requested_variables": len(unmapped_requested_variables),
             "redundant_files": len(redundant_files),
         },
         "expected_variables": expected_variables,
         "variables_with_log_errors": variables_with_log_errors,
         "expected_but_not_produced": expected_but_not_produced,
+        "missing_variable_diagnosis": missing_variable_diagnosis,
+        "mapped_elsewhere": mapped_elsewhere,
+        "unmapped_requested_variables": unmapped_requested_variables,
         "produced_variables": produced_variables,
         "dimension_inventory": dimension_inventory,
         "variable_provenance": variable_provenance,
@@ -1070,14 +1320,26 @@ def print_summary(report: dict[str, Any]) -> None:
         f"{report['counts']['variables_with_log_errors']} with log errors, "
         f"{report['counts']['missing_variables']} missing."
     )
+    print(
+        f"Mapped to another realm: {report['counts']['mapped_elsewhere']}; "
+        f"not found in shared output: "
+        f"{report['counts']['mapped_elsewhere_missing']}; "
+        f"unmapped: {report['counts']['unmapped_requested_variables']}."
+    )
     if report["variables_with_log_errors"]:
         print("Variables with log errors:")
         for variable in report["variables_with_log_errors"]:
             print(f"  - {variable}")
     if report["expected_but_not_produced"]:
-        print("Expected but not produced:")
+        reasons = {
+            item["variable"]: item["reason"]
+            for item in report.get("missing_variable_diagnosis", [])
+        }
+        print("Mapping exists but variable not written:")
         for variable in report["expected_but_not_produced"]:
             print(f"  - {variable}")
+            if variable in reasons:
+                print(f"    {reasons[variable]}")
     if report["redundant_files"]:
         print(
             "Files whose period another file of the same variable also covers, "
@@ -1109,12 +1371,30 @@ def main() -> int:
 
     yaml_path = get_yaml_path(args.model, args.realm, args.custom_yaml)
     yaml_variables = load_yaml_variables(yaml_path)
+    selected_mapping = Mapping.from_yaml(yaml_path)
+    selected_mapping.default_freq = args.frequency
+    mappings = load_mapping_catalog(
+        args.model,
+        REALM_YAML_MAP,
+        selected_realm=args.realm,
+        selected_mapping=selected_mapping,
+    )
+    owners = mapping_owners(mappings, args.frequency)
     requested_variables = get_requested_variables(
         args.realm, args.experiment, args.frequency
     )
-    expected_variables = filter_expected_variables(
-        yaml_variables, requested_variables, args.variables
+    candidate_names = (
+        set(requested_variables)
+        if requested_variables is not None
+        else set(yaml_variables)
     )
+    if args.variables:
+        candidate_names &= set(args.variables)
+    ownership, expected_variables = classify_validation_variables(
+        candidate_names, owners, args.realm, yaml_variables
+    )
+    mapped_elsewhere_names = set(ownership.mapped_elsewhere)
+    unmapped_requested_variables = sorted(ownership.unmapped)
     expected_variable_set = set(expected_variables)
     if not expected_variable_set:
         logger.warning(
@@ -1125,15 +1405,29 @@ def main() -> int:
         )
 
     log_records = collect_log_records(logs_dir, expected_variable_set, args.frequency)
-    produced_files, inventory_records, inspection_errors = scan_output_tree(
+    scanned_files, inventory_records, inspection_errors = scan_output_tree(
         cmip_root,
         model=args.model,
+        source_id=args.source_id,
         experiment=args.experiment,
         frequency=args.frequency,
         expected_variables=expected_variable_set,
+        located_variables=mapped_elsewhere_names,
         ensemble_member=args.ensemble_member,
     )
+    produced_files = select_produced_files(expected_variables, scanned_files)
     dimension_inventory = summarize_dimension_inventory(inventory_records)
+    mapped_elsewhere = []
+    for variable, owner_realms in sorted(ownership.mapped_elsewhere.items()):
+        matches = [str(path) for path in scanned_files.get(variable, [])]
+        mapped_elsewhere.append(
+            {
+                "variable": variable,
+                "owner_realms": list(owner_realms),
+                "found_in_output": bool(matches),
+                "files": matches,
+            }
+        )
 
     plot_outputs = {"timeseries": {}, "maps": {}, "zonal": {}}
     if args.plot_timeseries or args.plot_maps:
@@ -1164,6 +1458,29 @@ def main() -> int:
 
     variable_provenance = build_variable_provenance(yaml_variables, expected_variables)
 
+    missing_variables = sorted(expected_variable_set - set(produced_files))
+    timeseries_dir = resolve_timeseries_dir(
+        args.root_output_path, args.realm, args.timeseries_dir
+    )
+    missing_variable_diagnosis = []
+    if missing_variables and timeseries_dir is None:
+        logger.warning(
+            "No time series directory was found for realm %s, so the %d "
+            "variables that were not written are reported without a reason. "
+            "Pass --timeseries-dir to validate_cmor_output.py to name it.",
+            args.realm,
+            len(missing_variables),
+        )
+    elif missing_variables:
+        missing_variable_diagnosis = diagnose_missing_variables(
+            missing_variables,
+            selected_mapping,
+            timeseries_dir,
+            args.model,
+            args.realm,
+            args.frequency,
+        )
+
     report = build_report(
         args,
         yaml_path,
@@ -1174,13 +1491,34 @@ def main() -> int:
         inspection_errors,
         plot_outputs,
         variable_provenance,
+        mapped_elsewhere,
+        unmapped_requested_variables,
+        missing_variable_diagnosis,
     )
 
     write_json_report(report, report_dir / "validation_summary.json")
     write_csv_rows(report["log_records"], report_dir / "log_records.csv")
     write_csv_rows(
-        [{"variable": variable} for variable in report["expected_but_not_produced"]],
+        [
+            {
+                "variable": item["variable"],
+                "reason": item["reason"],
+                "source_model_vars": "; ".join(item["source_model_vars"]),
+                "fields_absent": "; ".join(item["fields_absent"]),
+                "fields_in_other_history_files": "; ".join(
+                    item["fields_in_other_history_files"]
+                ),
+                "include_patterns": "; ".join(item["include_patterns"]),
+            }
+            for item in report["missing_variable_diagnosis"]
+        ]
+        or [{"variable": variable} for variable in report["expected_but_not_produced"]],
         report_dir / "missing_variables.csv",
+    )
+    write_csv_rows(report["mapped_elsewhere"], report_dir / "mapped_elsewhere.csv")
+    write_csv_rows(
+        [{"variable": variable} for variable in report["unmapped_requested_variables"]],
+        report_dir / "unmapped_variables.csv",
     )
     write_csv_rows(
         report["dimension_inventory"], report_dir / "dimension_inventory.csv"
@@ -1202,9 +1540,13 @@ def main() -> int:
         index_path = build_site(report_dir.parent, args.html_dir)
         print(f"HTML interface written to {index_path}")
 
+    # An unmapped variable means no YAML maps it yet, which is a gap in the
+    # mappings rather than a fault in this run's output.  The report lists them;
+    # failing on them would make --strict fail for every realm that has one.
     if args.strict and (
         report["variables_with_log_errors"]
         or report["expected_but_not_produced"]
+        or report["counts"]["mapped_elsewhere_missing"]
         or report["redundant_files"]
     ):
         return RAN_AND_FOUND_PROBLEMS

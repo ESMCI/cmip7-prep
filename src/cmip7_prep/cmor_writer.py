@@ -1301,6 +1301,26 @@ class CmorSession(
         # -------------------------
         # Map dimension names to axis IDs
         # -------------------------
+        vegtype_id = None
+        if "vegtype" in var_dims:
+            if "vegtype" not in ds.coords:
+                raise ValueError("vegtype requires vegetation-type coordinate labels")
+            vegtype_id = cmor.axis(
+                table_entry="vegtype",
+                units="",
+                coord_vals=ds["vegtype"].values.tolist(),
+            )
+
+        landuse_id = None
+        if "landuse" in var_dims:
+            if "landuse" not in ds.coords:
+                raise ValueError("landuse requires land-use coordinate labels")
+            landuse_id = cmor.axis(
+                table_entry="landuse",
+                units="",
+                coord_vals=ds["landuse"].values.tolist(),
+            )
+
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
@@ -1321,6 +1341,8 @@ class CmorSession(
             "yq": lat_id,  # MOM6
             "fates_levpft": funcax_id,
             "fates_levfuel": funcax_id,
+            "vegtype": vegtype_id,
+            "landuse": landuse_id,
         }
         axes_ids = []
         for d in var_dims:
@@ -1428,13 +1450,9 @@ class CmorSession(
             )
             logger.debug("FX variable %s define lon_id %s", name, lon_id)
             logger.debug("Writing fx variable %s on curvilinear grid", name)
-            cmor.set_cur_dataset_attribute("grid", "curvilinear")
-            # cmor.set_cur_dataset_attribute("grid_label", "gn")
             if name == "deptho":
                 name = "deptho_ti-u-hxy-sea"
         else:
-            cmor.set_cur_dataset_attribute("grid", "1x1 degree")
-            # cmor.set_cur_dataset_attribute("grid_label", "gr")
             if name in ("areacella_ti-u-hxy-u", "sftlf_ti-u-hxy-u"):
                 self.load_table(self.tables_root, "land")
             elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
