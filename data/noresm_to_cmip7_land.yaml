@@ -113,7 +113,7 @@ variables:
   fracInLut_tsum-u-hxy-lnd: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
 
   fracLut_tpt-u-hxy-u: FATES_PATCHAREA_LU*FATES_FRACTION
-  
+
   fracOutLut_tsum-u-hxy-lnd: (FATES_TRANSITION_MATRIX_LULU)*FATES_FRACTION
 
   gppLut_tavg-u-hxy-multi: map_multi_dimension(FATES_GPP_LU, fates_levlanduse)*FATES_FRACTION
@@ -128,7 +128,7 @@ variables:
 
   gpp_tavg-u-hxy-tree: (sumover_index(FATES_GPP_PF, indexlist=[1, 2, 3, 4, 5, 6],
     dimname='fates_levpft'))*FATES_FRACTION
-  
+
   grassFracC3_tavg-u-hxy-u: (sumover_index(FATES_CROWNAREA_PF, indexlist=[12, 13],
     dimname='fates_levpft'))*FATES_FRACTION
 
@@ -144,7 +144,7 @@ variables:
   lai_tavg-u-hxy-lnd: (FATES_LAI)*FATES_FRACTION
 
   landCoverFrac_tavg-u-hxy-u: FATES_PATCHAREA_LU*FATES_FRACTION
-  
+
   mrro_tavg-u-hxy-lnd: QRUNOFF
 
   mrrob_tavg-u-hxy-lnd: QDRAI
