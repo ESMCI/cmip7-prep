@@ -110,6 +110,7 @@ def build_dataset_cfg(
     data_version: str,
     realm: str = "atmos",
     license_id: str = "CC-BY-4.0",
+    branch: dict | None = None,
 ) -> dict:
     """Assemble the CMOR dataset-attribute dict for one run.
 
@@ -121,6 +122,12 @@ def build_dataset_cfg(
     ``data_version`` is the vYYYYMMDD edition the output belongs to. It fills
     the <version> directory at the end of the DRS path, and every invocation
     writing one dataset has to be given the same value.
+
+    ``branch`` holds the branch attributes of a run that starts from another
+    run, as ``branch_time.branch_attributes`` returns them.  An empty dict
+    says the run has no parent, and the parent attributes are then left out
+    of the output.  The same is done for an experiment the CV gives no parent.
+    None says the run was not looked at, and the output carries placeholders.
     """
     cv = _load_controlled_vocabulary(str(tables_root))
     meta = load_regrid_maps(model).get("dataset") or {}
@@ -175,7 +182,33 @@ def build_dataset_cfg(
     )
     mip_era = cv.get("mip_era", "CMIP7")
 
-    return {
+    cv_gives_a_parent = bool(experiment_entry.get("parent_experiment_id"))
+    parent = {
+        "parent_mip_era": mip_era,
+        "parent_activity_id": parent_activity_id,
+        "parent_experiment_id": parent_experiment_id,
+        "parent_source_id": source_id,
+        "parent_variant_label": ripf,
+    }
+    if branch is None:
+        parent.update(
+            {
+                "branch_method": "no parent",
+                "branch_time_in_parent": 0.0,
+                "branch_time_in_child": 0.0,
+                "parent_time_units": "days since 1850-01-01",
+            }
+        )
+    elif branch and cv_gives_a_parent:
+        parent.update(branch)
+    elif cv_gives_a_parent:
+        # CMOR requires parent_experiment_id when the CV gives the experiment
+        # a parent, and accepts "no parent" for a run that has none.
+        parent = {"parent_experiment_id": "no parent"}
+    else:
+        parent = {}
+
+    cfg = {
         "version": checked_data_version(data_version),
         "mip_era": mip_era,
         "activity_id": activity_id,
@@ -204,15 +237,7 @@ def build_dataset_cfg(
         "forcing_index": forcing_index,
         "variant_label": ripf,
         "member_id": ripf,
-        "branch_method": "no parent",
-        "branch_time_in_parent": 0.0,
-        "branch_time_in_child": 0.0,
-        "parent_mip_era": mip_era,
-        "parent_activity_id": parent_activity_id,
-        "parent_experiment_id": parent_experiment_id,
-        "parent_source_id": source_id,
-        "parent_variant_label": ripf,
-        "parent_time_units": "days since 1850-01-01",
+        **parent,
         "horizontal_label": "hxy",
         "vertical_label": "l",
         "temporal_label": "tavg",
@@ -225,6 +250,7 @@ def build_dataset_cfg(
         "output_path_template": _OUTPUT_PATH_TEMPLATE,
         "output_file_template": _OUTPUT_FILE_TEMPLATE,
     }
+    return cfg
 
 
 def filled_for_cmor(
