@@ -80,6 +80,7 @@ land:
 seaIce:
   mon:
     tavg: [cice.h.]
+    tpt:  [cice.h2_inst.]
   day:
     tavg: [cice.h1.]
 
