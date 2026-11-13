@@ -126,8 +126,7 @@ def build_dataset_cfg(
     meta = load_regrid_maps(model).get("dataset") or {}
     base_source_id = meta.get("base_source_id")
 
-    # grid_label is the per-realm grid code from the model grid table; its
-    # human-readable description comes from the CV keyed by that same code.
+    # grid_label is the per-realm grid code from the model grid table.
     try:
         grid_label = get_realm_row(model, resolution, realm)["grid_label"]
     except (ValueError, KeyError):
@@ -139,7 +138,6 @@ def build_dataset_cfg(
             realm,
         )
         grid_label = "gr"
-    grid_desc = (cv.get("grid_label") or {}).get(grid_label, "")
 
     # Branded source_id/nominal_resolution written to the output, by resolution.
     source_id = resolve_by_resolution(
@@ -175,7 +173,7 @@ def build_dataset_cfg(
     )
     mip_era = cv.get("mip_era", "CMIP7")
 
-    return {
+    cfg = {
         "version": checked_data_version(data_version),
         "mip_era": mip_era,
         "activity_id": activity_id,
@@ -188,7 +186,6 @@ def build_dataset_cfg(
         "institution": institution,
         "source_id": source_id,
         "source": source,
-        "source_type": meta.get("source_type", "AOGCM"),
         "nominal_resolution": nominal_resolution,
         "license_id": license_id,
         "license": license_str,
@@ -196,15 +193,11 @@ def build_dataset_cfg(
         "frequency": frequency,
         "experiment_id": experiment,
         "experiment": experiment_entry.get("experiment", experiment),
-        "sub_experiment_id": "none",
-        "sub_experiment": "none",
         "realization_index": realization_index,
         "initialization_index": initialization_index,
         "physics_index": physics_index,
         "forcing_index": forcing_index,
         "variant_label": ripf,
-        "member_id": ripf,
-        "branch_method": "no parent",
         "branch_time_in_parent": 0.0,
         "branch_time_in_child": 0.0,
         "parent_mip_era": mip_era,
@@ -219,12 +212,17 @@ def build_dataset_cfg(
         "area_label": "u",
         "branding_suffix": "tavg-l-hxy-u",
         "grid_label": grid_label,
-        "grid": grid_desc,
         "region": "glb",
         "tracking_prefix": cv.get("tracking_prefix", "hdl:21.14107"),
         "output_path_template": _OUTPUT_PATH_TEMPLATE,
         "output_file_template": _OUTPUT_FILE_TEMPLATE,
     }
+    if meta.get("contact"):
+        cfg["contact"] = meta["contact"]
+    emd_url = resolve_by_resolution(meta.get("emd_urls"), resolution)
+    if emd_url:
+        cfg["EMD"] = emd_url
+    return cfg
 
 
 def filled_for_cmor(
