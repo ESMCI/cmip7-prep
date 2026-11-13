@@ -97,6 +97,16 @@ class Plan:
         return [step for step in self.steps if step.stage == stage]
 
 
+def env_run_path(case_dir: os.PathLike | str) -> Path:
+    """Return where an archived case keeps its env_run.xml.
+
+    The archive holds the case directory under the case's own name, as
+    <case-dir>/<case name>/env_run.xml.
+    """
+    case_dir = Path(case_dir)
+    return case_dir / case_dir.name / "env_run.xml"
+
+
 def realms_for(model: str) -> list[str]:
     """Return the realms a model's include-pattern table declares."""
     return list(load_include_patterns(model))
@@ -326,6 +336,7 @@ def build_plan(
                         sheet=sheet,
                         variant_label=variant_label,
                         tables_root=tables_root,
+                        case_dir=case_dir,
                     )
                 )
             if "validate" in stages:
@@ -454,6 +465,7 @@ def _cmor_step(
     sheet,
     variant_label=None,
     tables_root=None,
+    case_dir=None,
 ) -> Step:
     """Return the cmor_driver.py step for one realm and frequency."""
     command = [
@@ -488,6 +500,10 @@ def _cmor_step(
         command += ["--variant-label", variant_label]
     if tables_root:
         command += ["--tables-root", str(tables_root)]
+    # The driver reads the run's parent from env_run.xml, so the case is
+    # named only when the archive holds that file.
+    if case_dir and env_run_path(case_dir).is_file():
+        command += ["--case-dir", str(case_dir)]
     return Step(
         key=f"cmor-{realm}-{frequency}",
         stage="cmor",

@@ -429,6 +429,22 @@ class TestCommands:
         command = _command_of(plan, "cmor-seaIce-mon")
         assert command[command.index("--tables-root") + 1] == "/some/cmip7-cmor-tables"
 
+    def test_the_case_reaches_cmorization_when_it_holds_env_run(
+        self, case_dir, tmp_path
+    ):
+        """The driver reads the run's parent from the case's env_run.xml."""
+        env_run = case_dir / case_dir.name / "env_run.xml"
+        env_run.parent.mkdir()
+        env_run.touch()
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+        command = _command_of(plan, "cmor-seaIce-mon")
+        assert command[command.index("--case-dir") + 1] == str(case_dir)
+
+    def test_the_case_is_not_named_without_env_run(self, case_dir, tmp_path):
+        """An archive without env_run.xml is CMORized as before."""
+        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+        assert "--case-dir" not in _command_of(plan, "cmor-seaIce-mon")
+
     def test_the_two_stages_are_given_separate_worker_counts(self, case_dir, tmp_path):
         """Both stages run workers, but not the same number of them.
 
