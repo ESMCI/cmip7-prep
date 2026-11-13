@@ -7,6 +7,7 @@ from cmip7_prep import include_patterns as ip
 from cmip7_prep.include_patterns import (
     DATA_DIR,
     all_include_patterns,
+    first_history_file_for_fx,
     get_include_patterns,
     load_include_patterns,
     patterns_for_variable,
@@ -318,3 +319,37 @@ def test_unknown_frequency_names_the_available_ones():
     """A typo says what the realm actually defines rather than returning nothing."""
     with pytest.raises(ValueError, match="available:"):
         all_include_patterns("noresm", "atmos", frequencies=["nosuchfreq"])
+
+
+def _history_name(model, realm, frequency, stamp):
+    """Return a history file name in the first tavg stream of a frequency."""
+    pattern = get_include_patterns(model, realm, frequency, sampling="tavg")[0]
+    return f"case.{pattern.strip('.')}.{stamp}.nc"
+
+
+class TestFirstHistoryFileForFx:
+    """Tests for choosing the history file fx fields are read from."""
+
+    def test_the_earliest_file_is_chosen(self, tmp_path):
+        """CLM writes some time-constant fields only to the first file."""
+        for stamp in ("0002-01", "0001-02", "0001-01"):
+            (tmp_path / _history_name("noresm", "land", "mon", stamp)).touch()
+        chosen = first_history_file_for_fx("noresm", "land", tmp_path)
+        assert chosen.name == _history_name("noresm", "land", "mon", "0001-01")
+
+    def test_monthly_is_preferred_over_daily(self, tmp_path):
+        """The monthly stream carries the most fields."""
+        (tmp_path / _history_name("noresm", "land", "day", "0001-01-01")).touch()
+        (tmp_path / _history_name("noresm", "land", "mon", "0001-01")).touch()
+        chosen = first_history_file_for_fx("noresm", "land", tmp_path)
+        assert chosen.name == _history_name("noresm", "land", "mon", "0001-01")
+
+    def test_another_stream_is_used_when_monthly_is_absent(self, tmp_path):
+        """A case without monthly output still has its fx fields somewhere."""
+        (tmp_path / _history_name("noresm", "land", "day", "0001-01-01")).touch()
+        chosen = first_history_file_for_fx("noresm", "land", tmp_path)
+        assert chosen.name == _history_name("noresm", "land", "day", "0001-01-01")
+
+    def test_none_without_history(self, tmp_path):
+        """Nothing to read from is reported, not guessed."""
+        assert first_history_file_for_fx("noresm", "land", tmp_path) is None
