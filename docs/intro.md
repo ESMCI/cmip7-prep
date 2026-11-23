@@ -65,7 +65,6 @@ the plots out and the run is a fraction of that.
 =======
 ## The CMIP7 pieces it uses
 
->>>>>>> main
 Four things come from CMIP7 rather than from this repository. Each one answers a
 different question.
 
