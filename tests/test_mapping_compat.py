@@ -3,6 +3,8 @@ Unit tests for the Mapping class in mapping_compat.py.
 Tests mapping compatibility and normalization logic for CMIP7 variable mapping workflows.
 """
 
+# pylint: disable=too-many-lines
+
 import json
 import tempfile
 import xarray as xr
