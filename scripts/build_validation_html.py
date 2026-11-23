@@ -580,6 +580,20 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
           return el("li", {}, [el("span", { "class": "mono", text: name })]);
         })));
       }
+      if (elsewhere.length > 0) {
+        body.appendChild(el("h3", { text: "Mapped to another realm (" + elsewhere.length + ")" }));
+        body.appendChild(el("ul", { "class": "issue-list" }, elsewhere.map(function (v) {
+          var entry = el("li", {}, [el("span", { "class": "mono", text: v.variable })]);
+          entry.appendChild(el("span", { "class": "reason", text: "Owner: " + v.owner_realms.join(", ") + (v.found_in_output ? "; found in shared output" : "; not found in shared output") }));
+          return entry;
+        })));
+      }
+      if (unmapped.length > 0) {
+        body.appendChild(el("h3", { text: "No mapping exists for variable (" + unmapped.length + ")" }));
+        body.appendChild(el("ul", { "class": "issue-list" }, unmapped.map(function (name) {
+          return el("li", {}, [el("span", { "class": "mono", text: name })]);
+        })));
+      }
       if (empty.length > 0) {
         body.appendChild(el("h3", { text: "Produced but with zero-length dimensions (" + empty.length + ")" }));
         body.appendChild(el("ul", { "class": "issue-list" }, empty.map(function (v) {

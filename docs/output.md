@@ -125,6 +125,32 @@ gives all of them the same value.
 Each filename ends with the period it covers, so `--years 1:50:10` gives five
 files per variable whose periods join up with no gap or overlap.
 
+### Global metadata
+
+The shared CMIP7 dataset builder uses `variant_label` for the ensemble member
+and `grid_label` for the output grid. It does not emit the legacy attributes
+`member_id`, `grid`, `branch_method`, `source_type`, `sub_experiment_id` or
+`sub_experiment`. Fixed-field writing also leaves `grid` unset. Parent-experiment
+attributes and branch times are unchanged by this metadata update.
+
+NorESM output from every realm includes:
+
+```text
+contact = "Please send any requests or bug reports to noresm-ncc@met.no."
+EMD = "https://emd.wcrp-cmip.org/docs/Model/?model=noresm3-lm"
+```
+
+The `EMD` URL above is for NorESM3-LM; NorESM3-MM uses `model=noresm3-mm`.
+These optional attributes come from `contact` and the resolution-keyed
+`emd_urls` in the `dataset` block of
+[`noresm_grids.yaml`](../data/noresm_grids.yaml). An unlisted resolution has no
+`EMD` attribute, rather than pointing to a different model configuration.
+CESM does not inherit NorESM's contact or documentation URL.
+
+This policy applies to newly generated output using the shared builder.
+Existing files are not modified, and callers supplying their own dataset JSON
+remain responsible for its attributes.
+
 ## The end-of-run table
 
 When a run finishes it prints a table of what it did. The table is written to

@@ -1,17 +1,114 @@
 """Additional unit tests for cmor_utils.py (functions not covered by doctests)."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import xarray as xr
 
 from cmip7_prep.cmor_utils import (
     bounds_from_centers_1d,
+    existing_fx_files,
+    build_dataset_cfg,
     filled_for_cmor,
     open_existing_fx,
     resolve_table_filename,
     roll_for_monotonic_with_bounds,
     sigma_mid_and_bounds,
 )
+from cmip7_prep.regrid_maps import get_realm_row
+
+
+@pytest.mark.parametrize("resolution", ["NorESM3-LM", "NorESM3-MM"])
+@pytest.mark.parametrize(
+    "realm",
+    [
+        "atmos",
+        "aerosol",
+        "atmosChem",
+        "land",
+        "ocean",
+        "ocnBgchem",
+        "seaIce",
+        "landIce",
+    ],
+)
+def test_noresm_cmip7_dataset_metadata(resolution, realm):
+    """All realms use CMIP7 identifiers and model-specific contact metadata."""
+    cfg = build_dataset_cfg(
+        model="noresm",
+        resolution=resolution,
+        experiment="piControl",
+        frequency="mon",
+        ripf="r2i3p4f5",
+        tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        data_version="v20261103",
+        realm=realm,
+    )
+    assert cfg["contact"] == (
+        "Please send any requests or bug reports to noresm-ncc@met.no."
+    )
+    assert cfg["EMD"] == (
+        f"https://emd.wcrp-cmip.org/docs/Model/?model={resolution.lower()}"
+    )
+    assert cfg["variant_label"] == "r2i3p4f5"
+    assert [
+        cfg[f"{index}_index"]
+        for index in ("realization", "initialization", "physics", "forcing")
+    ] == ["r2", "i3", "p4", "f5"]
+    assert cfg["source_id"] == resolution
+    assert cfg["grid_label"] == get_realm_row("noresm", resolution, realm)["grid_label"]
+    assert cfg["version"] == "v20261103"
+    assert "<variant_label>" in cfg["output_path_template"]
+    assert "<grid_label>" in cfg["output_path_template"]
+    assert "<variant_label>" in cfg["output_file_template"]
+    assert "<grid_label>" in cfg["output_file_template"]
+    assert {
+        "branch_method",
+        "grid",
+        "member_id",
+        "source_type",
+        "sub_experiment_id",
+        "sub_experiment",
+        "further_info_url",
+    }.isdisjoint(cfg)
+    assert cfg["parent_source_id"] == resolution
+    assert cfg["parent_variant_label"] == "r2i3p4f5"
+    assert cfg["branch_time_in_parent"] == 0.0
+    assert cfg["branch_time_in_child"] == 0.0
+
+
+def test_cesm_does_not_inherit_noresm_contact():
+    """Optional NorESM attributes are not added to CESM output."""
+    cfg = build_dataset_cfg(
+        model="cesm",
+        resolution="ne30",
+        experiment="piControl",
+        frequency="mon",
+        ripf="r1i1p1f1",
+        tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        data_version="v20261103",
+    )
+    assert {"contact", "EMD"}.isdisjoint(cfg)
+
+
+def test_unlisted_resolution_does_not_use_another_models_emd(caplog):
+    """An unlisted NorESM configuration keeps contact but omits the model URL."""
+    cfg = build_dataset_cfg(
+        model="noresm",
+        resolution="custom",
+        experiment="piControl",
+        frequency="mon",
+        ripf="r1i1p1f1",
+        tables_root=Path(__file__).parent.parent / "cmip7-cmor-tables",
+        data_version="v20261103",
+    )
+    assert cfg["contact"] == (
+        "Please send any requests or bug reports to noresm-ncc@met.no."
+    )
+    assert "EMD" not in cfg
+    assert "No grid name" in caplog.text
+
 
 # ---------------------------------------------------------------------------
 # bounds_from_centers_1d
@@ -215,22 +312,52 @@ class TestOpenExistingFx:
         assert open_existing_fx(tmp_path, "sftlf") is None
 
     def test_no_match_for_nonconforming_name(self, tmp_path):
-        """File without the required underscore prefix token returns None."""
+        """A file whose name does not start with the branded name is not it."""
         sub = tmp_path / "subdir"
         sub.mkdir()
-        nc_path = sub / "sftlf_fx_v1.nc"  # lacks a leading '_sftlf_' glob match
+        nc_path = sub / "r1i1p1_sftlf_ti-u-hxy-u_fx_v1.nc"
         ds = xr.Dataset({"sftlf": xr.DataArray(np.ones((4, 8)), dims=["lat", "lon"])})
         ds.to_netcdf(nc_path)
-        assert open_existing_fx(tmp_path, "sftlf") is None
+        assert open_existing_fx(tmp_path, "sftlf_ti-u-hxy-u") is None
 
     def test_finds_fx_with_correct_glob_pattern(self, tmp_path):
-        """File matching **/*_sftlf_fx_*.nc is returned as a DataArray."""
-        nc_path = tmp_path / "r1i1p1_sftlf_fx_test.nc"
+        """A CMIP7-named fx file is found, and its variable_id read from it."""
+        sub = tmp_path / "CMIP7" / "fx" / "sftlf"
+        sub.mkdir(parents=True)
+        nc_path = sub / "sftlf_ti-u-hxy-u_fx_glb_gr_NorESM3-LM_piControl_r1i1p1f1.nc"
         da = xr.DataArray(np.ones((4, 8)), dims=["lat", "lon"])
         xr.Dataset({"sftlf": da}).to_netcdf(nc_path)
-        result = open_existing_fx(tmp_path, "sftlf")
+        result = open_existing_fx(tmp_path, "sftlf_ti-u-hxy-u")
         assert result is not None
         assert result.dims == ("lat", "lon")
+
+
+class TestExistingFxFiles:
+    """Tests for finding fx output already on disk, by name only."""
+
+    NAME = "sftlf_ti-u-hxy-u_fx_glb_gr_NorESM3-LM_piControl_r1i1p1f1.nc"
+
+    def test_nothing_in_an_absent_directory(self, tmp_path):
+        """A first run has no output directory yet."""
+        assert not existing_fx_files(tmp_path / "missing", "sftlf_ti-u-hxy-u")
+
+    def test_found_anywhere_below(self, tmp_path):
+        """The DRS tree puts the file several levels down."""
+        sub = tmp_path / "a" / "b"
+        sub.mkdir(parents=True)
+        (sub / self.NAME).touch()
+        assert existing_fx_files(tmp_path, "sftlf_ti-u-hxy-u") == [sub / self.NAME]
+
+    def test_narrowed_to_one_dataset(self, tmp_path):
+        """Another experiment's or member's file does not count."""
+        (tmp_path / self.NAME).touch()
+        assert existing_fx_files(tmp_path, "sftlf_ti-u-hxy-u", "piControl", "r1i1p1f1")
+        assert not existing_fx_files(
+            tmp_path, "sftlf_ti-u-hxy-u", "historical", "r1i1p1f1"
+        )
+        assert not existing_fx_files(
+            tmp_path, "sftlf_ti-u-hxy-u", "piControl", "r2i1p1f1"
+        )
 
 
 # ---------------------------------------------------------------------------

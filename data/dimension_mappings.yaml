@@ -1,0 +1,20 @@
+# Source indices are 1-based positions, not coordinate labels.
+fates_levpft:
+  target_dimension: vegtype
+  source_size: 15
+  groups:
+    broadleaf_deciduous_trees: [5, 6]
+    broadleaf_evergreen_trees: [1, 4]
+    needleleaf_deciduous_trees: [3]
+    needleleaf_evergreen_tree: [2]
+    natural_grasses: [12, 13, 14]
+    crops: [15]
+    shrubs: [7, 8, 9, 10, 11]
+fates_levlanduse:
+  target_dimension: landuse
+  source_size: 5
+  groups:
+    primary_and_secondary_land: [1, 2]
+    pastures: [3, 4]
+    crops: [5]
+    urban: []

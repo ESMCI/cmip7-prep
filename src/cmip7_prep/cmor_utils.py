@@ -133,8 +133,7 @@ def build_dataset_cfg(
     meta = load_regrid_maps(model).get("dataset") or {}
     base_source_id = meta.get("base_source_id")
 
-    # grid_label is the per-realm grid code from the model grid table; its
-    # human-readable description comes from the CV keyed by that same code.
+    # grid_label is the per-realm grid code from the model grid table.
     try:
         grid_label = get_realm_row(model, resolution, realm)["grid_label"]
     except (ValueError, KeyError):
@@ -146,7 +145,6 @@ def build_dataset_cfg(
             realm,
         )
         grid_label = "gr"
-    grid_desc = (cv.get("grid_label") or {}).get(grid_label, "")
 
     # Branded source_id/nominal_resolution written to the output, by resolution.
     source_id = resolve_by_resolution(
@@ -193,14 +191,15 @@ def build_dataset_cfg(
     if branch is None:
         parent.update(
             {
-                "branch_method": "no parent",
                 "branch_time_in_parent": 0.0,
                 "branch_time_in_child": 0.0,
                 "parent_time_units": "days since 1850-01-01",
             }
         )
     elif branch and cv_gives_a_parent:
-        parent.update(branch)
+        parent.update(
+            {name: value for name, value in branch.items() if name != "branch_method"}
+        )
     elif cv_gives_a_parent:
         # CMOR requires parent_experiment_id when the CV gives the experiment
         # a parent, and accepts "no parent" for a run that has none.
@@ -221,7 +220,6 @@ def build_dataset_cfg(
         "institution": institution,
         "source_id": source_id,
         "source": source,
-        "source_type": meta.get("source_type", "AOGCM"),
         "nominal_resolution": nominal_resolution,
         "license_id": license_id,
         "license": license_str,
@@ -229,14 +227,11 @@ def build_dataset_cfg(
         "frequency": frequency,
         "experiment_id": experiment,
         "experiment": experiment_entry.get("experiment", experiment),
-        "sub_experiment_id": "none",
-        "sub_experiment": "none",
         "realization_index": realization_index,
         "initialization_index": initialization_index,
         "physics_index": physics_index,
         "forcing_index": forcing_index,
         "variant_label": ripf,
-        "member_id": ripf,
         **parent,
         "horizontal_label": "hxy",
         "vertical_label": "l",
@@ -244,12 +239,16 @@ def build_dataset_cfg(
         "area_label": "u",
         "branding_suffix": "tavg-l-hxy-u",
         "grid_label": grid_label,
-        "grid": grid_desc,
         "region": "glb",
         "tracking_prefix": cv.get("tracking_prefix", "hdl:21.14107"),
         "output_path_template": _OUTPUT_PATH_TEMPLATE,
         "output_file_template": _OUTPUT_FILE_TEMPLATE,
     }
+    if meta.get("contact"):
+        cfg["contact"] = meta["contact"]
+    emd_url = resolve_by_resolution(meta.get("emd_urls"), resolution)
+    if emd_url:
+        cfg["EMD"] = emd_url
     return cfg
 
 
@@ -651,24 +650,57 @@ def resolve_table_filename(tables_path: Path, key: str) -> str:
 def _fx_glob_pattern(name: str) -> str:
     """Return a glob pattern for finding fx files for a given variable name.
 
-    >>> _fx_glob_pattern("sftlf")
-    '**/*_sftlf_fx_*.nc'
-    >>> _fx_glob_pattern("areacella")
-    '**/*_areacella_fx_*.nc'
+    CMIP7 file names start with the branded variable name
+    (``<variable_id>_<branding_suffix>_<frequency>_...``), so the name must
+    begin the pattern: a leading ``*_`` never matched a real file.
+
+    >>> _fx_glob_pattern("sftlf_ti-u-hxy-u")
+    '**/sftlf_ti-u-hxy-u_fx_*.nc'
+    >>> _fx_glob_pattern("areacella_ti-u-hxy-u")
+    '**/areacella_ti-u-hxy-u_fx_*.nc'
     """
-    # CMOR filenames vary; this finds most fx files for this var
-    # e.g., *_sftlf_fx_*.nc  or sftlf_fx_*.nc
-    return f"**/*_{name}_fx_*.nc"
+    return f"**/{name}_fx_*.nc"
+
+
+def existing_fx_files(
+    outdir: Path | str,
+    name: str,
+    experiment: str | None = None,
+    variant_label: str | None = None,
+) -> list[Path]:
+    """Return fx files already written for one branded variable under outdir.
+
+    ``experiment`` and ``variant_label`` narrow the match to one dataset, since
+    the file name ends ``_<experiment_id>_<variant_label>.nc``.  Only names are
+    compared; nothing is opened.
+    """
+    outdir = Path(outdir)
+    if not outdir.is_dir():
+        return []
+    suffix = "".join(f"_{part}" for part in (experiment, variant_label) if part)
+    return sorted(
+        path
+        for path in outdir.glob(_fx_glob_pattern(name))
+        if path.name.endswith(f"{suffix}.nc")
+    )
 
 
 def open_existing_fx(outdir: Path, name: str) -> xr.DataArray | None:
-    """Search recursively for an existing fx file for this variable name."""
-    # Search recursively for an existing fx file for this var
-    for p in outdir.rglob(_fx_glob_pattern(name)):
+    """Search recursively for an existing fx file for this variable name.
+
+    ``name`` is the branded name the file is named by; inside the file CMOR
+    stores the data under the variable_id (``sftlf`` for ``sftlf_ti-u-hxy-u``),
+    so both are looked for.
+    """
+    candidates = [name]
+    if "_" in name:
+        candidates.append(name.rsplit("_", 1)[0])
+    for p in Path(outdir).rglob(_fx_glob_pattern(name)):
         try:
             ds = xr.open_dataset(p, engine="netcdf4")
-            if name in ds:
-                return ds[name]
+            for candidate in candidates:
+                if candidate in ds:
+                    return ds[candidate]
         except FileNotFoundError:
             return None
         except (OSError, ValueError) as e:

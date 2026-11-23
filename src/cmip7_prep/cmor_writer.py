@@ -20,6 +20,7 @@ import datetime as dt
 import logging
 from functools import lru_cache
 import cmor
+import netCDF4
 
 import numpy as np
 import xarray as xr
@@ -43,6 +44,14 @@ logger = logging.getLogger(__name__)
 # An ice thickness category whose maximum is above this is CICE's open top
 # category, which it records as 1e+08 m.
 OPEN_ICE_CATEGORY_M = 100.0
+_LEGACY_GLOBAL_ATTRIBUTES = (
+    "branch_method",
+    "grid",
+    "member_id",
+    "source_type",
+    "sub_experiment_id",
+    "sub_experiment",
+)
 
 
 def iceband_values_and_bounds(ncat) -> Tuple[np.ndarray, np.ndarray]:
@@ -1367,6 +1376,26 @@ class CmorSession(
         # -------------------------
         # Map dimension names to axis IDs
         # -------------------------
+        vegtype_id = None
+        if "vegtype" in var_dims:
+            if "vegtype" not in ds.coords:
+                raise ValueError("vegtype requires vegetation-type coordinate labels")
+            vegtype_id = cmor.axis(
+                table_entry="vegtype",
+                units="",
+                coord_vals=ds["vegtype"].values.tolist(),
+            )
+
+        landuse_id = None
+        if "landuse" in var_dims:
+            if "landuse" not in ds.coords:
+                raise ValueError("landuse requires land-use coordinate labels")
+            landuse_id = cmor.axis(
+                table_entry="landuse",
+                units="",
+                coord_vals=ds["landuse"].values.tolist(),
+            )
+
         dim_to_axis = {
             "time": time_id,
             "alev": alev_id,  # hybrid sigma
@@ -1387,6 +1416,8 @@ class CmorSession(
             "yq": lat_id,  # MOM6
             "fates_levpft": funcax_id,
             "fates_levfuel": funcax_id,
+            "vegtype": vegtype_id,
+            "landuse": landuse_id,
             "nc": iceband_id,
         }
         axes_ids = []
@@ -1495,13 +1526,9 @@ class CmorSession(
             )
             logger.debug("FX variable %s define lon_id %s", name, lon_id)
             logger.debug("Writing fx variable %s on curvilinear grid", name)
-            cmor.set_cur_dataset_attribute("grid", "curvilinear")
-            # cmor.set_cur_dataset_attribute("grid_label", "gn")
             if name == "deptho":
                 name = "deptho_ti-u-hxy-sea"
         else:
-            cmor.set_cur_dataset_attribute("grid", "1x1 degree")
-            # cmor.set_cur_dataset_attribute("grid_label", "gr")
             if name in ("areacella_ti-u-hxy-u", "sftlf_ti-u-hxy-u"):
                 self.load_table(self.tables_root, "land")
             elif name in ("sftof_ti-u-hxy-u", "deptho", "areacello"):
@@ -1676,7 +1703,10 @@ class CmorSession(
         data = ds[str(bvn)]
 
         logger.debug("Ensure fx variables are written and cached")  # debug
-        self.ensure_fx_written_and_cached(ds)
+        # Without the variable being written: when it is itself an fx field
+        # (an fx run), the side path would write it a second time to the same
+        # file before the main write below.
+        self.ensure_fx_written_and_cached(ds.drop_vars(str(bvn), errors="ignore"))
 
         units = getattr(vdef, "units", "") or ""
         self.load_table(self.tables_root, self.primarytable)
@@ -1847,4 +1877,9 @@ class CmorSession(
         written_path = cmor.close(var_id, file_name=True)
         if not written_path:
             raise RuntimeError(f"CMOR closed {bvn} without naming the file it wrote")
-        return Path(written_path)
+        path = Path(written_path)
+        with netCDF4.Dataset(path, mode="a") as output:
+            for name in _LEGACY_GLOBAL_ATTRIBUTES:
+                if name in output.ncattrs():
+                    output.delncattr(name)
+        return path

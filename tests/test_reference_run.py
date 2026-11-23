@@ -156,421 +156,467 @@ def test_source_id_for_resolution_uses_the_default_without_a_list(monkeypatch):
 # ---------------------------------------------------------------- plan shape
 
 
-class TestPlanShape:
-    """Tests for which steps a plan contains."""
+def test_covers_every_realm_by_default(case_dir, tmp_path):
+    """One timeseries step per realm, when no realms are named."""
+    plan = _plan(case_dir, tmp_path / "out")
+    timeseries = plan.for_stage("timeseries")
+    assert {step.realm for step in timeseries} == set(realms_for("noresm"))
+    assert len(timeseries) == 6
 
-    def test_covers_every_realm_by_default(self, case_dir, tmp_path):
-        """One timeseries step per realm, when no realms are named."""
-        plan = _plan(case_dir, tmp_path / "out")
-        timeseries = plan.for_stage("timeseries")
-        assert {step.realm for step in timeseries} == set(realms_for("noresm"))
-        assert len(timeseries) == 6
 
-    def test_cmor_and_validate_are_per_frequency(self, case_dir, tmp_path):
-        """CMOR and validation run once per realm and frequency."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        assert [step.key for step in plan.for_stage("cmor")] == [
-            "cmor-seaIce-mon",
-            "cmor-seaIce-day",
-        ]
-        assert [step.key for step in plan.for_stage("validate")] == [
-            "validate-seaIce-mon",
-            "validate-seaIce-day",
-        ]
+def test_cmor_and_validate_are_per_frequency(case_dir, tmp_path):
+    """CMOR and validation run once per realm and frequency."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    assert [step.key for step in plan.for_stage("cmor")] == [
+        "cmor-seaIce-mon",
+        "cmor-seaIce-day",
+    ]
+    assert [step.key for step in plan.for_stage("validate")] == [
+        "validate-seaIce-fx",
+        "validate-seaIce-mon",
+        "validate-seaIce-day",
+    ]
 
-    def test_coarse_frequencies_are_processed_first(self, case_dir, tmp_path):
-        """Monthly output is produced before daily, and daily before hourly.
 
-        A run that stops partway should have produced the most useful output,
-        and CMORizing daily data took 24 minutes on a real two-year case while
-        monthly took a fraction of that.
-        """
-        plan = _plan(case_dir, tmp_path / "out", realms=["atmos"])
-        assert [step.frequency for step in plan.for_stage("cmor")] == [
-            "mon",
-            "day",
-            "6hr",
-            "3hr",
-            "1hr",
-        ]
+def test_fx_is_one_step_per_realm(case_dir, tmp_path):
+    """Time-invariant fields are written once per realm, not per frequency."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce", "land"])
+    assert [step.key for step in plan.for_stage("fx")] == [
+        "cmor-seaIce-fx",
+        "cmor-land-fx",
+    ]
 
-    def test_realms_can_be_narrowed(self, case_dir, tmp_path):
-        """Naming realms restricts the plan to them."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["land", "seaIce"])
-        assert {step.realm for step in plan.steps} == {"land", "seaIce"}
 
-    def test_frequencies_can_be_narrowed(self, case_dir, tmp_path):
-        """Naming frequencies restricts each realm to the ones it declares."""
-        plan = _plan(
-            case_dir, tmp_path / "out", realms=["atmos"], frequencies=["mon", "day"]
-        )
-        assert [step.frequency for step in plan.for_stage("cmor")] == ["mon", "day"]
+def test_fx_without_validate_plans_no_fx_validation(case_dir, tmp_path):
+    """Validation of fx follows the validate stage like any other."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], stages=["fx"])
+    assert [step.key for step in plan.steps] == ["cmor-seaIce-fx"]
 
-    def test_frequency_a_realm_does_not_declare_is_skipped(self, case_dir, tmp_path):
-        """Asking seaIce for 1hr skips it rather than planning a doomed step."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], frequencies=["1hr"])
-        assert not plan.steps
-        assert any("seaIce" in reason for reason in plan.skipped)
 
-    def test_stages_can_be_narrowed(self, case_dir, tmp_path):
-        """Only the requested stages are planned."""
-        plan = _plan(
-            case_dir, tmp_path / "out", realms=["seaIce"], stages=["timeseries"]
-        )
-        assert {step.stage for step in plan.steps} == {"timeseries"}
+def test_coarse_frequencies_are_processed_first(case_dir, tmp_path):
+    """Monthly output is produced before daily, and daily before hourly.
 
-    def test_unknown_stage_is_rejected(self, case_dir, tmp_path):
-        """A misspelled stage fails immediately, not mid-run."""
-        with pytest.raises(ValueError, match="Unknown stage"):
-            _plan(case_dir, tmp_path / "out", stages=["timeseries", "cmorise"])
+    A run that stops partway should have produced the most useful output,
+    and CMORizing daily data took 24 minutes on a real two-year case while
+    monthly took a fraction of that.
+    """
+    plan = _plan(case_dir, tmp_path / "out", realms=["atmos"])
+    assert [step.frequency for step in plan.for_stage("cmor")] == [
+        "mon",
+        "day",
+        "6hr",
+        "3hr",
+        "1hr",
+    ]
 
-    def test_missing_component_is_skipped_not_fatal(self, tmp_path):
-        """A case without every component plans what it can and says so.
 
-        An archived case need not hold every component, so a missing directory
-        is reported rather than ending the run.
-        """
-        case = tmp_path / "case"
-        _write_history_files(case, "noresm", realms=["seaIce"])
-        plan = _plan(case, tmp_path / "out")
-        assert {step.realm for step in plan.steps} == {"seaIce"}
-        assert len(plan.skipped) == 5
-        assert all("no history directory" in reason for reason in plan.skipped)
+def test_realms_can_be_narrowed(case_dir, tmp_path):
+    """Naming realms restricts the plan to them."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land", "seaIce"])
+    assert {step.realm for step in plan.steps} == {"land", "seaIce"}
 
-    def test_only_frequencies_the_case_wrote_are_planned(self, tmp_path):
-        """A case that wrote only monthly output gets only monthly steps.
 
-        A table lists every frequency a realm can produce, but a run writes
-        only the streams it was configured for.  Planning the rest guarantees
-        a CMORization failure saying nothing about the code -- which is what
-        happened on a real ne30 case with no hourly output.
-        """
-        case = tmp_path / "case"
-        _write_history_files(case, "noresm", realms=["atmos"], frequencies=["mon"])
-        plan = _plan(case, tmp_path / "out", realms=["atmos"])
-        assert [step.frequency for step in plan.for_stage("cmor")] == ["mon"]
-        assert any("no history files" in reason for reason in plan.skipped)
+def test_frequencies_can_be_narrowed(case_dir, tmp_path):
+    """Naming frequencies restricts each realm to the ones it declares."""
+    plan = _plan(
+        case_dir, tmp_path / "out", realms=["atmos"], frequencies=["mon", "day"]
+    )
+    assert [step.frequency for step in plan.for_stage("cmor")] == ["mon", "day"]
 
-    def test_the_absent_frequencies_are_named(self, tmp_path):
-        """The report says which streams the case did not write."""
-        case = tmp_path / "case"
-        _write_history_files(
-            case, "noresm", realms=["atmos"], frequencies=["mon", "day"]
-        )
-        plan = _plan(case, tmp_path / "out", realms=["atmos"])
-        reason = next(r for r in plan.skipped if "no history files" in r)
-        for absent in ("1hr", "3hr", "6hr"):
-            assert absent in reason
-        for present in ("'mon'", "'day'"):
-            assert present not in reason
 
-    def test_all_stages_present_by_default(self, case_dir, tmp_path):
-        """The default plan runs all three stages."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        assert {step.stage for step in plan.steps} == set(STAGES)
+def test_frequency_a_realm_does_not_declare_is_skipped(case_dir, tmp_path):
+    """Asking seaIce for 1hr skips it rather than planning a doomed step."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], frequencies=["1hr"])
+    assert not plan.steps
+    assert any("seaIce" in reason for reason in plan.skipped)
+
+
+def test_stages_can_be_narrowed(case_dir, tmp_path):
+    """Only the requested stages are planned."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], stages=["timeseries"])
+    assert {step.stage for step in plan.steps} == {"timeseries"}
+
+
+def test_unknown_stage_is_rejected(case_dir, tmp_path):
+    """A misspelled stage fails immediately, not mid-run."""
+    with pytest.raises(ValueError, match="Unknown stage"):
+        _plan(case_dir, tmp_path / "out", stages=["timeseries", "cmorise"])
+
+
+def test_missing_component_is_skipped_not_fatal(tmp_path):
+    """A case without every component plans what it can and says so.
+
+    An archived case need not hold every component, so a missing directory
+    is reported rather than ending the run.
+    """
+    case = tmp_path / "case"
+    _write_history_files(case, "noresm", realms=["seaIce"])
+    plan = _plan(case, tmp_path / "out")
+    assert {step.realm for step in plan.steps} == {"seaIce"}
+    assert len(plan.skipped) == 5
+    assert all("no history directory" in reason for reason in plan.skipped)
+
+
+def test_only_frequencies_the_case_wrote_are_planned(tmp_path):
+    """A case that wrote only monthly output gets only monthly steps.
+
+    A table lists every frequency a realm can produce, but a run writes
+    only the streams it was configured for.  Planning the rest guarantees
+    a CMORization failure saying nothing about the code -- which is what
+    happened on a real ne30 case with no hourly output.
+    """
+    case = tmp_path / "case"
+    _write_history_files(case, "noresm", realms=["atmos"], frequencies=["mon"])
+    plan = _plan(case, tmp_path / "out", realms=["atmos"])
+    assert [step.frequency for step in plan.for_stage("cmor")] == ["mon"]
+    assert any("no history files" in reason for reason in plan.skipped)
+
+
+def test_the_absent_frequencies_are_named(tmp_path):
+    """The report says which streams the case did not write."""
+    case = tmp_path / "case"
+    _write_history_files(case, "noresm", realms=["atmos"], frequencies=["mon", "day"])
+    plan = _plan(case, tmp_path / "out", realms=["atmos"])
+    reason = next(r for r in plan.skipped if "no history files" in r)
+    for absent in ("1hr", "3hr", "6hr"):
+        assert absent in reason
+    for present in ("'mon'", "'day'"):
+        assert present not in reason
+
+
+def test_all_stages_present_by_default(case_dir, tmp_path):
+    """The default plan runs all three stages."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    assert {step.stage for step in plan.steps} == set(STAGES)
 
 
 # -------------------------------------------------------------- command form
 
 
-class TestTimeseriesCommand:
-    """Tests for the time series command a plan builds."""
-
-    def test_timeseries_command_points_at_the_right_history_dir(
-        self, case_dir, tmp_path
-    ):
-        """Each realm reads from its own component's history directory."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["land"])
-        command = _command_of(plan, "timeseries-land")
-        assert "--inputdir" in command
-        assert command[command.index("--inputdir") + 1] == str(
-            case_dir / "lnd" / "hist"
-        )
-
-    def test_timeseries_passes_every_declared_frequency(self, case_dir, tmp_path):
-        """One timeseries run covers all of a realm's frequencies."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["land"])
-        command = _command_of(plan, "timeseries-land")
-        at = command.index("--frequency")
-        assert command[at + 1 : at + 5] == frequencies_for("noresm", "land")
-
-    def test_tables_root_reaches_the_timeseries_step(self, case_dir, tmp_path):
-        """The CMOR table says which variables need surface pressure."""
-        plan = _plan(
-            case_dir,
-            tmp_path / "out",
-            realms=["aerosol"],
-            tables_root="/scratch/cmip7-cmor-tables",
-        )
-        command = _command_of(plan, "timeseries-aerosol")
-        assert (
-            command[command.index("--tables-root") + 1] == "/scratch/cmip7-cmor-tables"
-        )
-
-    def test_years_are_passed_through(self, case_dir, tmp_path):
-        """--years reaches gen_timeseries.py as --years-spec."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], years="1526:1527:2")
-        command = _command_of(plan, "timeseries-seaIce")
-        assert command[command.index("--years-spec") + 1] == "1526:1527:2"
-
-    def test_no_years_spec_when_not_asked_for(self, case_dir, tmp_path):
-        """Without --years the flag is absent, so the script's default applies."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        assert "--years-spec" not in _command_of(plan, "timeseries-seaIce")
-
-    def test_ice_sheet_only_for_landice(self, case_dir, tmp_path):
-        """landIce gets --ice-sheet; other realms do not."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["landIce", "seaIce"])
-        assert "--ice-sheet" in _command_of(plan, "timeseries-landIce")
-        assert "--ice-sheet" not in _command_of(plan, "timeseries-seaIce")
-
-    def test_ice_sheet_can_be_chosen(self, case_dir, tmp_path):
-        """The ice sheet given is the one passed on.
-
-        The Antarctic files must exist for the plan to include them: the
-        patterns carry the ice sheet name, so a Greenland-only case offers no
-        Antarctic streams to process.
-        """
-        _write_history_files_for_ice_sheet(case_dir, "ais")
-        plan = _plan(case_dir, tmp_path / "out", realms=["landIce"], ice_sheet="ais")
-        command = _command_of(plan, "timeseries-landIce")
-        assert command[command.index("--ice-sheet") + 1] == "ais"
+def test_timeseries_command_points_at_the_right_history_dir(case_dir, tmp_path):
+    """Each realm reads from its own component's history directory."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land"])
+    command = _command_of(plan, "timeseries-land")
+    assert "--inputdir" in command
+    assert command[command.index("--inputdir") + 1] == str(case_dir / "lnd" / "hist")
 
 
-class TestCommands:
-    """Tests for the CMOR and validation commands a plan builds."""
-
-    def test_cmor_reads_the_timeseries_the_first_stage_writes(self, case_dir, tmp_path):
-        """The CMOR step's --tsdir is the timeseries step's --outputdir."""
-        out = tmp_path / "out"
-        plan = _plan(case_dir, out, realms=["seaIce"])
-        wrote = _command_of(plan, "timeseries-seaIce")
-        reads = _command_of(plan, "cmor-seaIce-mon")
-        assert (
-            wrote[wrote.index("--outputdir") + 1] == reads[reads.index("--tsdir") + 1]
-        )
-
-    def test_validate_reads_where_cmor_writes(self, case_dir, tmp_path):
-        """Validation's --root-output-path is the CMOR step's --outdir."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        wrote = _command_of(plan, "cmor-seaIce-mon")
-        reads = _command_of(plan, "validate-seaIce-mon")
-        assert (
-            wrote[wrote.index("--outdir") + 1]
-            == reads[reads.index("--root-output-path") + 1]
-        )
-        assert reads[reads.index("--source-id") + 1] == "NorESM3-LM"
-
-    def test_validate_is_strict(self, case_dir, tmp_path):
-        """Validation fails the run on missing variables or log errors."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        assert "--strict" in _command_of(plan, "validate-seaIce-mon")
-
-    def test_resolution_and_experiment_reach_cmor(self, case_dir, tmp_path):
-        """The atmosphere resolution and experiment are passed to the CMOR step.
-
-        The CMOR step is given the atmosphere resolution rather than the grid
-        it will regrid from: cmor_driver.py derives that itself from --model
-        and --realm, so the derivation has one home. See test_grids.py.
-        """
-        plan = _plan(
-            case_dir,
-            tmp_path / "out",
-            realms=["atmos"],
-            model_res="NorESM3-MM",
-            experiment="historical",
-        )
-        command = _command_of(plan, "cmor-atmos-mon")
-        validate = _command_of(plan, "validate-atmos-mon")
-        assert command[command.index("--model-res") + 1] == "NorESM3-MM"
-        assert command[command.index("--experiment") + 1] == "historical"
-        assert validate[validate.index("--source-id") + 1] == "NorESM3-MM"
-
-    def test_data_version_reaches_cmorization(self, case_dir, tmp_path):
-        """Every CMOR step is given the version it writes under."""
-        plan = _plan(
-            case_dir,
-            tmp_path / "out",
-            realms=["atmos"],
-            data_version="v20260315",
-        )
-        for frequency in ("mon", "day"):
-            command = _command_of(plan, f"cmor-atmos-{frequency}")
-            assert command[command.index("--data-version") + 1] == "v20260315"
-
-    def test_variant_label_reaches_both_later_stages(self, case_dir, tmp_path):
-        """The ensemble member labels the output and the validation of it.
-
-        Without it every member would be written to the same path, so a real
-        cmorisation run needs it passed through rather than defaulted.
-        """
-        plan = _plan(
-            case_dir, tmp_path / "out", realms=["seaIce"], variant_label="r2i1p1f1"
-        )
-        cmor = _command_of(plan, "cmor-seaIce-mon")
-        validate = _command_of(plan, "validate-seaIce-mon")
-        assert cmor[cmor.index("--variant-label") + 1] == "r2i1p1f1"
-        assert validate[validate.index("--ensemble-member") + 1] == "r2i1p1f1"
-
-    def test_variant_label_is_absent_when_not_given(self, case_dir, tmp_path):
-        """Without one, the flag is omitted so each script's default applies."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        assert "--variant-label" not in _command_of(plan, "cmor-seaIce-mon")
-        assert "--ensemble-member" not in _command_of(plan, "validate-seaIce-mon")
-
-    def test_tables_root_reaches_cmorization(self, case_dir, tmp_path):
-        """A chosen tables checkout is used for the writing, not just the check."""
-        plan = _plan(
-            case_dir,
-            tmp_path / "out",
-            realms=["seaIce"],
-            tables_root="/some/cmip7-cmor-tables",
-        )
-        command = _command_of(plan, "cmor-seaIce-mon")
-        assert command[command.index("--tables-root") + 1] == "/some/cmip7-cmor-tables"
-
-    def test_the_case_reaches_cmorization_when_it_holds_env_run(
-        self, case_dir, tmp_path
-    ):
-        """The driver reads the run's parent from the case's env_run.xml."""
-        env_run = case_dir / case_dir.name / "env_run.xml"
-        env_run.parent.mkdir()
-        env_run.touch()
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        command = _command_of(plan, "cmor-seaIce-mon")
-        assert command[command.index("--case-dir") + 1] == str(case_dir)
-
-    def test_the_case_is_not_named_without_env_run(self, case_dir, tmp_path):
-        """An archive without env_run.xml is CMORized as before."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        assert "--case-dir" not in _command_of(plan, "cmor-seaIce-mon")
-
-    def test_the_two_stages_are_given_separate_worker_counts(self, case_dir, tmp_path):
-        """Both stages run workers, but not the same number of them.
-
-        A CMOR worker holds a variable's regridded arrays while a timeseries
-        worker only reads files, so one number for both would either waste the
-        timeseries stage or run CMORization out of memory.
-        """
-        plan = _plan(
-            case_dir, tmp_path / "out", realms=["seaIce"], ts_workers=16, cmor_workers=4
-        )
-        timeseries = _command_of(plan, "timeseries-seaIce")
-        cmor = _command_of(plan, "cmor-seaIce-mon")
-        assert timeseries[timeseries.index("--workers") + 1] == "16"
-        assert cmor[cmor.index("--workers") + 1] == "4"
-
-    def test_cmorization_has_a_worker_count_of_its_own_by_default(
-        self, case_dir, tmp_path
-    ):
-        """Asking for timeseries workers does not change the CMOR ones."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], ts_workers=16)
-        cmor = _command_of(plan, "cmor-seaIce-mon")
-        assert cmor[cmor.index("--workers") + 1] == str(CMOR_WORKERS)
-
-    def test_timeseries_resumes_unless_overwriting_was_asked_for(
-        self, case_dir, tmp_path
-    ):
-        """Overwriting is requested explicitly, so a repeat run resumes.
-
-        gen_timeseries.py keeps existing output and produces only the missing
-        timesteps unless told otherwise, which is what makes repeating an
-        interrupted run cheap.
-        """
-        resuming = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        rewriting = _plan(
-            case_dir,
-            tmp_path / "out2",
-            realms=["seaIce"],
-            overwrite_timeseries=True,
-        )
-        assert "--overwrite_timeseries" not in _command_of(
-            resuming, "timeseries-seaIce"
-        )
-        assert "--overwrite_timeseries" in _command_of(rewriting, "timeseries-seaIce")
-
-    def test_steps_run_with_the_interpreter_running_the_plan(self, case_dir, tmp_path):
-        """Every step uses this interpreter, not whatever 'python' means.
-
-        The stages have to run in the environment the run was started from,
-        and 'python' may not be on PATH at all.
-        """
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        for step in plan.steps:
-            assert step.command[0] == sys.executable
-
-    def test_plots_are_not_produced_unless_asked_for(self, case_dir, tmp_path):
-        """Plotting every variable is expensive, so it is opt-in."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
-        command = _command_of(plan, "validate-seaIce-mon")
-        for flag in ("--plot-timeseries", "--plot-maps", "--html", "--max-plots"):
-            assert flag not in command
-
-    def test_plots_are_requested_when_asked_for(self, case_dir, tmp_path):
-        """Both kinds of plot are asked for together."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], plots=True)
-        command = _command_of(plan, "validate-seaIce-mon")
-        assert "--plot-timeseries" in command
-        assert "--plot-maps" in command
-
-    def test_html_and_plot_limit_are_forwarded(self, case_dir, tmp_path):
-        """The browsable index and the plot limit reach validation."""
-        plan = _plan(
-            case_dir,
-            tmp_path / "out",
-            realms=["seaIce"],
-            plots=True,
-            html=True,
-            max_plots=12,
-        )
-        command = _command_of(plan, "validate-seaIce-mon")
-        assert "--html" in command
-        assert command[command.index("--max-plots") + 1] == "12"
-
-    def test_every_step_has_a_distinct_log_name(self, case_dir, tmp_path):
-        """Logs cannot overwrite one another."""
-        plan = _plan(case_dir, tmp_path / "out")
-        names = [step.log_name for step in plan.steps]
-        assert len(names) == len(set(names))
+def test_timeseries_passes_every_declared_frequency(case_dir, tmp_path):
+    """One timeseries run covers all of a realm's frequencies."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land"])
+    command = _command_of(plan, "timeseries-land")
+    at = command.index("--frequency")
+    assert command[at + 1 : at + 5] == frequencies_for("noresm", "land")
 
 
-class TestTheDataVersionRecord:
-    """What each edition of the dataset was for, beside the output tree."""
+def test_tables_root_reaches_the_timeseries_step(case_dir, tmp_path):
+    """The CMOR table says which variables need surface pressure."""
+    plan = _plan(
+        case_dir,
+        tmp_path / "out",
+        realms=["aerosol"],
+        tables_root="/scratch/cmip7-cmor-tables",
+    )
+    command = _command_of(plan, "timeseries-aerosol")
+    assert command[command.index("--tables-root") + 1] == "/scratch/cmip7-cmor-tables"
 
-    def test_a_version_and_its_note_are_recorded(self, tmp_path):
-        """The line holds the version, the date and the note."""
-        assert record_data_version(tmp_path, "v20200101", "starting the cmorization")
-        written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
-        assert "v20200101" in written
-        assert "starting the cmorization" in written
 
-    def test_a_second_chunk_adds_nothing(self, tmp_path):
-        """Four chunks of one run leave one line between them."""
-        record_data_version(tmp_path, "v20200101", "starting the cmorization")
-        assert not record_data_version(tmp_path, "v20200101", "a later chunk")
-        written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
-        assert written.count("v20200101") == 1
-        assert "a later chunk" not in written
+def test_years_are_passed_through(case_dir, tmp_path):
+    """--years reaches gen_timeseries.py as --years-spec."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], years="1526:1527:2")
+    command = _command_of(plan, "timeseries-seaIce")
+    assert command[command.index("--years-spec") + 1] == "1526:1527:2"
 
-    def test_a_later_version_is_appended(self, tmp_path):
-        """The earlier version stays, so the file reads as a history."""
-        record_data_version(tmp_path, "v20200101", "starting the cmorization")
-        record_data_version(tmp_path, "v20200215", "fixing the cice history files")
-        written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
-        assert written.index("v20200101") < written.index("v20200215")
 
-    def test_a_note_is_optional(self, tmp_path):
-        """A version with nothing to say about it is still recorded."""
-        assert record_data_version(tmp_path, "v20200101")
-        written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
-        assert "v20200101" in written
+def test_no_years_spec_when_not_asked_for(case_dir, tmp_path):
+    """Without --years the flag is absent, so the script's default applies."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    assert "--years-spec" not in _command_of(plan, "timeseries-seaIce")
 
-    def test_the_record_sits_above_the_drs_tree(self, tmp_path):
-        """It is in the CMOR root, so it is not inside what gets published."""
-        cmor_root = tmp_path / "cmor"
-        record_data_version(cmor_root, "v20200101")
-        assert (cmor_root / DATA_VERSION_RECORD).exists()
-        assert not (cmor_root / "MIP-DRS7").exists()
+
+def test_ice_sheet_only_for_landice(case_dir, tmp_path):
+    """landIce gets --ice-sheet; other realms do not."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["landIce", "seaIce"])
+    assert "--ice-sheet" in _command_of(plan, "timeseries-landIce")
+    assert "--ice-sheet" not in _command_of(plan, "timeseries-seaIce")
+
+
+def test_ice_sheet_can_be_chosen(case_dir, tmp_path):
+    """The ice sheet given is the one passed on.
+
+    The Antarctic files must exist for the plan to include them: the
+    patterns carry the ice sheet name, so a Greenland-only case offers no
+    Antarctic streams to process.
+    """
+    _write_history_files_for_ice_sheet(case_dir, "ais")
+    plan = _plan(case_dir, tmp_path / "out", realms=["landIce"], ice_sheet="ais")
+    command = _command_of(plan, "timeseries-landIce")
+    assert command[command.index("--ice-sheet") + 1] == "ais"
+
+
+def test_cmor_reads_the_timeseries_the_first_stage_writes(case_dir, tmp_path):
+    """The CMOR step's --tsdir is the timeseries step's --outputdir."""
+    out = tmp_path / "out"
+    plan = _plan(case_dir, out, realms=["seaIce"])
+    wrote = _command_of(plan, "timeseries-seaIce")
+    reads = _command_of(plan, "cmor-seaIce-mon")
+    assert wrote[wrote.index("--outputdir") + 1] == reads[reads.index("--tsdir") + 1]
+
+
+def test_validate_reads_where_cmor_writes(case_dir, tmp_path):
+    """Validation's --root-output-path is the CMOR step's --outdir."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    wrote = _command_of(plan, "cmor-seaIce-mon")
+    reads = _command_of(plan, "validate-seaIce-mon")
+    assert (
+        wrote[wrote.index("--outdir") + 1]
+        == reads[reads.index("--root-output-path") + 1]
+    )
+    assert reads[reads.index("--source-id") + 1] == "NorESM3-LM"
+
+
+def test_validate_is_strict(case_dir, tmp_path):
+    """Validation fails the run on missing variables or log errors."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    assert "--strict" in _command_of(plan, "validate-seaIce-mon")
+
+
+def test_fx_reads_the_raw_history_files(case_dir, tmp_path):
+    """The time series generator gives fields without a time axis no file
+    of their own, and CLM writes some only to the first history file, so
+    the fx step reads the history directory rather than the time series."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land"])
+    command = _command_of(plan, "cmor-land-fx")
+    assert command[command.index("--tsdir") + 1] == str(case_dir / "lnd" / "hist")
+    assert command[command.index("--frequency") + 1] == "fx"
+
+
+def test_fx_writes_where_the_other_cmor_steps_write(case_dir, tmp_path):
+    """So the check for an existing file looks where the file would be."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land"])
+    fx = _command_of(plan, "cmor-land-fx")
+    mon = _command_of(plan, "cmor-land-mon")
+    assert fx[fx.index("--outdir") + 1] == mon[mon.index("--outdir") + 1]
+
+
+def test_fx_is_never_split_into_years(case_dir, tmp_path):
+    """A field without a time axis has no years to split."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land"], years="1:50:10")
+    assert "--years" not in _command_of(plan, "cmor-land-fx")
+
+
+def test_resolution_and_experiment_reach_cmor(case_dir, tmp_path):
+    """The atmosphere resolution and experiment are passed to the CMOR step.
+
+    The CMOR step is given the atmosphere resolution rather than the grid
+    it will regrid from: cmor_driver.py derives that itself from --model
+    and --realm, so the derivation has one home. See test_grids.py.
+    """
+    plan = _plan(
+        case_dir,
+        tmp_path / "out",
+        realms=["atmos"],
+        model_res="NorESM3-MM",
+        experiment="historical",
+    )
+    command = _command_of(plan, "cmor-atmos-mon")
+    validate = _command_of(plan, "validate-atmos-mon")
+    assert command[command.index("--model-res") + 1] == "NorESM3-MM"
+    assert command[command.index("--experiment") + 1] == "historical"
+    assert validate[validate.index("--source-id") + 1] == "NorESM3-MM"
+
+
+def test_data_version_reaches_cmorization(case_dir, tmp_path):
+    """Every CMOR step is given the version it writes under."""
+    plan = _plan(
+        case_dir,
+        tmp_path / "out",
+        realms=["atmos"],
+        data_version="v20260315",
+    )
+    for frequency in ("mon", "day"):
+        command = _command_of(plan, f"cmor-atmos-{frequency}")
+        assert command[command.index("--data-version") + 1] == "v20260315"
+
+
+def test_variant_label_reaches_both_later_stages(case_dir, tmp_path):
+    """The ensemble member labels the output and the validation of it.
+
+    Without it every member would be written to the same path, so a real
+    cmorisation run needs it passed through rather than defaulted.
+    """
+    plan = _plan(
+        case_dir, tmp_path / "out", realms=["seaIce"], variant_label="r2i1p1f1"
+    )
+    cmor = _command_of(plan, "cmor-seaIce-mon")
+    validate = _command_of(plan, "validate-seaIce-mon")
+    assert cmor[cmor.index("--variant-label") + 1] == "r2i1p1f1"
+    assert validate[validate.index("--ensemble-member") + 1] == "r2i1p1f1"
+
+
+def test_variant_label_is_absent_when_not_given(case_dir, tmp_path):
+    """Without one, the flag is omitted so each script's default applies."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    assert "--variant-label" not in _command_of(plan, "cmor-seaIce-mon")
+    assert "--ensemble-member" not in _command_of(plan, "validate-seaIce-mon")
+
+
+def test_tables_root_reaches_cmorization(case_dir, tmp_path):
+    """A chosen tables checkout is used for the writing, not just the check."""
+    plan = _plan(
+        case_dir,
+        tmp_path / "out",
+        realms=["seaIce"],
+        tables_root="/some/cmip7-cmor-tables",
+    )
+    command = _command_of(plan, "cmor-seaIce-mon")
+    assert command[command.index("--tables-root") + 1] == "/some/cmip7-cmor-tables"
+
+
+def test_the_case_reaches_cmorization_when_it_holds_env_run(case_dir, tmp_path):
+    """The driver reads the run's parent from the case's env_run.xml."""
+    env_run = case_dir / case_dir.name / "env_run.xml"
+    env_run.parent.mkdir()
+    env_run.touch()
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    command = _command_of(plan, "cmor-seaIce-mon")
+    assert command[command.index("--case-dir") + 1] == str(case_dir)
+
+
+def test_the_case_is_not_named_without_env_run(case_dir, tmp_path):
+    """An archive without env_run.xml is CMORized as before."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    assert "--case-dir" not in _command_of(plan, "cmor-seaIce-mon")
+
+
+def test_the_two_stages_are_given_separate_worker_counts(case_dir, tmp_path):
+    """Both stages run workers, but not the same number of them.
+
+    A CMOR worker holds a variable's regridded arrays while a timeseries
+    worker only reads files, so one number for both would either waste the
+    timeseries stage or run CMORization out of memory.
+    """
+    plan = _plan(
+        case_dir, tmp_path / "out", realms=["seaIce"], ts_workers=16, cmor_workers=4
+    )
+    timeseries = _command_of(plan, "timeseries-seaIce")
+    cmor = _command_of(plan, "cmor-seaIce-mon")
+    assert timeseries[timeseries.index("--workers") + 1] == "16"
+    assert cmor[cmor.index("--workers") + 1] == "4"
+
+
+def test_cmorization_has_a_worker_count_of_its_own_by_default(case_dir, tmp_path):
+    """Asking for timeseries workers does not change the CMOR ones."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], ts_workers=16)
+    cmor = _command_of(plan, "cmor-seaIce-mon")
+    assert cmor[cmor.index("--workers") + 1] == str(CMOR_WORKERS)
+
+
+def test_timeseries_resumes_unless_overwriting_was_asked_for(case_dir, tmp_path):
+    """Overwriting is requested explicitly, so a repeat run resumes.
+
+    gen_timeseries.py keeps existing output and produces only the missing
+    timesteps unless told otherwise, which is what makes repeating an
+    interrupted run cheap.
+    """
+    resuming = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    rewriting = _plan(
+        case_dir,
+        tmp_path / "out2",
+        realms=["seaIce"],
+        overwrite_timeseries=True,
+    )
+    assert "--overwrite_timeseries" not in _command_of(resuming, "timeseries-seaIce")
+    assert "--overwrite_timeseries" in _command_of(rewriting, "timeseries-seaIce")
+
+
+def test_steps_run_with_the_interpreter_running_the_plan(case_dir, tmp_path):
+    """Every step uses this interpreter, not whatever 'python' means.
+
+    The stages have to run in the environment the run was started from,
+    and 'python' may not be on PATH at all.
+    """
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    for step in plan.steps:
+        assert step.command[0] == sys.executable
+
+
+def test_plots_are_not_produced_unless_asked_for(case_dir, tmp_path):
+    """Plotting every variable is expensive, so it is opt-in."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"])
+    command = _command_of(plan, "validate-seaIce-mon")
+    for flag in ("--plot-timeseries", "--plot-maps", "--html", "--max-plots"):
+        assert flag not in command
+
+
+def test_plots_are_requested_when_asked_for(case_dir, tmp_path):
+    """Both kinds of plot are asked for together."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["seaIce"], plots=True)
+    command = _command_of(plan, "validate-seaIce-mon")
+    assert "--plot-timeseries" in command
+    assert "--plot-maps" in command
+
+
+def test_html_and_plot_limit_are_forwarded(case_dir, tmp_path):
+    """The browsable index and the plot limit reach validation."""
+    plan = _plan(
+        case_dir,
+        tmp_path / "out",
+        realms=["seaIce"],
+        plots=True,
+        html=True,
+        max_plots=12,
+    )
+    command = _command_of(plan, "validate-seaIce-mon")
+    assert "--html" in command
+    assert command[command.index("--max-plots") + 1] == "12"
+
+
+def test_every_step_has_a_distinct_log_name(case_dir, tmp_path):
+    """Logs cannot overwrite one another."""
+    plan = _plan(case_dir, tmp_path / "out")
+    names = [step.log_name for step in plan.steps]
+    assert len(names) == len(set(names))
+
+
+def test_a_version_and_its_note_are_recorded(tmp_path):
+    """The line holds the version, the date and the note."""
+    assert record_data_version(tmp_path, "v20200101", "starting the cmorization")
+    written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
+    assert "v20200101" in written
+    assert "starting the cmorization" in written
+
+
+def test_a_second_chunk_adds_nothing(tmp_path):
+    """Four chunks of one run leave one line between them."""
+    record_data_version(tmp_path, "v20200101", "starting the cmorization")
+    assert not record_data_version(tmp_path, "v20200101", "a later chunk")
+    written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
+    assert written.count("v20200101") == 1
+    assert "a later chunk" not in written
+
+
+def test_a_later_version_is_appended(tmp_path):
+    """The earlier version stays, so the file reads as a history."""
+    record_data_version(tmp_path, "v20200101", "starting the cmorization")
+    record_data_version(tmp_path, "v20200215", "fixing the cice history files")
+    written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
+    assert written.index("v20200101") < written.index("v20200215")
+
+
+def test_a_note_is_optional(tmp_path):
+    """A version with nothing to say about it is still recorded."""
+    assert record_data_version(tmp_path, "v20200101")
+    written = (tmp_path / DATA_VERSION_RECORD).read_text(encoding="utf-8")
+    assert "v20200101" in written
+
+
+def test_the_record_sits_above_the_drs_tree(tmp_path):
+    """It is in the CMOR root, so it is not inside what gets published."""
+    cmor_root = tmp_path / "cmor"
+    record_data_version(cmor_root, "v20200101")
+    assert (cmor_root / DATA_VERSION_RECORD).exists()
+    assert not (cmor_root / "MIP-DRS7").exists()
 
 
 @pytest.mark.parametrize("omitted", ["model", "experiment", "data_version"])
@@ -581,7 +627,7 @@ def test_case_properties_are_required(omitted):
     valid, and a data version taken from the clock would split one dataset
     across the days its chunks ran on, so none of the three may be defaulted.
     The resolution is not here only because it is accepted as a keyword and
-    refused later; see TestAtmosResolutionIsAlwaysRequired.
+    refused later; see test_planning_without_one_refuses below.
     """
     supplied = {
         "model": "noresm",
@@ -594,101 +640,99 @@ def test_case_properties_are_required(omitted):
         build_plan("case", "out", **supplied)
 
 
-class TestAtmosResolutionIsAlwaysRequired:
-    """Every realm needs the resolution the case was run at.
+# ------------------------------------------- atmosphere resolution is required
+
+
+def test_planning_without_one_refuses(case_dir, tmp_path):
+    """No realm plans without it, whatever grid its input is on.
 
     It names the atmosphere grid, but it identifies the case rather than only
     the grid a realm regrids from: source_id, nominal_resolution and every
-    realm's grid label are keyed by it.  Leaving it out of a sea-ice run
-    labelled the output with fallbacks instead of the case's own identity.
+    realm's grid label are keyed by it.
     """
+    with pytest.raises(ValueError, match="resolution the case was run at"):
+        build_plan(
+            case_dir,
+            tmp_path / "out",
+            model="noresm",
+            experiment="piControl",
+            data_version="v20200101",
+            realms=["seaIce", "landIce"],
+        )
 
-    def test_planning_without_one_refuses(self, case_dir, tmp_path):
-        """No realm plans without it, whatever grid its input is on."""
-        with pytest.raises(ValueError, match="resolution the case was run at"):
-            build_plan(
-                case_dir,
-                tmp_path / "out",
-                model="noresm",
-                experiment="piControl",
-                data_version="v20200101",
-                realms=["seaIce", "landIce"],
-            )
 
-    def test_an_unknown_resolution_is_rejected(self, case_dir, tmp_path):
-        """A resolution outside the known set is named back.
+def test_an_unknown_resolution_is_rejected(case_dir, tmp_path):
+    """A resolution outside the known set is named back.
 
-        cmor_driver.py would reject it too, but only after the timeseries
-        stage has already run.
-        """
-        with pytest.raises(ValueError, match="ne99"):
-            build_plan(
-                case_dir,
-                tmp_path / "out",
-                model="noresm",
-                experiment="piControl",
-                data_version="v20200101",
-                model_res="ne99",
-            )
+    cmor_driver.py would reject it too, but only after the timeseries
+    stage has already run.
+    """
+    with pytest.raises(ValueError, match="ne99"):
+        build_plan(
+            case_dir,
+            tmp_path / "out",
+            model="noresm",
+            experiment="piControl",
+            data_version="v20200101",
+            model_res="ne99",
+        )
 
-    @pytest.mark.parametrize("realm", realms_for("noresm"))
-    def test_every_realm_is_given_it(self, case_dir, tmp_path, realm):
-        """Each realm's CMOR steps carry it, not just the atmosphere's."""
-        plan = _plan(case_dir, tmp_path / "out", realms=[realm])
-        steps = plan.for_stage("cmor")
-        assert steps
-        for step in steps:
-            assert step.command[step.command.index("--model-res") + 1] == "NorESM3-LM"
+
+@pytest.mark.parametrize("realm", realms_for("noresm"))
+def test_every_realm_is_given_it(case_dir, tmp_path, realm):
+    """Each realm's CMOR steps carry it, not just the atmosphere's."""
+    plan = _plan(case_dir, tmp_path / "out", realms=[realm])
+    steps = plan.for_stage("cmor")
+    assert steps
+    for step in steps:
+        assert step.command[step.command.index("--model-res") + 1] == "NorESM3-LM"
 
 
 # ------------------------------------------- forwarding the grid decision
 
 
-class TestGridIsNotDecidedHere:
-    """The plan never decides which grid a run regrids from."""
+def test_no_step_carries_a_derived_grid(case_dir, tmp_path):
+    """No command names an input grid such as tnx1v4.
 
-    def test_no_step_carries_a_derived_grid(self, case_dir, tmp_path):
-        """No command names an input grid such as tnx1v4.
+    cmor_driver.py derives that from --model and --realm, so a plan that
+    passed one would mean two places deciding the same thing.
+    """
+    plan = _plan(case_dir, tmp_path / "out")
+    for step in plan.steps:
+        assert "--resolution" not in step.command
+        assert "tnx1v4" not in step.command
+        assert "tx2_3v2" not in step.command
 
-        cmor_driver.py derives that from --model and --realm, so a plan that
-        passed one would mean two places deciding the same thing.
-        """
-        plan = _plan(case_dir, tmp_path / "out")
-        for step in plan.steps:
-            assert "--resolution" not in step.command
-            assert "tnx1v4" not in step.command
-            assert "tx2_3v2" not in step.command
 
-    def test_landice_runs_every_stage_without_extra_input(self, case_dir, tmp_path):
-        """land ice needs no grid input of its own."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["landIce"])
-        assert {step.stage for step in plan.steps} == set(STAGES)
-        assert not plan.skipped
-        command = _command_of(plan, "cmor-landIce-yr")
-        assert command[command.index("--ice-sheet") + 1] == "gris"
+def test_landice_runs_every_stage_without_extra_input(case_dir, tmp_path):
+    """land ice needs no grid input of its own."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["landIce"])
+    assert {step.stage for step in plan.steps} == set(STAGES)
+    assert not plan.skipped
+    command = _command_of(plan, "cmor-landIce-yr")
+    assert command[command.index("--ice-sheet") + 1] == "gris"
 
 
 # -------------------------------------------------- years reaching CMORization
 
 
-class TestYearsReachCmorization:
-    """Tests that output files cover the same spans as the time series."""
+def test_the_years_given_reach_the_cmor_step(case_dir, tmp_path):
+    """Otherwise CMOR writes one file covering everything it finds."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land"], years="1:50:10")
+    command = _command_of(plan, "cmor-land-mon")
+    assert command[command.index("--years") + 1] == "1:50:10"
 
-    def test_the_years_given_reach_the_cmor_step(self, case_dir, tmp_path):
-        """Otherwise CMOR writes one file covering everything it finds."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["land"], years="1:50:10")
-        command = _command_of(plan, "cmor-land-mon")
-        assert command[command.index("--years") + 1] == "1:50:10"
 
-    def test_both_stages_are_given_the_same_spec(self, case_dir, tmp_path):
-        """One value, so the two cannot drift apart."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["land"], years="1:50:10")
-        timeseries = _command_of(plan, "timeseries-land")
-        cmor = _command_of(plan, "cmor-land-mon")
-        assert timeseries[timeseries.index("--years-spec") + 1] == "1:50:10"
-        assert cmor[cmor.index("--years") + 1] == "1:50:10"
+def test_both_stages_are_given_the_same_spec(case_dir, tmp_path):
+    """One value, so the two cannot drift apart."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land"], years="1:50:10")
+    timeseries = _command_of(plan, "timeseries-land")
+    cmor = _command_of(plan, "cmor-land-mon")
+    assert timeseries[timeseries.index("--years-spec") + 1] == "1:50:10"
+    assert cmor[cmor.index("--years") + 1] == "1:50:10"
 
-    def test_no_years_leaves_the_cmor_step_without_them(self, case_dir, tmp_path):
-        """Unsplit output stays the default."""
-        plan = _plan(case_dir, tmp_path / "out", realms=["land"])
-        assert "--years" not in _command_of(plan, "cmor-land-mon")
+
+def test_no_years_leaves_the_cmor_step_without_them(case_dir, tmp_path):
+    """Unsplit output stays the default."""
+    plan = _plan(case_dir, tmp_path / "out", realms=["land"])
+    assert "--years" not in _command_of(plan, "cmor-land-mon")

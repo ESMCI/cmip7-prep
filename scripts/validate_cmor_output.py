@@ -888,6 +888,16 @@ def write_markdown_summary(report: dict[str, Any], output_path: Path) -> None:
     lines.extend(["", "## No Mapping Exists For Variable", ""])
     for variable in report["unmapped_requested_variables"]:
         lines.append(f"- {variable}")
+    lines.extend(["", "## Variables Mapped to Another Realm", ""])
+    for item in report["mapped_elsewhere"]:
+        status = "found in shared output" if item["found_in_output"] else "not found"
+        lines.append(
+            f"- {item['variable']} (owner: {', '.join(item['owner_realms'])}; "
+            f"{status})"
+        )
+    lines.extend(["", "## No Mapping Exists For Variable", ""])
+    for variable in report["unmapped_requested_variables"]:
+        lines.append(f"- {variable}")
     lines.extend(["", "## Redundant Files", ""])
     for item in report["redundant_files"]:
         lines.append(f"- {item['redundant']} (covered by {item['covered_by']})")

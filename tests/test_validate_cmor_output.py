@@ -459,7 +459,7 @@ def test_diagnose_missing_variables_points_at_the_step_log_when_nothing_is_absen
     tmp_path,
 ):
     """A variable whose fields all arrived failed somewhere CMOR records."""
-    (tmp_path / "case.cam.h0.DOD550.185001-185912.nc").touch()
+    (tmp_path / "case.cam.h0a.DOD550.185001-185912.nc").touch()
     mapping = _StubMapping({"od550aer_tavg-u-hxy-u": ["DOD550"]})
 
     diagnosis = diagnose_missing_variables(
@@ -467,12 +467,16 @@ def test_diagnose_missing_variables_points_at_the_step_log_when_nothing_is_absen
     )
 
     assert diagnosis[0]["fields_absent"] == []
+    assert diagnosis[0]["fields_in_other_history_files"] == []
     assert "step log" in diagnosis[0]["reason"]
 
 
-def test_diagnose_missing_variables_separates_fields_on_another_history_file(tmp_path):
+@pytest.mark.parametrize("history_stream", ["cam.h0", "cam.h1"])
+def test_diagnose_missing_variables_separates_fields_on_another_history_file(
+    tmp_path, history_stream
+):
     """A field written only to another history tape is not an absent field."""
-    (tmp_path / "case.cam.h1.DOD550.185001-185912.nc").touch()
+    (tmp_path / f"case.{history_stream}.DOD550.185001-185912.nc").touch()
     mapping = _StubMapping({"od550aer_tavg-u-hxy-u": ["DOD550"]})
 
     diagnosis = diagnose_missing_variables(
@@ -481,3 +485,4 @@ def test_diagnose_missing_variables_separates_fields_on_another_history_file(tmp
 
     assert diagnosis[0]["fields_absent"] == []
     assert diagnosis[0]["fields_in_other_history_files"] == ["DOD550"]
+    assert "cam.h0a history files" in diagnosis[0]["reason"]
