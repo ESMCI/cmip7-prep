@@ -91,7 +91,10 @@ variables:
 
   sidragtop_tavg-u-hxy-si: sidragtop
 
-  sieqthick_tavg-u-hxy-si: sivol
+  sieqthick_tavg-u-hxy-si:
+    formula:
+      day: sivol_d
+      mon: sivol
 
   siextent_tavg-u-hm-u:
     variants:
@@ -298,9 +301,13 @@ variables:
 
   sivol_tavg-u-hm-u:
     variants:
-    - formula: (sivol * tarea).where(sivol.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+    - formula:
+        day: (sivol_d * tarea).where(sivol_d.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
+        mon: (sivol * tarea).where(sivol.coords['TLAT'] > 0).sum(dim=['nj', 'ni'])
       region: nh
-    - formula: (sivol * tarea).where(sivol.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+    - formula:
+        day: (sivol_d * tarea).where(sivol_d.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
+        mon: (sivol * tarea).where(sivol.coords['TLAT'] < 0).sum(dim=['nj', 'ni'])
       region: sh
 
   snc_tavg-u-hxy-si: sisnconc

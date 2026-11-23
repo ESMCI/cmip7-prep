@@ -89,7 +89,10 @@ grid_names_per_realm:
 # default_* keys catch any resolution not listed (e.g. non-CMIP test runs).
 dataset:
   base_source_id: NorESM3
-  source_type: AOGCM
+  contact: "Please send any requests or bug reports to noresm-ncc@met.no."
+  emd_urls:
+    NorESM3-LM: "https://emd.wcrp-cmip.org/docs/Model/?model=noresm3-lm"
+    NorESM3-MM: "https://emd.wcrp-cmip.org/docs/Model/?model=noresm3-mm"
   calendar: noleap
   source_ids:
     NorESM3-LM: NorESM3-LM

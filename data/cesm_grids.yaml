@@ -47,7 +47,6 @@ grid_names_per_realm:
 # resolution for now (placeholder).
 dataset:
   base_source_id: CESM3
-  source_type: AOGCM
   calendar: noleap
   source_ids: {}
   default_source_id: CESM3

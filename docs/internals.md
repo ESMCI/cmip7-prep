@@ -81,6 +81,57 @@ python scripts/convert_csv_to_yaml.py --model cesm \
 For NorESM a variable is kept only when its model field column is filled in,
 and every field it depends on has to be in the model output.
 
+### Mapping a dimension into vegetation types
+
+Formulas can group a source dimension into a CMIP categorical dimension:
+
+```text
+map_multi_dimension(FATES_GPP_PF, fates_levpft)
+```
+
+The dimension argument can also be quoted, as `"fates_levpft"`. It is a
+dimension name, not an additional source variable. The helper looks it up in
+[`dimension_mappings.yaml`](../data/dimension_mappings.yaml), replaces it with
+`vegtype`, and sums these 1-based source positions in CMIP coordinate order:
+
+| `vegtype` label | FATES PFTs |
+|---|---|
+| `broadleaf_deciduous_trees` | 5, 6 |
+| `broadleaf_evergreen_trees` | 1, 4 |
+| `needleleaf_deciduous_trees` | 3 |
+| `needleleaf_evergreen_tree` | 2 |
+| `natural_grasses` | 12, 13, 14 |
+| `crops` | 15 |
+| `shrubs` | 7, 8, 9, 10, 11 |
+
+The input must have 15 PFT entries. Indices are positions even if the input
+coordinate labels start at zero. Unknown mappings, missing dimensions,
+incorrect source sizes and existing target coordinates raise errors.
+Missing data propagates within its group instead of being counted as zero.
+Other dimensions, coordinates and variable attributes are preserved, and
+Dask-backed input stays lazy. CMOR writes the resulting string labels in the
+auxiliary coordinate `sector`, indexed by the output dimension `type`.
+
+Land-use categories can be mapped with
+`map_multi_dimension(FIELD, fates_levlanduse)`. The input must have five
+entries in FATES order: primary, secondary, rangeland, pasture, crops.
+The output dimension is `landuse`, in CMIP requested order:
+
+| `landuse` label | FATES land-use positions |
+|---|---|
+| `primary_and_secondary_land` | 1, 2 |
+| `pastures` | 3, 4 |
+| `crops` | 5 |
+| `urban` | none (missing values) |
+
+Empty groups in the dimension mapping produce missing values, not zeros.
+CMOR writes the land-use labels in the auxiliary coordinate `sector`,
+indexed by the output dimension `landuse`.
+
+The helper only groups and sums; it does not apply unit conversions or
+`FATES_FRACTION`. Include any scientifically required scaling explicitly in
+the surrounding formula.
+
 ## The modules
 
 | module | what it does |
@@ -107,6 +158,7 @@ and every field it depends on has to be in the model output.
 | `<model>_include_patterns.yaml` | the history time slice files per realm, frequency and sampling |
 | `<model>_grids.yaml` | the regrid weight files and the grid label per realm |
 | `intensive_vars.yaml` | the variables regridded bilinearly rather than conservatively |
+| `dimension_mappings.yaml` | source positions grouped into categorical output dimensions |
 | `CMIP7_data_request_*.csv` | the data request, as exported |
 | `depth_bnds.nc` | soil level depth bounds, for the `sdepth` axis |
 | `ocean_geometry.nc` | the MOM6 ocean grid geometry |
