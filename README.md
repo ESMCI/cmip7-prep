@@ -27,7 +27,7 @@ On NIRD, from inside a clone of this repository:
 
 ```bash
 cd scripts
-. setup_nird.sh
+source setup_nird.sh
 ```
 
 Anywhere else:
