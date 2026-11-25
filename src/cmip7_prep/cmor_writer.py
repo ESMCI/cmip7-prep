@@ -20,6 +20,7 @@ import datetime as dt
 import logging
 from functools import lru_cache
 import cmor
+import netCDF4
 
 import numpy as np
 import xarray as xr
@@ -43,6 +44,14 @@ logger = logging.getLogger(__name__)
 # An ice thickness category whose maximum is above this is CICE's open top
 # category, which it records as 1e+08 m.
 OPEN_ICE_CATEGORY_M = 100.0
+_LEGACY_GLOBAL_ATTRIBUTES = (
+    "branch_method",
+    "grid",
+    "member_id",
+    "source_type",
+    "sub_experiment_id",
+    "sub_experiment",
+)
 
 
 def iceband_values_and_bounds(ncat) -> Tuple[np.ndarray, np.ndarray]:
@@ -1868,4 +1877,9 @@ class CmorSession(
         written_path = cmor.close(var_id, file_name=True)
         if not written_path:
             raise RuntimeError(f"CMOR closed {bvn} without naming the file it wrote")
-        return Path(written_path)
+        path = Path(written_path)
+        with netCDF4.Dataset(path, mode="a") as output:
+            for name in _LEGACY_GLOBAL_ATTRIBUTES:
+                if name in output.ncattrs():
+                    output.delncattr(name)
+        return path

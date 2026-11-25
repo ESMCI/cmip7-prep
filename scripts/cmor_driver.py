@@ -59,6 +59,7 @@ from cmip7_prep.cmor_utils import (
     build_dataset_cfg,
     existing_fx_files,
 )
+from cmip7_prep.branch_time import branch_attributes
 from cmip7_prep.data_version import checked_data_version
 from cmip7_prep.include_patterns import (
     first_history_file_for_fx,
@@ -254,6 +255,30 @@ def parse_args():
             "is the CMIP variant_label, and appears in the output paths and "
             "file names. The longer spelling is accepted as an alias. "
             "(default: r1i1p1f1)"
+        ),
+    )
+
+    case.add_argument(
+        "--case-dir",
+        type=str,
+        default=None,
+        help=(
+            "Archived case root, holding atm/, lnd/, ice/, glc/ and ocn/, and "
+            "the case directory as <case-dir>/<case name>/. The run's parent "
+            "and the date it started from are read from env_run.xml there, as "
+            "RUN_REFCASE and RUN_REFDATE, and written to the output as the "
+            "branch attributes. A startup run has no parent, and the parent "
+            "attributes are left out of its output. Without this option the "
+            "parent attributes in the output are placeholders."
+        ),
+    )
+    case.add_argument(
+        "--parent-case-dir",
+        type=str,
+        default=None,
+        help=(
+            "Archived case root of the parent run. (default: the directory "
+            "named RUN_REFCASE beside --case-dir)"
         ),
     )
 
@@ -617,6 +642,7 @@ def process_one_var(
     experiment=None,
     data_version=None,
     window=None,
+    branch=None,
 ) -> list[tuple[str, str]]:
     """Compute+write one CMIP variable. Returns a list of (varname, 'ok' or error message) tuples.
 
@@ -815,6 +841,7 @@ def process_one_var(
                     tables_root=tables_root,
                     data_version=data_version,
                     realm=realm,
+                    branch=branch,
                 )
                 # A rerun overwrites the log it replaces.
                 region = write_cfg.get("region", "glb")
@@ -955,6 +982,23 @@ def main():
     if not TSDIR.is_dir():
         logger.error("Time series directory %s does not exist", TSDIR)
         sys.exit(1)
+
+    # The branch attributes are the same for every variable of this realm.
+    branch = None
+    if args.case_dir:
+        try:
+            branch = branch_attributes(
+                args.case_dir, realm, TSDIR, args.parent_case_dir
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            logger.error("Cannot work out the branch attributes: %s", exc)
+            sys.exit(2)
+        logger.info("Branch attributes: %s", branch or "the run has no parent")
+    else:
+        logger.warning(
+            "No --case-dir was given, so the parent attributes in the output "
+            "are placeholders."
+        )
 
     # Make output directory if it does not exist
     OUTDIR = Path(args.outdir)
@@ -1276,6 +1320,7 @@ def main():
                             experiment=args.experiment,
                             data_version=args.data_version,
                             window=window,
+                            branch=branch,
                         )
                         results.extend(res)
                     except Exception as exc:
@@ -1310,6 +1355,7 @@ def main():
                             "experiment": args.experiment,
                             "data_version": args.data_version,
                             "window": window,
+                            "branch": branch,
                         }
                     )
 

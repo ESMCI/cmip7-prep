@@ -100,9 +100,9 @@ def test_missing_sampling_raises_rather_than_returning_averages():
     # NorESM daily atmosphere output is time-averaged only.
     with pytest.raises(ValueError, match="sampling=tpt"):
         get_include_patterns("noresm", "atmos", "day", sampling="tpt")
-    # seaIce has no instantaneous output at any frequency.
+    # CESM seaIce has no instantaneous output at any frequency.
     with pytest.raises(ValueError, match="writes no tpt output"):
-        all_include_patterns("noresm", "seaIce", sampling="tpt")
+        all_include_patterns("cesm", "seaIce", sampling="tpt")
 
 
 # Which frequency carries instantaneous output differs by model: NorESM writes
