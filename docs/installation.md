@@ -6,7 +6,7 @@ From inside a clone of this repository:
 
 ```bash
 cd scripts
-. setup_nird.sh
+source setup_nird.sh
 ```
 
 That activates the shared environment and puts the package on your path. To do
