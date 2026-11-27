@@ -103,12 +103,6 @@ def test_normalize_written_cf_metadata_repairs_hybrid_output(tmp_path):
             assert output[name].units == "1"
         assert "units" not in output["lev_bnds"].ncattrs()
         assert "standard_name" not in output["lev_bnds"].ncattrs()
-        assert (
-            output["lev_bnds"].formula_terms
-            == "p0: p0 a: a_bnds b: b_bnds ps: ps"
-        )
-        assert (
-            output["zg"].cell_measures
-            == "area: areacella_ti-u-hxy-u"
-        )
+        assert output["lev_bnds"].formula_terms == "p0: p0 a: a_bnds b: b_bnds ps: ps"
+        assert output["zg"].cell_measures == "area: areacella_ti-u-hxy-u"
         assert output.external_variables == "areacella_ti-u-hxy-u"

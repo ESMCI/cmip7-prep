@@ -1201,14 +1201,14 @@ class CmorSession(
             )
 
             # p0 scalar
-            p0_name = next(
-                (name for name in ("P0", "p0") if name in ds), None
-            )
+            p0_name = next((name for name in ("P0", "p0") if name in ds), None)
             if p0_name is None:
                 raise KeyError("Hybrid sigma coordinates require P0 or p0.")
             p0_values = pressure_values_in_pa(ds[p0_name], p0_name)
             if p0_values.size != 1:
-                raise ValueError(f"{p0_name} must be scalar, got shape {p0_values.shape}.")
+                raise ValueError(
+                    f"{p0_name} must be scalar, got shape {p0_values.shape}."
+                )
             cmor.zfactor(
                 zaxis_id=alevh_id,
                 zfactor_name="p0",
@@ -1298,14 +1298,14 @@ class CmorSession(
             )
 
             # p0 scalar
-            p0_name = next(
-                (name for name in ("P0", "p0") if name in ds), None
-            )
+            p0_name = next((name for name in ("P0", "p0") if name in ds), None)
             if p0_name is None:
                 raise KeyError("Hybrid sigma coordinates require P0 or p0.")
             p0_values = pressure_values_in_pa(ds[p0_name], p0_name)
             if p0_values.size != 1:
-                raise ValueError(f"{p0_name} must be scalar, got shape {p0_values.shape}.")
+                raise ValueError(
+                    f"{p0_name} must be scalar, got shape {p0_values.shape}."
+                )
             cmor.zfactor(
                 zaxis_id=alev_id,
                 zfactor_name="p0",
