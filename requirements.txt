@@ -19,7 +19,7 @@ xesmf
 geocat-comp
 
 # scripts/
-gents                    # gen_timeseries.py
+gents==0.9.3             # gen_timeseries.py; keep in sync with environment.yml
 cmip7-data-request-api   # cmor_driver.py, query_missing_vars.py, validate_cmor_output.py
 matplotlib               # validate_cmor_output.py plots (optional; import is guarded)
 

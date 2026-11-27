@@ -241,6 +241,103 @@ def vertex_bounds_of(dataset, coord, coord_name: str):
     return None
 
 
+def pressure_values_in_pa(value, name: str) -> np.ndarray:
+    """Return pressure values in Pa, rejecting undeclared or unsupported units."""
+    units = str(value.attrs.get("units", "")).strip().lower()
+    factors = {
+        "pa": 1.0,
+        "hpa": 100.0,
+        "mb": 100.0,
+        "mbar": 100.0,
+        "millibar": 100.0,
+        "kpa": 1000.0,
+    }
+    if units not in factors:
+        raise ValueError(
+            f"{name} must declare pressure units in Pa, hPa, mb/mbar, or kPa; "
+            f"found {units!r}."
+        )
+    return np.asarray(value.values, dtype="f8") * factors[units]
+
+
+def _append_external_variable(output: netCDF4.Dataset, name: str) -> None:
+    """Add a variable name to the CF ``external_variables`` attribute."""
+    existing = (
+        str(output.getncattr("external_variables"))
+        if "external_variables" in output.ncattrs()
+        else ""
+    )
+    names = existing.split()
+    if name not in names:
+        names.append(name)
+        output.setncattr("external_variables", " ".join(names))
+
+
+def normalize_written_cf_metadata(
+    path: Path,
+    *,
+    variable_id: str,
+    table_path: Path | str,
+    branded_name: str,
+    atmospheric_area_name: str = "areacella_ti-u-hxy-u",
+) -> None:
+    """Repair metadata that CMOR or the table can omit from hybrid output.
+
+    CMOR converts coefficient units from ``1`` to an empty UDUNITS expression,
+    then writes no ``units`` attribute.  Compliance checkers need the explicit
+    CF dimensionless unit on those formula coefficients.  CMOR also copies
+    coordinate attributes to bounds variables; CF recommends that bounds do not
+    repeat ``standard_name`` or ``units``.
+    """
+    try:
+        table = _load_table_json(str(table_path))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Could not read CMOR table {table_path}") from exc
+
+    entry = (table.get("variable_entry") or {}).get(branded_name, {})
+
+    with netCDF4.Dataset(path, mode="a") as output:
+        coefficient_names = ("a", "b", "a_bnds", "b_bnds")
+        for name in coefficient_names:
+            if name in output.variables:
+                output[name].units = "1"
+
+        for coordinate in output.variables.values():
+            bounds_name = (
+                coordinate.getncattr("bounds")
+                if "bounds" in coordinate.ncattrs()
+                else None
+            )
+            if not isinstance(bounds_name, str) or bounds_name not in output.variables:
+                continue
+            bounds = output[bounds_name]
+            if "formula_terms" in bounds.ncattrs():
+                for attribute in ("standard_name", "units"):
+                    if attribute in bounds.ncattrs():
+                        bounds.delncattr(attribute)
+
+        data_var = output.variables.get(variable_id)
+        if data_var is None:
+            return
+
+        cell_measures = entry.get("cell_measures")
+        realm = str(entry.get("modeling_realm") or Path(table_path).stem)
+        is_atmospheric = realm.removeprefix("CMIP7_").split()[0] == "atmos"
+        if (
+            not cell_measures
+            and is_atmospheric
+            and {"lat", "lon"}.issubset(data_var.dimensions)
+        ):
+            cell_measures = f"area: {atmospheric_area_name}"
+
+        if cell_measures:
+            data_var.setncattr("cell_measures", str(cell_measures))
+            measure_names = str(cell_measures).split()[1::2]
+            for measure_name in measure_names:
+                if measure_name not in output.variables:
+                    _append_external_variable(output, measure_name)
+
+
 class CmorSession(
     AbstractContextManager
 ):  # pylint: disable=too-many-instance-attributes
@@ -1104,11 +1201,23 @@ class CmorSession(
             )
 
             # p0 scalar
+            p0_name = next((name for name in ("P0", "p0") if name in ds), None)
+            if p0_name is None:
+                raise KeyError("Hybrid sigma coordinates require P0 or p0.")
+            p0_values = pressure_values_in_pa(ds[p0_name], p0_name)
+            if p0_values.size != 1:
+                raise ValueError(
+                    f"{p0_name} must be scalar, got shape {p0_values.shape}."
+                )
             cmor.zfactor(
-                zaxis_id=alevh_id, zfactor_name="p0", units="Pa", zfactor_values=1.0e5
+                zaxis_id=alevh_id,
+                zfactor_name="p0",
+                units="Pa",
+                zfactor_values=float(p0_values.item()),
             )
 
             # ps(time,lat,lon) zfactor must be DEFINED before the main variable
+            ps_values = pressure_values_in_pa(ds[ps_name], ps_name)
             ps_zvar_id = cmor.zfactor(
                 zaxis_id=alevh_id,
                 zfactor_name="ps",
@@ -1121,7 +1230,16 @@ class CmorSession(
             )
 
             # stash to write before main variable
-            self._pending_ps = (ps_zvar_id, ds[ps_name])
+            self._pending_ps = (
+                ps_zvar_id,
+                xr.DataArray(
+                    ps_values,
+                    dims=ds[ps_name].dims,
+                    coords=ds[ps_name].coords,
+                    attrs=ds[ps_name].attrs | {"units": "Pa"},
+                    name=ps_name,
+                ),
+            )
 
         # -------------------------
         # --- vertical: standard_hybrid_sigma
@@ -1180,12 +1298,24 @@ class CmorSession(
             )
 
             # p0 scalar
+            p0_name = next((name for name in ("P0", "p0") if name in ds), None)
+            if p0_name is None:
+                raise KeyError("Hybrid sigma coordinates require P0 or p0.")
+            p0_values = pressure_values_in_pa(ds[p0_name], p0_name)
+            if p0_values.size != 1:
+                raise ValueError(
+                    f"{p0_name} must be scalar, got shape {p0_values.shape}."
+                )
             cmor.zfactor(
-                zaxis_id=alev_id, zfactor_name="p0", units="Pa", zfactor_values=1.0e5
+                zaxis_id=alev_id,
+                zfactor_name="p0",
+                units="Pa",
+                zfactor_values=float(p0_values.item()),
             )
 
             # ps(time,lat,lon) zfactor must be DEFINED before the main variable
             ps_da = ds[ps_name]  # ensure units are Pa
+            ps_values = pressure_values_in_pa(ps_da, ps_name)
             ps_zvar_id = cmor.zfactor(
                 zaxis_id=alev_id,
                 zfactor_name="ps",
@@ -1198,7 +1328,16 @@ class CmorSession(
             )
 
             # stash to write before main variable
-            self._pending_ps = (ps_zvar_id, ps_da)
+            self._pending_ps = (
+                ps_zvar_id,
+                xr.DataArray(
+                    ps_values,
+                    dims=ps_da.dims,
+                    coords=ps_da.coords,
+                    attrs=ps_da.attrs | {"units": "Pa"},
+                    name=ps_name,
+                ),
+            )
 
         # -------------------------
         # --- vertical: pressure
@@ -1882,4 +2021,10 @@ class CmorSession(
             for name in _LEGACY_GLOBAL_ATTRIBUTES:
                 if name in output.ncattrs():
                     output.delncattr(name)
+        normalize_written_cf_metadata(
+            path,
+            variable_id=str(getattr(vdef, "name", bvn)),
+            table_path=self.table_path(self.tables_root, self.primarytable),
+            branded_name=str(bvn),
+        )
         return path

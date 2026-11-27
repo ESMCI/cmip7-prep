@@ -6,7 +6,7 @@ fates_levpft:
     broadleaf_deciduous_trees: [5, 6]
     broadleaf_evergreen_trees: [1, 4]
     needleleaf_deciduous_trees: [3]
-    needleleaf_evergreen_tree: [2]
+    needleleaf_evergreen_trees: [2]
     natural_grasses: [12, 13, 14]
     crops: [15]
     shrubs: [7, 8, 9, 10, 11]

@@ -49,7 +49,7 @@ def test_map_multi_dimension_formula(fates_pfts, dimension_arg):
         "broadleaf_deciduous_trees",
         "broadleaf_evergreen_trees",
         "needleleaf_deciduous_trees",
-        "needleleaf_evergreen_tree",
+        "needleleaf_evergreen_trees",
         "natural_grasses",
         "crops",
         "shrubs",
