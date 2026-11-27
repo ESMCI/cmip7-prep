@@ -21,7 +21,7 @@ python = ">=3.10.13,<3.14"
 #     dask xesmf cftime pyyaml jsonschema click pandas tqdm geocat-comp
 #   conda activate cmip7-prep
 #   pip install -e . --no-deps
-#   pip install gents dulwich cmip7-data-request-api
+#   pip install gents==0.9.3 dulwich cmip7-data-request-api
 # Optional performance
 dask = {extras = ["array", "distributed"], version = "^2024.7.0", optional = true}
 zarr = {version = "^2.18.2", optional = true}
